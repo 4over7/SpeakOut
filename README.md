@@ -190,8 +190,8 @@ graph TD
     Agent -->|JSON-RPC| MCP{MCP Client}
     
     subgraph "Plugins (MCP)"
-        MCP -->|Stdio| Python["Calendar Script"]
-        MCP -->|SSE| Remote["Remote Server"]
+        MCP -->|Stdio| Local["Local Server (Any Executable)"]
+        MCP -->|SSE| Remote["Remote Server (HTTP)"]
     end
 ```
 
