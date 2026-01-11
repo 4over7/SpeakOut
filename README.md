@@ -158,13 +158,27 @@ SpeakOut 充当 **Model Context Protocol (MCP)** 的“通用调度器”。
 
 ```mermaid
 graph TD
-    User(("User 🗣️")) -->|Audio Stream| Mic["Microphone Input"]
-    Mic -->|"PCM 16k"| ASR["Sherpa-ONNX Engine"]
+    User(("User 🗣️")) 
     
-    ASR -->|"Text Stream"| Debounce["Debounce & Buffer"]
-    Debounce -->|"Final Text"| Router{"LLM Router 🧠"}
+    subgraph "Trigger Modes"
+        InputKey["Left Option (Input Mode)"]
+        SmartKey["Right Option (Smart Mode)"]
+    end
+
+    User --> InputKey
+    User --> SmartKey
     
-    subgraph "SpeakOut Core"
+    InputKey -->|Start| Mic["Microphone"]
+    SmartKey -->|Start| Mic
+    
+    Mic -->|PCM 16k| ASR["Sherpa-ONNX Engine"]
+    ASR -->|Text| Switch{"Mode Switch 🔀"}
+    
+    Switch -->|"Input Mode"| Inject["Text Injection ⌨️"]
+    
+    Switch -->|"Smart Mode"| Router{"LLM Router 🧠"}
+    
+    subgraph "SpeakOut Intelligence"
         Router -->|"Intent: Note"| Diary["Diary Service 📝"]
         Router -->|"Intent: Tool Call"| Agent["Agent Service 🤖"]
     end
