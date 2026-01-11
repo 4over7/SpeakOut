@@ -1,7 +1,13 @@
+<div align="center">
+
+  <img src="assets/app_icon.png" width="160" height="160" style="border-radius: 36px" alt="SpeakOut Icon" />
+
 # 子曰 SpeakOut 🎙️
 
-> **Your Voice, Your AI Operating System.**  
-> Offline-First. Privacy-Focused. Limitless Capabilities.
+  **Your Voice, Your AI Operating System.**  
+  *Offline-First. Privacy-Focused. Limitless Capabilities.*
+
+</div>
 
 SpeakOut is not just a dictation tool. It is a **Next-Generation AI Assistant** that lives on your Mac, turning your voice into structured notes, actionable commands, and high-quality text—completely private by default.
 
@@ -53,6 +59,35 @@ A timeline of your digital life.
     - If "Command" -> Construct JSON-RPC call.
 3. **MCP Client**: Connects to local or remote agents via Stodio/SSE.
 
+```mermaid
+graph TD
+    User((User))
+    User --> |Left Option| InputKey[Input Mode]
+    User --> |Right Option| SmartKey[Smart Mode]
+    
+    InputKey & SmartKey --> Mic[Microphone]
+    Mic --> AudioEngine[Audio Engine]
+    AudioEngine --> VAD[VAD]
+    VAD --> |Speech| ASRRouter{ASR Engine?}
+    
+    ASRRouter --> |Local| LocalASR["Sherpa-ONNX (Offline)"]
+    ASRRouter --> |Cloud| CloudASR["Aliyun ASR (Via Gateway)"]
+    
+    LocalASR & CloudASR --> |Text| ModeSwitch{Switch}
+    
+    InputKey -.-> |Selects| ModeSwitch
+    SmartKey -.-> |Selects| ModeSwitch
+    
+    ModeSwitch --> |Input| Inject["Text Injection ⌨️"]
+    ModeSwitch --> |Smart| LLM[LLM Agent]
+    
+    LLM --> |Command| MCP["MCP Client (Tools)"]
+    LLM --> |Note| Diary[Diary Service]
+    
+    MCP --> |Execute| LocalServer[Local Server]
+    MCP --> |Action| CloudAPI[Cloud API]
+```
+
 ### Privacy by Design
 
 - **Local First**: ASR is 100% offline.
@@ -101,10 +136,14 @@ flutter test test/agent_suite_test.dart
 
 ---
 
+<div align="center">
+  <img src="assets/app_icon.png" width="160" height="160" style="border-radius: 36px" alt="SpeakOut Icon" />
+
 # 子曰 SpeakOut (中文介绍) 🎙️
 
-> **你的声音，你的 AI 操作系统。**  
-> 离线优先。隐私至上。无限可能。
+  **你的声音，你的 AI 操作系统。**  
+  *离线优先。隐私至上。无限可能。*
+</div>
 
 SpeakOut 不仅仅是一个语音输入法。它是运行在你 Mac 上的 **下一代 AI 助手**，能将你的语音转化为结构化的笔记、可执行的指令和高质量的文本——而且默认情况下完全私密。
 
@@ -116,33 +155,33 @@ SpeakOut 不仅仅是一个语音输入法。它是运行在你 Mac 上的 **下
 
 按下快捷键（默认：`Left Option`）。说话。完成。
 
-- **超低延迟**：由本地 CPU/GPU 运行的 **Sherpa-ONNX** 引擎驱动。
-- **混合识别**：支持中英文混合识别，准确率极高。
-- **隐私核心**：默认情况下，没有任何音频数据会离开你的设备。
+- ⚡️ **超低延迟**：由本地 CPU/GPU 运行的 **Sherpa-ONNX** 引擎驱动。
+- 🌍 **混合识别**：支持中英文混合识别，准确率极高。
+- 🔒 **隐私核心**：默认情况下，没有任何音频数据会离开你的设备。
 
 ### 2. 📝 闪念笔记 (日记模式)
 
 无需切换上下文即可捕捉转瞬即逝的想法。
 
-- **快捷键**：`Right Option`（可配置）。
-- **自动保存**：想法会自动打上时间戳并追加到每日 Markdown 文件中（例如 `2024-01-10.md`）。
-- **AI 纠错**：可选的 LLM 后处理，用于修复同音字和标点符号。
+- ⌨️ **快捷键**：`Right Option`（可配置）。
+- 💾 **自动保存**：想法会自动打上时间戳并追加到每日 Markdown 文件中（例如 `2024-01-10.md`）。
+- ✨ **AI 纠错**：可选的 LLM 后处理，用于修复同音字和标点符号。
 
 ### 3. 🤖 MCP 智能代理平台 (v3.5 新增)
 
 SpeakOut 充当 **Model Context Protocol (MCP)** 的“通用调度器”。
 
-- **自然语言操作**：“明天下午2点添加一个会议” -> 执行日历脚本。
-- **可扩展技能**：将任何 Python/Node.js 脚本添加为“工具”。SpeakOut 负责意图解析。
-- **安全确认 (HITL)**：“人机交互”确认机制确保 AI 在未经你批准的情况下绝不执行危险命令。
+- 🗣️ **自然语言操作**：“明天下午2点添加一个会议” -> 执行日历脚本。
+- 🔌 **可扩展技能**：将任何 Python/Node.js 脚本添加为“工具”。SpeakOut 负责意图解析。
+- 🛡️ **安全确认 (HITL)**：“人机交互”确认机制确保 AI 在未经你批准的情况下绝不执行危险命令。
 
 ### 4. 💬 统一聊天界面
 
 你数字生活的时间轴。
 
-- 在一个地方查看所有的语音笔记、Agent 执行结果和 AI 对话。
-- 手动将有趣的聊天气泡归档到你的日记中。
-- **持久化历史**：对话记录安全地保存在本地。
+- 👁️ 在一个地方查看所有的语音笔记、Agent 执行结果和 AI 对话。
+- 📂 手动将有趣的聊天气泡归档到你的日记中。
+- 🕰️ **持久化历史**：对话记录安全地保存在本地。
 
 ---
 
@@ -158,41 +197,31 @@ SpeakOut 充当 **Model Context Protocol (MCP)** 的“通用调度器”。
 
 ```mermaid
 graph TD
-    User(("User 🗣️")) 
+    User((用户))
+    User --> |Left Option| InputKey[输入模式]
+    User --> |Right Option| SmartKey[智能模式]
     
-    subgraph "Trigger Modes"
-        InputKey["Left Option (Input Mode)"]
-        SmartKey["Right Option (Smart Mode)"]
-    end
-
-    User --> InputKey
-    User --> SmartKey
+    InputKey & SmartKey --> Mic[麦克风]
+    Mic --> AudioEngine[音频引擎]
+    AudioEngine --> VAD[VAD]
+    VAD --> |语音流| ASRRouter{ASR 引擎}
     
-    InputKey -->|Start| Mic["Microphone"]
-    SmartKey -->|Start| Mic
+    ASRRouter --> |本地| LocalASR["Sherpa-ONNX (离线)"]
+    ASRRouter --> |云端| CloudASR["阿里云 ASR (经网关)"]
     
-    Mic -->|PCM 16k| ASR["Sherpa-ONNX Engine"]
-    ASR -->|Text| Switch{"Mode Switch 🔀"}
+    LocalASR & CloudASR --> |文本| ModeSwitch{模式分发}
     
-    Switch -->|"Input Mode"| Inject["Text Injection ⌨️"]
+    InputKey -.-> |选择| ModeSwitch
+    SmartKey -.-> |选择| ModeSwitch
     
-    Switch -->|"Smart Mode"| Router{"LLM Router 🧠"}
+    ModeSwitch --> |输入模式| Inject["文本注入 ⌨️"]
+    ModeSwitch --> |智能模式| LLM[LLM 智能体]
     
-    subgraph "SpeakOut Intelligence"
-        Router -->|"Intent: Tool Call"| Agent["Agent Service 🤖"]
-        Router -->|"Intent: Note"| Diary["Diary Service 📝"]
-    end
+    LLM --> |指令| MCP["MCP 客户端 (工具)"]
+    LLM --> |笔记| Diary[日记服务]
     
-    Agent -->|Result| ChatUI["Chat Interface 💬"]
-    Diary -->|Saved| ChatUI
-    Diary -->|Append| MDFile["Daily Note (.md)"]
-    
-    Agent -->|JSON-RPC| MCP{MCP Client}
-    
-    subgraph "Plugins (MCP)"
-        MCP -->|Stdio| Local["Local Server"]
-        MCP -->|SSE| Remote["Remote Server"]
-    end
+    MCP --> |执行| LocalServer[本地服务]
+    MCP --> |调用| CloudAPI[云端 API]
 ```
 
 ### 隐私设计

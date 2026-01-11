@@ -1,5 +1,20 @@
 # SpeakOut Version History
 
+## v1.1.0 (2026-01-11) - 💳 Commercialization & UI Polish
+
+The first commercial-ready release with Hybrid Payment System support.
+
+- **Payment System (Hybrid)**:
+  - **Pro License**: Support for CD-Key redemption (`/redeem`) and Stripe Webhooks.
+  - **Flexible Top-up**: Integrated "Buy Credits" link and manual code entry.
+  - **Account Tab**: Dedicated settings page for license management.
+- **UI/UX Refactor**:
+  - **Settings Redesign**: Moved "Account" to a primary tab; optimized layout for better readability.
+  - **Visuals**: Updated App Icon to 160px rounded rectangle; standardized README headers.
+- **Documentation**:
+  - **Bilingual Architecture**: Added Mermaid diagrams to both English and Chinese README sections.
+  - **Icons**: Enhanced Chinese product introduction with visual emojis.
+
 ## v1.0.0 (2026-01-11) - 🚀 Initial Open Source Release
 
 The first public stable release of SpeakOut.

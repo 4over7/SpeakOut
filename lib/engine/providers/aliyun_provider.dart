@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../asr_provider.dart';
 import 'aliyun_token_service.dart';
+import '../../services/config_service.dart';
 
 class AliyunProvider implements ASRProvider {
   WebSocketChannel? _channel;
@@ -29,6 +30,8 @@ class AliyunProvider implements ASRProvider {
 
   @override
   bool get isReady => _isReady;
+
+  String? get taskId => _taskId;
 
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
@@ -73,7 +76,17 @@ class AliyunProvider implements ASRProvider {
     final url = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token=$_token";
     _channel = WebSocketChannel.connect(Uri.parse(url));
     
-    _taskId = Uuid().v4().replaceAll('-', '');
+    
+    // Traceable Task ID Generation
+    // Logic: MD5(LicenseKey).substring(0,8) + Random(24)
+    // Benefit: Can identify user from Aliyun logs even without mapping table
+    String prefix = "00000000";
+    final license = ConfigService().licenseKey;
+    if (license.isNotEmpty) {
+       prefix = md5.convert(utf8.encode(license)).toString().substring(0, 8);
+    }
+    final randomPart = const Uuid().v4().replaceAll('-', '').substring(8);
+    _taskId = prefix + randomPart;
     
     // Listen for messages
     _channel!.stream.listen((message) {

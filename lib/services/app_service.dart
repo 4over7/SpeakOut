@@ -1,6 +1,8 @@
 import 'dart:io';
 import '../engine/core_engine.dart';
-import '../services/config_service.dart';
+import 'notification_service.dart';
+import 'metering_service.dart';
+import 'config_service.dart';
 import '../engine/model_manager.dart';
 
 /// 管理应用程序生命周期与核心业务逻辑
@@ -89,6 +91,8 @@ class AppService {
         final activeName = activeInfo?.name ?? '';
         await engine.initPunctuation(modelPath, activeModelName: activeName);
         _isPunctuationInitialized = true;
+        // 5. Init Metering (Usage Reporting)
+        MeteringService().init();
       }
     } catch (e) {
       print("AppService: Punctuation init failed: $e. Attempting self-heal.");

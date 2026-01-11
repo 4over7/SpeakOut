@@ -16,6 +16,7 @@ import 'providers/aliyun_provider.dart';
 import '../services/diary_service.dart';
 import '../services/agent_service.dart';
 import '../services/chat_service.dart';
+import '../services/metering_service.dart';
 
 // MethodChannel for native overlay control
 const _overlayChannel = MethodChannel('com.SpeakOut/overlay');
@@ -38,6 +39,9 @@ class CoreEngine {
   // ASR Provider abstraction
   ASRProvider? _asrProvider;
   
+  // Metering State
+  DateTime? _startTime;
+
   // State
   bool _isRecording = false;
   bool _isInit = false;
@@ -366,6 +370,7 @@ class CoreEngine {
             return;
         }
         await _asrProvider!.start();
+        _startTime = DateTime.now(); // Mark start time for Metering
         _log("ASR Provider Started.");
         
         if (await _audioRecorder.isRecording()) {
@@ -512,6 +517,14 @@ class CoreEngine {
       String text = "";
       try {
         text = await _asrProvider!.stop();
+        
+        // METERING LOGIC: Track Usage
+        if (_asrProvider is AliyunProvider && _startTime != null) {
+           final duration = DateTime.now().difference(_startTime!).inMilliseconds / 1000.0;
+           final taskId = (_asrProvider as AliyunProvider).taskId ?? "unknown";
+           MeteringService().trackUsage(duration, taskId);
+           _startTime = null; // reset
+        }
       } catch (e) {
         _log("Provider Stop Error: $e");
       }

@@ -1,0 +1,19 @@
+name = "speakout-gateway"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# 1. 数据库 (KV Namespace)
+# 运行 'npx wrangler kv:namespace create SPEAKOUT_DB' 来获取 ID，并替换下面
+[[kv_namespaces]]
+binding = "SPEAKOUT_DB"
+id = "2af35a1d35124cbabacf16bcc41da124"
+
+# 2. 环境变量 (Secrets)
+# 请在 Cloudflare 后台设置以下变量，不要硬编码在这里！
+# ALIYUN_ACCESS_KEY_ID
+# ALIYUN_ACCESS_KEY_SECRET
+# ALIYUN_APP_KEY
+
+[vars]
+# 公开变量 (如有)
+ENVIRONMENT = "production"

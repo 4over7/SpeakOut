@@ -14,6 +14,25 @@ class ConfigService {
   factory ConfigService() => _instance;
   ConfigService._internal();
 
+  static const String kDefaultGatewayUrl = 'https://speakout-gateway.4over7.workers.dev';
+  static const String kDefaultTopUpUrl = "https://mianbaoduo.com"; // Placeholder
+  static const String _kGatewayUrlKey = 'gateway_url';
+  static const String _kTopUpUrlKey = 'top_up_url';
+  
+  // License
+  String get licenseKey => _prefs.getString('license_key') ?? '';
+  bool get isProUser => _prefs.getBool('is_pro_user') ?? false;
+  String get gatewayUrl => _prefs.getString(_kGatewayUrlKey) ?? kDefaultGatewayUrl;
+  set gatewayUrl(String val) => _prefs.setString(_kGatewayUrlKey, val);
+
+  String get topUpUrl => _prefs.getString(_kTopUpUrlKey) ?? kDefaultTopUpUrl;
+  set topUpUrl(String val) => _prefs.setString(_kTopUpUrlKey, val);
+
+  Future<void> setLicenseKey(String key) async => await _prefs.setString('license_key', key);
+  Future<void> setProStatus(bool isPro) async => await _prefs.setBool('is_pro_user', isPro);
+  // The setGatewayUrl method is replaced by the setter above.
+  // Future<void> setGatewayUrl(String url) async => await _prefs.setString('gateway_url', url);
+
   late SharedPreferences _prefs;
   bool _initialized = false;
   late String _defaultDocPath; // Sandbox-safe path
