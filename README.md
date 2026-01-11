@@ -179,10 +179,12 @@ graph TD
     Switch -->|"Smart Mode"| Router{"LLM Router 🧠"}
     
     subgraph "SpeakOut Intelligence"
-        Router -->|"Intent: Note"| Diary["Diary Service 📝"]
         Router -->|"Intent: Tool Call"| Agent["Agent Service 🤖"]
+        Router -->|"Intent: Note"| Diary["Diary Service 📝"]
     end
     
+    Agent -->|Result| ChatUI["Chat Interface 💬"]
+    Diary -->|Saved| ChatUI
     Diary -->|Append| MDFile["Daily Note (.md)"]
     
     Agent -->|JSON-RPC| MCP{MCP Client}
@@ -191,9 +193,6 @@ graph TD
         MCP -->|Stdio| Python["Calendar Script"]
         MCP -->|SSE| Remote["Remote Server"]
     end
-    
-    Agent -->|Result| ChatUI["Chat Interface 💬"]
-    Diary -->|Saved| ChatUI
 ```
 
 ### 隐私设计
