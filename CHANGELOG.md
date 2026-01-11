@@ -1,6 +1,21 @@
 # SpeakOut Version History
 
-## v3.5.18.43 (2026-01-10) - 💎 体验打磨 (Experience Polish)
+## v1.0.0 (2026-01-11) - 🚀 Initial Open Source Release
+
+The first public stable release of SpeakOut.
+
+- **Open Source**: Complete code release under MIT License.
+- **Key Features**:
+  - **Tri-Force Engine**: Offline ASR (Sherpa) + Flash Notes (Diary) + MCP Agents.
+  - **Privacy First**: Local-only processing by default.
+  - **Extension System**: Full support for Model Context Protocol (MCP) to extend capabilities.
+- **Documentation**: Comprehensive README (EN/ZH) and Architecture Diagrams.
+
+---
+
+## Beta Phase History (Archives)
+
+### v3.5.18.43 (2026-01-10) - 💎 体验打磨 (Experience Polish)
 
 ### 🐛 关键修复 (Critical Fix)
 
@@ -20,7 +35,7 @@
 
 ---
 
-## v3.5.18.35 (2026-01-10) - 🤖 智能代理 (Agentic MCP)
+### v3.5.18.35 (2026-01-10) - 🤖 智能代理 (Agentic MCP)
 
 ### 🚀 核心功能 (Core Features)
 
