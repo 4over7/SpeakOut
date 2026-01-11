@@ -190,8 +190,8 @@ graph TD
     Agent -->|JSON-RPC| MCP{MCP Client}
     
     subgraph "Plugins (MCP)"
-        MCP -->|Stdio| Local["Local Server (Any Executable)"]
-        MCP -->|SSE| Remote["Remote Server (HTTP)"]
+        MCP -->|Stdio| Local["Local Server"]
+        MCP -->|SSE| Remote["Remote Server"]
     end
 ```
 
