@@ -33,13 +33,22 @@ Capture fleeting thoughts without context switching.
 
 ### 3. 🤖 MCP Agent Platform (New in v3.5)
 
+> ⚠️ **Beta Feature**: This module is currently **experimental**. APIs may change without notice. Please use with caution in production environments.
+
 SpeakOut acts as a "Universal Dispatcher" for the **Model Context Protocol (MCP)**.
 
 - **Natural Language Actions**: "Add a meeting tomorrow at 2pm" -> Executes Calendar Script.
 - **Extensible Skills**: Add any Python/Node.js script as a "Tool". SpeakOut handles the intent parsing.
 - **HITL Security**: "Human-in-the-Loop" confirmation ensures the AI never executes dangerous commands without your approval.
 
-### 4. 💬 Unified Chat Interface
+### 4. 💎 Pro Features (Coming Soon)
+
+> 🚧 **Under Construction**: The payment and license verification system is currently internally tested and **not yet ready for public use**.
+
+- **Hybrid Payment**: Support for Global (Stripe) and China (CD-Key) payments.
+- **Cloud Sync**: Sync your diary and settings across devices (Planned).
+
+### 5. 💬 Unified Chat Interface
 
 A timeline of your digital life.
 
@@ -170,13 +179,22 @@ SpeakOut 不仅仅是一个语音输入法。它是运行在你 Mac 上的 **下
 
 ### 3. 🤖 MCP 智能代理平台 (v3.5 新增)
 
+> ⚠️ **Beta 功能**：此模块目前处于 **实验阶段**。API 可能会随时更改。请在生产环境中谨慎使用。
+
 SpeakOut 充当 **Model Context Protocol (MCP)** 的“通用调度器”。
 
 - 🗣️ **自然语言操作**：“明天下午2点添加一个会议” -> 执行日历脚本。
 - 🔌 **可扩展技能**：将任何 Python/Node.js 脚本添加为“工具”。SpeakOut 负责意图解析。
 - 🛡️ **安全确认 (HITL)**：“人机交互”确认机制确保 AI 在未经你批准的情况下绝不执行危险命令。
 
-### 4. 💬 统一聊天界面
+### 4. 💎 付费功能 (即将推出)
+
+> 🚧 **施工中**：支付和许可证验证系统目前仅供内部测试，**尚未对公众开放**。
+
+- **混合支付**：支持全球 (Stripe) 和中国 (CD-Key/激活码) 支付体系。
+- **云端同步**：多设备同步您的日记和设置（规划中）。
+
+### 5. 💬 统一聊天界面
 
 你数字生活的时间轴。
 
