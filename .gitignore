@@ -44,6 +44,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Node.js
+node_modules/
+gateway/node_modules/
+
 # Secrets
 assets/aliyun_config.json
 assets/llm_config.json

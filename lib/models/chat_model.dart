@@ -4,6 +4,7 @@ enum ChatRole {
   ai,       // AI Reply (Chat)
   system,   // System Info / Voice Note log
   tool,     // Agent Tool Execution Result
+  dictation // Input Mode (Text Injection) History
 }
 
 class ChatMessage {

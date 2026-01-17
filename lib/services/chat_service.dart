@@ -48,6 +48,10 @@ class ChatService {
     );
   }
   
+  void addDictation(String text) {
+    _addMessage(text, ChatRole.dictation);
+  }
+  
   Future<void> clearHistory() async {
     _messages.clear();
     _streamController.add(_messages);

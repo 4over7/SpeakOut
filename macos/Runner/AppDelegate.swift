@@ -47,21 +47,31 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func showRecordingOverlay(initialText: String) {
-    if recordingOverlayWindow != nil {
-      recordingOverlayWindow?.orderFront(nil)
-      updateStatusLabel(initialText)
+    // 1. Always calculate target position logic FIRST (Dynamic Multi-Monitor Support)
+    let mouseLoc = NSEvent.mouseLocation
+    let screen =
+      NSScreen.screens.first { NSMouseInRect(mouseLoc, $0.frame, false) } ?? NSScreen.main
+
+    guard let targetScreen = screen else { return }
+
+    let panelWidth: CGFloat = 400
+    let panelHeight: CGFloat = 50
+
+    // Calculate position relative to the target screen
+    let xPos = targetScreen.frame.origin.x + (targetScreen.frame.width - panelWidth) / 2
+    let yPos = targetScreen.frame.origin.y + 60
+
+    // 2. Reuse Existing Window if available
+    if let panel = recordingOverlayWindow {
+      // CRITICAL FIX: Move window to the new cursor screen
+      panel.setFrameOrigin(NSPoint(x: xPos, y: yPos))
+      panel.orderFront(nil)
+      updateStatusLabel(initialText)  // ensure text is fresh
       startWaveAnimation()
       return
     }
 
-    // Get screen center
-    guard let screen = NSScreen.main else { return }
-    let panelWidth: CGFloat = 400  // Wider for text
-    let panelHeight: CGFloat = 50  // Compact pill shape
-    let xPos = (screen.frame.width - panelWidth) / 2
-    let yPos: CGFloat = 60  // Position from bottom
-
-    // Create floating panel
+    // 3. Create New Window (First Time)
     let panel = NSPanel(
       contentRect: NSRect(x: xPos, y: yPos, width: panelWidth, height: panelHeight),
       styleMask: [.borderless, .nonactivatingPanel],
@@ -72,24 +82,15 @@ class AppDelegate: FlutterAppDelegate {
     panel.level = .floating
     panel.backgroundColor = .clear
     panel.isOpaque = false
-    panel.hasShadow = true
+    panel.hasShadow = false
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-    // Create blur background (毛玻璃效果)
-    let blurView = NSVisualEffectView(
-      frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
-    blurView.blendingMode = .behindWindow
-    blurView.material = .hudWindow
-    blurView.state = .active
-    blurView.wantsLayer = true
-    blurView.layer?.cornerRadius = panelHeight / 2
-    blurView.layer?.masksToBounds = true
-
-    // Dark overlay for better contrast
-    let darkOverlay = NSView(frame: blurView.bounds)
-    darkOverlay.wantsLayer = true
-    darkOverlay.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.5).cgColor
-    blurView.addSubview(darkOverlay)
+    // Create transparent background (User request: ~30% opacity, no blur) -> Updated to 15%
+    let backgroundView = NSView(frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
+    backgroundView.wantsLayer = true
+    backgroundView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.15).cgColor
+    backgroundView.layer?.cornerRadius = panelHeight / 2
+    backgroundView.layer?.masksToBounds = true
 
     // === WAVEFORM BARS ===
     let barCount = 7
@@ -107,7 +108,7 @@ class AppDelegate: FlutterAppDelegate {
       barView.wantsLayer = true
       barView.layer?.backgroundColor = accentColor.cgColor
       barView.layer?.cornerRadius = barWidth / 2
-      blurView.addSubview(barView)
+      backgroundView.addSubview(barView)
       waveformViews.append(barView)
     }
 
@@ -121,13 +122,14 @@ class AppDelegate: FlutterAppDelegate {
     label.isEditable = false
     label.isBordered = false
     label.drawsBackground = false
-    label.textColor = NSColor.white.withAlphaComponent(0.95)
+    // User request: Text opacity 70%
+    label.textColor = NSColor.white.withAlphaComponent(0.7)
     label.font = NSFont.systemFont(ofSize: 14, weight: .medium)
     label.lineBreakMode = .byTruncatingTail
-    blurView.addSubview(label)
+    backgroundView.addSubview(label)
     statusLabel = label
 
-    panel.contentView = blurView
+    panel.contentView = backgroundView
     recordingOverlayWindow = panel
 
     panel.orderFront(nil)

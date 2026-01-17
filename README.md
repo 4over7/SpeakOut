@@ -139,7 +139,7 @@ flutter test test/agent_suite_test.dart
 <div align="center">
   <img src="assets/app_icon.png" width="160" height="160" style="border-radius: 36px" alt="SpeakOut Icon" />
 
-# 子曰 SpeakOut (中文介绍) 🎙️
+# 子曰 SpeakOut 🎙️
 
   **你的声音，你的 AI 操作系统。**  
   *离线优先。隐私至上。无限可能。*

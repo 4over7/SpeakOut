@@ -79,13 +79,7 @@ class CoreEngine {
 
   // Debug Logger
   void _log(String msg) {
-    try {
-      final f = File('/tmp/SpeakOut_debug.log');
-      final time = DateTime.now().toIso8601String();
-      f.writeAsStringSync("[$time] [CoreEngine] $msg\n", mode: FileMode.append);
-    } catch (e) {
-      print("Log Failed: $e");
-    }
+    debugPrint("[CoreEngine] $msg");
   }
 
   // Device Listing
@@ -290,17 +284,25 @@ class CoreEngine {
     CoreEngine()._handleKey(keyCode, isDown);
   }
 
+  // Key state debouncing
+  bool _pttKeyHeld = false;
+  bool _diaryKeyHeld = false;
+
   void _handleKey(int keyCode, bool isDown) {
     if (isDown) _rawKeyController.add(keyCode);
     
     // Check PTT
     if (keyCode == pttKeyCode) {
       if (isDown) {
-        if (!_isRecording) {
-           _isDiaryMode = false;
-           startRecording();
+        if (!_pttKeyHeld) { // RISING EDGE
+           _pttKeyHeld = true;
+           if (!_isRecording) {
+              _isDiaryMode = false;
+              startRecording();
+           }
         }
       } else {
+        _pttKeyHeld = false; // FALLING EDGE
         if (_isRecording && !_isDiaryMode) stopRecording();
       }
       return;
@@ -309,11 +311,15 @@ class CoreEngine {
     // Check Diary
     if (ConfigService().diaryEnabled && keyCode == ConfigService().diaryKeyCode) {
       if (isDown) {
-        if (!_isRecording) {
-           _isDiaryMode = true;
-           startRecording();
+        if (!_diaryKeyHeld) { // RISING EDGE
+           _diaryKeyHeld = true;
+           if (!_isRecording) {
+              _isDiaryMode = true;
+              startRecording();
+           }
         }
       } else {
+        _diaryKeyHeld = false; // FALLING EDGE
         if (_isRecording && _isDiaryMode) stopRecording();
       }
     }
@@ -580,7 +586,7 @@ class CoreEngine {
                }
            });
             // 1. Add to Unified Log
-            ChatService().addInfo(finalText);
+            ChatService().addUserMessage(finalText);
             
             // 2. Parallel: Analyze intent for MCP commands
            AgentService().process(finalText);
@@ -588,6 +594,9 @@ class CoreEngine {
            // STANDARD MODE: Inject
            _statusController.add("Ready");
            _nativeInput.inject(finalText);
+           
+           // Unified History: Log dictation
+           ChatService().addDictation(finalText);
         }
       } else {
         _statusController.add("🔇 No Speech");

@@ -283,17 +283,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _initSystemTray() async {
-    String path = Platform.isWindows ? 'assets/app_icon.ico' : 'assets/app_icon.png';
+    String path = Platform.isWindows ? 'assets/app_icon.ico' : 'assets/tray_icon.png';
     // We assume assets exist or use default blank. 
-    // Actually, system_tray needs an icon. For now, skipping explicit icon if asset missing.
-    // Macos handles app icon for tray? No.
-    // TODO: Add Tray Icon asset.
     
     final AppWindow appWindow = AppWindow();
     
     await _systemTray.initSystemTray(
-      title: "SpeakOut",
+      title: "", // No title as requested
       iconPath: path,
+      isTemplate: true,
     );
     
     final Menu menu = Menu();

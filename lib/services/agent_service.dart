@@ -151,13 +151,20 @@ class AgentService {
   
   /// The main entry point for the "Agent Brain"
   Future<void> process(String text) async {
-    if (_clients.isEmpty) return; // No tools, no agent
+    // 1. Check for Tools
+    if (_clients.isEmpty) {
+      ChatService().addInfo("⚠️ No MCP tools connected. Please add tools in Settings -> MCP Agents to enable capabilities.");
+      return;
+    }
     
-    // 1. Collect Tools
     final allTools = _clients.where((c) => c.isConnected).expand((c) => c.tools).toList();
-    if (allTools.isEmpty) return;
+    if (allTools.isEmpty) {
+       ChatService().addInfo("⚠️ No active tools found. Please check your MCP server connections.");
+       return;
+    }
     
     debugPrint("[Agent] Analyzing: '$text' with ${allTools.length} tools.");
+    ChatService().addInfo("🤔 Analyzing intent with ${allTools.length} tools...");
     
     // 2. Ask LLM (Router)
     final toolCall = await LLMService().routeIntent(text, allTools);
@@ -167,6 +174,7 @@ class AgentService {
       final args = Map<String, dynamic>.from(toolCall['arguments'] ?? {});
       
       debugPrint("[Agent] Intent Detected: $name($args)");
+      ChatService().addInfo("🎯 Intent Detected: $name");
       
       // 3. User Confirmation (HITL Security)
       final pending = PendingToolCall(
@@ -198,6 +206,8 @@ class AgentService {
             // Check tools from CONNECTED clients only
            if (client.isConnected && client.tools.any((t) => t.name == name)) {
               debugPrint("[Agent] Executing on ${client.config.label}...");
+              ChatService().addInfo("⚙️ Executing on ${client.config.label}...");
+              
               final result = await client.callTool(name, args);
               
               debugPrint("[Agent] Result: $result");
@@ -215,6 +225,7 @@ class AgentService {
       }
     } else {
       debugPrint("[Agent] No intent matched.");
+      ChatService().addInfo("📝 No command matched. Saved as Context/Note.");
     }
   }
   

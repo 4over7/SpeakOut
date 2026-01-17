@@ -18,11 +18,25 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  int _selectedFilterIndex = 0; // 0: All, 1: Chat, 2: Dictation
   
   @override
   void initState() {
     super.initState();
     ChatService().init();
+  }
+  
+  List<ChatMessage> _filterMessages(List<ChatMessage> all) {
+    if (_selectedFilterIndex == 0) return all;
+    if (_selectedFilterIndex == 1) {
+      // Chat: User, AI, Tool, System (excluding Dictation)
+      return all.where((m) => m.role != ChatRole.dictation).toList();
+    }
+    if (_selectedFilterIndex == 2) {
+      // Dictation only
+      return all.where((m) => m.role == ChatRole.dictation).toList();
+    }
+    return all;
   }
   
   void _scrollToBottom() {
@@ -61,24 +75,62 @@ class _ChatPageState extends State<ChatPage> {
           builder: (context, scrollController) {
             return Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: CupertinoSlidingSegmentedControl<int>(
+                      children: const {
+                        0: Text("All History"),
+                        1: Text("Agent Chat"),
+                        2: Text("Dictation Log"),
+                      },
+                      groupValue: _selectedFilterIndex,
+                      onValueChanged: (v) {
+                        setState(() => _selectedFilterIndex = v ?? 0);
+                      },
+                      backgroundColor: MacosColors.systemGrayColor.withOpacity(0.2),
+                      thumbColor: MacosTheme.of(context).brightness == Brightness.dark 
+                          ? const Color(0xFF636366) 
+                          : Colors.white,
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: StreamBuilder<List<ChatMessage>>(
                     stream: ChatService().messageStream,
                     initialData: ChatService().messages,
                     builder: (context, snapshot) {
-                      final msgs = snapshot.data ?? [];
+                      final allMsgs = snapshot.data ?? [];
+                      final msgs = _filterMessages(allMsgs);
+                      
                       if (msgs.isEmpty) {
                         return Center(
-                          child: Text("No interaction history.", style: AppTheme.caption(context)),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _selectedFilterIndex == 2 ? CupertinoIcons.keyboard : CupertinoIcons.bubble_left,
+                                color: MacosColors.systemGrayColor.withOpacity(0.3),
+                                size: 48
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _selectedFilterIndex == 2 ? "No dictation logs yet." : "No interaction history.", 
+                                style: AppTheme.caption(context)
+                              ),
+                            ],
+                          ),
                         );
                       }
                       
-                      // Auto-scroll on new message
+                      // Auto-scroll on new message ONLY if showing All or relevant tab
+                      // And only if at bottom? For simplicity, we keep auto-scroll behavior.
                       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
                       return ListView.builder(
                         controller: _scrollCtrl,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced top padding
                         itemCount: msgs.length,
                         itemBuilder: (context, index) {
                           final msg = msgs[index];
@@ -100,6 +152,7 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildMessageBubble(ChatMessage msg) {
     final isUser = msg.role == ChatRole.user;
     final isTool = msg.role == ChatRole.tool;
+    // Dictation is conceptually 'User' but system-logged. Let's treat it as system-aligned but with avatar.
     final isSystem = msg.role == ChatRole.system;
     
     // Formatting
@@ -134,6 +187,13 @@ class _ChatPageState extends State<ChatPage> {
                         fontSize: 10, 
                         fontWeight: FontWeight.bold,
                         color: AppTheme.getAccent(context)
+                      )),
+                      
+                    if (msg.role == ChatRole.dictation)
+                      Text("⌨️ Dictation Log", style: TextStyle(
+                        fontSize: 10, 
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueGrey
                       )),
                       
                     SelectableText(
@@ -204,6 +264,8 @@ class _ChatPageState extends State<ChatPage> {
         return AppTheme.accentColor;
       case ChatRole.tool:
         return const Color(0xFF2C3E50); // Dark Blue
+      case ChatRole.dictation:
+        return Colors.blueGrey.withOpacity(0.15); // Light distinct style
       case ChatRole.ai:
         return MacosColors.systemGrayColor.withOpacity(0.2);
       case ChatRole.system:
@@ -227,6 +289,10 @@ class _ChatPageState extends State<ChatPage> {
       case ChatRole.tool:
         icon = CupertinoIcons.hammer_fill;
         color = Colors.orange;
+        break;
+      case ChatRole.dictation:
+        icon = CupertinoIcons.keyboard;
+        color = Colors.blueGrey;
         break;
       case ChatRole.system:
         icon = CupertinoIcons.info;
