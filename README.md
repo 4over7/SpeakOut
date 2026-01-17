@@ -1,6 +1,4 @@
-<div align="center">
-
-  <img src="assets/app_icon.png" width="160" height="160" style="border-radius: 36px" alt="SpeakOut Icon" />
+  <img src="assets/app_icon_rounded.png" width="160" height="160" alt="SpeakOut Icon" />
 
 # 子曰 SpeakOut 🎙️
 
