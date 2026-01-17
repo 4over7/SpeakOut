@@ -155,8 +155,8 @@ int start_keyboard_listener(DartKeyCallback callback) {
   CGEventMask eventMask = (1 << kCGEventKeyDown) | (1 << kCGEventKeyUp) |
                           (1 << kCGEventFlagsChanged);
 
-  // Use kCGHIDEventTap for highest priority - intercepts events before system shortcuts
-  // kCGHeadInsertEventTap puts us early in the chain
+  // Use kCGHIDEventTap for highest priority - intercepts events before system
+  // shortcuts kCGHeadInsertEventTap puts us early in the chain
   // kCGEventTapOptionDefault means we can inspect and optionally modify events
   eventTap = CGEventTapCreate(kCGHIDEventTap, kCGHeadInsertEventTap,
                               kCGEventTapOptionDefault, eventMask,
@@ -200,37 +200,56 @@ void stop_keyboard_listener() {
 }
 
 // 3. Inject Text (Simple String)
+// 3. Inject Text (Robust Chunking)
 void inject_text(const char *text) {
-  // Requires accessibility permissions
   if (text == NULL)
     return;
 
+  // 1. Convert C-String to CFString
   CFStringRef cfStr =
       CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8);
+  if (!cfStr)
+    return;
 
+  CFIndex totalLen = CFStringGetLength(cfStr);
+  if (totalLen == 0) {
+    CFRelease(cfStr);
+    return;
+  }
+
+  // 2. Setup Event Source
   CGEventSourceRef source =
       CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-
   CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 0, true);
   CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 0, false);
 
-  // CGEventKeyboardSetUnicodeString is the magic that types the chars
-  UniChar buffer[2048];
-  CFIndex len = CFStringGetLength(cfStr);
+  // 3. Chunking Loop
+  // Many apps drop events if payload is too large.
+  // 50 chars per event is a safe balance between speed and reliability.
+  const int CHUNK_SIZE = 50;
+  UniChar buffer[CHUNK_SIZE];
 
-  // Handle chunking if too long?
-  // For simplicity, assume reasonably short phrases or handle simple buffer.
-  // If len > 2048, truncated. Real version should loop.
-  if (len > 2048)
-    len = 2048;
+  for (CFIndex i = 0; i < totalLen; i += CHUNK_SIZE) {
+    // Calculate current chunk length
+    CFIndex remaining = totalLen - i;
+    CFIndex chunkLen = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
 
-  CFStringGetCharacters(cfStr, CFRangeMake(0, len), buffer);
-  CGEventKeyboardSetUnicodeString(keyDown, len, buffer);
-  CGEventKeyboardSetUnicodeString(keyUp, len, buffer);
+    // Extract characters
+    CFStringGetCharacters(cfStr, CFRangeMake(i, chunkLen), buffer);
 
-  CGEventPost(kCGHIDEventTap, keyDown);
-  CGEventPost(kCGHIDEventTap, keyUp);
+    // Set string to event
+    CGEventKeyboardSetUnicodeString(keyDown, chunkLen, buffer);
+    CGEventKeyboardSetUnicodeString(keyUp, chunkLen, buffer);
 
+    // Post Event
+    CGEventPost(kCGHIDEventTap, keyDown);
+    CGEventPost(kCGHIDEventTap, keyUp);
+
+    // Extremely brief pause to let Main Loop breathe if text is huge (optional,
+    // but safer) usleep(1000); // 1ms
+  }
+
+  // 4. Cleanup
   CFRelease(keyDown);
   CFRelease(keyUp);
   CFRelease(source);
