@@ -504,16 +504,22 @@ class CoreEngine {
     _isStopping = true;
     _isRecording = false;
     
+    // 1. UI FIRST (Optimistic Update)
+    // Don't wait for ANY hardware. Hide UI immediately.
     _recordingController.add(false); 
     _statusController.add("处理中...");
-    
     try { await _overlayChannel.invokeMethod('hideRecording'); } catch (_) {}
     
-    try { await _overlayChannel.invokeMethod('hideRecording'); } catch (_) {}
-    
-    await Future.delayed(const Duration(milliseconds: 500)); // Increased from 200ms to 500ms
-    
-    await _stopAudioSafely();
+    // 2. HARDWARE SHUTDOWN (With Timeout Protection)
+    // If CoreAudio hangs (err 1852797029), we must NOT hang the app.
+    try {
+      await _stopAudioSafely().timeout(const Duration(milliseconds: 500), onTimeout: () {
+          _log("⚠️ Audio Hardware Timeout! Forcing shutdown.");
+          _audioStarted = false; // Force flag reset
+      });
+    } catch (e) {
+       _log("Audio Stop Error: $e");
+    }
     
     try { await _audioDumpSink?.close(); _audioDumpSink = null; } catch(_) {}
     
