@@ -8,27 +8,13 @@
 #include <time.h>
 
 // Debug Log Path
-#define DEBUG_LOG_PATH "/tmp/speakout_debug.log"
-
 void log_to_file(const char *fmt, ...) {
-  FILE *fp = fopen(DEBUG_LOG_PATH, "a");
-  if (!fp)
-    return;
-
-  time_t now;
-  time(&now);
-  char buf[20];
-  strftime(buf, sizeof(buf), "%H:%M:%S", localtime(&now));
-
-  fprintf(fp, "[%s] ", buf);
-
   va_list args;
   va_start(args, fmt);
-  vfprintf(fp, fmt, args);
+  NSString *formatStr = [[NSString alloc] initWithUTF8String:fmt];
+  NSString *msg = [[NSString alloc] initWithFormat:formatStr arguments:args];
+  NSLog(@"[NativeInput] %@", msg);
   va_end(args);
-
-  fprintf(fp, "\n");
-  fclose(fp);
 }
 
 // Callback function type defined in Dart
