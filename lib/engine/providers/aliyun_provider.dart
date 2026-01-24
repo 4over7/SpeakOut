@@ -164,13 +164,7 @@ class AliyunProvider implements ASRProvider {
     _currentSentence = "";
     
     // Generate new Task ID for this recording session
-    String prefix = "00000000";
-    final license = ConfigService().licenseKey;
-    if (license.isNotEmpty) {
-       prefix = md5.convert(utf8.encode(license)).toString().substring(0, 8);
-    }
-    final randomPart = const Uuid().v4().replaceAll('-', '').substring(8);
-    _taskId = prefix + randomPart;
+    _taskId = const Uuid().v4().replaceAll('-', '');
 
     // Send Start Directive (reusing existing connection)
     final startCmd = {

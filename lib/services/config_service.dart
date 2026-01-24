@@ -74,18 +74,6 @@ class ConfigService {
     _initialized = true;
   }
 
-  // --- License ---
-  String get licenseKey => _prefs?.getString('license_key') ?? '';
-  bool get isProUser => _prefs?.getBool('is_pro_user') ?? false;
-  String get gatewayUrl => _prefs?.getString(_kGatewayUrlKey) ?? kDefaultGatewayUrl;
-  set gatewayUrl(String val) => _prefs?.setString(_kGatewayUrlKey, val);
-
-  String get topUpUrl => _prefs?.getString(_kTopUpUrlKey) ?? kDefaultTopUpUrl;
-  set topUpUrl(String val) => _prefs?.setString(_kTopUpUrlKey, val);
-
-  Future<void> setLicenseKey(String key) async => await _prefs?.setString('license_key', key);
-  Future<void> setProStatus(bool isPro) async => await _prefs?.setBool('is_pro_user', isPro);
-
   // --- Hotkey ---
 
   int get pttKeyCode => _prefs?.getInt(AppConstants.kKeyPttKeyCode) ?? AppConstants.kDefaultPttKeyCode;

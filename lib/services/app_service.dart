@@ -1,10 +1,7 @@
 import 'dart:io';
 import '../engine/core_engine.dart';
 import 'notification_service.dart';
-import 'metering_service.dart';
 import 'config_service.dart';
-import 'mcp_config_service.dart';
-import 'agent_service.dart';
 import 'chat_service.dart';
 import '../engine/model_manager.dart';
 
@@ -28,9 +25,7 @@ class AppService {
     await ConfigService().init();
     
     // 1.5 Other Services
-    await McpConfigService().init();
     await ChatService().init();
-    await AgentService().init();
     
     engine.updateStatus("正在启动键盘监听...");
     await Future.delayed(const Duration(milliseconds: 100));
@@ -129,8 +124,6 @@ class AppService {
         final activeName = activeInfo?.name ?? '';
         await engine.initPunctuation(modelPath, activeModelName: activeName);
         _isPunctuationInitialized = true;
-        // 5. Init Metering (Usage Reporting)
-        MeteringService().init();
       }
     } catch (e) {
       print("AppService: Punctuation init failed: $e. Attempting self-heal.");

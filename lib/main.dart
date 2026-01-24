@@ -13,8 +13,6 @@ import 'services/config_service.dart';
 import 'ui/recording_overlay.dart';
 import 'ui/settings_page.dart';
 import 'services/app_service.dart';
-import 'services/mcp_config_service.dart';
-import 'services/agent_service.dart';
 import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'engine/core_engine.dart';
@@ -632,22 +630,5 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
-  }
-  
-  void _showToolConfirmation(PendingToolCall pending) async {
-    // Bring window to front if possible (requires window_manager)
-    // await windowManager.show();
-    
-    final approved = await showToolConfirmationDialog(
-      context: context,
-      toolName: pending.toolName,
-      arguments: pending.arguments,
-    );
-    
-    if (approved) {
-      pending.approve();
-    } else {
-      pending.deny();
-    }
   }
 }

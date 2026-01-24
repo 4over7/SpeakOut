@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'config_service.dart';
-import 'metering_service.dart';
 
 class LLMService {
   static final LLMService _instance = LLMService._internal();
@@ -72,24 +71,6 @@ class LLMService {
         final content = json['choices']?[0]?['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
           _log("LLM SUCCESS. Output differs: ${content.trim() != input}");
-          
-          // METERING: Token-based Billing
-          // 1. Try get actual usage
-          int tokens = 0;
-          if (json['usage'] != null && json['usage']['total_tokens'] != null) {
-             tokens = json['usage']['total_tokens'];
-          } else {
-             // 2. Fallback Estimate (Conservative: 1 char = 2 tokens)
-             tokens = (input.length + content.length) * 2;
-          }
-          
-          // 3. Convert to "Seconds Currency"
-          // Ratio: 1000 Tokens (¥0.01) ≈ 15 Seconds ASR (¥0.01)
-          double equivalentSeconds = (tokens / 1000.0) * 15.0;
-          if (equivalentSeconds < 1.0) equivalentSeconds = 1.0; // Minimum charge
-          
-          MeteringService().trackUsage(equivalentSeconds, "llm-correction");
-          
           return content.trim();
         }
         _log("LLM returned empty content.");
@@ -169,12 +150,6 @@ Rules:
                "name": result['tool'],
                "arguments": result['arguments'] ?? {}
              };
-             
-             // METERING: Router Call (Approximate, usually small)
-             // Router prompt is huge (~500 tokens), user input small.
-             // Fixed heavy charge for now, or estimate?
-             // Let's assume Router consumes ~500 tokens fixed.
-             MeteringService().trackUsage(500 / 1000.0 * 15.0, "llm-router");
            }
         } catch (e) {
           _log("Router JSON Parse Error: $e");

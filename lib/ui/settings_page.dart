@@ -13,9 +13,7 @@ import '../engine/core_engine.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:file_picker/file_picker.dart';
-import 'settings/mcp_settings_view.dart';
 import 'theme.dart';
-import '../../services/license_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -43,8 +41,6 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _akIdController = TextEditingController();
   final TextEditingController _akSecretController = TextEditingController();
   final TextEditingController _appKeyController = TextEditingController();
-  final TextEditingController _licenseController = TextEditingController();
-  bool _verifyingLicense = false;
   
   // Hotkey State
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
@@ -68,7 +64,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadVersion();
     super.initState();
     _loadVersion();
-    _tabController = MacosTabController(initialIndex: 0, length: 6);
+    _tabController = MacosTabController(initialIndex: 0, length: 4);
     _tabController.addListener(() {
       setState(() => _selectedIndex = _tabController.index);
     });
@@ -77,7 +73,6 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadHotkeyConfig();
     _loadActiveModel();
     _loadAliyunConfig();
-    _licenseController.text = ConfigService().licenseKey;
   }
   
   Future<void> _loadAliyunConfig() async {
@@ -279,28 +274,20 @@ class _SettingsPageState extends State<SettingsPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             items: [
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.person_crop_circle, color: _selectedIndex == 0 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text("Account", style: TextStyle(color: _selectedIndex == 0 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.settings, color: _selectedIndex == 0 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabGeneral, style: TextStyle(color: _selectedIndex == 0 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.settings, color: _selectedIndex == 1 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabGeneral, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 1 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabModels, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 2 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabModels, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 2 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
-              ),
-              SidebarItem(
-                leading: MacosIcon(CupertinoIcons.cube_box, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text("Agent Tools", style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
-              ),
-              SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : null)), 
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)), 
               ),
             ],
           );
@@ -322,11 +309,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: SingleChildScrollView(
                   child: SingleChildScrollView(
                     child: Builder(builder: (_) {
-                       if (_selectedIndex == 0) return _buildAccountView();
-                       if (_selectedIndex == 1) return _buildGeneralView();
-                       if (_selectedIndex == 2) return _buildModelsView();
-                       if (_selectedIndex == 3) return _buildDiaryView();
-                       if (_selectedIndex == 4) return const McpSettingsView();
+                       if (_selectedIndex == 0) return _buildGeneralView();
+                       if (_selectedIndex == 1) return _buildModelsView();
+                       if (_selectedIndex == 2) return _buildDiaryView();
                        return _buildAboutView(context, _version);
                     }),
                   ),
@@ -458,137 +443,9 @@ class _SettingsPageState extends State<SettingsPage> {
       );
   }
 
-  // --- View: Account ---
-  Widget _buildAccountView() {
-    final isPro = ConfigService().isProUser;
-    
-    return Column(
-      children: [
-        SettingsGroup(
-          title: "Account Status",
-          children: [
-             Padding(
-               padding: const EdgeInsets.all(16),
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                    // Status Header
-                    Row(
-                      children: [
-                        Icon(isPro ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.lock_circle, 
-                             color: isPro ? Colors.green : MacosColors.systemGrayColor, size: 28),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                             Text(isPro ? "Pro License Active" : "Free Plan", 
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                             if (!isPro) 
-                               Padding(
-                                 padding: const EdgeInsets.only(top: 4),
-                                 child: Text("Unlock Sync, Unlimited API & Cloud Models.", style: AppTheme.caption(context)),
-                               ),
-                          ],
-                        ),
-                        const Spacer(),
-                        if (isPro)
-                          PushButton(
-                             controlSize: ControlSize.small,
-                             child: const Text("Log out"),
-                             onPressed: () async {
-                                await LicenseService().logout();
-                                _licenseController.clear();
-                                setState((){});
-                             },
-                          )
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    const Divider(height: 1),
-                    const SizedBox(height: 24),
-                    
-                    if (!isPro) ...[
-                       const Text("Activate License", style: TextStyle(fontWeight: FontWeight.w600)),
-                       const SizedBox(height: 12),
-                       Row(
-                         children: [
-                            Expanded(
-                              child: MacosTextField(
-                                controller: _licenseController,
-                                placeholder: "Enter your License Key...",
-                              )
-                            ),
-                            const SizedBox(width: 8),
-                            PushButton(
-                               controlSize: ControlSize.regular,
-                               child: _verifyingLicense ? const CupertinoActivityIndicator(radius: 8) : const Text("Activate"),
-                               onPressed: _verifyingLicense ? null : () async {
-                                  setState(() => _verifyingLicense = true);
-                                  final success = await LicenseService().verifyLicense(_licenseController.text.trim());
-                                  setState(() {
-                                    _verifyingLicense = false;
-                                  });
-                               },
-                            )
-                         ],
-                       ),
-                       const SizedBox(height: 32),
-                       
-                       Row(
-                         children: [
-                            Expanded(
-                              child: PushButton(
-                                controlSize: ControlSize.large,
-                                child: const Text("Redeem Code"),
-                                onPressed: () => _showRedeemDialog(),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: PushButton(
-                                controlSize: ControlSize.large,
-                                child: const Text("Buy Pro License ➞"),
-                                onPressed: () async {
-                                   final url = Uri.parse(ConfigService().topUpUrl);
-                                   if (await canLaunchUrl(url)) await launchUrl(url);
-                                },
-                              ),
-                            ),
-                         ],
-                       )
-                    ] else ...[
-                       Text("License Info", style: AppTheme.caption(context)),
-                       const SizedBox(height: 8),
-                       Container(
-                         padding: const EdgeInsets.all(8),
-                         decoration: BoxDecoration(
-                           color: MacosColors.alternatingContentBackgroundColor,
-                           borderRadius: BorderRadius.circular(6)
-                         ),
-                         child: Row(children: [
-                            const Text("KEY: ", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                            Expanded(child: Text(
-                              ConfigService().licenseKey.isNotEmpty 
-                                ? "••••-••••-••••-${ConfigService().licenseKey.substring(ConfigService().licenseKey.length - 4)}"
-                                : "Unknown",
-                              style: AppTheme.mono(context)
-                            )),
-                         ]),
-                       ),
-                    ]
-                 ],
-               ),
-             )
-          ],
-        )
-      ],
-    );
-  }
 
   Widget _buildGeneralView() {
     final loc = AppLocalizations.of(context)!;
-    final isPro = ConfigService().isProUser;
     
     return Column(
       children: [
@@ -916,35 +773,7 @@ class _SettingsPageState extends State<SettingsPage> {
       );
   }
 
-  // --- DIALOGS ---
-  
-  void _showRedeemDialog() {
-      final codeCtrl = TextEditingController();
-      showCupertinoDialog(
-        context: context, 
-        builder: (c) => CupertinoAlertDialog(
-           title: const Text("Redeem Code"),
-           content: Column(children:[
-             const SizedBox(height: 10),
-             const Text("Enter your code from Mianbaoduo/Gumroad:"),
-             const SizedBox(height: 10),
-             MacosTextField(controller: codeCtrl, placeholder: "TIME-XX-XXXX"),
-           ]),
-           actions: [
-              CupertinoDialogAction(child: const Text("Cancel"), onPressed: () => Navigator.pop(c)),
-              CupertinoDialogAction(child: const Text("Redeem"), onPressed: () async {
-                  Navigator.pop(c);
-                  if (codeCtrl.text.trim().isEmpty) return;
-                  
-                  final success = await LicenseService().redeemCode(codeCtrl.text.trim());
-                  if (success) {
-                      setState(() {});
-                  }
-              }),
-           ],
-        )
-      );
-  }
+
 
   // --- View: About ---
   Widget _buildAboutView(BuildContext context, String version) {

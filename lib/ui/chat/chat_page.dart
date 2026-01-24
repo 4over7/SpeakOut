@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../models/chat_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/diary_service.dart';
-import '../../services/agent_service.dart';
 import '../../ui/theme.dart';
 
 class ChatPage extends StatefulWidget {
@@ -366,8 +365,5 @@ class _ChatPageState extends State<ChatPage> {
     
     _textCtrl.clear();
     ChatService().addUserMessage(text);
-    
-    // Process text as a potential command
-    AgentService().process(text);
   }
 }

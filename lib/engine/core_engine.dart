@@ -13,9 +13,7 @@ import 'asr_provider.dart';
 import 'providers/sherpa_provider.dart';
 import 'providers/aliyun_provider.dart';
 import '../services/diary_service.dart';
-import '../services/agent_service.dart';
 import '../services/chat_service.dart';
-import '../services/metering_service.dart';
 
 // MethodChannel for native overlay control
 const _overlayChannel = MethodChannel('com.SpeakOut/overlay');
@@ -528,14 +526,6 @@ class CoreEngine {
              _log("⚠️ ASR Provider Stop Timeout!");
              return "";
         });
-        
-        // METERING LOGIC: Track Usage
-        if (_asrProvider is AliyunProvider && _startTime != null) {
-           final duration = DateTime.now().difference(_startTime!).inMilliseconds / 1000.0;
-           final taskId = (_asrProvider as AliyunProvider).taskId ?? "unknown";
-           MeteringService().trackUsage(duration, taskId);
-           _startTime = null; // reset
-        }
       } catch (e) {
         _log("Provider Stop Error: $e");
       }
@@ -592,9 +582,6 @@ class CoreEngine {
            });
             // 1. Add to Unified Log
             ChatService().addUserMessage(finalText);
-            
-            // 2. Parallel: Analyze intent for MCP commands
-           AgentService().process(finalText);
         } else {
            // STANDARD MODE: Inject
            _statusController.add("Ready");
