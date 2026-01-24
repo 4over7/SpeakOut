@@ -21,6 +21,10 @@ mkdir -p "${STAGING_DIR}"
 # 2. Prepare Staging
 echo "Preparing files..."
 cp -R "build/macos/Build/Products/Release/${APP_NAME}.app" "${STAGING_DIR}/"
+# Injection: Copy Dylib to App Bundle
+mkdir -p "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib"
+cp "native_lib/libnative_input.dylib" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/"
+
 ln -s /Applications "${STAGING_DIR}/Applications"
 
 # 3. Create Temp DMG

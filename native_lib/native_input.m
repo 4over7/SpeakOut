@@ -1,16 +1,36 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 #include <Foundation/Foundation.h>
+#include <AudioToolbox/AudioToolbox.h>
+#import <AVFoundation/AVFoundation.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <mach/mach_time.h>
 
+// Debug Log Path
 // Debug Log Path
 void log_to_file(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
+  
+  // Write to ~/Downloads/speakout_native.log
+  // Hardcoded for reliable debugging on this machine
+  const char* path = "/Users/leon/Downloads/speakout_native.log";
+  FILE *f = fopen(path, "a");
+  if (f) {
+      time_t now;
+      time(&now);
+      char buf[20];
+      strftime(buf, sizeof(buf), "%H:%M:%S", localtime(&now));
+      fprintf(f, "[%s] ", buf);
+      vfprintf(f, fmt, args);
+      fprintf(f, "\n");
+      fclose(f);
+  }
+  
   NSString *formatStr = [[NSString alloc] initWithUTF8String:fmt];
   NSString *msg = [[NSString alloc] initWithFormat:formatStr arguments:args];
   NSLog(@"[NativeInput] %@", msg);
@@ -59,7 +79,15 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
 
   // Capture Key events
   if (type == kCGEventKeyDown || type == kCGEventKeyUp) {
+    uint64_t t0 = mach_absolute_time();
     dartCallback((int)keyCode, type == kCGEventKeyDown);
+    uint64_t t1 = mach_absolute_time();
+    
+    // Convert to milliseconds
+    mach_timebase_info_data_t info;
+    mach_timebase_info(&info);
+    double ms = (double)(t1 - t0) * info.numer / info.denom / 1000000.0;
+    log_to_file("Key %d %s: dartCallback took %.2f ms", keyCode, type == kCGEventKeyDown ? "DOWN" : "UP", ms);
   } else if (type == kCGEventFlagsChanged) {
     CGEventFlags flags = CGEventGetFlags(event);
     bool isDown = false;
@@ -249,4 +277,168 @@ bool check_permission() {
   bool trusted =
       AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
   return trusted;
+}
+
+// 3. Check Key State (Watchdog)
+// Returns 1 if key is physically down, 0 if up.
+int check_key_pressed(int keyCode) {
+  // kCGEventSourceStateHIDSystemState combines physical keyboard state
+  bool isDown = CGEventSourceKeyState(kCGEventSourceStateHIDSystemState, (CGKeyCode)keyCode);
+  return isDown ? 1 : 0;
+}
+
+// ============================================================================
+// AUDIO RECORDING via AudioQueue (Input Only - No Output Device Involvement)
+// ============================================================================
+
+#define NUM_BUFFERS 3
+#define BUFFER_DURATION_MS 100  // 100ms per buffer = 1600 samples @ 16kHz
+
+// Callback for audio data from Dart
+typedef void (*DartAudioCallback)(const int16_t* samples, int sampleCount);
+
+// Audio Recording State
+static AudioQueueRef audioQueue = NULL;
+static AudioQueueBufferRef audioBuffers[NUM_BUFFERS];
+static DartAudioCallback audioCallback = NULL;
+static bool isRecording = false;
+static AudioStreamBasicDescription audioFormat;
+
+// AudioQueue Input Callback
+static void AudioInputCallback(void *inUserData,
+                                AudioQueueRef inAQ,
+                                AudioQueueBufferRef inBuffer,
+                                const AudioTimeStamp *inStartTime,
+                                UInt32 inNumberPacketDescriptions,
+                                const AudioStreamPacketDescription *inPacketDescs) {
+    if (!isRecording || audioCallback == NULL) {
+        return;
+    }
+    
+    // inBuffer->mAudioData contains raw PCM Int16 samples
+    int16_t *samples = (int16_t *)inBuffer->mAudioData;
+    int sampleCount = inBuffer->mAudioDataByteSize / sizeof(int16_t);
+    
+    // Send to Dart
+    audioCallback(samples, sampleCount);
+    
+    // Re-enqueue buffer for next capture
+    if (isRecording) {
+        AudioQueueEnqueueBuffer(inAQ, inBuffer, 0, NULL);
+    }
+}
+
+// Start Audio Recording
+// Returns 1 on success, negative on error
+int start_audio_recording(DartAudioCallback callback) {
+    if (isRecording) {
+        log_to_file("Audio: Already recording");
+        return 1;
+    }
+    
+    if (callback == NULL) {
+        log_to_file("Audio: Callback is NULL");
+        return -1;
+    }
+    
+    audioCallback = callback;
+    
+    // Configure audio format: 16kHz, Mono, 16-bit signed integer
+    memset(&audioFormat, 0, sizeof(audioFormat));
+    audioFormat.mSampleRate = 16000.0;
+    audioFormat.mFormatID = kAudioFormatLinearPCM;
+    audioFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
+    audioFormat.mBitsPerChannel = 16;
+    audioFormat.mChannelsPerFrame = 1;
+    audioFormat.mBytesPerFrame = 2;  // 16-bit mono = 2 bytes
+    audioFormat.mFramesPerPacket = 1;
+    audioFormat.mBytesPerPacket = 2;
+    
+    // Create AudioQueue for Input
+    OSStatus status = AudioQueueNewInput(&audioFormat,
+                                          AudioInputCallback,
+                                          NULL,  // user data
+                                          CFRunLoopGetMain(),
+                                          kCFRunLoopCommonModes,
+                                          0,
+                                          &audioQueue);
+    
+    if (status != noErr) {
+        log_to_file("Audio: Failed to create AudioQueue, status=%d", (int)status);
+        return -2;
+    }
+    
+    // Calculate buffer size for 100ms of audio
+    // 16kHz * 0.1s = 1600 samples * 2 bytes = 3200 bytes
+    UInt32 bufferByteSize = (UInt32)(audioFormat.mSampleRate * BUFFER_DURATION_MS / 1000.0 * audioFormat.mBytesPerFrame);
+    
+    // Allocate and enqueue buffers
+    for (int i = 0; i < NUM_BUFFERS; i++) {
+        status = AudioQueueAllocateBuffer(audioQueue, bufferByteSize, &audioBuffers[i]);
+        if (status != noErr) {
+            log_to_file("Audio: Failed to allocate buffer %d, status=%d", i, (int)status);
+            AudioQueueDispose(audioQueue, true);
+            audioQueue = NULL;
+            return -3;
+        }
+        AudioQueueEnqueueBuffer(audioQueue, audioBuffers[i], 0, NULL);
+    }
+    
+    // Start recording
+    status = AudioQueueStart(audioQueue, NULL);
+    if (status != noErr) {
+        log_to_file("Audio: Failed to start AudioQueue, status=%d", (int)status);
+        AudioQueueDispose(audioQueue, true);
+        audioQueue = NULL;
+        return -4;
+    }
+    
+    isRecording = true;
+    log_to_file("Audio: Recording started (16kHz, Mono, Int16)");
+    return 1;
+}
+
+// Stop Audio Recording
+void stop_audio_recording() {
+    if (!isRecording || audioQueue == NULL) {
+        return;
+    }
+    
+    isRecording = false;
+    
+    // Stop and dispose queue
+    AudioQueueStop(audioQueue, true);  // true = stop immediately
+    AudioQueueDispose(audioQueue, true);
+    audioQueue = NULL;
+    audioCallback = NULL;
+    
+    log_to_file("Audio: Recording stopped");
+}
+
+// Check if currently recording
+int is_audio_recording() {
+    return isRecording ? 1 : 0;
+}
+
+// Check microphone permission (macOS 10.14+)
+int check_microphone_permission() {
+    if (@available(macOS 10.14, *)) {
+        AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+        if (status == AVAuthorizationStatusAuthorized) {
+            return 1;  // Granted
+        } else if (status == AVAuthorizationStatusNotDetermined) {
+            // Request permission
+            __block int result = 0;
+            dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+            [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {
+                result = granted ? 1 : 0;
+                dispatch_semaphore_signal(sema);
+            }];
+            dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
+            return result;
+        } else {
+            return 0;  // Denied or Restricted
+        }
+    }
+    return 1;  // Pre-10.14 doesn't require permission
 }

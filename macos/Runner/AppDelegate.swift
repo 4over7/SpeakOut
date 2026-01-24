@@ -21,6 +21,9 @@ class AppDelegate: FlutterAppDelegate {
       )
 
       channel.setMethodCallHandler { [weak self] (call, result) in
+        // Debug Log: Trace Incoming Calls
+        NSLog("[Overlay] MethodChannel received: %@", call.method)
+
         switch call.method {
         case "showRecording":
           if let args = call.arguments as? [String: Any], let text = args["text"] as? String {
@@ -47,6 +50,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func showRecordingOverlay(initialText: String) {
+    NSLog("[Overlay] showRecordingOverlay called with text: %@", initialText)
     // 1. Always calculate target position logic FIRST (Dynamic Multi-Monitor Support)
     let mouseLoc = NSEvent.mouseLocation
     let screen =
@@ -147,6 +151,9 @@ class AppDelegate: FlutterAppDelegate {
     let panelHeight = panel.frame.height
 
     waveTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+      // Debug log every 1 second (approx 12 frames) to avoid flooding
+      // if Int.random(in: 0...12) == 0 { NSLog("[Overlay] Animation Frame") }
+
       guard let self = self, self.isShowingRecording else { return }
 
       let maxHeight: CGFloat = 24
@@ -173,6 +180,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func hideRecordingOverlay() {
+    NSLog("[Overlay] hideRecordingOverlay called")
     isShowingRecording = false
     waveTimer?.invalidate()
     waveTimer = nil

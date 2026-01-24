@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
-import 'package:record/record.dart'; // For InputDevice
 import 'package:url_launcher/url_launcher.dart'; // Pay Link
 import '../services/config_service.dart';
 import '../services/app_service.dart';
@@ -459,37 +458,6 @@ class _SettingsPageState extends State<SettingsPage> {
       );
   }
 
-  Widget _buildAudioDropdown(List<InputDevice> devices, String? currentId) {
-     final loc = AppLocalizations.of(context)!;
-     final displayMap = {for (var d in devices) d.id: d.label};
-     displayMap['default'] = "${loc.systemDefault} (Default)";
-     
-     return Container(
-        height: 28,
-        constraints: const BoxConstraints(maxWidth: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: MacosTheme.of(context).canvasColor,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: MacosColors.separatorColor),
-        ),
-        child: MacosPopupButton<String?>(
-          value: devices.any((d) => d.id == currentId) ? currentId : null,
-          hint: const Text("Select Device"),
-          items: [
-            MacosPopupMenuItem(value: null, child: Text(loc.systemDefault)),
-            ...devices.map((d) => MacosPopupMenuItem(value: d.id, child: Text(d.label, overflow: TextOverflow.ellipsis))),
-          ],
-          onChanged: (id) async {
-             String? name = devices.where((d) => d.id == id).firstOrNull?.label;
-             await ConfigService().setAudioInputDeviceId(id, name: name);
-             setState((){});
-             await AppService().engine.refreshInputDevice();
-          },
-        ),
-     );
-  }
-
   // --- View: Account ---
   Widget _buildAccountView() {
     final isPro = ConfigService().isProUser;
@@ -639,18 +607,25 @@ class _SettingsPageState extends State<SettingsPage> {
                ),
              ),
              const SettingsDivider(),
-             // Audio Input
-             FutureBuilder<List<InputDevice>>(
-               future: AppService().engine.listInputDevices(),
-               builder: (ctx, snapshot) {
-                 final devices = snapshot.data ?? [];
-                 final current = ConfigService().audioInputDeviceId;
-                 return SettingsTile(
-                   label: loc.audioInput,
-                   icon: CupertinoIcons.mic,
-                   child: _buildAudioDropdown(devices, current),
-                 );
-               }
+             // Audio Input (Native audio uses system default)
+             SettingsTile(
+               label: loc.audioInput,
+               icon: CupertinoIcons.mic,
+               child: Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                 decoration: BoxDecoration(
+                   color: MacosColors.systemGrayColor.withOpacity(0.1),
+                   borderRadius: BorderRadius.circular(6),
+                 ),
+                 child: Row(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                     const MacosIcon(CupertinoIcons.checkmark_circle_fill, color: Colors.green, size: 14),
+                     const SizedBox(width: 6),
+                     Text("${loc.systemDefault}", style: AppTheme.body(context)),
+                   ],
+                 ),
+               ),
              ),
           ],
         ),

@@ -3,6 +3,9 @@ import '../engine/core_engine.dart';
 import 'notification_service.dart';
 import 'metering_service.dart';
 import 'config_service.dart';
+import 'mcp_config_service.dart';
+import 'agent_service.dart';
+import 'chat_service.dart';
 import '../engine/model_manager.dart';
 
 /// 管理应用程序生命周期与核心业务逻辑
@@ -19,18 +22,53 @@ class AppService {
 
   /// 初始化应用核心服务
   Future<void> init() async {
+    engine.updateStatus("正在配置服务...");
+    await Future.delayed(const Duration(milliseconds: 50));
     // 1. Config
     await ConfigService().init();
     
+    // 1.5 Other Services
+    await McpConfigService().init();
+    await ChatService().init();
+    await AgentService().init();
+    
+    engine.updateStatus("正在启动键盘监听...");
+    await Future.delayed(const Duration(milliseconds: 100));
+
     // 2. Engine (Set KeyCode)
     engine.pttKeyCode = ConfigService().pttKeyCode;
-    await engine.init(); // START LISTENER (Crucial Fix)
+    try {
+       await engine.init(); 
+    } catch (e) {
+       engine.updateStatus("❌ 键盘监听失败: $e");
+       await Future.delayed(const Duration(seconds: 2));
+    }
     
-    // 3. Initialize ASR (Essential for Sherpa bindings)
-    await _initASR();
+    // 3. Initialize ASR (HEAVY TASK - Delay significantly)
+    // Give the UI time to fully settle (1 second) before hitting the CPU hard
+    engine.updateStatus("准备加载语音模型...");
+    await Future.delayed(const Duration(milliseconds: 800));
     
-    // 4. Punctuation (Auto) - After ASR
+    engine.updateStatus("正在加载语音模型...");
+    await Future.delayed(const Duration(milliseconds: 50)); 
+    try {
+      await _initASR();
+    } catch (e) {
+      engine.updateStatus("❌ 语音模型失败: $e");
+    }
+    
+    // 4. Punctuation
     await _initPunctuation();
+    
+    // Final Health Check
+    if (engine.isListenerRunning) {
+        engine.updateStatus("✅就绪");
+        await Future.delayed(const Duration(milliseconds: 500));
+        engine.updateStatus(""); // Clear
+    } else {
+        // Persistent Error - Do NOT Clear
+        engine.updateStatus("❌ 监听启动失败 (请检查权限)");
+    }
   }
   
   Future<void> _initASR() async {

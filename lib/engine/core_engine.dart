@@ -4,7 +4,6 @@ import 'dart:ffi' as ffi;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../ffi/native_input.dart';
 import '../ffi/native_input_base.dart';
@@ -27,13 +26,12 @@ class CoreEngine {
   // Simple singleton
   factory CoreEngine() => _instance;
 
-  // Dependencies - always use real implementations
+  // Dependencies - Native Audio via FFI (replaces record package)
   late final NativeInputBase _nativeInput;
-  AudioRecorder _audioRecorder = AudioRecorder();
+  ffi.NativeCallable<AudioCallbackC>? _audioCallable;
   
   CoreEngine._internal() {
     _nativeInput = NativeInput();
-    // _audioRecorder already initialized
   }
   
   // ASR Provider abstraction
@@ -41,6 +39,7 @@ class CoreEngine {
   
   // Metering State
   DateTime? _startTime;
+  Timer? _watchdogTimer; // Safety mechanism
 
   // State
   bool _isRecording = false;
@@ -63,6 +62,12 @@ class CoreEngine {
   final _statusController = StreamController<String>.broadcast();
   Stream<String> get statusStream => _statusController.stream;
   
+  // Public helper for AppService
+  void updateStatus(String msg) {
+    _statusController.add(msg);
+  }
+
+  
   final _recordingController = StreamController<bool>.broadcast();
   Stream<bool> get recordingStream => _recordingController.stream;
   
@@ -82,16 +87,14 @@ class CoreEngine {
     debugPrint("[CoreEngine] $msg");
   }
 
-  // Device Listing
-  Future<List<InputDevice>> listInputDevices() async {
-    try {
-      if (!await _audioRecorder.hasPermission()) return [];
-      return await _audioRecorder.listInputDevices();
-    } catch (e) {
-      _log("Error listing devices: $e");
-      return [];
-    }
+  // Device Listing - Using native permission check
+  Future<bool> listInputDevices() async {
+    // Native audio doesn't need device listing - uses system default
+    return _nativeInput.checkMicrophonePermission();
   }
+
+  bool _isListenerRunning = false;
+  bool get isListenerRunning => _isListenerRunning;
 
   Future<void> init() async {
     _log("Init started [v3.5.0]. _isInit: $_isInit");
@@ -113,14 +116,18 @@ class CoreEngine {
     try {
       _nativeCallable = ffi.NativeCallable<KeyCallbackC>.listener(_onKeyStatic);
       if (_nativeInput.startListener(_nativeCallable!.nativeFunction)) {
+        _isListenerRunning = true;
         _statusController.add("Keyboard Listener Started.");
         _log("Listener start success.");
         if (_nativeInput.checkPermission()) _statusController.add("Accessibility Trusted: true");
       } else {
          _statusController.add("Failed to start Keyboard Listener.");
+         _isListenerRunning = false;
       }
     } catch (e, stack) {
        _log("Listener Exception: $e\n$stack");
+       _isListenerRunning = false;
+       rethrow; // Let AppService handle it
     }
 
     _isInit = true;
@@ -129,42 +136,10 @@ class CoreEngine {
   
   ffi.NativeCallable<KeyCallbackC>? _nativeCallable;
   
-  // Cache for Input Device
-  InputDevice? _cachedInputDevice;
-  bool _deviceCacheValid = false;
-
+  // Native audio doesn't need device caching - uses system default
+  // Keeping this stub for API compatibility
   Future<void> refreshInputDevice() async {
-     try {
-       if (!await _audioRecorder.hasPermission()) return;
-       final selectedId = ConfigService().audioInputDeviceId;
-       if (selectedId == null) {
-         _cachedInputDevice = null;
-         _deviceCacheValid = true;
-         return;
-       }
-       final devices = await _audioRecorder.listInputDevices();
-       
-       // 1. Try Exact Match by ID
-       InputDevice? match = devices.cast<InputDevice?>().firstWhere((d) => d!.id == selectedId, orElse: () => null);
-       
-       // 2. If ID changed (common on macOS reboot), try Match by Name
-       if (match == null) {
-           final savedName = ConfigService().audioInputDeviceName;
-           if (savedName != null) {
-              match = devices.cast<InputDevice?>().firstWhere((d) => d!.label == savedName, orElse: () => null);
-              if (match != null) {
-                 _log("Recovered Device by Name: ${match.label} (New ID: ${match.id})");
-                 // Optional: Update ID silently?
-                 await ConfigService().setAudioInputDeviceId(match.id, name: match.label);
-              }
-           }
-       }
-       
-       _cachedInputDevice = match;
-       _deviceCacheValid = true;
-     } catch (e) { 
-       _deviceCacheValid = false; 
-     }
+    _log("Native audio uses system default microphone");
   }
 
   // Switch Provider Logic
@@ -289,6 +264,7 @@ class CoreEngine {
   bool _diaryKeyHeld = false;
 
   void _handleKey(int keyCode, bool isDown) {
+    final t0 = DateTime.now().millisecondsSinceEpoch;
     if (isDown) _rawKeyController.add(keyCode);
     
     // Check PTT
@@ -298,12 +274,18 @@ class CoreEngine {
            _pttKeyHeld = true;
            if (!_isRecording) {
               _isDiaryMode = false;
+              _log("[T+0ms] Key DOWN detected, calling startRecording");
               startRecording();
+              _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] startRecording returned");
            }
         }
       } else {
         _pttKeyHeld = false; // FALLING EDGE
-        if (_isRecording && !_isDiaryMode) stopRecording();
+        if (_isRecording && !_isDiaryMode) {
+          _log("[T+0ms] Key UP detected, calling stopRecording");
+          stopRecording();
+          _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] stopRecording returned");
+        }
       }
       return;
     }
@@ -325,18 +307,18 @@ class CoreEngine {
     }
   }
 
-  // REFACTORED AUDIO PIPELINE
+  // NATIVE AUDIO PIPELINE (Replaces record package)
   Future<void> startRecording() async {
-    _log("Start Recording Called");
+    final t0 = DateTime.now().millisecondsSinceEpoch;
+    _log("[T+0ms] startRecording() BEGIN");
     
-    // 1. PERMISSION CHECK (Using record package, not permission_handler)
-    // permission_handler was found to BLOCK indefinitely on macOS.
-    final hasPerm = await _audioRecorder.hasPermission();
-    if (!hasPerm) {
-        _log("Permission DENIED by record.hasPermission().");
+    // 1. PERMISSION CHECK (Native FFI)
+    if (!_nativeInput.checkMicrophonePermission()) {
+        _log("Permission DENIED by native check.");
         _statusController.add("需要麦克风权限");
         return;
     }
+    _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] Permission check done");
 
     if (_isRecording) {
       _log("Already recording, ignoring.");
@@ -353,9 +335,9 @@ class CoreEngine {
       _audioDumpSink = f.openWrite();
     } catch (e) {
       _log("Audio Dump Init Failed: $e");
-    } 
+    }
+    _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] Audio dump init done");
 
-    // 2. UI FEEDBACK (Show Immediately)
     // 2. UI FEEDBACK (Show Immediately)
     try { 
        if (_isDiaryMode) {
@@ -365,8 +347,9 @@ class CoreEngine {
          _overlayChannel.invokeMethod('showRecording'); 
        }
     } catch (e) {/*ignore*/}
+    _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] showRecording invoked");
 
-    // 3. AUDIO INIT
+    // 3. AUDIO INIT via Native FFI
     try {
         // CRITICAL: Start ASR Provider FIRST (Creates internal stream)
         if (_asrProvider == null || !_asrProvider!.isReady) {
@@ -376,23 +359,36 @@ class CoreEngine {
             return;
         }
         await _asrProvider!.start();
-        _startTime = DateTime.now(); // Mark start time for Metering
+        _startTime = DateTime.now();
         _log("ASR Provider Started.");
-        
-        if (await _audioRecorder.isRecording()) {
-            await _audioRecorder.stop();
-        }
-        
-        InputDevice? device;
-        if (_deviceCacheValid && _cachedInputDevice != null) {
-            device = _cachedInputDevice;
-            _log("Using Cached Device: ${device?.label ?? 'Unknown'}");
-        } else {
-            device = null; // OS Default
-            _log("Using System Default Device");
-        }
 
-        await _attemptStartStream(device);
+        // 4. WATCHDOG TIMER (The "Safety Net")
+        _watchdogTimer?.cancel();
+        _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+             if (!_isRecording) { timer.cancel(); return; }
+             final targetKey = _isDiaryMode ? ConfigService().diaryKeyCode : pttKeyCode;
+             bool isPhysicallyDown = _nativeInput.isKeyPressed(targetKey);
+             if (!isPhysicallyDown) {
+                 _log("🐶 Watchdog: Key $targetKey is UP physically but App is Recording. Forcing Stop.");
+                 timer.cancel();
+                 stopRecording();
+             }
+        });
+        
+        // 5. SETUP NATIVE AUDIO CALLBACK
+        _setupNativeAudioCallback();
+        
+        // 6. START NATIVE RECORDING
+        _log("Starting native audio recording...");
+        final success = _nativeInput.startAudioRecording(_audioCallable!.nativeFunction);
+        if (!success) {
+            _log("Native audio start failed!");
+            _cleanupRecordingState();
+            _statusController.add("麦克风启动失败");
+            return;
+        }
+        _audioStarted = true;
+        _log("Native audio recording started successfully.");
 
     } catch (e) {
         _log("Start Fatal Error: $e");
@@ -400,45 +396,36 @@ class CoreEngine {
         _statusController.add("启动失败");
     }
   }
+  
+  /// Setup native audio callback (Int16 samples -> Float32 for ASR)
+  void _setupNativeAudioCallback() {
+    // Dispose previous callable if exists
+    _audioCallable?.close();
+    
+    // Create new native callable for audio data
+    _audioCallable = ffi.NativeCallable<AudioCallbackC>.listener(
+      _onNativeAudioData,
+    );
+    _log("Native audio callback setup complete.");
+  }
+  
+  /// Native audio callback handler - receives Int16 samples from AudioQueue
+  static void _onNativeAudioData(ffi.Pointer<ffi.Int16> samplesPtr, int sampleCount) {
+    final engine = CoreEngine._instance;
+    if (!engine._isRecording || sampleCount <= 0) return;
+    
+    // Convert Pointer<Int16> to Uint8List (matching old processAudioData interface)
+    // Each Int16 is 2 bytes
+    final byteCount = sampleCount * 2;
+    final bytes = samplesPtr.cast<ffi.Uint8>().asTypedList(byteCount);
+    
+    // Process using existing pipeline
+    engine._processAudioData(Uint8List.fromList(bytes));
+  }
 
   // Mutex for stopping state
   bool _isStopping = false;
   bool _audioStarted = false;
-
-  Future<void> _attemptStartStream(InputDevice? device) async {
-      _log("Stream Request: Device=${device?.label ?? 'OS Default'}, Rate=16000, Mode=Standard");
-      
-      try {
-        final stream = await _audioRecorder.startStream(
-          RecordConfig(
-            encoder: AudioEncoder.pcm16bits,
-            sampleRate: 16000, 
-            numChannels: 1,
-            device: device,
-            echoCancel: false, 
-            autoGain: false, 
-            noiseSuppress: false,
-          ),
-        );
-        _audioStarted = true;
-        _log("Stream Started (16k Standard).");
-
-        stream.listen((data) {
-           _processAudioData(data);
-        }, onError: (e) {
-          _log("Stream Error: $e");
-          _cleanupRecordingState();
-          _statusController.add("麦克风错误");
-        }, onDone: () {
-          _log("Stream Closed");
-          if (_isRecording) _cleanupRecordingState();
-        });
-      } catch (e) {
-         _log("Stream Creation Failed: $e");
-         _cleanupRecordingState();
-         _statusController.add("麦克风初始化失败");
-      }
-  }
   
   void _processAudioData(Uint8List data) {
     if (!_isRecording) return;
@@ -485,6 +472,10 @@ class CoreEngine {
      _isRecording = false;
      _isStopping = false;
      _audioStarted = false;
+     _isRecording = false;
+     _isStopping = false;
+     _audioStarted = false;
+     _watchdogTimer?.cancel(); // Kill watchdog
      _recordingController.add(false);
      _recordingController.add(false);
      try { _overlayChannel.invokeMethod('hideRecording'); } catch(e) {}
@@ -494,7 +485,7 @@ class CoreEngine {
   Future<void> _stopAudioSafely() async {
     if (_audioStarted) {
       try {
-        await _audioRecorder.stop();
+        _nativeInput.stopAudioRecording();
         _audioStarted = false;
       } catch (e) { _log("Stop Audio Error: $e"); }
     }
@@ -508,15 +499,19 @@ class CoreEngine {
     // Don't wait for ANY hardware. Hide UI immediately.
     _recordingController.add(false); 
     _statusController.add("处理中...");
-    try { await _overlayChannel.invokeMethod('hideRecording'); } catch (_) {}
     
-    // 2. HARDWARE SHUTDOWN (With Timeout Protection)
-    // If CoreAudio hangs (err 1852797029), we must NOT hang the app.
+    // Fire and forget hide command - don't await native response
+    _overlayChannel.invokeMethod('hideRecording').catchError((e) {
+      _log("Overlay Hide Error: $e");
+    });
+    
+    // Yield to event loop to ensure method channel message is dispatched 
+    // before we hit any potential native blocking code
+    await Future.delayed(const Duration(milliseconds: 10));
+    
+    // 2. HARDWARE SHUTDOWN (Native audio is synchronous, no timeout needed)
     try {
-      await _stopAudioSafely().timeout(const Duration(milliseconds: 500), onTimeout: () {
-          _log("⚠️ Audio Hardware Timeout! Forcing shutdown.");
-          _audioStarted = false; // Force flag reset
-      });
+      await _stopAudioSafely();
     } catch (e) {
        _log("Audio Stop Error: $e");
     }
@@ -528,7 +523,11 @@ class CoreEngine {
     if (_asrProvider != null) {
       String text = "";
       try {
-        text = await _asrProvider!.stop();
+        // Enforce timeout on Provider Stop as well (Sherpa FFI could block)
+        text = await _asrProvider!.stop().timeout(const Duration(seconds: 2), onTimeout: () {
+             _log("⚠️ ASR Provider Stop Timeout!");
+             return "";
+        });
         
         // METERING LOGIC: Track Usage
         if (_asrProvider is AliyunProvider && _startTime != null) {
@@ -547,7 +546,7 @@ class CoreEngine {
       // AI Correction Logic
       if (text.isNotEmpty && ConfigService().aiCorrectionEnabled) {
          _statusController.add("AI 优化中...");
-         try { await _overlayChannel.invokeMethod('updateStatus', {"text": "🤖 AI Optimizing..."}); } catch(_) {}
+         try { _overlayChannel.invokeMethod('updateStatus', {"text": "🤖 AI Optimizing..."}); } catch(_) {}
          
          try {
             finalText = await LLMService().correctText(text);

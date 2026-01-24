@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'native_input_base.dart';
 
 class NativeInput implements NativeInputBase {
@@ -13,13 +14,7 @@ class NativeInput implements NativeInputBase {
 
   // Debug Logger
   void _log(String msg) {
-    try {
-      final f = File('/tmp/SpeakOut_debug.log');
-      final time = DateTime.now().toIso8601String();
-      f.writeAsStringSync("[$time] [Dart] $msg\n", mode: FileMode.append);
-    } catch (e) {
-      print("Log Failed: $e");
-    }
+    debugPrint("[NativeInput] $msg");
   }
 
   NativeInput() {
@@ -115,5 +110,87 @@ class NativeInput implements NativeInputBase {
     final result = _checkPermission();
     _log("Dart: check_permission returned $result");
     return result == 1; // Assuming 1 is true
+  }
+
+  // New Watchdog binding
+  late CheckKeyPressedDart _checkKeyPressed;
+  bool _watchdogBound = false;
+
+  @override
+  bool isKeyPressed(int keyCode) {
+    if (!_watchdogBound) {
+       try {
+         _checkKeyPressed = _dylib.lookup<NativeFunction<CheckKeyPressedC>>('check_key_pressed').asFunction();
+         _watchdogBound = true;
+       } catch (e) {
+         _log("FAILED to bind check_key_pressed: $e");
+         return false;
+       }
+    }
+    return _checkKeyPressed(keyCode) == 1;
+  }
+  
+  // ============ AUDIO RECORDING ============
+  late StartAudioRecordingDart _startAudioRecording;
+  late StopAudioRecordingDart _stopAudioRecording;
+  late IsAudioRecordingDart _isAudioRecording;
+  late CheckMicrophonePermissionDart _checkMicPermission;
+  bool _audioBound = false;
+  
+  void _bindAudioFunctions() {
+    if (_audioBound) return;
+    try {
+      _startAudioRecording = _dylib
+          .lookup<NativeFunction<StartAudioRecordingC>>('start_audio_recording')
+          .asFunction();
+      _stopAudioRecording = _dylib
+          .lookup<NativeFunction<StopAudioRecordingC>>('stop_audio_recording')
+          .asFunction();
+      _isAudioRecording = _dylib
+          .lookup<NativeFunction<IsAudioRecordingC>>('is_audio_recording')
+          .asFunction();
+      _checkMicPermission = _dylib
+          .lookup<NativeFunction<CheckMicrophonePermissionC>>('check_microphone_permission')
+          .asFunction();
+      _audioBound = true;
+      _log("Audio FFI bindings SUCCESS");
+    } catch (e) {
+      _log("Audio FFI bindings FAILED: $e");
+    }
+  }
+  
+  @override
+  bool startAudioRecording(Pointer<NativeFunction<AudioCallbackC>> callback) {
+    _bindAudioFunctions();
+    if (!_audioBound) return false;
+    _log("Dart: Calling start_audio_recording...");
+    final result = _startAudioRecording(callback);
+    _log("Dart: start_audio_recording returned $result");
+    return result == 1;
+  }
+  
+  @override
+  void stopAudioRecording() {
+    _bindAudioFunctions();
+    if (!_audioBound) return;
+    _log("Dart: Calling stop_audio_recording...");
+    _stopAudioRecording();
+  }
+  
+  @override
+  bool isAudioRecording() {
+    _bindAudioFunctions();
+    if (!_audioBound) return false;
+    return _isAudioRecording() == 1;
+  }
+  
+  @override
+  bool checkMicrophonePermission() {
+    _bindAudioFunctions();
+    if (!_audioBound) return false;
+    _log("Dart: Calling check_microphone_permission...");
+    final result = _checkMicPermission();
+    _log("Dart: check_microphone_permission returned $result");
+    return result == 1;
   }
 }

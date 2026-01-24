@@ -25,36 +25,34 @@ import 'ui/theme.dart';
 import 'ui/dialogs/tool_confirmation_dialog.dart';
 import 'ui/chat/chat_page.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await windowManager.ensureInitialized();
-  
-  // Initialize Services
-  await ConfigService().init();
-  await McpConfigService().init();
-  await ChatService().init();
-  await AgentService().init();
-  
-  // Initialize Engine
-  await CoreEngine().init();
+// Global Error Catcher
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await windowManager.ensureInitialized();
+    
+    // Catch Build Errors
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      return MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: SelectableText(
+                "Startup Error:\n${details.exception}\nStack: ${details.stack}",
+                style: const TextStyle(color: Colors.red, fontSize: 14),
+              ),
+            ),
+          ),
+        ),
+      );
+    };
 
-  // Set window size
-  WindowOptions windowOptions = const WindowOptions(
-    size: Size(800, 600), // Larger size for Settings UI
-    center: true,
-    backgroundColor: Colors.transparent,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.hidden,
-  );
-  
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.setSize(const Size(800, 600)); // Force set size
-    await windowManager.center(); // Re-center
-    await windowManager.show();
-    await windowManager.focus();
+    runApp(const SpeakOutApp());
+  }, (error, stack) {
+    print("CRITICAL ERROR: $error\n$stack");
   });
-
-  runApp(const SpeakOutApp());
 }
 
 class SpeakOutApp extends StatefulWidget {
@@ -70,6 +68,9 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
     return ValueListenableBuilder<Locale?>(
       valueListenable: ConfigService().localeNotifier,
       builder: (context, locale, child) {
+        // Fallback to system or English if ConfigService not ready
+        final targetLocale = locale; 
+
         return MacosApp(
           title: 'SpeakOut',
           // Auto-adapt to system light/dark mode
@@ -90,6 +91,16 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          // Ensure we have a fallback resolution
+          localeResolutionCallback: (locale, supportedLocales) {
+            if (locale == null) return supportedLocales.first;
+            for (var supportedLocale in supportedLocales) {
+              if (supportedLocale.languageCode == locale.languageCode) {
+                return supportedLocale;
+              }
+            }
+            return supportedLocales.first;
+          },
           supportedLocales: AppLocalizations.supportedLocales,
           
           home: const HomePage(),
@@ -123,8 +134,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _initSystemTray();
-    _appService.init(); // Central Init
+    // Async Init after first frame to prevent White Screen
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+       await _initWindow();
+       await _appService.init(); 
+    });
     
     // Listen to Engine status
     _appService.engine.statusStream.listen((msg) {
@@ -310,6 +324,27 @@ class _HomePageState extends State<HomePage> {
         Platform.isWindows ? _systemTray.popUpContextMenu() : appWindow.show();
       }
     });
+  }
+
+  Future<void> _initWindow() async {
+      // windowManager initialized in main now
+      WindowOptions windowOptions = const WindowOptions(
+        size: Size(800, 600),
+        center: true,
+        backgroundColor: Colors.transparent,
+        skipTaskbar: false,
+        titleBarStyle: TitleBarStyle.hidden,
+      );
+      
+      await windowManager.waitUntilReadyToShow(windowOptions, () async {
+        await windowManager.setSize(const Size(800, 600));
+        await windowManager.center();
+        await windowManager.show();
+        await windowManager.focus();
+      });
+      
+      // Init Tray
+      await _initSystemTray();
   }
 
   // Legacy init methods removed (See Refactor Phase 3)

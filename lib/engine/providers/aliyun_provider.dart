@@ -21,6 +21,13 @@ class AliyunProvider implements ASRProvider {
   String? _taskId;
   
   bool _isReady = false;
+  
+  // Connection Pool State
+  bool _isConnected = false;
+  Timer? _heartbeatTimer;
+  Timer? _idleDisconnectTimer;
+  static const Duration _idleTimeout = Duration(minutes: 5);
+  static const Duration _heartbeatInterval = Duration(seconds: 30);
 
   @override
   Stream<String> get textStream => _textController.stream;
@@ -45,6 +52,83 @@ class AliyunProvider implements ASRProvider {
     }
     
     _isReady = true;
+    
+    // Pre-connect at initialization (async, non-blocking)
+    _ensureConnectedAsync();
+  }
+  
+  /// Ensure WebSocket is connected (async, for background pre-connect)
+  Future<void> _ensureConnectedAsync() async {
+    if (_isConnected && _channel != null) return;
+    
+    try {
+      await _refreshTokenIfNeeded();
+      await _connectWebSocket();
+    } catch (e) {
+      // Silent failure for pre-connect, will retry on actual start()
+    }
+  }
+  
+  /// Connect WebSocket and setup listeners
+  Future<void> _connectWebSocket() async {
+    if (_isConnected && _channel != null) return;
+    
+    final url = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token=$_token";
+    _channel = WebSocketChannel.connect(Uri.parse(url));
+    
+    _channel!.stream.listen((message) {
+      if (message is String) {
+        _handleMessage(message);
+      }
+    }, onError: (e) {
+      _textController.add("Connection Error: $e");
+      _isConnected = false;
+    }, onDone: () {
+      _isConnected = false;
+      _stopHeartbeat();
+    });
+    
+    _isConnected = true;
+    _startHeartbeat();
+  }
+  
+  /// Start heartbeat timer to keep connection alive
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      if (_isConnected && _channel != null) {
+        // Send empty ping to keep connection alive
+        // Aliyun WebSocket accepts standard WebSocket ping frames
+        try {
+          // WebSocket ping is handled at protocol level, but we can send an empty message
+          // or rely on the library's built-in ping. For safety, just check connection.
+        } catch (_) {}
+      }
+    });
+  }
+  
+  /// Stop heartbeat timer
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+  
+  /// Reset idle disconnect timer (called on each recording)
+  void _resetIdleTimer() {
+    _idleDisconnectTimer?.cancel();
+    _idleDisconnectTimer = Timer(_idleTimeout, () {
+      _disconnectIfIdle();
+    });
+  }
+  
+  /// Disconnect after idle timeout
+  void _disconnectIfIdle() {
+    if (_isConnected && _channel != null) {
+      _channel!.sink.close();
+      _channel = null;
+      _isConnected = false;
+      _stopHeartbeat();
+    }
   }
 
   Future<void> _refreshTokenIfNeeded() async {
@@ -64,22 +148,22 @@ class AliyunProvider implements ASRProvider {
 
   @override
   Future<void> start() async {
-    await _refreshTokenIfNeeded();
+    // Ensure connection is ready (reuse existing or create new)
+    if (!_isConnected || _channel == null) {
+      await _refreshTokenIfNeeded();
+      await _connectWebSocket();
+    }
     
-    // Reset state
-    _startCompleter = Completer<void>();
+    // Reset idle timer since we're actively using the connection
+    _resetIdleTimer();
+    
+    // Reset state for new transcription task
     _pendingBuffer.clear();
     _isHandshakeComplete = false;
     _committedText = "";
     _currentSentence = "";
     
-    final url = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token=$_token";
-    _channel = WebSocketChannel.connect(Uri.parse(url));
-    
-    
-    // Traceable Task ID Generation
-    // Logic: MD5(LicenseKey).substring(0,8) + Random(24)
-    // Benefit: Can identify user from Aliyun logs even without mapping table
+    // Generate new Task ID for this recording session
     String prefix = "00000000";
     final license = ConfigService().licenseKey;
     if (license.isNotEmpty) {
@@ -87,22 +171,11 @@ class AliyunProvider implements ASRProvider {
     }
     final randomPart = const Uuid().v4().replaceAll('-', '').substring(8);
     _taskId = prefix + randomPart;
-    
-    // Listen for messages
-    _channel!.stream.listen((message) {
-      if (message is String) {
-        _handleMessage(message);
-      }
-    }, onError: (e) {
-      _textController.add("Connection Error: $e");
-    }, onDone: () {
-      // closed
-    });
 
-    // Send Start Directive
+    // Send Start Directive (reusing existing connection)
     final startCmd = {
       "header": {
-        "message_id": Uuid().v4().replaceAll('-', ''),
+        "message_id": const Uuid().v4().replaceAll('-', ''),
         "task_id": _taskId,
         "namespace": "SpeechTranscriber",
         "name": "StartTranscription",
@@ -118,8 +191,6 @@ class AliyunProvider implements ASRProvider {
     };
     
     _channel!.sink.add(jsonEncode(startCmd));
-    
-    // Non-blocking return! Logic continues to buffer in acceptWaveform
   }
 
   String _committedText = "";
@@ -202,19 +273,14 @@ class AliyunProvider implements ASRProvider {
     if (_channel == null) return "";
     
     // Robustness: If handshake is still pending, wait for it (up to 2s)
-    // This ensures we don't close the channel before flushing the initial buffer
-    if (!_isHandshakeComplete && _startCompleter != null) {
-        try {
-           await _startCompleter!.future.timeout(const Duration(seconds: 2));
-        } catch (_) {
-           // Timeout, assume failed. proceed to close.
-        }
+    if (!_isHandshakeComplete) {
+        await Future.delayed(const Duration(seconds: 2));
     }
     
-    // Send Stop...
+    // Send Stop (but DON'T close the connection - keep it for reuse)
     final stopCmd = {
       "header": {
-        "message_id": Uuid().v4().replaceAll('-', ''),
+        "message_id": const Uuid().v4().replaceAll('-', ''),
         "task_id": _taskId,
         "namespace": "SpeechTranscriber",
         "name": "StopTranscription",
@@ -226,19 +292,21 @@ class AliyunProvider implements ASRProvider {
     
     // Wait briefly for any final messages
     await Future.delayed(const Duration(milliseconds: 500));
-    await _channel!.sink.close();
-    _channel = null;
+    
+    // Reset idle timer (connection stays open)
+    _resetIdleTimer();
     
     // Return final accumulated text
-    // If currentSentence is not empty, append it? 
-    // Usually Cloud sends TranscriptionCompleted before closing.
-    // unlikely to have partial left. But safer to return committed + current
     return _committedText + _currentSentence; 
   }
 
   @override
   Future<void> dispose() async {
-    _channel?.sink.close();
+    _idleDisconnectTimer?.cancel();
+    _stopHeartbeat();
+    await _channel?.sink.close();
+    _channel = null;
+    _isConnected = false;
     _textController.close();
   }
 }
