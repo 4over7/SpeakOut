@@ -185,4 +185,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get diarySaved => '已保存到笔记';
+
+  @override
+  String get engineType => '引擎类型';
+
+  @override
+  String get punctuationModel => '标点符号模型';
+
+  @override
+  String get punctuationModelDesc => '为识别结果自动添加标点符号。此模型是必需的。';
+
+  @override
+  String get asrModels => '语音识别模型';
+
+  @override
+  String get asrModelsDesc => '请下载并激活至少一个语音识别模型才能使用语音输入功能。';
+
+  @override
+  String get required => '必需';
+
+  @override
+  String get pickOne => '二选一';
 }

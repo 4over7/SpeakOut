@@ -67,5 +67,12 @@
   "createFolder": "New Folder",
   "folderCreated": "Folder Created",
   "chooseFile": "Choose File...",
-  "diarySaved": "Saved to Note"
+  "diarySaved": "Saved to Note",
+  "engineType": "Engine Type",
+  "punctuationModel": "Punctuation Model",
+  "punctuationModelDesc": "Automatically adds punctuation to recognized text. This model is required.",
+  "asrModels": "Speech Recognition Models",
+  "asrModelsDesc": "Please download and activate at least one ASR model to use voice input.",
+  "required": "Required",
+  "pickOne": "Pick One"
 }

@@ -445,6 +445,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved to Note'**
   String get diarySaved;
+
+  /// No description provided for @engineType.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine Type'**
+  String get engineType;
+
+  /// No description provided for @punctuationModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Punctuation Model'**
+  String get punctuationModel;
+
+  /// No description provided for @punctuationModelDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically adds punctuation to recognized text. This model is required.'**
+  String get punctuationModelDesc;
+
+  /// No description provided for @asrModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech Recognition Models'**
+  String get asrModels;
+
+  /// No description provided for @asrModelsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Please download and activate at least one ASR model to use voice input.'**
+  String get asrModelsDesc;
+
+  /// No description provided for @required.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get required;
+
+  /// No description provided for @pickOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick One'**
+  String get pickOne;
 }
 
 class _AppLocalizationsDelegate

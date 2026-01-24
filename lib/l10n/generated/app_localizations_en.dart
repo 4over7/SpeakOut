@@ -190,4 +190,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diarySaved => 'Saved to Note';
+
+  @override
+  String get engineType => 'Engine Type';
+
+  @override
+  String get punctuationModel => 'Punctuation Model';
+
+  @override
+  String get punctuationModelDesc =>
+      'Automatically adds punctuation to recognized text. This model is required.';
+
+  @override
+  String get asrModels => 'Speech Recognition Models';
+
+  @override
+  String get asrModelsDesc =>
+      'Please download and activate at least one ASR model to use voice input.';
+
+  @override
+  String get required => 'Required';
+
+  @override
+  String get pickOne => 'Pick One';
 }

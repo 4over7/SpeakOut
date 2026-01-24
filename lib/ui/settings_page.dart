@@ -331,7 +331,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Column(
       children: [
         SettingsGroup(
-          title: "Engine Type",
+          title: loc.engineType,
           children: [
              SettingsTile(
                label: loc.engineLocal,
@@ -381,13 +381,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 )
              ],
            )
-        else
+        else ...[
+           // 标点模型（必需）
            SettingsGroup(
-             title: loc.tabModels,
+             title: "${loc.punctuationModel} (${loc.required})",
              children: [
-                // Punctuation
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                  child: Text(loc.punctuationModelDesc, style: AppTheme.caption(context)),
+                ),
                 SettingsTile(
-                  label: "Punctuation Model",
+                  label: loc.punctuationModel,
                   child: _buildActionBtn(
                     context,
                     isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
@@ -398,13 +402,25 @@ class _SettingsPageState extends State<SettingsPage> {
                     onActivate: () {},
                   ),
                 ),
-                const SettingsDivider(),
-                // Models
+             ],
+           ),
+           
+           const SizedBox(height: 24),
+           
+           // 语音识别模型（二选一）
+           SettingsGroup(
+             title: "${loc.asrModels} (${loc.pickOne})",
+             children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                  child: Text(loc.asrModelsDesc, style: AppTheme.caption(context)),
+                ),
                 ...ModelManager.availableModels.map((m) {
                    return Column(
                      children: [
                        SettingsTile(
                          label: m.name,
+                         subtitle: m.description,
                          child: _buildActionBtn(
                           context,
                            isDownloaded: _downloadedStatus[m.id] ?? false,
@@ -418,9 +434,10 @@ class _SettingsPageState extends State<SettingsPage> {
                        if (m != ModelManager.availableModels.last) const SettingsDivider(),
                      ],
                    );
-                }).toList(),
+                }),
              ],
            ),
+        ],
       ],
     );
   }
@@ -714,25 +731,49 @@ class _SettingsPageState extends State<SettingsPage> {
     required bool isDownloaded, required bool isLoading, required bool isActive,
     required VoidCallback onDownload, required VoidCallback onDelete, required VoidCallback onActivate
   }) {
-    if (isLoading) return const ProgressCircle(value: null);
+    final loc = AppLocalizations.of(context)!;
+    if (isLoading) {
+      return SizedBox(
+        width: 140,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: _downloadProgress > 0 ? _downloadProgress : null,
+                minHeight: 6,
+                backgroundColor: MacosColors.systemGrayColor.withOpacity(0.2),
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.getAccent(context)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _downloadStatus.isNotEmpty ? _downloadStatus : loc.preparing,
+              style: AppTheme.caption(context),
+            ),
+          ],
+        ),
+      );
+    }
     if (!isDownloaded) {
        return PushButton(
          controlSize: ControlSize.regular,
          // Use Primary Color (Teal) for Download
          color: AppTheme.getAccent(context), 
          onPressed: onDownload,
-         child: const Text("Download", style: TextStyle(color: Colors.white)),
+         child: Text(loc.download, style: const TextStyle(color: Colors.white)),
        );
     }
     // Downloaded
     return Row(
       children: [
         if (isActive) 
-           const Row(
+           Row(
              children: [
-               Icon(CupertinoIcons.checkmark_alt_circle_fill, color: AppTheme.successColor),
-               SizedBox(width: 4),
-               Text("Active", style: TextStyle(color: AppTheme.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
+               const Icon(CupertinoIcons.checkmark_alt_circle_fill, color: AppTheme.successColor),
+               const SizedBox(width: 4),
+               Text(loc.active, style: const TextStyle(color: AppTheme.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
              ],
            )
         else
@@ -740,7 +781,7 @@ class _SettingsPageState extends State<SettingsPage> {
              controlSize: ControlSize.regular,
              color: MacosColors.controlColor.resolveFrom(context),
              onPressed: onActivate, 
-             child: const Text("Activate")
+             child: Text(loc.activate)
            ),
         const SizedBox(width: 12),
         MacosIconButton(
@@ -890,10 +931,11 @@ class SettingsGroup extends StatelessWidget {
 
 class SettingsTile extends StatelessWidget {
   final String label;
+  final String? subtitle;
   final Widget child;
   final IconData? icon; // Added Icon support
 
-  const SettingsTile({super.key, required this.label, required this.child, this.icon});
+  const SettingsTile({super.key, required this.label, this.subtitle, required this.child, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -905,7 +947,19 @@ class SettingsTile extends StatelessWidget {
             MacosIcon(icon, size: 20, color: MacosColors.systemGrayColor),
             const SizedBox(width: 12),
           ],
-          Expanded(child: Text(label, style: AppTheme.body(context))),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTheme.body(context)),
+                if (subtitle != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(subtitle!, style: AppTheme.caption(context)),
+                  ),
+              ],
+            ),
+          ),
           child,
         ],
       ),
