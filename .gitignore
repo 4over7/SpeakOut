@@ -51,3 +51,7 @@ gateway/node_modules/
 # Secrets
 assets/aliyun_config.json
 assets/llm_config.json
+
+# Sensitive config files
+assets/aliyun_config.json
+assets/llm_config.json
