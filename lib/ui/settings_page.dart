@@ -592,6 +592,22 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         
         const SizedBox(height: 32),
+        // 3.5 ASR Post-processing (De-duplication)
+        SettingsGroup(
+          title: "ASR Post-processing",
+          children: [
+            SettingsTile(
+              label: "De-duplicate (去重)",
+              icon: CupertinoIcons.textformat_abc,
+              child: MacosSwitch(
+                value: ConfigService().deduplicationEnabled,
+                onChanged: (v) async { await ConfigService().setDeduplicationEnabled(v); setState((){}); },
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 32),
         // 4. Config (AI Correction)
         SettingsGroup(
           title: loc.aiCorrection,

@@ -103,6 +103,57 @@ class CoreEngine {
     debugPrint("[CoreEngine] $msg");
   }
 
+  /// De-duplicate repeated characters AND phrases
+  /// Handles: "识识别" → "识别", "还是还是" → "还是", "一下一下" → "一下"
+  String _deduplicateText(String text) {
+    if (text.length < 2) return text;
+    String result = text;
+    
+    // Phase 1: Remove repeated phrases (longest first: 4, 3, 2 chars)
+    for (int phraseLen = 4; phraseLen >= 2; phraseLen--) {
+      result = _removeRepeatedPhrases(result, phraseLen);
+    }
+    
+    // Phase 2: Remove consecutive identical characters
+    final buffer = StringBuffer();
+    String? lastChar;
+    for (int i = 0; i < result.length; i++) {
+      final char = result[i];
+      if (char != lastChar) {
+        buffer.write(char);
+        lastChar = char;
+      }
+    }
+    return buffer.toString();
+  }
+  
+  /// Remove immediately repeated phrases of given length
+  /// e.g., for len=2: "还是还是好" → "还是好"
+  String _removeRepeatedPhrases(String text, int len) {
+    if (text.length < len * 2) return text;
+    final buffer = StringBuffer();
+    int i = 0;
+    while (i < text.length) {
+      if (i + len * 2 <= text.length) {
+        final phrase1 = text.substring(i, i + len);
+        final phrase2 = text.substring(i + len, i + len * 2);
+        if (phrase1 == phrase2) {
+          // Skip the repeated phrase
+          buffer.write(phrase1);
+          i += len * 2;
+          // Continue skipping if more repetitions
+          while (i + len <= text.length && text.substring(i, i + len) == phrase1) {
+            i += len;
+          }
+          continue;
+        }
+      }
+      buffer.write(text[i]);
+      i++;
+    }
+    return buffer.toString();
+  }
+
   // Device Listing - Using native permission check
   Future<bool> listInputDevices() async {
     // Native audio doesn't need device listing - uses system default
@@ -594,6 +645,11 @@ class CoreEngine {
       _log("Raw Text: '$text'");
       String finalText = text;
 
+      // Post-processing: De-duplicate consecutive repeated characters
+      if (finalText.isNotEmpty && ConfigService().deduplicationEnabled) {
+        finalText = _deduplicateText(finalText);
+        _log("After Dedup: '$finalText'");
+      }
 
       // AI Correction Logic
       if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {

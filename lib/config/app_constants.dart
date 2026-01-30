@@ -12,7 +12,7 @@ class AppConstants {
   // Defaults
   static const int kDefaultPttKeyCode = 58; // Left Option
   static const String kDefaultPttKeyName = "Left Option";
-  static const String kDefaultModelId = 'zipformer_bi_2023_02_20';
+  static const String kDefaultModelId = 'paraformer_bi_zh_en';
   
   // Aliyun Defaults (Loaded from assets/aliyun_config.json)
   static String kDefaultAliyunAppKey = '';
@@ -38,6 +38,9 @@ class AppConstants {
 2. 去除口吃（如：呃、那个），但保留句末语气词。
 3. 增加标点。
 4. 仅输出修复后的文本内容，不要输出标签。""";
+
+  // ASR De-duplication (post-processing)
+  static const bool kDefaultDeduplicationEnabled = true;
 
   
   // UI Layout

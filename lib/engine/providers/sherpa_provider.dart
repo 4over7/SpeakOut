@@ -33,6 +33,8 @@ class SherpaProvider implements ASRProvider {
     sherpa.OnlineRecognizerConfig recognizerConfig;
 
     if (modelType == 'paraformer') {
+      // Paraformer uses CTC-based decoding, less prone to repetition
+      // Use default greedy_search and no blankPenalty
       recognizerConfig = sherpa.OnlineRecognizerConfig(
         model: sherpa.OnlineModelConfig(
           paraformer: sherpa.OnlineParaformerModelConfig(
@@ -71,6 +73,10 @@ class SherpaProvider implements ASRProvider {
         rule1MinTrailingSilence: 2.4,
         rule2MinTrailingSilence: 1.2,
         rule3MinUtteranceLength: 20,
+        // Anti-repetition tuning
+        decodingMethod: 'modified_beam_search',
+        maxActivePaths: 4,
+        blankPenalty: 5.0,
       );
     }
     

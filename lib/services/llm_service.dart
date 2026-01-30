@@ -28,7 +28,7 @@ class LLMService {
   Future<String> correctText(String input) async {
     if (input.trim().isEmpty) return input;
     if (!ConfigService().aiCorrectionEnabled) {
-      _log("AI Correction DISABLED. Returning input.");
+      _log("RAW INPUT (AI OFF): $input");
       return input;
     }
     
@@ -42,6 +42,7 @@ class LLMService {
       return input;
     }
 
+    _log("RAW INPUT: $input");
     _log("Calling LLM: $baseUrl, model=$model, inputLen=${input.length}");
 
     try {

@@ -148,6 +148,10 @@ class ConfigService {
   Future<void> setLlmApiKey(String key) async => await _prefs?.setString('llm_api_key', key);
   Future<void> setLlmModel(String model) async => await _prefs?.setString('llm_model', model);
 
+  // --- ASR De-duplication Config ---
+  bool get deduplicationEnabled => _prefs?.getBool('dedup_enabled') ?? AppConstants.kDefaultDeduplicationEnabled;
+  Future<void> setDeduplicationEnabled(bool enabled) async => await _prefs?.setBool('dedup_enabled', enabled);
+
   String? get llmBaseUrlOverride => _prefs?.getString('llm_base_url');
   String? get llmApiKeyOverride => _prefs?.getString('llm_api_key');
   String? get llmModelOverride => _prefs?.getString('llm_model');

@@ -4,6 +4,7 @@ import 'notification_service.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
 import '../engine/model_manager.dart';
+import '../config/app_constants.dart';
 
 /// 管理应用程序生命周期与核心业务逻辑
 /// Central Hub for initialization and logic.
@@ -83,7 +84,7 @@ class AppService {
       if (path == null) {
         print("AppService: Downloading default model...");
         try {
-          final defaultId = ModelManager.availableModels.first.id;
+          final defaultId = AppConstants.kDefaultModelId;
           // We can't easily show progress in UI here unless we expose stream.
           // For now, blocking wait or rely on engine status updates if hooked.
           path = await modelManager.downloadAndExtractModel(defaultId);

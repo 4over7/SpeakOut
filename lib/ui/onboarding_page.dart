@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/config_service.dart';
 import '../engine/model_manager.dart';
 import '../engine/core_engine.dart';
+import '../config/app_constants.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'theme.dart';
 
@@ -99,8 +100,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
         },
       );
 
-      // Step 2: Download ASR model (Zipformer recommended)
-      final defaultModel = ModelManager.availableModels.first;
+      // Step 2: Download ASR model (using default from AppConstants)
+      final defaultModel = _modelManager.getModelById(AppConstants.kDefaultModelId) ?? ModelManager.availableModels.first;
       setState(() {
         _downloadStatus = "下载语音识别模型...";
         _downloadProgress = 0.3;

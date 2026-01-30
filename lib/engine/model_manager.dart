@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive_io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:speakout/config/app_constants.dart';
 
 class ModelInfo {
   final String id;
@@ -61,7 +62,7 @@ class ModelManager {
 
   Future<ModelInfo?> getActiveModelInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    String activeId = prefs.getString('active_model_id') ?? availableModels[0].id;
+    String activeId = prefs.getString('active_model_id') ?? AppConstants.kDefaultModelId;
     try {
       return availableModels.firstWhere((m) => m.id == activeId);
     } catch (_) {
@@ -74,7 +75,7 @@ class ModelManager {
     final prefs = await SharedPreferences.getInstance();
     
     // Default to bilingual if not set
-    String activeId = prefs.getString('active_model_id') ?? availableModels[0].id;
+    String activeId = prefs.getString('active_model_id') ?? AppConstants.kDefaultModelId;
     
     // Check if valid
     ModelInfo? model;
