@@ -40,20 +40,28 @@ class AppService {
     }
     
     // 3. Initialize ASR (HEAVY TASK - Delay significantly)
-    // Give the UI time to fully settle (1 second) before hitting the CPU hard
-    engine.updateStatus("准备加载语音模型...");
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    engine.updateStatus("正在加载语音模型...");
-    await Future.delayed(const Duration(milliseconds: 50)); 
-    try {
-      await _initASR();
-    } catch (e) {
-      engine.updateStatus("❌ 语音模型失败: $e");
+    // Skip if already initialized (e.g., by onboarding)
+    if (engine.isASRReady) {
+      engine.updateStatus("语音模型已就绪");
+      await Future.delayed(const Duration(milliseconds: 200));
+    } else {
+      // Give the UI time to fully settle (1 second) before hitting the CPU hard
+      engine.updateStatus("准备加载语音模型...");
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      engine.updateStatus("正在加载语音模型...");
+      await Future.delayed(const Duration(milliseconds: 50)); 
+      try {
+        await _initASR();
+      } catch (e) {
+        engine.updateStatus("❌ 语音模型失败: $e");
+      }
     }
     
-    // 4. Punctuation
-    await _initPunctuation();
+    // 4. Punctuation (also skip if already initialized)
+    if (!_isPunctuationInitialized) {
+      await _initPunctuation();
+    }
     
     // Final Health Check
     if (engine.isListenerRunning) {
@@ -106,15 +114,11 @@ class AppService {
     if (_isPunctuationInitialized) return;
     
     try {
-      // 检查标点模型
+      // 检查标点模型 - 不再自动下载，由 Onboarding 或 Settings 页面处理
       bool hasModel = await modelManager.isPunctuationModelDownloaded();
       if (!hasModel) {
-        print("Auto-downloading Punctuation Model...");
-        await modelManager.downloadPunctuationModel(
-          onProgress: (progress) {
-             if (progress >= 1.0) print("Punctuation Downloaded.");
-          }
-        );
+        print("Punctuation model not found. User can download from Settings.");
+        return; // Skip init if not downloaded
       }
       
       String? modelPath = await modelManager.getPunctuationModelPath();

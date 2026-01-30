@@ -1,5 +1,22 @@
 # SpeakOut Version History
 
+## [1.2.21] - 2026-01-31
+
+### FTUE (首次使用体验) 修复
+
+- **新增 Onboarding 引导流程**：新用户首次启动时展示权限授权和模型下载的引导页面。
+- **修复权限检测类型错误**：`native_input.dart` 中 `checkPermission()` 错误地将 `bool` 与 `int` 比较 (`result == 1`)，导致权限检测永远返回 false。
+- **修复键盘监听器未启动**：`CoreEngine.init()` 使用 `_isInit` 作为守卫条件，但 `initASR()` 也设置了该标志，导致 onboarding 后键盘监听器无法启动。现改为检查 `_isListenerRunning`。
+- **修复模型下载进度显示**：解决提取阶段显示 `-100%` 的问题，现显示"解压中..."。
+- **移除静默标点模型下载**：避免用户混淆 Zipformer 和标点模型的下载状态。
+- **新增权限自动刷新**：HomePage 实现 `WidgetsBindingObserver`，从系统设置返回后自动重新检测权限状态。
+- **修复 dylib 路径解析**：Release 版本中添加 `flutter_assets` 路径检测，确保原生库正确加载。
+
+### 开发工具
+
+- **新增数据清理脚本**：`scripts/clear_data.sh` 用于完整清理 FTUE 测试数据。
+- **清理遗留 MCP 文件**：删除不再使用的 `add_server_dialog.dart`。
+
 ## [1.2.20] - 2026-01-30
 
 - **确认修复 ASR 幻觉重复问题**：通过系统性诊断确认问题根源在 Native 库编译/打包环节，重新编译 `libnative_input.dylib` 并重新打包后，语音识别重复问题（如"测测测试"）已彻底消除。

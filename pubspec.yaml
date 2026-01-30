@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.20+20
+version: 1.2.21+21
 
 environment:
   sdk: ^3.10.4
@@ -86,8 +86,8 @@ flutter:
     - assets/app_icon.png
     - assets/app_icon.ico
     - assets/tray_icon.png
-    - assets/aliyun_config.json
-    - assets/llm_config.json
+    # Note: aliyun_config.json and llm_config.json removed for security
+    # Credentials are stored in SharedPreferences (user's Library folder)
     - native_lib/libnative_input.dylib
 
   # An image asset can refer to one or more resolution-specific "variants", see

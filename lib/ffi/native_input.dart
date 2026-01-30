@@ -11,6 +11,7 @@ class NativeInput implements NativeInputBase {
   late StopKeyboardListenerDart _stopListener;
   late InjectTextDart _injectText;
   late CheckPermissionDart _checkPermission;
+  late CheckPermissionDart _checkPermissionSilent;
 
   // Debug Logger
   void _log(String msg) {
@@ -27,15 +28,23 @@ class NativeInput implements NativeInputBase {
     final exeDir = File(Platform.resolvedExecutable).parent;
     _log("ExeDir: ${exeDir.path}");
     
-    // Check injected path (Manual Install Script)
+    // Path 1: Contents/MacOS/native_lib (old location, manual script)
     final bundleLibPath = '${exeDir.path}/native_lib/libnative_input.dylib';
     _log("Checking Bundle Path: $bundleLibPath");
+    
+    // Path 2: flutter_assets inside App.framework (Release build location)
+    final appDir = exeDir.parent; // Contents/
+    final flutterAssetsPath = '${appDir.path}/Frameworks/App.framework/Versions/A/Resources/flutter_assets/native_lib/libnative_input.dylib';
+    _log("Checking flutter_assets Path: $flutterAssetsPath");
     
     // Normalize path to verify
     try {
       if (File(bundleLibPath).existsSync()) {
         path = bundleLibPath;
-        _log("Found in Bundle: $path");
+        _log("Found in Bundle MacOS: $path");
+      } else if (File(flutterAssetsPath).existsSync()) {
+        path = flutterAssetsPath;
+        _log("Found in flutter_assets: $path");
       } else if (!File(path).existsSync()) {
          // Fallback for terminal 'dart run' from root
          path = '${Directory.current.path}/native_lib/libnative_input.dylib';
@@ -75,6 +84,10 @@ class NativeInput implements NativeInputBase {
       _checkPermission = _dylib
           .lookup<NativeFunction<CheckPermissionC>>('check_permission')
           .asFunction();
+
+      _checkPermissionSilent = _dylib
+          .lookup<NativeFunction<CheckPermissionC>>('check_permission_silent')
+          .asFunction();
           
     } catch (e) {
       _log("Symbol Lookup FAILED: $e");
@@ -106,10 +119,11 @@ class NativeInput implements NativeInputBase {
 
   @override
   bool checkPermission() {
-    _log("Dart: Calling check_permission...");
-    final result = _checkPermission();
-    _log("Dart: check_permission returned $result");
-    return result == 1; // Assuming 1 is true
+    // Use silent check (no prompt) - for refreshing status
+    _log("Dart: Calling check_permission_silent...");
+    final result = _checkPermissionSilent();
+    _log("Dart: check_permission_silent returned $result");
+    return result;  // result is already bool, not int!
   }
 
   // New Watchdog binding

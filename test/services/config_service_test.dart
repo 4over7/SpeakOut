@@ -4,6 +4,8 @@ import 'package:speakout/services/config_service.dart';
 import 'package:speakout/config/app_constants.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  
   group('ConfigService Tests', () {
     
     setUp(() {

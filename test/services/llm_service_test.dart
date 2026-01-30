@@ -7,6 +7,8 @@ import 'package:speakout/services/llm_service.dart';
 import 'package:speakout/config/app_constants.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  
   group('LLMService Tests', () {
     late LLMService service;
 

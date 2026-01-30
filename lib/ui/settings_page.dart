@@ -33,7 +33,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // Model State
   final Map<String, bool> _downloadedStatus = {};
   final Set<String> _downloadingIds = {}; // Support concurrent downloads
-  final Map<String, double> _downloadProgressMap = {}; // Per-model progress
+  final Map<String, double?> _downloadProgressMap = {}; // Per-model progress (null = indeterminate)
   final Map<String, String> _downloadStatusMap = {}; // Per-model status text
   String? _activatingId; // Only one model can be activating at a time
   String? _activeModelId;
@@ -208,8 +208,11 @@ class _SettingsPageState extends State<SettingsPage> {
        await _modelManager.downloadAndExtractModel(model.id, 
          onProgress: (p) { 
             if(mounted) setState(() { 
-               _downloadProgressMap[model.id] = p; 
-               _downloadStatusMap[model.id] = loc.downloading((p*100).toStringAsFixed(0));
+               _downloadProgressMap[model.id] = p < 0 ? null : p;
+               // -1 means extraction phase (indeterminate progress)
+               _downloadStatusMap[model.id] = p < 0 
+                   ? "解压中..." 
+                   : loc.downloading((p*100).toStringAsFixed(0));
             }); 
          }
        );

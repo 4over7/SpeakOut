@@ -22,6 +22,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'ui/theme.dart';
 import 'ui/dialogs/tool_confirmation_dialog.dart';
 import 'ui/chat/chat_page.dart';
+import 'ui/onboarding_page.dart';
 
 // Global Error Catcher
 void main() {
@@ -61,6 +62,29 @@ class SpeakOutApp extends StatefulWidget {
 }
 
 class _SpeakOutAppState extends State<SpeakOutApp> {
+  bool _showOnboarding = false;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    await ConfigService().init();
+    if (mounted) {
+      setState(() {
+        _showOnboarding = ConfigService().isFirstLaunch;
+        _initialized = true;
+      });
+    }
+  }
+
+  void _onOnboardingComplete() {
+    setState(() => _showOnboarding = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Locale?>(
@@ -101,9 +125,34 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
           },
           supportedLocales: AppLocalizations.supportedLocales,
           
-          home: const HomePage(),
+          // Show onboarding for first-time users
+          home: !_initialized 
+              ? const _LoadingScreen()
+              : _showOnboarding 
+                  ? OnboardingPage(onComplete: _onOnboardingComplete)
+                  : const HomePage(),
         );
       },
+    );
+  }
+}
+
+/// Simple loading screen while checking first-launch status
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return MacosWindow(
+      child: MacosScaffold(
+        children: [
+          ContentArea(
+            builder: (context, _) => const Center(
+              child: CupertinoActivityIndicator(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -115,7 +164,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final AppService _appService = AppService();
   final SystemTray _systemTray = SystemTray();
   
@@ -132,6 +181,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    // Register lifecycle observer for permission refresh
+    WidgetsBinding.instance.addObserver(this);
+    
     // Async Init after first frame to prevent White Screen
     WidgetsBinding.instance.addPostFrameCallback((_) async {
        await _initWindow();
@@ -237,7 +289,31 @@ class _HomePageState extends State<HomePage> {
   Timer? _waveTimer;
   
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When app resumes from background (user returns from System Settings), re-check permissions
+    if (state == AppLifecycleState.resumed && _lastError.isNotEmpty) {
+      _recheckPermissions();
+    }
+  }
+  
+  Future<void> _recheckPermissions() async {
+    // Check if accessibility permission was granted
+    final hasPermission = _appService.engine.checkAccessibilityPermission();
+    if (hasPermission && _lastError.contains("Accessibility")) {
+      // Permission granted - restart engine listener
+      await _appService.engine.init();
+      if (mounted) {
+        setState(() {
+          _lastError = "";
+          _ready = _appService.engine.isListenerRunning;
+        });
+      }
+    }
+  }
+  
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _waveTimer?.cancel();
     super.dispose();
   }

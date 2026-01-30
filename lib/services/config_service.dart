@@ -45,31 +45,12 @@ class ConfigService {
     // Load Locale
     _updateLocaleNotifier();
     
-    // Load Secrets
-    try {
-      final jsonStr = await rootBundle.loadString('assets/aliyun_config.json');
-      final Map<String, dynamic> json = jsonDecode(jsonStr);
-      
-      AppConstants.kDefaultAliyunAppKey = json['aliyun_app_key'] ?? '';
-      AppConstants.kDefaultAliyunAkId = json['aliyun_ak_id'] ?? '';
-      AppConstants.kDefaultAliyunAkSecret = json['aliyun_ak_secret'] ?? '';
-    } catch (e) {
-      // _log("ConfigService: No aliyun_config.json found.");
-    }
-    
-    // Load LLM Config
-    try {
-      final jsonStr = await rootBundle.loadString('assets/llm_config.json');
-      final Map<String, dynamic> json = jsonDecode(jsonStr);
-      
-      // Update Defaults if present in file
-      if (json['llm_base_url'] != null) AppConstants.kDefaultLlmBaseUrl = json['llm_base_url'];
-      if (json['llm_api_key'] != null) AppConstants.kDefaultLlmApiKey = json['llm_api_key'];
-      if (json['llm_model'] != null) AppConstants.kDefaultLlmModel = json['llm_model'];
-      if (json['ai_correction_prompt'] != null) AppConstants.kDefaultAiCorrectionPrompt = json['ai_correction_prompt'];
-    } catch (e) {
-      // _log("ConfigService: No llm_config.json found.");
-    }
+    // SECURITY: Sensitive credentials (Aliyun, LLM API keys) are NOT bundled in the app.
+    // Users must configure them in Settings → Cloud Configuration.
+    // Credentials are stored in SharedPreferences (user's ~/Library folder, not in app bundle).
+    // 
+    // For development, create assets/aliyun_config.json and assets/llm_config.json locally
+    // (these files are in .gitignore and won't be committed or bundled).
     
     _initialized = true;
   }
@@ -188,5 +169,22 @@ class ConfigService {
     if (lang == 'en') localeNotifier.value = const Locale('en');
     else if (lang == 'zh') localeNotifier.value = const Locale('zh');
     else localeNotifier.value = null; // System
+  }
+
+  // --- First Launch / Onboarding ---
+  static const String _kOnboardingCompleted = 'onboarding_completed';
+  
+  /// Returns true if this is the first time the app is launched
+  /// (onboarding has not been completed)
+  bool get isFirstLaunch => !(_prefs?.getBool(_kOnboardingCompleted) ?? false);
+  
+  /// Mark onboarding as completed
+  Future<void> completeOnboarding() async {
+    await _prefs?.setBool(_kOnboardingCompleted, true);
+  }
+  
+  /// Reset onboarding status (for testing)
+  Future<void> resetOnboarding() async {
+    await _prefs?.remove(_kOnboardingCompleted);
   }
 }

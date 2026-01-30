@@ -93,6 +93,10 @@ class CoreEngine {
   StreamSubscription<String>? _asrSubscription;
   
   bool get isRecording => _isRecording;
+  
+  /// Check if ASR provider is ready (model loaded)
+  bool get isASRReady => _asrProvider != null && _asrProvider!.isReady;
+
 
   // Debug Logger
   void _log(String msg) {
@@ -105,12 +109,35 @@ class CoreEngine {
     return _nativeInput?.checkMicrophonePermission() ?? false;
   }
 
+  /// Check if NativeInput (native library) loaded successfully
+  bool get isNativeInputReady => _nativeInput != null;
+
+  /// Check if accessibility permission is granted (for keyboard listener)
+  bool checkAccessibilityPermission() {
+    if (_nativeInput == null) {
+      print("[CoreEngine] checkAccessibilityPermission: _nativeInput is NULL!");
+      return false;
+    }
+    final result = _nativeInput!.checkPermission();
+    print("[CoreEngine] checkAccessibilityPermission: $result");
+    return result;
+  }
+
+  /// Check if microphone permission is granted (for audio recording)
+  bool checkMicPermission() {
+    return _nativeInput?.checkMicrophonePermission() ?? false;
+  }
+
   bool _isListenerRunning = false;
   bool get isListenerRunning => _isListenerRunning;
 
   Future<void> init() async {
-    _log("Init started. _isInit: $_isInit");
-    if (_isInit) return;
+    _log("Init started. _isListenerRunning: $_isListenerRunning");
+    // Only skip if keyboard listener is already running (not just ASR init)
+    if (_isListenerRunning) {
+      _log("Listener already running, skipping init.");
+      return;
+    }
 
     // 1. Check Native Perms
     _log("Checking permissions...");

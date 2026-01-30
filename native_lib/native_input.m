@@ -4,22 +4,36 @@
 #include <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <mach/mach_time.h>
+#include <pwd.h>
+#include <unistd.h>
 
 // Debug Log Path
 // Debug Log Path
+// Get dynamic log path: ~/Downloads/speakout_native.log
+static char* get_log_path() {
+  static char path[512] = {0};
+  if (path[0] == 0) {
+    const char* home = getenv("HOME");
+    if (!home) {
+      struct passwd* pw = getpwuid(getuid());
+      home = pw ? pw->pw_dir : "/tmp";
+    }
+    snprintf(path, sizeof(path), "%s/Downloads/speakout_native.log", home);
+  }
+  return path;
+}
+
 void log_to_file(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   
-  // Write to ~/Downloads/speakout_native.log
-  // Hardcoded for reliable debugging on this machine
-  const char* path = "/Users/leon/Downloads/speakout_native.log";
-  FILE *f = fopen(path, "a");
+  FILE *f = fopen(get_log_path(), "a");
   if (f) {
       time_t now;
       time(&now);
@@ -50,7 +64,7 @@ static DartKeyCallback dartCallback = NULL;
 
 // Active hotkey info
 static int targetKeyCode = -1; // e.g., 58 for Option, etc.
-static bool isMonitoring = false;
+static atomic_bool isMonitoring = false;
 
 // CGEventCallback
 CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
@@ -246,13 +260,13 @@ void inject_text(const char *text) {
   // 3. Chunking Loop
   // Many apps drop events if payload is too large.
   // 50 chars per event is a safe balance between speed and reliability.
-  const int CHUNK_SIZE = 50;
-  UniChar buffer[CHUNK_SIZE];
+  #define INJECT_CHUNK_SIZE 50
+  UniChar buffer[INJECT_CHUNK_SIZE];
 
-  for (CFIndex i = 0; i < totalLen; i += CHUNK_SIZE) {
+  for (CFIndex i = 0; i < totalLen; i += INJECT_CHUNK_SIZE) {
     // Calculate current chunk length
     CFIndex remaining = totalLen - i;
-    CFIndex chunkLen = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
+    CFIndex chunkLen = (remaining > INJECT_CHUNK_SIZE) ? INJECT_CHUNK_SIZE : remaining;
 
     // Extract characters
     CFStringGetCharacters(cfStr, CFRangeMake(i, chunkLen), buffer);
@@ -276,10 +290,18 @@ void inject_text(const char *text) {
   CFRelease(cfStr);
 }
 
-// 4. Check Permission
+// 4. Check Permission (with prompt dialog)
 bool check_permission() {
   // Obj-C syntax for permission check dictionary
   NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt : @YES};
+  bool trusted =
+      AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
+  return trusted;
+}
+
+// 4b. Check Permission silently (no prompt - for refresh button)
+bool check_permission_silent() {
+  NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt : @NO};
   bool trusted =
       AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
   return trusted;
@@ -307,17 +329,18 @@ typedef void (*DartAudioCallback)(const int16_t* samples, int sampleCount);
 static AudioQueueRef audioQueue = NULL;
 static AudioQueueBufferRef audioBuffers[NUM_BUFFERS];
 static DartAudioCallback audioCallback = NULL;
-static bool isRecording = false;
+static atomic_bool isRecording = false;  // Thread-safe: accessed from AudioQueue callback thread
 static AudioStreamBasicDescription audioFormat;
 
-// AudioQueue Input Callback
+// AudioQueue Input Callback (runs on background system thread)
 static void AudioInputCallback(void *inUserData,
                                 AudioQueueRef inAQ,
                                 AudioQueueBufferRef inBuffer,
                                 const AudioTimeStamp *inStartTime,
                                 UInt32 inNumberPacketDescriptions,
                                 const AudioStreamPacketDescription *inPacketDescs) {
-    if (!isRecording || audioCallback == NULL) {
+    // Atomic load for thread safety
+    if (!atomic_load(&isRecording) || audioCallback == NULL) {
         return;
     }
     
@@ -342,7 +365,7 @@ static void AudioInputCallback(void *inUserData,
 // Start Audio Recording
 // Returns 1 on success, negative on error
 int start_audio_recording(DartAudioCallback callback) {
-    if (isRecording) {
+    if (atomic_load(&isRecording)) {
         log_to_file("Audio: Already recording");
         return 1;
     }
@@ -405,18 +428,18 @@ int start_audio_recording(DartAudioCallback callback) {
         return -4;
     }
     
-    isRecording = true;
+    atomic_store(&isRecording, true);
     log_to_file("Audio: Recording started (16kHz, Mono, Int16)");
     return 1;
 }
 
 // Stop Audio Recording
 void stop_audio_recording() {
-    if (!isRecording || audioQueue == NULL) {
+    if (!atomic_load(&isRecording) || audioQueue == NULL) {
         return;
     }
     
-    isRecording = false;
+    atomic_store(&isRecording, false);
     
     // Stop and dispose queue
     AudioQueueStop(audioQueue, true);  // true = stop immediately

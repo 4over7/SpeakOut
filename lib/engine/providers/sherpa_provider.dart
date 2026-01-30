@@ -108,16 +108,21 @@ class SherpaProvider implements ASRProvider {
   void acceptWaveform(Float32List samples) {
     if (_stream == null || _recognizer == null) return;
     
-    _stream!.acceptWaveform(samples: samples, sampleRate: 16000);
-    
-    // Active Decoding Loop
-    while (_recognizer!.isReady(_stream!)) {
-      _recognizer!.decode(_stream!);
-    }
-    
-    final result = _recognizer!.getResult(_stream!);
-    if (result.text.isNotEmpty) {
-      _textController.add(result.text); // Emit partial result
+    try {
+      _stream!.acceptWaveform(samples: samples, sampleRate: 16000);
+      
+      // Active Decoding Loop
+      while (_recognizer!.isReady(_stream!)) {
+        _recognizer!.decode(_stream!);
+      }
+      
+      final result = _recognizer!.getResult(_stream!);
+      if (result.text.isNotEmpty) {
+        _textController.add(result.text); // Emit partial result
+      }
+    } catch (e) {
+      // Prevent FFI exceptions from crashing the app
+      print("[SherpaProvider] acceptWaveform error: $e");
     }
   }
 
@@ -125,30 +130,33 @@ class SherpaProvider implements ASRProvider {
   Future<String> stop() async {
     if (_stream == null || _recognizer == null) return "";
     
-    // Inject silence padding logic could be handled here or higher up?
-    // Linus Principle: "Keep functions doing one thing". 
-    // The provider should just stop. Padding is specific to engine tweaking.
-    // However, for Sherpa specifically, padding is part of the "voodoo" to make it work well.
-    // I will include the silence padding HERE because it's implementation specific to Sherpa's decoder quirks.
-    
-    // Padding (Increased to 0.8s to fix tail truncation)
-    final silence = Float32List(12800); // 0.8s @ 16k
-    acceptWaveform(silence);
-    
-    _stream!.inputFinished();
-    
-    // Final Decode
-    while (_recognizer!.isReady(_stream!)) {
-      _recognizer!.decode(_stream!);
+    try {
+      // Inject silence padding for Sherpa's decoder quirks
+      // Padding (Increased to 0.8s to fix tail truncation)
+      final silence = Float32List(12800); // 0.8s @ 16k
+      acceptWaveform(silence);
+      
+      _stream!.inputFinished();
+      
+      // Final Decode
+      while (_recognizer!.isReady(_stream!)) {
+        _recognizer!.decode(_stream!);
+      }
+      
+      final result = _recognizer!.getResult(_stream!);
+      final text = result.text.trim();
+      
+      _stream!.free();
+      _stream = null;
+      
+      return text;
+    } catch (e) {
+      print("[SherpaProvider] stop error: $e");
+      // Cleanup on error
+      try { _stream?.free(); } catch (_) {}
+      _stream = null;
+      return "";
     }
-    
-    final result = _recognizer!.getResult(_stream!);
-    final text = result.text.trim();
-    
-    _stream!.free();
-    _stream = null;
-    
-    return text;
   }
 
   String _findFile(String dirPath, String pattern) {
