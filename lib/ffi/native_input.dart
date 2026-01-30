@@ -135,6 +135,7 @@ class NativeInput implements NativeInputBase {
   late StopAudioRecordingDart _stopAudioRecording;
   late IsAudioRecordingDart _isAudioRecording;
   late CheckMicrophonePermissionDart _checkMicPermission;
+  late NativeFreeDart _nativeFree;
   bool _audioBound = false;
   
   void _bindAudioFunctions() {
@@ -151,6 +152,9 @@ class NativeInput implements NativeInputBase {
           .asFunction();
       _checkMicPermission = _dylib
           .lookup<NativeFunction<CheckMicrophonePermissionC>>('check_microphone_permission')
+          .asFunction();
+      _nativeFree = _dylib
+          .lookup<NativeFunction<NativeFreeC>>('native_free')
           .asFunction();
       _audioBound = true;
       _log("Audio FFI bindings SUCCESS");
@@ -192,5 +196,12 @@ class NativeInput implements NativeInputBase {
     final result = _checkMicPermission();
     _log("Dart: check_microphone_permission returned $result");
     return result == 1;
+  }
+
+  @override
+  void nativeFree(Pointer<Void> ptr) {
+    _bindAudioFunctions();
+    if (!_audioBound) return;
+    _nativeFree(ptr);
   }
 }

@@ -25,11 +25,16 @@ class CoreEngine {
   factory CoreEngine() => _instance;
 
   // Dependencies - Native Audio via FFI (replaces record package)
-  late final NativeInputBase _nativeInput;
+  late final NativeInputBase? _nativeInput;
   ffi.NativeCallable<AudioCallbackC>? _audioCallable;
   
   CoreEngine._internal() {
-    _nativeInput = NativeInput();
+    try {
+      _nativeInput = NativeInput();
+    } catch (e) {
+      print("[CoreEngine] Warning: Failed to init NativeInput: $e");
+      _nativeInput = null;
+    }
   }
   
   // ASR Provider abstraction
@@ -42,7 +47,10 @@ class CoreEngine {
   // State
   bool _isRecording = false;
   bool _isInit = false;
-  bool _isDiaryMode = false; // NEW: Track if current session is Diary
+  bool _isDiaryMode = false;
+  
+  // AGC State: Previous gain for sample-level interpolation
+  double _lastAppliedGain = 1.0;
   
   // Keep Offline Punctuation & Debugging related fields
   sherpa.OfflinePunctuation? _punctuation;
@@ -75,8 +83,14 @@ class CoreEngine {
   final _resultController = StreamController<String>.broadcast();
   Stream<String> get resultStream => _resultController.stream;
   
-  // NEW: Forward partial results from ASR provider for real-time display
-  Stream<String>? get partialTextStream => _asrProvider?.textStream;
+  // NEW: Persistent Partial Stream Controller
+  // This acts as a hub. UI listens to this ONCE.
+  // We forward data from whichever _asrProvider is currently active into this controller.
+  final _partialTextController = StreamController<String>.broadcast();
+  Stream<String> get partialTextStream => _partialTextController.stream;
+  
+  // Subscription to the current provider's stream
+  StreamSubscription<String>? _asrSubscription;
   
   bool get isRecording => _isRecording;
 
@@ -88,19 +102,19 @@ class CoreEngine {
   // Device Listing - Using native permission check
   Future<bool> listInputDevices() async {
     // Native audio doesn't need device listing - uses system default
-    return _nativeInput.checkMicrophonePermission();
+    return _nativeInput?.checkMicrophonePermission() ?? false;
   }
 
   bool _isListenerRunning = false;
   bool get isListenerRunning => _isListenerRunning;
 
   Future<void> init() async {
-    _log("Init started [v3.5.0]. _isInit: $_isInit");
+    _log("Init started. _isInit: $_isInit");
     if (_isInit) return;
 
     // 1. Check Native Perms
     _log("Checking permissions...");
-    bool trusted = _nativeInput.checkPermission();
+    bool trusted = _nativeInput?.checkPermission() ?? false;
     _statusController.add("Accessibility Trusted: $trusted");
     if (!trusted) {
       _statusController.add("Error: Please grant Accessibility permissions in System Settings.");
@@ -113,11 +127,11 @@ class CoreEngine {
     _log("Setting up NativeCallable...");
     try {
       _nativeCallable = ffi.NativeCallable<KeyCallbackC>.listener(_onKeyStatic);
-      if (_nativeInput.startListener(_nativeCallable!.nativeFunction)) {
+      if (_nativeInput != null && _nativeInput!.startListener(_nativeCallable!.nativeFunction)) {
         _isListenerRunning = true;
         _statusController.add("Keyboard Listener Started.");
         _log("Listener start success.");
-        if (_nativeInput.checkPermission()) _statusController.add("Accessibility Trusted: true");
+        if (_nativeInput?.checkPermission() ?? false) _statusController.add("Accessibility Trusted: true");
       } else {
          _statusController.add("Failed to start Keyboard Listener.");
          _isListenerRunning = false;
@@ -148,6 +162,10 @@ class CoreEngine {
     
     // Dispose previous if any
     if (_asrProvider != null) {
+      // Cancel previous subscription to avoid memory leaks or dead stream listening
+      await _asrSubscription?.cancel();
+      _asrSubscription = null;
+      
       await _asrProvider!.dispose();
       _asrProvider = null;
     }
@@ -177,6 +195,15 @@ class CoreEngine {
     try {
       await provider.initialize(config);
       _asrProvider = provider;
+      
+      // CRITICAL FIX: Subscribe to new provider and forward to persistent controller
+      // Added _deduplicateFinal to partial stream to fix real-time stuttering
+      _asrSubscription = provider.textStream.listen((text) {
+         if (!_partialTextController.isClosed) {
+            _partialTextController.add(text);
+         }
+      });
+      
       _isInit = true;
       _modelPath = modelPath; 
       
@@ -240,17 +267,6 @@ class CoreEngine {
   
   bool get isPunctuationEnabled => _punctuationEnabled;
 
-  // Deduplication helper
-  String _deduplicateFinal(String text) {
-    if (text.isEmpty) return text;
-    String result = text;
-    for (int len = 4; len >= 2; len--) {
-      final pattern = RegExp(r'(.{' + len.toString() + r'})\1+');
-      result = result.replaceAllMapped(pattern, (m) => m.group(1)!);
-    }
-    result = result.replaceAllMapped(RegExp(r'(.)\1+'), (m) => m.group(1)!);
-    return result;
-  }
 
   // Key Handling
   static void _onKeyStatic(int keyCode, bool isDown) {
@@ -311,7 +327,7 @@ class CoreEngine {
     _log("[T+0ms] startRecording() BEGIN");
     
     // 1. PERMISSION CHECK (Native FFI)
-    if (!_nativeInput.checkMicrophonePermission()) {
+    if (_nativeInput == null || !_nativeInput!.checkMicrophonePermission()) {
         _log("Permission DENIED by native check.");
         _statusController.add("需要麦克风权限");
         return;
@@ -352,8 +368,14 @@ class CoreEngine {
         // CRITICAL: Start ASR Provider FIRST (Creates internal stream)
         if (_asrProvider == null || !_asrProvider!.isReady) {
             _log("ASR Provider not ready!");
+            // Show visible error on overlay BEFORE cleaning up
+            try {
+              _overlayChannel.invokeMethod('updateStatus', {"text": "❌ 请先下载语音模型"});
+            } catch (_) {}
+            _statusController.add("引擎未就绪 - 请下载模型");
+            // Delay to let user see the message
+            await Future.delayed(const Duration(seconds: 2));
             _cleanupRecordingState();
-            _statusController.add("引擎未就绪");
             return;
         }
         await _asrProvider!.start();
@@ -365,7 +387,7 @@ class CoreEngine {
         _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
              if (!_isRecording) { timer.cancel(); return; }
              final targetKey = _isDiaryMode ? ConfigService().diaryKeyCode : pttKeyCode;
-             bool isPhysicallyDown = _nativeInput.isKeyPressed(targetKey);
+             bool isPhysicallyDown = _nativeInput?.isKeyPressed(targetKey) ?? false;
              if (!isPhysicallyDown) {
                  _log("🐶 Watchdog: Key $targetKey is UP physically but App is Recording. Forcing Stop.");
                  timer.cancel();
@@ -378,7 +400,7 @@ class CoreEngine {
         
         // 6. START NATIVE RECORDING
         _log("Starting native audio recording...");
-        final success = _nativeInput.startAudioRecording(_audioCallable!.nativeFunction);
+        final success = _nativeInput?.startAudioRecording(_audioCallable!.nativeFunction) ?? false;
         if (!success) {
             _log("Native audio start failed!");
             _cleanupRecordingState();
@@ -410,7 +432,11 @@ class CoreEngine {
   /// Native audio callback handler - receives Int16 samples from AudioQueue
   static void _onNativeAudioData(ffi.Pointer<ffi.Int16> samplesPtr, int sampleCount) {
     final engine = CoreEngine._instance;
-    if (!engine._isRecording || sampleCount <= 0) return;
+    if (!engine._isRecording || sampleCount <= 0) {
+      // Still need to free even if not recording
+      engine._nativeInput?.nativeFree(samplesPtr.cast<ffi.Void>());
+      return;
+    }
     
     // Convert Pointer<Int16> to Uint8List (matching old processAudioData interface)
     // Each Int16 is 2 bytes
@@ -418,7 +444,11 @@ class CoreEngine {
     final bytes = samplesPtr.cast<ffi.Uint8>().asTypedList(byteCount);
     
     // Process using existing pipeline
+    // Uint8List.fromList creates a copy, so samplesPtr is safe to free after this
     engine._processAudioData(Uint8List.fromList(bytes));
+    
+    // CRITICAL: Free the malloced copy from native code
+    engine._nativeInput?.nativeFree(samplesPtr.cast<ffi.Void>());
   }
 
   // Mutex for stopping state
@@ -428,28 +458,37 @@ class CoreEngine {
   void _processAudioData(Uint8List data) {
     if (!_isRecording) return;
     
-    // RAW 16k Int16 -> Float32 with DIGITAL GAIN
+    // RAW 16k Int16 -> Float32 with DYNAMIC GAIN (Prevention vs Clipping)
     final int sampleCount = data.length ~/ 2;
     final floatSamples = Float32List(sampleCount);
     final byteData = ByteData.sublistView(data);
     
-    // GAIN CONFIGURATION (8x = +18dB)
-    const double digitalGain = 8.0; 
+    // 1. First Pass: Detect Peak in current 100ms buffer
+    double rawPeak = 0;
+    for (int i = 0; i < sampleCount; i++) {
+      double s = byteData.getInt16(i * 2, Endian.little).abs() / 32768.0;
+      if (s > rawPeak) rawPeak = s;
+    }
+
+    // 2. RAW SIGNAL TEST: Disable all digital gain (using constant 1.0x)
+    // This allows us to see if the engine handles raw microphone levels better
+    // without any risk of digital artifacts or truncation.
+    const double dynamicGain = 1.0;
     
     double energy = 0;
 
+    // 3. Process samples with NO gain
     for (int i = 0; i < sampleCount; i++) {
         double sample = byteData.getInt16(i * 2, Endian.little) / 32768.0;
-        sample *= digitalGain;
-        if (sample > 1.0) sample = 1.0;
-        if (sample < -1.0) sample = -1.0;
+        
+        // No gain applied, direct raw signal
         floatSamples[i] = sample;
         energy += sample * sample;
     }
     
     // RMS Log
     if (DateTime.now().millisecond < 20) {
-       _log("RMS: ${(energy / sampleCount).toStringAsFixed(5)} [Gain: ${digitalGain}x]");
+       _log("RMS: ${(energy / sampleCount).toStringAsFixed(5)} [RAW SIGNAL - NO GAIN]");
     }
 
     if (_asrProvider != null) {
@@ -470,11 +509,7 @@ class CoreEngine {
      _isRecording = false;
      _isStopping = false;
      _audioStarted = false;
-     _isRecording = false;
-     _isStopping = false;
-     _audioStarted = false;
      _watchdogTimer?.cancel(); // Kill watchdog
-     _recordingController.add(false);
      _recordingController.add(false);
      try { _overlayChannel.invokeMethod('hideRecording'); } catch(e) {}
      _isDiaryMode = false;
@@ -483,7 +518,7 @@ class CoreEngine {
   Future<void> _stopAudioSafely() async {
     if (_audioStarted) {
       try {
-        _nativeInput.stopAudioRecording();
+        _nativeInput?.stopAudioRecording();
         _audioStarted = false;
       } catch (e) { _log("Stop Audio Error: $e"); }
     }
@@ -530,16 +565,16 @@ class CoreEngine {
         _log("Provider Stop Error: $e");
       }
       _log("Raw Text: '$text'");
-      
       String finalText = text;
 
+
       // AI Correction Logic
-      if (text.isNotEmpty && ConfigService().aiCorrectionEnabled) {
+      if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {
          _statusController.add("AI 优化中...");
          try { _overlayChannel.invokeMethod('updateStatus', {"text": "🤖 AI Optimizing..."}); } catch(_) {}
          
          try {
-            finalText = await LLMService().correctText(text);
+            finalText = await LLMService().correctText(finalText);
             _log("LLM Result: '$finalText'");
          } catch(e) {
             _log("Ai Correction Error: $e");
@@ -551,7 +586,7 @@ class CoreEngine {
       // AND only if using Local Engine (Sherpa). Cloud engines usually provide punctuation.
       final bool isLocalEngine = ConfigService().asrEngineType == 'sherpa';
       
-      if (text.isNotEmpty && _punctuationEnabled && isLocalEngine) {
+      if (finalText.isNotEmpty && _punctuationEnabled && isLocalEngine) {
           if (!_hasTerminalPunctuation(finalText)) {
               final temp = addPunctuation(finalText);
               if (temp != finalText) {
@@ -585,7 +620,7 @@ class CoreEngine {
         } else {
            // STANDARD MODE: Inject
            _statusController.add("Ready");
-           _nativeInput.inject(finalText);
+           _nativeInput?.inject(finalText);
            
            // Unified History: Log dictation
            ChatService().addDictation(finalText);

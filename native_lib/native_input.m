@@ -213,6 +213,12 @@ void stop_keyboard_listener() {
   printf("[Native] Keyboard listener stopped.\n");
 }
 
+// Memory safety for async audio callbacks
+void native_free(void *ptr) {
+    if (ptr) free(ptr);
+}
+
+
 // 3. Inject Text (Simple String)
 // 3. Inject Text (Robust Chunking)
 void inject_text(const char *text) {
@@ -291,7 +297,7 @@ int check_key_pressed(int keyCode) {
 // AUDIO RECORDING via AudioQueue (Input Only - No Output Device Involvement)
 // ============================================================================
 
-#define NUM_BUFFERS 3
+#define NUM_BUFFERS 10
 #define BUFFER_DURATION_MS 100  // 100ms per buffer = 1600 samples @ 16kHz
 
 // Callback for audio data from Dart
@@ -315,14 +321,19 @@ static void AudioInputCallback(void *inUserData,
         return;
     }
     
-    // inBuffer->mAudioData contains raw PCM Int16 samples
-    int16_t *samples = (int16_t *)inBuffer->mAudioData;
-    int sampleCount = inBuffer->mAudioDataByteSize / sizeof(int16_t);
+    // CRITICAL: We MUST copy the data before re-enqueuing the buffer.
+    // Since Dart's NativeCallable.listener is asynchronous, the buffer
+    // will be overwritten by the time Dart processes it if we don't copy.
+    UInt32 size = inBuffer->mAudioDataByteSize;
+    void *copy = malloc(size);
+    if (copy) {
+        memcpy(copy, inBuffer->mAudioData, size);
+        int sampleCount = size / sizeof(int16_t);
+        // Dart is responsible for calling native_free(copy)
+        audioCallback((int16_t *)copy, sampleCount);
+    }
     
-    // Send to Dart
-    audioCallback(samples, sampleCount);
-    
-    // Re-enqueue buffer for next capture
+    // Re-enqueue buffer immediately for next capture
     if (isRecording) {
         AudioQueueEnqueueBuffer(inAQ, inBuffer, 0, NULL);
     }
@@ -355,11 +366,12 @@ int start_audio_recording(DartAudioCallback callback) {
     audioFormat.mBytesPerPacket = 2;
     
     // Create AudioQueue for Input
+    // Use NULL for runloop to run on a background system thread
     OSStatus status = AudioQueueNewInput(&audioFormat,
                                           AudioInputCallback,
                                           NULL,  // user data
-                                          CFRunLoopGetMain(),
-                                          kCFRunLoopCommonModes,
+                                          NULL,  // background thread
+                                          NULL,  // runloop mode
                                           0,
                                           &audioQueue);
     

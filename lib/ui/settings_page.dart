@@ -30,14 +30,18 @@ class _SettingsPageState extends State<SettingsPage> {
   late MacosTabController _tabController;
 
   // Model State
+  // Model State
   final Map<String, bool> _downloadedStatus = {};
-  String? _loadingId;
+  final Set<String> _downloadingIds = {}; // Support concurrent downloads
+  final Map<String, double> _downloadProgressMap = {}; // Per-model progress
+  final Map<String, String> _downloadStatusMap = {}; // Per-model status text
+  String? _activatingId; // Only one model can be activating at a time
   String? _activeModelId;
-  double _downloadProgress = 0;
-  String _downloadStatus = "";
   
   // Cloud State
   String _asrEngineType = 'sherpa';
+
+
   final TextEditingController _akIdController = TextEditingController();
   final TextEditingController _akSecretController = TextEditingController();
   final TextEditingController _appKeyController = TextEditingController();
@@ -60,8 +64,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   void initState() {
-    super.initState();
-    _loadVersion();
     super.initState();
     _loadVersion();
     _tabController = MacosTabController(initialIndex: 0, length: 4);
@@ -195,23 +197,36 @@ class _SettingsPageState extends State<SettingsPage> {
   // (Simplified for brevity in rewrite, keeping core logic)
   Future<void> _download(ModelInfo model) async {
      final loc = AppLocalizations.of(context)!;
-     setState(() { _loadingId = model.id; _downloadStatus = loc.preparing; _downloadProgress = 0; });
+     // Add to downloading set
+     setState(() { 
+       _downloadingIds.add(model.id); 
+       _downloadProgressMap[model.id] = 0;
+       _downloadStatusMap[model.id] = loc.preparing;
+     });
+     
      try {
        await _modelManager.downloadAndExtractModel(model.id, 
-         onProgress: (p) { if(mounted) setState(() { _downloadProgress = p; _downloadStatus = loc.downloading((p*100).toStringAsFixed(0)); }); }
+         onProgress: (p) { 
+            if(mounted) setState(() { 
+               _downloadProgressMap[model.id] = p; 
+               _downloadStatusMap[model.id] = loc.downloading((p*100).toStringAsFixed(0));
+            }); 
+         }
        );
        await _refresh();
      } catch(e) { _showError(e.toString()); }
-     finally { if(mounted) setState(() { _loadingId = null; }); }
+     finally { 
+       if(mounted) setState(() { _downloadingIds.remove(model.id); }); 
+     }
   }
   
   Future<void> _activate(ModelInfo model) async {
-    setState(() => _loadingId = model.id);
+    setState(() => _activatingId = model.id);
     await _modelManager.setActiveModel(model.id);
     final path = await _modelManager.getActiveModelPath();
     if (path != null) await _engine.initASR(path, modelType: model.type);
     await ConfigService().setActiveModelId(model.id);
-    setState(() { _loadingId = null; _activeModelId = model.id; });
+    setState(() { _activatingId = null; _activeModelId = model.id; });
   }
 
   Future<void> _delete(ModelInfo model) async {
@@ -220,17 +235,34 @@ class _SettingsPageState extends State<SettingsPage> {
   }
   
   Future<void> _downloadPunctuation() async {
-      // Similar download logic for punctuation
-      // Implementation omitted for brevity, reusing existing patterns
       final loc = AppLocalizations.of(context)!;
-     setState(() { _loadingId = ModelManager.punctuationModelId; _downloadStatus = loc.preparing; });
-     try {
-       await _modelManager.downloadPunctuationModel(onProgress: (p) { if(mounted) setState(() { _downloadProgress = p; _downloadStatus = loc.downloading((p*100).toStringAsFixed(0)); }); });
-       await _refresh();
-       final path = await _modelManager.getPunctuationModelPath();
-       if (path != null) await _engine.initPunctuation(path);
-     } catch(e) { _showError(e.toString()); }
-     finally { if(mounted) setState(() { _loadingId = null; }); }
+      final punctId = ModelManager.punctuationModelId;
+      
+      setState(() { 
+        _downloadingIds.add(punctId);
+        _downloadProgressMap[punctId] = 0;
+        _downloadStatusMap[punctId] = loc.preparing;
+      });
+      
+      try {
+        await _modelManager.downloadPunctuationModel(
+          onProgress: (p) { 
+            if(mounted) setState(() { 
+              _downloadProgressMap[punctId] = p; 
+              _downloadStatusMap[punctId] = loc.downloading((p*100).toStringAsFixed(0));
+            }); 
+          },
+          onStatus: (s) {
+             if(mounted) setState(() { _downloadStatusMap[punctId] = s; });
+          }
+        );
+        await _refresh();
+        final path = await _modelManager.getPunctuationModelPath();
+        if (path != null) await _engine.initPunctuation(path);
+      } catch(e) { _showError(e.toString()); }
+      finally { 
+        if(mounted) setState(() { _downloadingIds.remove(punctId); }); 
+      }
   }
   
   Future<void> _deletePunctuation() async {
@@ -239,11 +271,24 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showError(String msg) {
+    // Sanitize long URLs
+    String cleanMsg = msg.replaceAll(RegExp(r'uri=https?:\/\/[^\s,]+'), '[URL]');
+    
+    // Translate common errors
+    if (cleanMsg.contains("ClientException") || cleanMsg.contains("SocketException")) {
+       cleanMsg = "网络连接失败，请检查网络设置。\n\n详细信息: $cleanMsg";
+    }
+    
+    // Limits
+    if (cleanMsg.length > 300) {
+      cleanMsg = cleanMsg.substring(0, 300) + "...";
+    }
+    
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const MacosIcon(CupertinoIcons.exclamationmark_triangle),
-        title: const Text("Error"), message: Text(msg),
+        title: const Text("Error"), message: Text(cleanMsg),
         primaryButton: PushButton(controlSize: ControlSize.large, onPressed: () => Navigator.pop(context), child: const Text("OK")),
       ),
     );
@@ -395,7 +440,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: _buildActionBtn(
                     context,
                     isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
-                    isLoading: _loadingId == ModelManager.punctuationModelId,
+                    isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
+                    progress: _downloadProgressMap[ModelManager.punctuationModelId],
+                    statusText: _downloadStatusMap[ModelManager.punctuationModelId],
                     isActive: true, // Always active if present
                     onDownload: _downloadPunctuation,
                     onDelete: _deletePunctuation,
@@ -424,7 +471,9 @@ class _SettingsPageState extends State<SettingsPage> {
                          child: _buildActionBtn(
                           context,
                            isDownloaded: _downloadedStatus[m.id] ?? false,
-                           isLoading: _loadingId == m.id,
+                           isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                           progress: _downloadProgressMap[m.id],
+                           statusText: _downloadStatusMap[m.id],
                            isActive: _activeModelId == m.id,
                            onDownload: () => _download(m),
                            onDelete: () => _delete(m),
@@ -729,7 +778,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildActionBtn(BuildContext context, {
     required bool isDownloaded, required bool isLoading, required bool isActive,
-    required VoidCallback onDownload, required VoidCallback onDelete, required VoidCallback onActivate
+    required VoidCallback onDownload, required VoidCallback onDelete, required VoidCallback onActivate,
+    double? progress, String? statusText
   }) {
     final loc = AppLocalizations.of(context)!;
     if (isLoading) {
@@ -741,7 +791,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: _downloadProgress > 0 ? _downloadProgress : null,
+                value: progress,
                 minHeight: 6,
                 backgroundColor: MacosColors.systemGrayColor.withOpacity(0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.getAccent(context)),
@@ -749,7 +799,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              _downloadStatus.isNotEmpty ? _downloadStatus : loc.preparing,
+              statusText ?? loc.preparing,
               style: AppTheme.caption(context),
             ),
           ],

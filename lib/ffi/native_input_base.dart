@@ -23,6 +23,7 @@ typedef CheckKeyPressedDart = int Function(int keyCode);
 // Audio Recording FFI Types
 // Callback: void callback(const int16_t* samples, int sampleCount)
 typedef AudioCallbackC = Void Function(Pointer<Int16> samples, Int32 sampleCount);
+typedef AudioCallbackDart = void Function(Pointer<Int16> samples, int sampleCount);
 
 typedef StartAudioRecordingC = Int32 Function(Pointer<NativeFunction<AudioCallbackC>> callback);
 typedef StartAudioRecordingDart = int Function(Pointer<NativeFunction<AudioCallbackC>> callback);
@@ -36,6 +37,9 @@ typedef IsAudioRecordingDart = int Function();
 typedef CheckMicrophonePermissionC = Int32 Function();
 typedef CheckMicrophonePermissionDart = int Function();
 
+typedef NativeFreeC = Void Function(Pointer<Void>);
+typedef NativeFreeDart = void Function(Pointer<Void>);
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
@@ -48,4 +52,5 @@ abstract class NativeInputBase {
   void stopAudioRecording();
   bool isAudioRecording();
   bool checkMicrophonePermission();
+  void nativeFree(Pointer<Void> ptr);
 }
