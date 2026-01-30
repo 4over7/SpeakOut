@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
-import 'package:url_launcher/url_launcher.dart'; // Pay Link
+import 'package:url_launcher/url_launcher.dart';
 import '../services/config_service.dart';
 import '../services/app_service.dart';
 import '../config/app_constants.dart';
@@ -641,23 +641,34 @@ class _SettingsPageState extends State<SettingsPage> {
                      
                      const SizedBox(height: 16),
                      
-                     // 3. Custom API Toggle
+                     // 3. API Config Section (Required when AI correction is enabled)
                      Row(
+                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                        children: [
-                          MacosCheckbox(
-                            value: _showCustomApi || (ConfigService().llmApiKeyOverride?.isNotEmpty ?? false),
-                            onChanged: (v) {
-                               setState(() => _showCustomApi = v);
-                            },
-                          ),
-                          const SizedBox(width: 8),
                           Text(loc.apiConfig, style: AppTheme.body(context)),
+                          GestureDetector(
+                            onTap: () async {
+                              final uri = Uri.parse("https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen");
+                              if (await canLaunchUrl(uri)) await launchUrl(uri);
+                            },
+                            child: Row(
+                              children: [
+                                MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
+                                const SizedBox(width: 4),
+                                Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                              ],
+                            ),
+                          ),
                        ],
+                     ),
+                     const SizedBox(height: 4),
+                     Text(
+                       "需要 OpenAI 兼容的 API（推荐阿里云百炼）",
+                       style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
                      ),
                      
                      // 4. API Fields
-                     if (_showCustomApi || (ConfigService().llmApiKeyOverride?.isNotEmpty ?? false)) ...[
-                        const SizedBox(height: 12),
+                     const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -687,8 +698,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             ],
                           ),
                         ),
-                     ],
-                   ],
+                    ],
                  ),
                ),
              ]
