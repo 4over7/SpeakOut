@@ -19,11 +19,11 @@ class AppConstants {
   static String kDefaultAliyunAkId = '';
   static String kDefaultAliyunAkSecret = '';
   
-  // AI Correction Defaults
+  // AI Correction Defaults (Aliyun DashScope recommended)
   static const bool kDefaultAiCorrectionEnabled = false;
-  static String kDefaultLlmBaseUrl = 'https://api.openai.com/v1';
+  static String kDefaultLlmBaseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
   static String kDefaultLlmApiKey = '';
-  static String kDefaultLlmModel = 'gpt-3.5-turbo';
+  static String kDefaultLlmModel = 'qwen-turbo';
   static String kDefaultAiCorrectionPrompt = """
 你是一个智能助手，负责优化语音转文字的结果。
 用户输入将被包含在 <speech_text> 标签中。
