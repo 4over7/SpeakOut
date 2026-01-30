@@ -20,7 +20,7 @@ class AppConstants {
   static String kDefaultAliyunAkSecret = '';
   
   // AI Correction Defaults
-  static const bool kDefaultAiCorrectionEnabled = true;
+  static const bool kDefaultAiCorrectionEnabled = false;
   static String kDefaultLlmBaseUrl = 'https://api.openai.com/v1';
   static String kDefaultLlmApiKey = '';
   static String kDefaultLlmModel = 'gpt-3.5-turbo';
