@@ -98,9 +98,16 @@ class CoreEngine {
   bool get isASRReady => _asrProvider != null && _asrProvider!.isReady;
 
 
-  // Debug Logger
+  // Debug Logger - writes to file
   void _log(String msg) {
     debugPrint("[CoreEngine] $msg");
+    try {
+      final f = File('/tmp/SpeakOut_debug.log');
+      final time = DateTime.now().toIso8601String();
+      f.writeAsStringSync("[$time] [CoreEngine] $msg\n", mode: FileMode.append);
+    } catch (e) {
+      debugPrint("Log write failed: $e");
+    }
   }
 
   /// De-duplicate repeated characters AND phrases
@@ -357,6 +364,10 @@ class CoreEngine {
 
   void _handleKey(int keyCode, bool isDown) {
     final t0 = DateTime.now().millisecondsSinceEpoch;
+    // Debug all key events
+    final diaryEnabled = ConfigService().diaryEnabled;
+    final diaryKeyCode = ConfigService().diaryKeyCode;
+    _log("[KeyEvent] code=$keyCode, isDown=$isDown, pttKey=$pttKeyCode, diaryEnabled=$diaryEnabled, diaryKey=$diaryKeyCode");
     if (isDown) _rawKeyController.add(keyCode);
     
     // Check PTT
@@ -384,9 +395,11 @@ class CoreEngine {
     
     // Check Diary
     if (ConfigService().diaryEnabled && keyCode == ConfigService().diaryKeyCode) {
+      _log("[Diary] Key event: isDown=$isDown, _diaryKeyHeld=$_diaryKeyHeld, _isRecording=$_isRecording, _isDiaryMode=$_isDiaryMode");
       if (isDown) {
         if (!_diaryKeyHeld) { // RISING EDGE
            _diaryKeyHeld = true;
+           _log("[Diary] RISING EDGE - Starting recording in diary mode");
            if (!_isRecording) {
               _isDiaryMode = true;
               startRecording();
@@ -394,7 +407,11 @@ class CoreEngine {
         }
       } else {
         _diaryKeyHeld = false; // FALLING EDGE
-        if (_isRecording && _isDiaryMode) stopRecording();
+        _log("[Diary] FALLING EDGE - _isRecording=$_isRecording, _isDiaryMode=$_isDiaryMode");
+        if (_isRecording && _isDiaryMode) {
+          _log("[Diary] Stopping recording");
+          stopRecording();
+        }
       }
     }
   }
@@ -460,18 +477,21 @@ class CoreEngine {
         _startTime = DateTime.now();
         _log("ASR Provider Started.");
 
-        // 4. WATCHDOG TIMER (The "Safety Net")
+        // 4. WATCHDOG TIMER (The "Safety Net") - Only for PTT mode
+        // Diary mode has reliable key-up events, so watchdog is not needed
         _watchdogTimer?.cancel();
-        _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
-             if (!_isRecording) { timer.cancel(); return; }
-             final targetKey = _isDiaryMode ? ConfigService().diaryKeyCode : pttKeyCode;
-             bool isPhysicallyDown = _nativeInput?.isKeyPressed(targetKey) ?? false;
-             if (!isPhysicallyDown) {
-                 _log("🐶 Watchdog: Key $targetKey is UP physically but App is Recording. Forcing Stop.");
-                 timer.cancel();
-                 stopRecording();
-             }
-        });
+        if (!_isDiaryMode) {
+          _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+               if (!_isRecording) { timer.cancel(); return; }
+               final targetKey = pttKeyCode;
+               bool isPhysicallyDown = _nativeInput?.isKeyPressed(targetKey) ?? false;
+               if (!isPhysicallyDown) {
+                   _log("🐶 Watchdog: Key $targetKey is UP physically but App is Recording. Forcing Stop.");
+                   timer.cancel();
+                   stopRecording();
+               }
+          });
+        }
         
         // 5. SETUP NATIVE AUDIO CALLBACK
         _setupNativeAudioCallback();
