@@ -373,7 +373,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         
         Text("下载语音模型", style: AppTheme.display(context).copyWith(fontSize: 24)),
         const SizedBox(height: 8),
-        Text("首次使用需要下载约 500MB 的语音识别模型", style: AppTheme.caption(context)),
+        Text("首次使用需要下载约 1GB 的语音识别模型", style: AppTheme.caption(context)),
         const SizedBox(height: 32),
         
         // Progress

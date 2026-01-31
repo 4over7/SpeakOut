@@ -172,7 +172,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _ready = false;
   String _lastError = "";
   bool _isRecording = false;
-  String _currentKeyName = "Left Option";
+  String _currentKeyName = ""; // Loaded from config in initState
   String _recognizedText = ""; 
   
   AppNotification? _currentNotification;
@@ -183,6 +183,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     // Register lifecycle observer for permission refresh
     WidgetsBinding.instance.addObserver(this);
+    // Load hotkey name from config
+    _currentKeyName = ConfigService().pttKeyName;
     
     // Async Init after first frame to prevent White Screen
     WidgetsBinding.instance.addPostFrameCallback((_) async {

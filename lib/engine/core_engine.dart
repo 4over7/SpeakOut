@@ -212,14 +212,25 @@ class CoreEngine {
     _log("Setting up NativeCallable...");
     try {
       _nativeCallable = ffi.NativeCallable<KeyCallbackC>.listener(_onKeyStatic);
-      if (_nativeInput != null && _nativeInput!.startListener(_nativeCallable!.nativeFunction)) {
-        _isListenerRunning = true;
-        _statusController.add("Keyboard Listener Started.");
-        _log("Listener start success.");
-        if (_nativeInput?.checkPermission() ?? false) _statusController.add("Accessibility Trusted: true");
+      _log("NativeCallable created. Calling startListener...");
+      final hasNativeInput = _nativeInput != null;
+      _log("_nativeInput is null: ${!hasNativeInput}");
+      if (hasNativeInput) {
+        final started = _nativeInput!.startListener(_nativeCallable!.nativeFunction);
+        _log("startListener returned: $started");
+        if (started) {
+          _isListenerRunning = true;
+          _statusController.add("Keyboard Listener Started.");
+          _log("Listener start success.");
+          if (_nativeInput?.checkPermission() ?? false) _statusController.add("Accessibility Trusted: true");
+        } else {
+           _statusController.add("Failed to start Keyboard Listener.");
+           _log("Listener start FAILED.");
+           _isListenerRunning = false;
+        }
       } else {
-         _statusController.add("Failed to start Keyboard Listener.");
-         _isListenerRunning = false;
+        _log("Cannot start listener - _nativeInput is null");
+        _isListenerRunning = false;
       }
     } catch (e, stack) {
        _log("Listener Exception: $e\n$stack");
@@ -640,7 +651,11 @@ class CoreEngine {
     // before we hit any potential native blocking code
     await Future.delayed(const Duration(milliseconds: 10));
     
-    // 2. HARDWARE SHUTDOWN (Native audio is synchronous, no timeout needed)
+    // 2. GIVE ASR TIME TO PROCESS LAST AUDIO CHUNK
+    // Wait a bit before stopping audio so ASR can process any buffered data
+    await Future.delayed(const Duration(milliseconds: 200));
+    
+    // 3. HARDWARE SHUTDOWN (Native audio is synchronous, no timeout needed)
     try {
       await _stopAudioSafely();
     } catch (e) {
