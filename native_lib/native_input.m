@@ -333,14 +333,34 @@ static atomic_bool isRecording = false;  // Thread-safe: accessed from AudioQueu
 static AudioStreamBasicDescription audioFormat;
 
 // AudioQueue Input Callback (runs on background system thread)
+// Flag to track if callback is valid (set to false before clearing audioCallback)
+static volatile bool callbackValid = false;
+
 static void AudioInputCallback(void *inUserData,
                                 AudioQueueRef inAQ,
                                 AudioQueueBufferRef inBuffer,
                                 const AudioTimeStamp *inStartTime,
                                 UInt32 inNumberPacketDescriptions,
                                 const AudioStreamPacketDescription *inPacketDescs) {
-    // Atomic load for thread safety
-    if (!atomic_load(&isRecording) || audioCallback == NULL) {
+    // DEFENSIVE: Check all conditions before calling Dart callback
+    // The callbackValid flag is set to false BEFORE audioCallback is cleared,
+    // preventing race conditions where we call a stale callback pointer.
+    if (!atomic_load(&isRecording)) {
+        return;
+    }
+    
+    // Double-check callback validity
+    if (!callbackValid || audioCallback == NULL) {
+        // Callback became invalid, just re-enqueue buffer without calling Dart
+        if (atomic_load(&isRecording)) {
+            AudioQueueEnqueueBuffer(inAQ, inBuffer, 0, NULL);
+        }
+        return;
+    }
+    
+    // Capture callback pointer locally to prevent race condition
+    DartAudioCallback localCallback = audioCallback;
+    if (localCallback == NULL) {
         return;
     }
     
@@ -353,11 +373,12 @@ static void AudioInputCallback(void *inUserData,
         memcpy(copy, inBuffer->mAudioData, size);
         int sampleCount = size / sizeof(int16_t);
         // Dart is responsible for calling native_free(copy)
-        audioCallback((int16_t *)copy, sampleCount);
+        // Use local copy of callback pointer for safety
+        localCallback((int16_t *)copy, sampleCount);
     }
     
     // Re-enqueue buffer immediately for next capture
-    if (isRecording) {
+    if (atomic_load(&isRecording)) {
         AudioQueueEnqueueBuffer(inAQ, inBuffer, 0, NULL);
     }
 }
@@ -376,6 +397,7 @@ int start_audio_recording(DartAudioCallback callback) {
     }
     
     audioCallback = callback;
+    callbackValid = true;  // Mark callback as valid
     
     // Configure audio format: 16kHz, Mono, 16-bit signed integer
     memset(&audioFormat, 0, sizeof(audioFormat));
@@ -440,6 +462,10 @@ void stop_audio_recording() {
     }
     
     atomic_store(&isRecording, false);
+    
+    // CRITICAL: Mark callback invalid BEFORE stopping queue
+    // This prevents the callback from being called with stale pointer
+    callbackValid = false;
     
     // Stop and dispose queue
     AudioQueueStop(audioQueue, true);  // true = stop immediately
