@@ -14,6 +14,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'theme.dart';
+import '../services/audio_device_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -61,6 +62,11 @@ class _SettingsPageState extends State<SettingsPage> {
   // UI State
   bool _showCustomApi = false;
   String _version = "";
+  
+  // Audio Device State
+  List<AudioDevice> _audioDevices = [];
+  AudioDevice? _currentAudioDevice;
+  bool _autoManageAudio = true;
 
   @override
   void initState() {
@@ -75,6 +81,18 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadHotkeyConfig();
     _loadActiveModel();
     _loadAliyunConfig();
+    _loadAudioDevices();
+  }
+  
+  void _loadAudioDevices() {
+    final service = _engine.audioDeviceService;
+    if (service == null) return;
+    service.refreshDevices();
+    setState(() {
+      _audioDevices = service.devices;
+      _currentAudioDevice = service.currentDevice;
+      _autoManageAudio = service.autoManageEnabled;
+    });
   }
   
   Future<void> _loadAliyunConfig() async {
@@ -512,6 +530,99 @@ class _SettingsPageState extends State<SettingsPage> {
       );
   }
 
+  Widget _buildAudioInputSection(AppLocalizations loc) {
+    final isBluetooth = _currentAudioDevice?.isBluetooth ?? false;
+    final deviceName = _currentAudioDevice?.name ?? loc.systemDefault;
+    
+    return Column(
+      children: [
+        SettingsTile(
+          label: loc.audioInput,
+          icon: CupertinoIcons.mic,
+          child: MacosPopupButton<String>(
+            value: _currentAudioDevice?.id ?? 'system',
+            items: [
+              MacosPopupMenuItem(
+                value: 'system',
+                child: Text(loc.systemDefault, style: AppTheme.body(context)),
+              ),
+              ..._audioDevices.map((d) => MacosPopupMenuItem(
+                value: d.id,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (d.isBluetooth)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 4),
+                        child: MacosIcon(CupertinoIcons.bluetooth, size: 12),
+                      ),
+                    Text(d.name, style: AppTheme.body(context)),
+                  ],
+                ),
+              )),
+            ],
+            onChanged: (value) {
+              if (value == null || value == 'system') return;
+              final service = _engine.audioDeviceService;
+              if (service == null) return;
+              service.setInputDevice(value);
+              _loadAudioDevices();
+            },
+          ),
+        ),
+        // Show Bluetooth warning if current device is Bluetooth
+        if (isBluetooth)
+          Padding(
+            padding: const EdgeInsets.only(left: 40, top: 4),
+            child: Row(
+              children: [
+                const MacosIcon(CupertinoIcons.exclamationmark_triangle, color: Colors.orange, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  '蓝牙麦克风可能降低转写质量',
+                  style: AppTheme.caption(context).copyWith(color: Colors.orange),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    _engine.audioDeviceService?.switchToBuiltinMic();
+                    _loadAudioDevices();
+                  },
+                  child: Text(
+                    '切换到内置麦克风',
+                    style: AppTheme.caption(context).copyWith(
+                      color: MacosColors.systemBlueColor,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SettingsDivider(),
+        // Auto-manage toggle
+        SettingsTile(
+          label: '自动优化音频',
+          icon: CupertinoIcons.wand_stars,
+          child: MacosSwitch(
+            value: _autoManageAudio,
+            onChanged: (v) {
+              setState(() => _autoManageAudio = v);
+              _engine.audioDeviceService?.autoManageEnabled = v;
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 40, top: 2),
+          child: Text(
+            '检测到蓝牙耳机时自动切换到高质量麦克风',
+            style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildGeneralView() {
     final loc = AppLocalizations.of(context)!;
@@ -533,26 +644,8 @@ class _SettingsPageState extends State<SettingsPage> {
                ),
              ),
              const SettingsDivider(),
-             // Audio Input (Native audio uses system default)
-             SettingsTile(
-               label: loc.audioInput,
-               icon: CupertinoIcons.mic,
-               child: Container(
-                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                 decoration: BoxDecoration(
-                   color: MacosColors.systemGrayColor.withOpacity(0.1),
-                   borderRadius: BorderRadius.circular(6),
-                 ),
-                 child: Row(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     const MacosIcon(CupertinoIcons.checkmark_circle_fill, color: Colors.green, size: 14),
-                     const SizedBox(width: 6),
-                     Text("${loc.systemDefault}", style: AppTheme.body(context)),
-                   ],
-                 ),
-               ),
-             ),
+             // Audio Input with Device Selection
+             _buildAudioInputSection(loc),
           ],
         ),
         
