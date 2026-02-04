@@ -345,4 +345,41 @@ class NativeInput implements NativeInputBase {
     _setPreferredDeviceUid(ptr);
     calloc.free(ptr);
   }
+  
+  // ============ SIGNAL QUALITY ANALYSIS ============
+  late AnalyzeAudioQualityDart _analyzeAudioQuality;
+  late IsLikelyTelephoneQualityDart _isLikelyTelephoneQuality;
+  bool _qualityBound = false;
+  
+  void _bindQualityFunctions() {
+    if (_qualityBound) return;
+    try {
+      _analyzeAudioQuality = _dylib
+          .lookup<NativeFunction<AnalyzeAudioQualityC>>('analyze_audio_quality')
+          .asFunction();
+      _isLikelyTelephoneQuality = _dylib
+          .lookup<NativeFunction<IsLikelyTelephoneQualityC>>('is_likely_telephone_quality')
+          .asFunction();
+      _qualityBound = true;
+      _log("Quality analysis FFI bindings SUCCESS");
+    } catch (e) {
+      _log("Quality analysis FFI bindings FAILED: $e");
+    }
+  }
+  
+  @override
+  String analyzeAudioQuality(Pointer<Int16> samples, int sampleCount, int sampleRate) {
+    _bindQualityFunctions();
+    if (!_qualityBound) return '{"error":"not bound"}';
+    final ptr = _analyzeAudioQuality(samples, sampleCount, sampleRate);
+    if (ptr == nullptr) return '{}';
+    return ptr.toDartString();
+  }
+  
+  @override
+  bool isLikelyTelephoneQuality() {
+    _bindQualityFunctions();
+    if (!_qualityBound) return false;
+    return _isLikelyTelephoneQuality() == 1;
+  }
 }

@@ -943,3 +943,168 @@ void set_preferred_device_uid(const char* uid) {
         log_to_file("AudioDevice: Preferred device set to: %s", uid);
     }
 }
+
+// ============================================================================
+// SIGNAL QUALITY ANALYSIS (Phase 3)
+// ============================================================================
+
+#import <Accelerate/Accelerate.h>
+
+// FFT setup for 512-sample analysis window
+static FFTSetup fftSetup = NULL;
+static int log2n = 9; // 2^9 = 512
+
+static void ensureFFTSetup() {
+    if (fftSetup == NULL) {
+        fftSetup = vDSP_create_fftsetup(log2n, FFT_RADIX2);
+        log_to_file("AudioQuality: FFT setup created (N=512)");
+    }
+}
+
+/// Analyze audio samples and estimate quality
+/// Returns JSON: {"bandwidth": 8000, "snr": 15.5, "isTelephoneQuality": true}
+/// Parameters:
+///   - samples: 16-bit audio samples
+///   - sampleCount: number of samples (should be >= 512)
+///   - sampleRate: audio sample rate (e.g., 16000)
+const char* analyze_audio_quality(const int16_t* samples, int sampleCount, int sampleRate) {
+    static char resultBuffer[256];
+    
+    if (samples == NULL || sampleCount < 512) {
+        snprintf(resultBuffer, sizeof(resultBuffer), 
+                 "{\"bandwidth\":0,\"snr\":0,\"isTelephoneQuality\":false,\"error\":\"insufficient samples\"}");
+        return resultBuffer;
+    }
+    
+    ensureFFTSetup();
+    
+    // Use 512 samples for FFT
+    int N = 512;
+    
+    // Convert int16 to float and apply Hann window
+    float* floatSamples = (float*)malloc(N * sizeof(float));
+    float* windowedSamples = (float*)malloc(N * sizeof(float));
+    
+    for (int i = 0; i < N; i++) {
+        floatSamples[i] = (float)samples[i] / 32768.0f;
+        // Hann window
+        float window = 0.5f * (1.0f - cosf(2.0f * M_PI * i / (N - 1)));
+        windowedSamples[i] = floatSamples[i] * window;
+    }
+    
+    // Prepare for FFT (split complex format)
+    DSPSplitComplex splitComplex;
+    splitComplex.realp = (float*)malloc((N/2) * sizeof(float));
+    splitComplex.imagp = (float*)malloc((N/2) * sizeof(float));
+    
+    // Pack real samples into split complex format
+    vDSP_ctoz((DSPComplex*)windowedSamples, 2, &splitComplex, 1, N/2);
+    
+    // Perform FFT
+    vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFT_FORWARD);
+    
+    // Calculate magnitude squared for each bin
+    float* magnitudes = (float*)malloc((N/2) * sizeof(float));
+    vDSP_zvmags(&splitComplex, 1, magnitudes, 1, N/2);
+    
+    // Calculate total energy and high-frequency energy
+    float totalEnergy = 0;
+    float highFreqEnergy = 0;
+    float lowFreqEnergy = 0;
+    
+    float binWidth = (float)sampleRate / N;  // Hz per bin
+    int cutoffBin = (int)(4000.0f / binWidth); // 4kHz cutoff for "telephone" detection
+    int highestSignificantBin = 0;
+    float noiseFloor = 0;
+    
+    // Find noise floor (average of highest frequency bins)
+    for (int i = N/2 - 20; i < N/2; i++) {
+        noiseFloor += magnitudes[i];
+    }
+    noiseFloor /= 20.0f;
+    
+    float threshold = noiseFloor * 10.0f; // 10dB above noise floor
+    
+    for (int i = 1; i < N/2; i++) {
+        totalEnergy += magnitudes[i];
+        if (i > cutoffBin) {
+            highFreqEnergy += magnitudes[i];
+        } else {
+            lowFreqEnergy += magnitudes[i];
+        }
+        
+        // Find highest bin with significant energy
+        if (magnitudes[i] > threshold) {
+            highestSignificantBin = i;
+        }
+    }
+    
+    // Estimate effective bandwidth
+    float effectiveBandwidth = highestSignificantBin * binWidth;
+    
+    // Calculate SNR (rough estimate: peak to noise floor ratio in dB)
+    float peakMag = 0;
+    vDSP_maxv(magnitudes, 1, &peakMag, N/2);
+    float snr = (noiseFloor > 0) ? 10.0f * log10f(peakMag / noiseFloor) : 0;
+    
+    // Determine if telephone quality:
+    // - Effective bandwidth < 4kHz
+    // - OR high frequency energy is < 10% of low frequency energy
+    bool isTelephoneQuality = false;
+    if (effectiveBandwidth < 4000) {
+        isTelephoneQuality = true;
+    } else if (lowFreqEnergy > 0 && (highFreqEnergy / lowFreqEnergy) < 0.1f) {
+        isTelephoneQuality = true;
+    }
+    
+    log_to_file("AudioQuality: bandwidth=%.0f Hz, SNR=%.1f dB, telephone=%s",
+                effectiveBandwidth, snr, isTelephoneQuality ? "YES" : "NO");
+    
+    // Build result JSON
+    snprintf(resultBuffer, sizeof(resultBuffer),
+             "{\"bandwidth\":%.0f,\"snr\":%.1f,\"isTelephoneQuality\":%s}",
+             effectiveBandwidth, snr, isTelephoneQuality ? "true" : "false");
+    
+    // Cleanup
+    free(floatSamples);
+    free(windowedSamples);
+    free(splitComplex.realp);
+    free(splitComplex.imagp);
+    free(magnitudes);
+    
+    return resultBuffer;
+}
+
+/// Quick check if current audio appears to be telephone quality
+/// Uses device transport type + sample rate as heuristic
+/// Returns 1 if likely telephone quality, 0 otherwise
+int is_likely_telephone_quality() {
+    AudioObjectPropertyAddress propAddr = {
+        kAudioHardwarePropertyDefaultInputDevice,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+    
+    AudioObjectID deviceID = 0;
+    UInt32 size = sizeof(AudioObjectID);
+    OSStatus status = AudioObjectGetPropertyData(kAudioObjectSystemObject, &propAddr, 0, NULL, &size, &deviceID);
+    
+    if (status != noErr || deviceID == kAudioObjectUnknown) {
+        return 0;
+    }
+    
+    // Check if Bluetooth
+    if (!isBluetoothDevice(deviceID)) {
+        return 0; // Not Bluetooth, unlikely to be telephone quality
+    }
+    
+    // Check sample rate - low sample rate indicates HFP/HSP mode
+    Float64 sampleRate = getDeviceSampleRate(deviceID);
+    if (sampleRate > 0 && sampleRate <= 16000) {
+        log_to_file("AudioQuality: Bluetooth device with low sample rate (%.0f Hz) - likely telephone quality", sampleRate);
+        return 1;
+    }
+    
+    return 0;
+}
+

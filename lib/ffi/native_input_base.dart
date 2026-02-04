@@ -72,6 +72,13 @@ typedef GetPreferredDeviceUidDart = Pointer<Utf8> Function();
 typedef SetPreferredDeviceUidC = Void Function(Pointer<Utf8> uid);
 typedef SetPreferredDeviceUidDart = void Function(Pointer<Utf8> uid);
 
+// Signal Quality Analysis FFI Types
+typedef AnalyzeAudioQualityC = Pointer<Utf8> Function(Pointer<Int16> samples, Int32 sampleCount, Int32 sampleRate);
+typedef AnalyzeAudioQualityDart = Pointer<Utf8> Function(Pointer<Int16> samples, int sampleCount, int sampleRate);
+
+typedef IsLikelyTelephoneQualityC = Int32 Function();
+typedef IsLikelyTelephoneQualityDart = int Function();
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
@@ -96,4 +103,8 @@ abstract class NativeInputBase {
   void stopDeviceChangeListener();
   String getPreferredDeviceUid();
   void setPreferredDeviceUid(String uid);
+  
+  // Signal Quality Analysis
+  String analyzeAudioQuality(Pointer<Int16> samples, int sampleCount, int sampleRate);
+  bool isLikelyTelephoneQuality();
 }
