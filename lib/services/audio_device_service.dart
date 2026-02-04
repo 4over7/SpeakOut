@@ -6,6 +6,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import '../ffi/native_input.dart';
 import '../ffi/native_input_base.dart';
+import 'notification_service.dart';
 
 /// Represents an audio input device
 class AudioDevice {
@@ -69,8 +70,8 @@ class AudioDeviceService {
   // Native callback holder
   NativeCallable<DeviceChangeCallbackC>? _deviceChangeCallable;
   
-  // Notification callback (to show Toast to user)
-  void Function(String message, {bool showUndoButton})? onNotification;
+  // Last detected Bluetooth device name (for undo)
+  String? _lastBluetoothDeviceName;
   
   AudioDeviceService(this._nativeInput);
   
@@ -144,12 +145,19 @@ class AudioDeviceService {
   void _handleBluetoothMicDetected(String bluetoothDeviceName) {
     debugPrint('[AudioDeviceService] Bluetooth mic detected, auto-switching to built-in...');
     
+    _lastBluetoothDeviceName = bluetoothDeviceName;
     final success = switchToBuiltinMic();
     
     if (success && showSwitchNotifications) {
-      onNotification?.call(
-        '已自动切换到高质量麦克风，转写更准确',
-        showUndoButton: true,
+      NotificationService().notifyWithAction(
+        message: '已自动切换到高质量麦克风，转写更准确',
+        actionLabel: '仍用耳机麦',
+        onAction: () {
+          switchToBluetoothMic();
+          NotificationService().notify('已切换回耳机麦克风');
+        },
+        type: NotificationType.audioDeviceSwitch,
+        duration: const Duration(seconds: 6),
       );
     }
   }

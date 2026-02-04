@@ -539,15 +539,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           decoration: BoxDecoration(
                             color: _currentNotification!.type == NotificationType.error 
                                 ? AppTheme.errorColor 
-                                : (_currentNotification!.type == NotificationType.success ? MacosColors.systemGreenColor : MacosColors.systemBlueColor),
+                                : (_currentNotification!.type == NotificationType.success 
+                                    ? MacosColors.systemGreenColor 
+                                    : (_currentNotification!.type == NotificationType.audioDeviceSwitch
+                                        ? MacosColors.systemOrangeColor
+                                        : MacosColors.systemBlueColor)),
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))
                             ]
                           ),
-                          child: Text(
-                            _currentNotification!.message,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _currentNotification!.message,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              // Action button if present
+                              if (_currentNotification!.actionLabel != null && _currentNotification!.onAction != null) ...[
+                                const SizedBox(width: 12),
+                                GestureDetector(
+                                  onTap: () {
+                                    _currentNotification!.onAction!();
+                                    setState(() => _currentNotification = null);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.25),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      _currentNotification!.actionLabel!,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
