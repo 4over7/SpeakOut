@@ -40,6 +40,38 @@ typedef CheckMicrophonePermissionDart = int Function();
 typedef NativeFreeC = Void Function(Pointer<Void>);
 typedef NativeFreeDart = void Function(Pointer<Void>);
 
+// Audio Device Management FFI Types
+typedef GetAudioInputDevicesC = Pointer<Utf8> Function();
+typedef GetAudioInputDevicesDart = Pointer<Utf8> Function();
+
+typedef GetCurrentInputDeviceC = Pointer<Utf8> Function();
+typedef GetCurrentInputDeviceDart = Pointer<Utf8> Function();
+
+typedef SetInputDeviceC = Int32 Function(Pointer<Utf8> deviceUID);
+typedef SetInputDeviceDart = int Function(Pointer<Utf8> deviceUID);
+
+typedef SwitchToBuiltinMicC = Int32 Function();
+typedef SwitchToBuiltinMicDart = int Function();
+
+typedef IsCurrentInputBluetoothC = Int32 Function();
+typedef IsCurrentInputBluetoothDart = int Function();
+
+// Device change callback: void callback(const char* deviceId, const char* deviceName, int isBluetooth)
+typedef DeviceChangeCallbackC = Void Function(Pointer<Utf8> deviceId, Pointer<Utf8> deviceName, Int32 isBluetooth);
+typedef DeviceChangeCallbackDart = void Function(Pointer<Utf8> deviceId, Pointer<Utf8> deviceName, int isBluetooth);
+
+typedef StartDeviceChangeListenerC = Int32 Function(Pointer<NativeFunction<DeviceChangeCallbackC>> callback);
+typedef StartDeviceChangeListenerDart = int Function(Pointer<NativeFunction<DeviceChangeCallbackC>> callback);
+
+typedef StopDeviceChangeListenerC = Void Function();
+typedef StopDeviceChangeListenerDart = void Function();
+
+typedef GetPreferredDeviceUidC = Pointer<Utf8> Function();
+typedef GetPreferredDeviceUidDart = Pointer<Utf8> Function();
+
+typedef SetPreferredDeviceUidC = Void Function(Pointer<Utf8> uid);
+typedef SetPreferredDeviceUidDart = void Function(Pointer<Utf8> uid);
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
@@ -53,4 +85,15 @@ abstract class NativeInputBase {
   bool isAudioRecording();
   bool checkMicrophonePermission();
   void nativeFree(Pointer<Void> ptr);
+  
+  // Audio Device Management
+  String getAudioInputDevices();
+  String getCurrentInputDevice();
+  bool setInputDevice(String deviceUID);
+  bool switchToBuiltinMic();
+  bool isCurrentInputBluetooth();
+  bool startDeviceChangeListener(Pointer<NativeFunction<DeviceChangeCallbackC>> callback);
+  void stopDeviceChangeListener();
+  String getPreferredDeviceUid();
+  void setPreferredDeviceUid(String uid);
 }

@@ -218,4 +218,131 @@ class NativeInput implements NativeInputBase {
     if (!_audioBound) return;
     _nativeFree(ptr);
   }
+  
+  // ============ AUDIO DEVICE MANAGEMENT ============
+  late GetAudioInputDevicesDart _getAudioInputDevices;
+  late GetCurrentInputDeviceDart _getCurrentInputDevice;
+  late SetInputDeviceDart _setInputDevice;
+  late SwitchToBuiltinMicDart _switchToBuiltinMic;
+  late IsCurrentInputBluetoothDart _isCurrentInputBluetooth;
+  late StartDeviceChangeListenerDart _startDeviceChangeListener;
+  late StopDeviceChangeListenerDart _stopDeviceChangeListener;
+  late GetPreferredDeviceUidDart _getPreferredDeviceUid;
+  late SetPreferredDeviceUidDart _setPreferredDeviceUid;
+  bool _deviceBound = false;
+  
+  void _bindDeviceFunctions() {
+    if (_deviceBound) return;
+    try {
+      _getAudioInputDevices = _dylib
+          .lookup<NativeFunction<GetAudioInputDevicesC>>('get_audio_input_devices')
+          .asFunction();
+      _getCurrentInputDevice = _dylib
+          .lookup<NativeFunction<GetCurrentInputDeviceC>>('get_current_input_device')
+          .asFunction();
+      _setInputDevice = _dylib
+          .lookup<NativeFunction<SetInputDeviceC>>('set_input_device')
+          .asFunction();
+      _switchToBuiltinMic = _dylib
+          .lookup<NativeFunction<SwitchToBuiltinMicC>>('switch_to_builtin_mic')
+          .asFunction();
+      _isCurrentInputBluetooth = _dylib
+          .lookup<NativeFunction<IsCurrentInputBluetoothC>>('is_current_input_bluetooth')
+          .asFunction();
+      _startDeviceChangeListener = _dylib
+          .lookup<NativeFunction<StartDeviceChangeListenerC>>('start_device_change_listener')
+          .asFunction();
+      _stopDeviceChangeListener = _dylib
+          .lookup<NativeFunction<StopDeviceChangeListenerC>>('stop_device_change_listener')
+          .asFunction();
+      _getPreferredDeviceUid = _dylib
+          .lookup<NativeFunction<GetPreferredDeviceUidC>>('get_preferred_device_uid')
+          .asFunction();
+      _setPreferredDeviceUid = _dylib
+          .lookup<NativeFunction<SetPreferredDeviceUidC>>('set_preferred_device_uid')
+          .asFunction();
+      _deviceBound = true;
+      _log("Device FFI bindings SUCCESS");
+    } catch (e) {
+      _log("Device FFI bindings FAILED: $e");
+    }
+  }
+  
+  @override
+  String getAudioInputDevices() {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return '[]';
+    final ptr = _getAudioInputDevices();
+    if (ptr == nullptr) return '[]';
+    return ptr.toDartString();
+  }
+  
+  @override
+  String getCurrentInputDevice() {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return '{}';
+    final ptr = _getCurrentInputDevice();
+    if (ptr == nullptr) return '{}';
+    return ptr.toDartString();
+  }
+  
+  @override
+  bool setInputDevice(String deviceUID) {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return false;
+    final ptr = deviceUID.toNativeUtf8();
+    final result = _setInputDevice(ptr);
+    calloc.free(ptr);
+    return result == 1;
+  }
+  
+  @override
+  bool switchToBuiltinMic() {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return false;
+    _log("Dart: Calling switch_to_builtin_mic...");
+    final result = _switchToBuiltinMic();
+    _log("Dart: switch_to_builtin_mic returned $result");
+    return result == 1;
+  }
+  
+  @override
+  bool isCurrentInputBluetooth() {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return false;
+    return _isCurrentInputBluetooth() == 1;
+  }
+  
+  @override
+  bool startDeviceChangeListener(Pointer<NativeFunction<DeviceChangeCallbackC>> callback) {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return false;
+    _log("Dart: Starting device change listener...");
+    return _startDeviceChangeListener(callback) == 1;
+  }
+  
+  @override
+  void stopDeviceChangeListener() {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return;
+    _stopDeviceChangeListener();
+  }
+  
+  @override
+  String getPreferredDeviceUid() {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return '';
+    final ptr = _getPreferredDeviceUid();
+    if (ptr == nullptr) return '';
+    return ptr.toDartString();
+  }
+  
+  @override
+  void setPreferredDeviceUid(String uid) {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return;
+    final ptr = uid.toNativeUtf8();
+    _setPreferredDeviceUid(ptr);
+    calloc.free(ptr);
+  }
 }

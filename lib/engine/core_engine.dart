@@ -14,6 +14,7 @@ import 'providers/sherpa_provider.dart';
 import 'providers/aliyun_provider.dart';
 import '../services/diary_service.dart';
 import '../services/chat_service.dart';
+import '../services/audio_device_service.dart';
 
 // MethodChannel for native overlay control
 const _overlayChannel = MethodChannel('com.SpeakOut/overlay');
@@ -28,9 +29,16 @@ class CoreEngine {
   late final NativeInputBase? _nativeInput;
   ffi.NativeCallable<AudioCallbackC>? _audioCallable;
   
+  // Audio Device Management
+  AudioDeviceService? _audioDeviceService;
+  AudioDeviceService? get audioDeviceService => _audioDeviceService;
+  
   CoreEngine._internal() {
     try {
       _nativeInput = NativeInput();
+      // Initialize AudioDeviceService with NativeInput
+      _audioDeviceService = AudioDeviceService(_nativeInput as NativeInput);
+      AudioDeviceService.setInstance(_audioDeviceService!);
     } catch (e) {
       print("[CoreEngine] Warning: Failed to init NativeInput: $e");
       _nativeInput = null;
@@ -207,6 +215,16 @@ class CoreEngine {
     
     // Warm up Audio Config
     await refreshInputDevice();
+    
+    // 2.5 Initialize Audio Device Service (Bluetooth detection)
+    _audioDeviceService?.initialize();
+    _log("Audio device service initialized. Auto-manage: ${_audioDeviceService?.autoManageEnabled}");
+    
+    // Check for Bluetooth mic at startup
+    if (_audioDeviceService?.isCurrentInputBluetooth == true) {
+      _log("Warning: Bluetooth mic detected at startup. Switching to built-in...");
+      _audioDeviceService?.switchToBuiltinMic();
+    }
 
     // 2. Init Native Listener
     _log("Setting up NativeCallable...");
