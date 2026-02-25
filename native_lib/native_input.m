@@ -67,6 +67,12 @@ static DartKeyCallback dartCallback = NULL;
 static int targetKeyCode = -1; // e.g., 58 for Option, etc.
 static atomic_bool isMonitoring = false;
 
+// macOS 26+: Globe/Fn key sends KeyDown/Up with keyCode=179 in addition to
+// FlagsChanged with keyCode=63. The FlagsChanged events fire DOWN+UP almost
+// simultaneously (useless for push-to-talk hold detection), while KeyDown/Up
+// 179 has proper hold timing. Once we see 179 events, suppress FlagsChanged 63.
+static bool hasGlobeKeyEvents = false;
+
 // CGEventCallback
 CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
                              CGEventRef event, void *refcon) {
@@ -94,15 +100,25 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
 
   // Capture Key events
   if (type == kCGEventKeyDown || type == kCGEventKeyUp) {
+    // macOS 26+: Globe/Fn key sends KeyDown/Up with keyCode=179.
+    // Map to legacy Fn keyCode 63 so Dart PTT matching works.
+    int mappedKeyCode = (int)keyCode;
+    if (keyCode == 179) {
+      hasGlobeKeyEvents = true;
+      mappedKeyCode = 63;
+      log_to_file("Globe key 179 -> mapped to Fn 63 (%s)",
+                  type == kCGEventKeyDown ? "DOWN" : "UP");
+    }
+
     uint64_t t0 = mach_absolute_time();
-    dartCallback((int)keyCode, type == kCGEventKeyDown);
+    dartCallback(mappedKeyCode, type == kCGEventKeyDown);
     uint64_t t1 = mach_absolute_time();
 
     // Convert to milliseconds
     mach_timebase_info_data_t info;
     mach_timebase_info(&info);
     double ms = (double)(t1 - t0) * info.numer / info.denom / 1000000.0;
-    log_to_file("Key %d %s: dartCallback took %.2f ms", keyCode,
+    log_to_file("Key %d %s: dartCallback took %.2f ms", mappedKeyCode,
                 type == kCGEventKeyDown ? "DOWN" : "UP", ms);
   } else if (type == kCGEventFlagsChanged) {
     CGEventFlags flags = CGEventGetFlags(event);
@@ -130,29 +146,31 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
       isDown = (flags & kCGEventFlagMaskAlphaShift) != 0;
     }
     // FN Key: keyCode=63 - use state tracking
-    // On newer Macs, FN key generates kCGEventFlagsChanged with keyCode=63
-    // but the flag bit may vary. Use toggle approach: first event = down,
-    // second = up
+    // On macOS 26+, Fn/Globe key also sends KeyDown/Up 179 with proper hold
+    // timing. FlagsChanged 63 fires DOWN+UP almost simultaneously, making it
+    // useless for push-to-talk. Once we detect Globe key 179, suppress this.
     else if (keyCode == 63) {
+      if (hasGlobeKeyEvents) {
+        // Suppress: KeyDown/Up 179 (mapped to 63) handles this correctly
+        log_to_file("FN FlagsChanged 63: suppressed (Globe key 179 active)");
+        return event;
+      }
+      // Legacy path for older macOS without Globe key 179 events
       static bool lastFnState = false;
-      // Check kCGEventFlagMaskSecondaryFn (0x800000) first
       bool fnFlagSet = (flags & kCGEventFlagMaskSecondaryFn) != 0;
-      // Fallback: if flag not set, toggle state on each event
       if (fnFlagSet) {
         isDown = true;
         lastFnState = true;
       } else {
-        // If flag is cleared and we were previously down, it's a release
         if (lastFnState) {
           isDown = false;
           lastFnState = false;
         } else {
-          // First event with no flag = assume down
           isDown = true;
           lastFnState = true;
         }
       }
-      log_to_file("FN Key 63: flags=0x%llx, fnFlagSet=%d, isDown=%d",
+      log_to_file("FN Key 63 (legacy): flags=0x%llx, fnFlagSet=%d, isDown=%d",
                   (unsigned long long)flags, fnFlagSet, isDown);
     }
 
@@ -661,7 +679,7 @@ static NSString *getDeviceStringProperty(AudioObjectID deviceID,
     return nil;
   }
 
-  NSString *result = (__bridge_transfer NSString *)value;
+  NSString *result = (NSString *)value;
   return result;
 }
 
