@@ -396,6 +396,12 @@ class CoreEngine {
 
   void _handleKey(int keyCode, bool isDown) {
     final t0 = DateTime.now().millisecondsSinceEpoch;
+    
+    // macOS 26+: Globe/Fn key sends keyCode 179 (kCGEventKeyDown) in addition
+    // to legacy keyCode 63 (kCGEventFlagsChanged). Normalize so users who
+    // configured Fn (63) still get matched when Globe (179) arrives.
+    if (keyCode == 179) keyCode = 63;
+    
     // Debug all key events
     final diaryEnabled = ConfigService().diaryEnabled;
     final diaryKeyCode = ConfigService().diaryKeyCode;
