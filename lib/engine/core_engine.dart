@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ffi' as ffi;
+import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -25,9 +26,11 @@ class CoreEngine {
   // Simple singleton
   factory CoreEngine() => _instance;
 
-  // Dependencies - Native Audio via FFI (replaces record package)
+  // Dependencies - Native Audio via FFI (Ring Buffer + Polling)
   late final NativeInputBase? _nativeInput;
-  ffi.NativeCallable<AudioCallbackC>? _audioCallable;
+  Timer? _audioPollTimer;
+  ffi.Pointer<ffi.Int16>? _pollBuffer;  // Reusable buffer for polling
+  static const int _pollBufferSamples = 16000;  // Max 1 second per poll (16kHz)
   
   // Audio Device Management
   AudioDeviceService? _audioDeviceService;
@@ -522,12 +525,9 @@ class CoreEngine {
           });
         }
         
-        // 5. SETUP NATIVE AUDIO CALLBACK
-        _setupNativeAudioCallback();
-        
-        // 6. START NATIVE RECORDING
-        _log("Starting native audio recording...");
-        final success = _nativeInput?.startAudioRecording(_audioCallable!.nativeFunction) ?? false;
+        // 5. START NATIVE RECORDING (Ring Buffer mode - no Dart callback)
+        _log("Starting native audio recording (ring buffer)...");
+        final success = _nativeInput?.startAudioRecording() ?? false;
         if (!success) {
             _log("Native audio start failed!");
             _cleanupRecordingState();
@@ -535,7 +535,11 @@ class CoreEngine {
             return;
         }
         _audioStarted = true;
-        _log("Native audio recording started successfully.");
+        _log("Native audio recording started.");
+        
+        // 6. START POLLING TIMER to read from ring buffer
+        _startAudioPolling();
+        _log("Audio polling timer started (50ms interval).");
 
     } catch (e) {
         _log("Start Fatal Error: $e");
@@ -544,38 +548,40 @@ class CoreEngine {
     }
   }
   
-  /// Setup native audio callback (Int16 samples -> Float32 for ASR)
-  void _setupNativeAudioCallback() {
-    // Dispose previous callable if exists
-    _audioCallable?.close();
+  /// Start polling the C ring buffer for audio data
+  void _startAudioPolling() {
+    _stopAudioPolling(); // Cancel any existing timer
     
-    // Create new native callable for audio data
-    _audioCallable = ffi.NativeCallable<AudioCallbackC>.listener(
-      _onNativeAudioData,
-    );
-    _log("Native audio callback setup complete.");
+    // Allocate a reusable native buffer for polling
+    _pollBuffer ??= pkg_ffi.calloc<ffi.Int16>(_pollBufferSamples);
+    
+    // Poll every 50ms — at 16kHz this means ~800 samples per poll
+    _audioPollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      _pollAudioRingBuffer();
+    });
   }
   
-  /// Native audio callback handler - receives Int16 samples from AudioQueue
-  static void _onNativeAudioData(ffi.Pointer<ffi.Int16> samplesPtr, int sampleCount) {
-    final engine = CoreEngine._instance;
-    if (!engine._isRecording || sampleCount <= 0) {
-      // Still need to free even if not recording
-      engine._nativeInput?.nativeFree(samplesPtr.cast<ffi.Void>());
-      return;
-    }
+  /// Stop polling and free the poll buffer
+  void _stopAudioPolling() {
+    _audioPollTimer?.cancel();
+    _audioPollTimer = null;
+    // Note: _pollBuffer is intentionally kept allocated for reuse
+    // It will be freed when the engine is disposed
+  }
+  
+  /// Poll the C ring buffer and feed audio to ASR pipeline
+  void _pollAudioRingBuffer() {
+    if (!_isRecording || _nativeInput == null || _pollBuffer == null) return;
     
-    // Convert Pointer<Int16> to Uint8List (matching old processAudioData interface)
-    // Each Int16 is 2 bytes
-    final byteCount = sampleCount * 2;
-    final bytes = samplesPtr.cast<ffi.Uint8>().asTypedList(byteCount);
+    final samplesRead = _nativeInput!.readAudioBuffer(_pollBuffer!, _pollBufferSamples);
+    if (samplesRead <= 0) return;
     
-    // Process using existing pipeline
-    // Uint8List.fromList creates a copy, so samplesPtr is safe to free after this
-    engine._processAudioData(Uint8List.fromList(bytes));
+    // Convert Pointer<Int16> to Uint8List (matching _processAudioData interface)
+    final byteCount = samplesRead * 2;
+    final bytes = _pollBuffer!.cast<ffi.Uint8>().asTypedList(byteCount);
     
-    // CRITICAL: Free the malloced copy from native code
-    engine._nativeInput?.nativeFree(samplesPtr.cast<ffi.Void>());
+    // Uint8List.fromList creates a copy, safe to reuse _pollBuffer next poll
+    _processAudioData(Uint8List.fromList(bytes));
   }
 
   // Mutex for stopping state
@@ -636,6 +642,7 @@ class CoreEngine {
      _isRecording = false;
      _isStopping = false;
      _audioStarted = false;
+     _stopAudioPolling();  // Cancel ring buffer polling
      _watchdogTimer?.cancel(); // Kill watchdog
      _recordingController.add(false);
      try { _overlayChannel.invokeMethod('hideRecording'); } catch(e) {}
@@ -643,6 +650,7 @@ class CoreEngine {
   }
 
   Future<void> _stopAudioSafely() async {
+    _stopAudioPolling();  // Stop polling BEFORE stopping AudioQueue
     if (_audioStarted) {
       try {
         _nativeInput?.stopAudioRecording();

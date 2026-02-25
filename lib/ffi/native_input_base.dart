@@ -20,13 +20,9 @@ typedef KeyCallbackC = Void Function(Int32 keyCode, Bool isDown);
 typedef CheckKeyPressedC = Int32 Function(Int32 keyCode);
 typedef CheckKeyPressedDart = int Function(int keyCode);
 
-// Audio Recording FFI Types
-// Callback: void callback(const int16_t* samples, int sampleCount)
-typedef AudioCallbackC = Void Function(Pointer<Int16> samples, Int32 sampleCount);
-typedef AudioCallbackDart = void Function(Pointer<Int16> samples, int sampleCount);
-
-typedef StartAudioRecordingC = Int32 Function(Pointer<NativeFunction<AudioCallbackC>> callback);
-typedef StartAudioRecordingDart = int Function(Pointer<NativeFunction<AudioCallbackC>> callback);
+// Audio Recording FFI Types (Ring Buffer API - no Dart callback)
+typedef StartAudioRecordingC = Int32 Function();
+typedef StartAudioRecordingDart = int Function();
 
 typedef StopAudioRecordingC = Void Function();
 typedef StopAudioRecordingDart = void Function();
@@ -39,6 +35,13 @@ typedef CheckMicrophonePermissionDart = int Function();
 
 typedef NativeFreeC = Void Function(Pointer<Void>);
 typedef NativeFreeDart = void Function(Pointer<Void>);
+
+// Ring Buffer polling types
+typedef GetAvailableAudioSamplesC = Int32 Function();
+typedef GetAvailableAudioSamplesDart = int Function();
+
+typedef ReadAudioBufferC = Int32 Function(Pointer<Int16> outSamples, Int32 maxSamples);
+typedef ReadAudioBufferDart = int Function(Pointer<Int16> outSamples, int maxSamples);
 
 // Audio Device Management FFI Types
 typedef GetAudioInputDevicesC = Pointer<Utf8> Function();
@@ -86,12 +89,14 @@ abstract class NativeInputBase {
   bool checkPermission();
   bool isKeyPressed(int keyCode);
   
-  // Audio Recording
-  bool startAudioRecording(Pointer<NativeFunction<AudioCallbackC>> callback);
+  // Audio Recording (Ring Buffer API)
+  bool startAudioRecording();
   void stopAudioRecording();
   bool isAudioRecording();
   bool checkMicrophonePermission();
   void nativeFree(Pointer<Void> ptr);
+  int getAvailableAudioSamples();
+  int readAudioBuffer(Pointer<Int16> outSamples, int maxSamples);
   
   // Audio Device Management
   String getAudioInputDevices();

@@ -144,12 +144,14 @@ class NativeInput implements NativeInputBase {
     return _checkKeyPressed(keyCode) == 1;
   }
   
-  // ============ AUDIO RECORDING ============
+  // ============ AUDIO RECORDING (Ring Buffer) ============
   late StartAudioRecordingDart _startAudioRecording;
   late StopAudioRecordingDart _stopAudioRecording;
   late IsAudioRecordingDart _isAudioRecording;
   late CheckMicrophonePermissionDart _checkMicPermission;
   late NativeFreeDart _nativeFree;
+  late GetAvailableAudioSamplesDart _getAvailableAudioSamples;
+  late ReadAudioBufferDart _readAudioBuffer;
   bool _audioBound = false;
   
   void _bindAudioFunctions() {
@@ -170,19 +172,25 @@ class NativeInput implements NativeInputBase {
       _nativeFree = _dylib
           .lookup<NativeFunction<NativeFreeC>>('native_free')
           .asFunction();
+      _getAvailableAudioSamples = _dylib
+          .lookup<NativeFunction<GetAvailableAudioSamplesC>>('get_available_audio_samples')
+          .asFunction();
+      _readAudioBuffer = _dylib
+          .lookup<NativeFunction<ReadAudioBufferC>>('read_audio_buffer')
+          .asFunction();
       _audioBound = true;
-      _log("Audio FFI bindings SUCCESS");
+      _log("Audio FFI bindings SUCCESS (Ring Buffer API)");
     } catch (e) {
       _log("Audio FFI bindings FAILED: $e");
     }
   }
   
   @override
-  bool startAudioRecording(Pointer<NativeFunction<AudioCallbackC>> callback) {
+  bool startAudioRecording() {
     _bindAudioFunctions();
     if (!_audioBound) return false;
-    _log("Dart: Calling start_audio_recording...");
-    final result = _startAudioRecording(callback);
+    _log("Dart: Calling start_audio_recording (ring buffer)...");
+    final result = _startAudioRecording();
     _log("Dart: start_audio_recording returned $result");
     return result == 1;
   }
@@ -217,6 +225,20 @@ class NativeInput implements NativeInputBase {
     _bindAudioFunctions();
     if (!_audioBound) return;
     _nativeFree(ptr);
+  }
+  
+  @override
+  int getAvailableAudioSamples() {
+    _bindAudioFunctions();
+    if (!_audioBound) return 0;
+    return _getAvailableAudioSamples();
+  }
+  
+  @override
+  int readAudioBuffer(Pointer<Int16> outSamples, int maxSamples) {
+    _bindAudioFunctions();
+    if (!_audioBound) return 0;
+    return _readAudioBuffer(outSamples, maxSamples);
   }
   
   // ============ AUDIO DEVICE MANAGEMENT ============
