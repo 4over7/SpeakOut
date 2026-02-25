@@ -1,4 +1,5 @@
 #import <AVFoundation/AVFoundation.h>
+#import <AppKit/AppKit.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <AudioToolbox/AudioToolbox.h>
 #include <Carbon/Carbon.h>
@@ -234,13 +235,47 @@ void native_free(void *ptr) {
     free(ptr);
 }
 
-// 3. Inject Text (Simple String)
-// 3. Inject Text (Robust Chunking)
-void inject_text(const char *text) {
-  if (text == NULL)
-    return;
+// 3. Inject Text — Smart Detection
+// Detects if the active app is a terminal emulator.
+// Terminals: clipboard paste (Cmd+V), since CGEventKeyboardSetUnicodeString
+//   is unreliable in terminal emulators (e.g. Ghostty garbles Unicode).
+// Other apps: CGEvent keyboard injection (avoids touching clipboard).
 
-  // 1. Convert C-String to CFString
+// Check if the frontmost app is a known terminal emulator
+static bool is_terminal_app(void) {
+  @autoreleasepool {
+    NSRunningApplication *frontApp =
+        [[NSWorkspace sharedWorkspace] frontmostApplication];
+    if (frontApp == nil)
+      return false;
+
+    NSString *bundleId = frontApp.bundleIdentifier;
+    if (bundleId == nil)
+      return false;
+
+    // Known terminal emulator bundle IDs
+    NSArray *terminalBundleIds = @[
+      @"com.mitchellh.ghostty",  // Ghostty
+      @"com.googlecode.iterm2",  // iTerm2
+      @"com.apple.Terminal",     // macOS Terminal
+      @"io.alacritty",           // Alacritty
+      @"dev.warp.Warp-Stable",   // Warp
+      @"net.kovidgoyal.kitty",   // Kitty
+      @"co.zeit.hyper",          // Hyper
+      @"com.github.wez.wezterm", // WezTerm
+    ];
+
+    for (NSString *termId in terminalBundleIds) {
+      if ([bundleId isEqualToString:termId]) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+// Inject via CGEvent keyboard events (works for most GUI apps)
+static void inject_via_keyboard(const char *text) {
   CFStringRef cfStr =
       CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8);
   if (!cfStr)
@@ -252,44 +287,112 @@ void inject_text(const char *text) {
     return;
   }
 
-  // 2. Setup Event Source
   CGEventSourceRef source =
       CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
   CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 0, true);
   CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 0, false);
 
-// 3. Chunking Loop
-// Many apps drop events if payload is too large.
-// 50 chars per event is a safe balance between speed and reliability.
+// Chunk to avoid apps dropping events for large payloads.
+// Ensure chunk boundaries don't split UTF-16 surrogate pairs.
 #define INJECT_CHUNK_SIZE 50
   UniChar buffer[INJECT_CHUNK_SIZE];
 
-  for (CFIndex i = 0; i < totalLen; i += INJECT_CHUNK_SIZE) {
-    // Calculate current chunk length
+  for (CFIndex i = 0; i < totalLen;) {
     CFIndex remaining = totalLen - i;
     CFIndex chunkLen =
         (remaining > INJECT_CHUNK_SIZE) ? INJECT_CHUNK_SIZE : remaining;
 
-    // Extract characters
-    CFStringGetCharacters(cfStr, CFRangeMake(i, chunkLen), buffer);
+    // Prevent splitting a surrogate pair
+    if (chunkLen < remaining) {
+      CFStringGetCharacters(cfStr, CFRangeMake(i + chunkLen - 1, 1), buffer);
+      if (CFStringIsSurrogateHighCharacter(buffer[0])) {
+        chunkLen--; // Don't split the pair
+      }
+    }
 
-    // Set string to event
+    CFStringGetCharacters(cfStr, CFRangeMake(i, chunkLen), buffer);
     CGEventKeyboardSetUnicodeString(keyDown, chunkLen, buffer);
     CGEventKeyboardSetUnicodeString(keyUp, chunkLen, buffer);
-
-    // Post Event
     CGEventPost(kCGHIDEventTap, keyDown);
     CGEventPost(kCGHIDEventTap, keyUp);
 
-    // Extremely brief pause to let Main Loop breathe if text is huge (optional,
-    // but safer) usleep(1000); // 1ms
+    i += chunkLen;
   }
 
-  // 4. Cleanup
   CFRelease(keyDown);
   CFRelease(keyUp);
   CFRelease(source);
   CFRelease(cfStr);
+}
+
+// Inject via clipboard paste (Cmd+V) — for terminal emulators
+static void inject_via_clipboard(const char *text) {
+  @autoreleasepool {
+    NSString *newText = [NSString stringWithUTF8String:text];
+    if (newText == nil || newText.length == 0)
+      return;
+
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+
+    // 1. Save current clipboard contents
+    NSArray *savedItems = nil;
+    NSArray *oldContents = [pasteboard pasteboardItems];
+    if (oldContents.count > 0) {
+      NSMutableArray *items = [NSMutableArray array];
+      for (NSPasteboardItem *item in oldContents) {
+        NSPasteboardItem *copy = [[NSPasteboardItem alloc] init];
+        for (NSString *type in [item types]) {
+          NSData *data = [item dataForType:type];
+          if (data) {
+            [copy setData:data forType:type];
+          }
+        }
+        [items addObject:copy];
+      }
+      savedItems = items;
+    }
+
+    // 2. Put text on clipboard
+    [pasteboard clearContents];
+    [pasteboard setString:newText forType:NSPasteboardTypeString];
+    usleep(10000); // 10ms for pasteboard propagation
+
+    // 3. Simulate Cmd+V (keycode 9 = 'v')
+    CGEventSourceRef source =
+        CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+    CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 9, true);
+    CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 9, false);
+    CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
+    CGEventSetFlags(keyUp, kCGEventFlagMaskCommand);
+    CGEventPost(kCGHIDEventTap, keyDown);
+    CGEventPost(kCGHIDEventTap, keyUp);
+    CFRelease(keyDown);
+    CFRelease(keyUp);
+    CFRelease(source);
+
+    // 4. Restore clipboard after 200ms
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          [pasteboard clearContents];
+          if (savedItems != nil && savedItems.count > 0) {
+            [pasteboard writeObjects:savedItems];
+          }
+        });
+  }
+}
+
+// Main entry: auto-detect and use the right method
+void inject_text(const char *text) {
+  if (text == NULL || text[0] == '\0')
+    return;
+
+  if (is_terminal_app()) {
+    log_to_file("Inject: Using clipboard paste (terminal detected)");
+    inject_via_clipboard(text);
+  } else {
+    inject_via_keyboard(text);
+  }
 }
 
 // 4. Check Permission (with prompt dialog)
