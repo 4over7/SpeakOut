@@ -8,21 +8,26 @@ class LLMService {
   factory LLMService() => _instance;
   LLMService._internal();
 
-  /// Clients can be injected for testing
+  /// Clients can be injected for testing.
+  /// When not injected, a shared default client is used.
   http.Client? _client;
+  http.Client? _defaultClient;
 
   void setClient(http.Client client) {
     _client = client;
   }
 
+  http.Client get _effectiveClient {
+    if (_client != null) return _client!;
+    _defaultClient ??= http.Client();
+    return _defaultClient!;
+  }
+
   void _log(String msg) {
-    try {
-      final f = File('/tmp/SpeakOut_debug.log');
-      final time = DateTime.now().toIso8601String();
-      f.writeAsStringSync("[$time] [LLM] $msg\n", mode: FileMode.append);
-    } catch (e) {
-      print("LLM Log Failed: $e");
-    }
+    final time = DateTime.now().toIso8601String();
+    File('/tmp/SpeakOut_debug.log')
+        .writeAsString("[$time] [LLM] $msg\n", mode: FileMode.append)
+        .ignore();
   }
 
   Future<String> correctText(String input) async {
@@ -46,7 +51,7 @@ class LLMService {
     _log("Calling LLM: $baseUrl, model=$model, inputLen=${input.length}");
 
     try {
-      final client = _client ?? http.Client();
+      final client = _effectiveClient;
       final uri = Uri.parse('$baseUrl/chat/completions');
       
       final body = {
@@ -114,7 +119,7 @@ Rules:
 """;
 
     try {
-      final client = _client ?? http.Client();
+      final client = _effectiveClient;
       final uri = Uri.parse('$baseUrl/chat/completions');
       
       final body = {

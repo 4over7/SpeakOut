@@ -31,7 +31,6 @@ class _SettingsPageState extends State<SettingsPage> {
   late MacosTabController _tabController;
 
   // Model State
-  // Model State
   final Map<String, bool> _downloadedStatus = {};
   final Set<String> _downloadingIds = {}; // Support concurrent downloads
   final Map<String, double?> _downloadProgressMap = {}; // Per-model progress (null = indeterminate)
@@ -46,6 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _akIdController = TextEditingController();
   final TextEditingController _akSecretController = TextEditingController();
   final TextEditingController _appKeyController = TextEditingController();
+  late final TextEditingController _aiPromptController;
   
   // Hotkey State
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
@@ -71,6 +71,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
+    _aiPromptController = TextEditingController(text: ConfigService().aiCorrectionPrompt);
     _loadVersion();
     _tabController = MacosTabController(initialIndex: 0, length: 4);
     _tabController.addListener(() {
@@ -110,6 +111,10 @@ class _SettingsPageState extends State<SettingsPage> {
     _keySubscription?.cancel();
     _keyCaptureFocusNode.dispose();
     _tabController.dispose();
+    _akIdController.dispose();
+    _akSecretController.dispose();
+    _appKeyController.dispose();
+    _aiPromptController.dispose();
     super.dispose();
   }
   
@@ -373,14 +378,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: SingleChildScrollView(
-                  child: SingleChildScrollView(
                     child: Builder(builder: (_) {
                        if (_selectedIndex == 0) return _buildGeneralView();
                        if (_selectedIndex == 1) return _buildModelsView();
                        if (_selectedIndex == 2) return _buildDiaryView();
                        return _buildAboutView(context, _version);
                     }),
-                  ),
                   ),
                 ),
               );
@@ -438,7 +441,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         controlSize: ControlSize.regular,
                         onPressed: () async {
                            await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
-                           _showError("Saved Cloud Config!");
+                           if (mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               const SnackBar(content: Text("Saved Cloud Config!"), duration: Duration(seconds: 2)),
+                             );
+                           }
                         }, 
                         child: Text(loc.saveApply)
                       ),
@@ -729,6 +736,7 @@ class _SettingsPageState extends State<SettingsPage> {
                          GestureDetector(
                            onTap: () async {
                               await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                              _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
                               setState((){});
                            },
                            child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
@@ -739,7 +747,7 @@ class _SettingsPageState extends State<SettingsPage> {
                      MacosTextField(
                        maxLines: 5,
                        placeholder: "Enter instructions for AI...",
-                       controller: TextEditingController(text: ConfigService().aiCorrectionPrompt),
+                       controller: _aiPromptController,
                        decoration: BoxDecoration(
                           color: AppTheme.getInputBackground(context),
                           borderRadius: BorderRadius.circular(6),

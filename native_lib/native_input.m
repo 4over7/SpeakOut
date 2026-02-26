@@ -33,6 +33,8 @@ static char *get_log_path() {
 void log_to_file(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
+  va_list args_copy;
+  va_copy(args_copy, args);
 
   FILE *f = fopen(get_log_path(), "a");
   if (f) {
@@ -47,8 +49,9 @@ void log_to_file(const char *fmt, ...) {
   }
 
   NSString *formatStr = [[NSString alloc] initWithUTF8String:fmt];
-  NSString *msg = [[NSString alloc] initWithFormat:formatStr arguments:args];
+  NSString *msg = [[NSString alloc] initWithFormat:formatStr arguments:args_copy];
   NSLog(@"[NativeInput] %@", msg);
+  va_end(args_copy);
   va_end(args);
 }
 
@@ -203,11 +206,10 @@ int start_keyboard_listener(DartKeyCallback callback) {
   CGEventMask eventMask = (1 << kCGEventKeyDown) | (1 << kCGEventKeyUp) |
                           (1 << kCGEventFlagsChanged);
 
-  // Use kCGHIDEventTap for highest priority - intercepts events before system
-  // shortcuts kCGHeadInsertEventTap puts us early in the chain
-  // kCGEventTapOptionDefault means we can inspect and optionally modify events
+  // Use kCGHIDEventTap for highest priority
+  // kCGEventTapOptionListenOnly: we only observe events, never modify/block them
   eventTap = CGEventTapCreate(kCGHIDEventTap, kCGHeadInsertEventTap,
-                              kCGEventTapOptionDefault, eventMask,
+                              kCGEventTapOptionListenOnly, eventMask,
                               myCGEventCallback, NULL);
 
   if (!eventTap) {
@@ -307,8 +309,19 @@ static void inject_via_keyboard(const char *text) {
 
   CGEventSourceRef source =
       CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+  if (!source) {
+    CFRelease(cfStr);
+    return;
+  }
   CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 0, true);
   CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 0, false);
+  if (!keyDown || !keyUp) {
+    if (keyDown) CFRelease(keyDown);
+    if (keyUp) CFRelease(keyUp);
+    CFRelease(source);
+    CFRelease(cfStr);
+    return;
+  }
 
 // Chunk to avoid apps dropping events for large payloads.
 // Ensure chunk boundaries don't split UTF-16 surrogate pairs.
@@ -378,15 +391,19 @@ static void inject_via_clipboard(const char *text) {
     // 3. Simulate Cmd+V (keycode 9 = 'v')
     CGEventSourceRef source =
         CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-    CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 9, true);
-    CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 9, false);
-    CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
-    CGEventSetFlags(keyUp, kCGEventFlagMaskCommand);
-    CGEventPost(kCGHIDEventTap, keyDown);
-    CGEventPost(kCGHIDEventTap, keyUp);
-    CFRelease(keyDown);
-    CFRelease(keyUp);
-    CFRelease(source);
+    if (source) {
+      CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 9, true);
+      CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 9, false);
+      if (keyDown && keyUp) {
+        CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
+        CGEventSetFlags(keyUp, kCGEventFlagMaskCommand);
+        CGEventPost(kCGHIDEventTap, keyDown);
+        CGEventPost(kCGHIDEventTap, keyUp);
+      }
+      if (keyDown) CFRelease(keyDown);
+      if (keyUp) CFRelease(keyUp);
+      CFRelease(source);
+    }
 
     // 4. Restore clipboard after 200ms
     dispatch_after(
@@ -459,10 +476,8 @@ static AudioStreamBasicDescription audioFormat;
 
 // Lock-free ring buffer (single producer / single consumer)
 static int16_t ringBuffer[RING_BUFFER_SAMPLES];
-static volatile uint64_t ringWritePos =
-    0; // monotonically increasing write cursor
-static volatile uint64_t ringReadPos =
-    0; // monotonically increasing read cursor
+static _Atomic uint64_t ringWritePos = 0; // monotonically increasing write cursor
+static _Atomic uint64_t ringReadPos = 0;  // monotonically increasing read cursor
 
 // AudioQueue Input Callback — runs on CoreAudio's AQClient thread.
 // IMPORTANT: This function NEVER calls Dart. It only writes to the ring buffer.
@@ -479,14 +494,13 @@ static void AudioInputCallback(
   const int16_t *samples = (const int16_t *)inBuffer->mAudioData;
 
   // Write samples into ring buffer (wrap around using modulo)
-  uint64_t wp = ringWritePos;
+  uint64_t wp = atomic_load_explicit(&ringWritePos, memory_order_relaxed);
   for (int i = 0; i < sampleCount; i++) {
     ringBuffer[wp % RING_BUFFER_SAMPLES] = samples[i];
     wp++;
   }
-  // Memory barrier: ensure all writes are visible before advancing cursor
-  __sync_synchronize();
-  ringWritePos = wp;
+  // Release barrier: ensure all buffer writes are visible before advancing cursor
+  atomic_store_explicit(&ringWritePos, wp, memory_order_release);
 
   // Re-enqueue buffer immediately for next capture
   if (atomic_load(&isRecording)) {
@@ -496,16 +510,17 @@ static void AudioInputCallback(
 
 /// Returns the number of unread samples available in the ring buffer.
 int get_available_audio_samples() {
-  uint64_t wp = ringWritePos;
-  uint64_t rp = ringReadPos;
+  uint64_t wp = atomic_load_explicit(&ringWritePos, memory_order_acquire);
+  uint64_t rp = atomic_load_explicit(&ringReadPos, memory_order_relaxed);
   int64_t avail = (int64_t)(wp - rp);
   if (avail < 0)
     avail = 0;
   // Cap to ring buffer size to prevent reading stale wrapped data
   if (avail > RING_BUFFER_SAMPLES) {
     // Reader fell behind; skip to latest data minus a small margin
-    ringReadPos = wp - RING_BUFFER_SAMPLES + 1600; // skip to ~100ms before head
-    avail = (int64_t)(wp - ringReadPos);
+    uint64_t newRp = wp - RING_BUFFER_SAMPLES + 1600;
+    atomic_store_explicit(&ringReadPos, newRp, memory_order_relaxed);
+    avail = (int64_t)(wp - newRp);
   }
   return (int)avail;
 }
@@ -523,14 +538,12 @@ int read_audio_buffer(int16_t *outSamples, int maxSamples) {
 
   int toRead = avail < maxSamples ? avail : maxSamples;
 
-  uint64_t rp = ringReadPos;
+  uint64_t rp = atomic_load_explicit(&ringReadPos, memory_order_relaxed);
   for (int i = 0; i < toRead; i++) {
     outSamples[i] = ringBuffer[rp % RING_BUFFER_SAMPLES];
     rp++;
   }
-  // Memory barrier before advancing read cursor
-  __sync_synchronize();
-  ringReadPos = rp;
+  atomic_store_explicit(&ringReadPos, rp, memory_order_relaxed);
 
   return toRead;
 }
@@ -544,8 +557,8 @@ int start_audio_recording() {
   }
 
   // Reset ring buffer cursors
-  ringWritePos = 0;
-  ringReadPos = 0;
+  atomic_store_explicit(&ringWritePos, 0, memory_order_relaxed);
+  atomic_store_explicit(&ringReadPos, 0, memory_order_relaxed);
 
   // Configure audio format: 16kHz, Mono, 16-bit signed integer
   memset(&audioFormat, 0, sizeof(audioFormat));
@@ -679,7 +692,7 @@ static NSString *getDeviceStringProperty(AudioObjectID deviceID,
     return nil;
   }
 
-  NSString *result = (NSString *)value;
+  NSString *result = (__bridge_transfer NSString *)value;
   return result;
 }
 
@@ -1010,7 +1023,9 @@ deviceChangeListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddresses,
     if (inAddresses[i].mSelector == kAudioHardwarePropertyDefaultInputDevice) {
       log_to_file("AudioDevice: Default input device changed");
 
-      if (deviceChangeCallback != NULL) {
+      // Capture callback pointer locally to avoid TOCTOU race with stop_device_change_listener
+      DartDeviceChangeCallback cb = deviceChangeCallback;
+      if (cb != NULL) {
         // Get new device info
         AudioObjectPropertyAddress propAddr = {
             kAudioHardwarePropertyDefaultInputDevice,
@@ -1029,8 +1044,8 @@ deviceChangeListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddresses,
           bool isBluetooth = isBluetoothDevice(deviceID);
 
           if (uid && name) {
-            deviceChangeCallback([uid UTF8String], [name UTF8String],
-                                 isBluetooth ? 1 : 0);
+            cb([uid UTF8String], [name UTF8String],
+               isBluetooth ? 1 : 0);
           }
         }
       }

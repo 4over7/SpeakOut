@@ -24,7 +24,14 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     ChatService().init();
   }
-  
+
+  @override
+  void dispose() {
+    _textCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
   List<ChatMessage> _filterMessages(List<ChatMessage> all) {
     if (_selectedFilterIndex == 0) return all;
     if (_selectedFilterIndex == 1) {

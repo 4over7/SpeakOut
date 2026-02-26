@@ -92,19 +92,11 @@ class AliyunProvider implements ASRProvider {
     _startHeartbeat();
   }
   
-  /// Start heartbeat timer to keep connection alive
+  /// Heartbeat is handled at WebSocket protocol level (auto ping/pong).
+  /// No application-level heartbeat needed.
   void _startHeartbeat() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      if (_isConnected && _channel != null) {
-        // Send empty ping to keep connection alive
-        // Aliyun WebSocket accepts standard WebSocket ping frames
-        try {
-          // WebSocket ping is handled at protocol level, but we can send an empty message
-          // or rely on the library's built-in ping. For safety, just check connection.
-        } catch (_) {}
-      }
-    });
+    // Intentionally empty — WebSocket library handles ping/pong at protocol level.
+    // Keeping method for API compatibility with _stopHeartbeat calls.
   }
   
   /// Stop heartbeat timer
@@ -132,17 +124,20 @@ class AliyunProvider implements ASRProvider {
   }
 
   Future<void> _refreshTokenIfNeeded() async {
-    // Simple basic logic: if no token, get one.
-    // In production, check expiry.
-    if (_token == null) {
+    final now = DateTime.now();
+    final expired = _tokenExpireTime != null && now.isAfter(_tokenExpireTime!);
+    if (_token == null || expired) {
       _token = await AliyunTokenService.generateToken(_accessKeyId, _accessKeySecret);
       if (_token == null) throw Exception("Failed to get Aliyun Token");
+      // Aliyun tokens are valid for 24h; refresh 1h before expiry
+      _tokenExpireTime = now.add(const Duration(hours: 23));
     }
   }
 
   Completer<void>? _startCompleter;
-  
-  // Audio Buffering for Handshake Latency
+
+  // Audio Buffering for Handshake Latency (capped to prevent OOM)
+  static const int _maxPendingBuffers = 200; // ~10s of audio at 50ms chunks
   final List<Uint8List> _pendingBuffer = [];
   bool _isHandshakeComplete = false;
 
@@ -231,7 +226,7 @@ class AliyunProvider implements ASRProvider {
          _textController.add(errMsg);
       }
     } catch (e) {
-      // json parse error
+      print("[AliyunProvider] Message parse error: $e");
     }
   }
 
@@ -243,7 +238,9 @@ class AliyunProvider implements ASRProvider {
     final pcmBytes = _float32ToInt16Bytes(samples);
     
     if (!_isHandshakeComplete) {
-       _pendingBuffer.add(pcmBytes);
+       if (_pendingBuffer.length < _maxPendingBuffers) {
+         _pendingBuffer.add(pcmBytes);
+       }
     } else {
        _channel!.sink.add(pcmBytes);
     }
@@ -266,9 +263,15 @@ class AliyunProvider implements ASRProvider {
   Future<String> stop() async {
     if (_channel == null) return "";
     
-    // Robustness: If handshake is still pending, wait for it (up to 2s)
+    // Wait for handshake to complete (up to 2s) before sending stop
     if (!_isHandshakeComplete) {
-        await Future.delayed(const Duration(seconds: 2));
+      await Future.any([
+        Future.doWhile(() async {
+          await Future.delayed(const Duration(milliseconds: 100));
+          return !_isHandshakeComplete;
+        }),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
     }
     
     // Send Stop (but DON'T close the connection - keep it for reuse)
@@ -296,6 +299,7 @@ class AliyunProvider implements ASRProvider {
 
   @override
   Future<void> dispose() async {
+    _isReady = false;
     _idleDisconnectTimer?.cancel();
     _stopHeartbeat();
     await _channel?.sink.close();

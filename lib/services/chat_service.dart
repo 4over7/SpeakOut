@@ -19,6 +19,7 @@ class ChatService {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
 
   bool _isInit = false;
+  Future<void>? _pendingSave; // Serialize writes to prevent concurrent file I/O
 
   Future<void> init() async {
     if (_isInit) return;
@@ -71,7 +72,12 @@ class ChatService {
     
     _messages.add(msg);
     _streamController.add(_messages);
-    _saveHistory();
+    _scheduleSave();
+  }
+
+  /// Serialize save operations to prevent concurrent file writes
+  void _scheduleSave() {
+    _pendingSave = (_pendingSave ?? Future.value()).then((_) => _saveHistory());
   }
 
   // --- Persistence ---
@@ -100,6 +106,7 @@ class ChatService {
       // Keep last 100 messages to avoid bloat
       if (_messages.length > 100) {
         _messages.removeRange(0, _messages.length - 100);
+        _streamController.add(_messages); // Notify UI of truncation
       }
       
       final dir = Directory(ConfigService().diaryDirectory);

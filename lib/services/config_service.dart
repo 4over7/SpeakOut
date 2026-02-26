@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
@@ -24,14 +25,17 @@ class ConfigService {
   // Safe field: Nullable prefs
   SharedPreferences? _prefs;
   bool _initialized = false;
+  Completer<void>? _initCompleter;
   // Default doc path (fallback if not init)
-  String _defaultDocPath = ""; 
-  
+  String _defaultDocPath = "";
+
   // Local Notifier for Language Change
   final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
 
   Future<void> init() async {
     if (_initialized) return;
+    if (_initCompleter != null) return _initCompleter!.future;
+    _initCompleter = Completer<void>();
     _prefs = await SharedPreferences.getInstance();
     
     // Get Safe Directory
@@ -53,6 +57,7 @@ class ConfigService {
     // (these files are in .gitignore and won't be committed or bundled).
     
     _initialized = true;
+    _initCompleter!.complete();
   }
 
   // --- Hotkey ---

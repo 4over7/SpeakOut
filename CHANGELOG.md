@@ -1,5 +1,71 @@
 # SpeakOut Version History
 
+## [1.2.26] - 2026-02-26
+
+### 安全修复 (P0)
+
+- **Gateway: 移除 CORS 全开放** — 不再设置 `Access-Control-Allow-Origin: *`，桌面客户端不需要 CORS。
+- **Gateway: 注释 Stripe Webhook** — 未完成的支付模块暂时禁用，避免无签名验证的端点暴露。
+- **Gateway: 注释 /token 路由** — 当前客户端本地生成 Token，Gateway 端占位代码暂时禁用。
+- **Gateway: 充值码改用 `crypto.getRandomValues()`** — 替换不安全的 `Math.random()`。
+- **Gateway: /redeem TOCTOU 缓解** — 先标记卡密已用再增加余额，防止并发双充。
+- **Gateway: /admin/generate 输入验证** — 增加 amount/count/prefix 类型校验，count 上限 100。
+- **Gateway: /report 类型校验** — `total_seconds` 增加 `typeof` 检查。
+
+### 内存与线程安全 (P1)
+
+- **native_input.m: 修复 `va_list` 双重消费** — 使用 `va_copy` 创建副本，消除未定义行为。
+- **native_input.m: 修复 `CFStringRef` 泄漏** — `getDeviceStringProperty` 使用 `__bridge_transfer` 正确转移所有权给 ARC。
+- **native_input.m: Ring Buffer 游标改用 `_Atomic`** — 替换 `volatile`，使用 `memory_order_acquire/release` 保证正确的 acquire-release 语义。
+- **native_input.m: CGEventTap 改用 `kCGEventTapOptionListenOnly`** — 仅监听不修改事件，降低权限需求。
+- **native_input.m: CGEvent 创建增加 NULL 检查** — `inject_via_keyboard` 和 `inject_via_clipboard` 中防止 NULL 解引用。
+- **native_input.m: `deviceChangeCallback` 竞态修复** — 本地拷贝回调指针，避免 CoreAudio 线程与主线程之间的 TOCTOU。
+
+### Engine 层修复 (P1-P2)
+
+- **CoreEngine: `stopRecording` 防重入** — 入口检查 `_isStopping`，防止 watchdog 和按键释放并发触发。
+- **CoreEngine: 新增 `dispose()` 方法** — 关闭所有 StreamController、释放 NativeCallable、free `_pollBuffer` 原生内存。
+- **CoreEngine: 同步日志改异步** — `writeAsStringSync` → `writeAsString().ignore()`，不再阻塞音频处理热路径。
+- **CoreEngine: 清理 AGC 死代码** — 移除无效的 `rawPeak` 计算循环和 `dynamicGain = 1.0` 常量，以及未使用的 `_lastAppliedGain` 字段。
+- **AliyunProvider: Token 刷新逻辑** — 基于 `_tokenExpireTime` 在过期前 1 小时自动刷新，不再永不刷新。
+- **AliyunProvider: `_pendingBuffer` 上限** — 最多缓存 200 个音频块（~10 秒），防止握手卡住时 OOM。
+- **AliyunProvider: `dispose()` 设置 `_isReady = false`** — 防止 dispose 后仍被调用。
+- **AliyunProvider: 清理空心跳 Timer** — 移除空操作的定时器，WebSocket 协议层自动处理 ping/pong。
+- **AliyunProvider: JSON 解析错误不再静默吞掉** — 输出日志便于调试。
+- **SherpaProvider: `dispose()` 关闭 `_textController`** — 防止 StreamController 泄漏。
+- **SherpaProvider: `_recognizer.free()`** — 正确释放 FFI 对象的原生内存。
+
+### Service 层修复 (P1-P2)
+
+- **LLMService: 修复 HTTP Client 泄漏** — 使用共享的 `_defaultClient` 实例替代每次创建新 Client。
+- **ConfigService: `init()` 并发保护** — 使用 `Completer` 防止多次并发初始化。
+- **ChatService: 写入序列化** — `_scheduleSave()` 确保 `_saveHistory` 顺序执行，防止并发文件写入竞态。
+- **ChatService: 截断后通知 UI** — `_saveHistory` 截断消息后发送 stream 事件。
+- **ModelManager: 下载 sink 异常安全** — `try-finally` 确保网络中断时正确关闭 `IOSink` 和 `http.Client`。
+- **ModelManager: `firstWhere` → `firstOrNull`** — 无效 ID 不再抛 StateError，改为安全返回。
+
+### UI 修复 (P1-P3)
+
+- **SettingsPage: 修复 `TextEditingController` 在 build 中创建** — AI Prompt 输入框改用 `initState` 中创建的 `_aiPromptController`，解决光标重置和内存泄漏。
+- **SettingsPage: 移除双层 `SingleChildScrollView`** — 删除复制粘贴产生的多余嵌套。
+- **SettingsPage: `dispose()` 释放所有 Controller** — 补齐 `_akIdController`、`_akSecretController`、`_appKeyController`、`_aiPromptController` 的释放。
+- **SettingsPage: 保存成功提示改用 SnackBar** — 不再用 `_showError` 显示成功消息。
+- **main.dart: Stream subscription 生命周期管理** — 5 个 subscription 存储为字段，`dispose()` 中统一 cancel。
+- **main.dart: 波形数组长度 5→7** — 与 UI 渲染的 7 个 bar 一致，消除模运算导致的视觉重复。
+- **ChatPage: 新增 `dispose()`** — 释放 `_textCtrl` 和 `_scrollCtrl`。
+
+### 代码清理
+
+- **删除死代码 `RecordingOverlay`** — 已被原生覆盖层替代，移除文件和 import。
+- **`offline_debug.dart` 移到 `tools/`** — 不属于测试，移出 `test/` 目录。
+- **`run_tests.sh` 修复** — 使用 `set -e` + `flutter test` 全量运行，替换引用不存在文件的旧命令。
+- **SettingsPage: 移除重复注释** — `// Model State` 去重。
+
+### 文档
+
+- **新增 `CLAUDE.md`** — 项目指引文件，包含构建命令、架构设计、关键模块路径。
+- **新增代码评审报告** — `docs/wiki/code_review_2026_02_26.md`，45 个问题的完整审查记录。
+
 ## [1.2.21] - 2026-01-31
 
 ### FTUE (首次使用体验) 修复

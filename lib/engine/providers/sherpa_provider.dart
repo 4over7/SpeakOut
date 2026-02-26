@@ -191,7 +191,9 @@ class SherpaProvider implements ASRProvider {
   Future<void> dispose() async {
     _stream?.free();
     _stream = null;
-    _recognizer = null; 
+    _recognizer?.free();
+    _recognizer = null;
     _isInit = false;
+    _textController.close();
   }
 }

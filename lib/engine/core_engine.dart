@@ -60,9 +60,6 @@ class CoreEngine {
   bool _isInit = false;
   bool _isDiaryMode = false;
   
-  // AGC State: Previous gain for sample-level interpolation
-  double _lastAppliedGain = 1.0;
-  
   // Keep Offline Punctuation & Debugging related fields
   sherpa.OfflinePunctuation? _punctuation;
   bool _punctuationEnabled = false;
@@ -109,16 +106,31 @@ class CoreEngine {
   bool get isASRReady => _asrProvider != null && _asrProvider!.isReady;
 
 
-  // Debug Logger - writes to file
+  // Debug Logger - writes to file asynchronously
   void _log(String msg) {
     debugPrint("[CoreEngine] $msg");
-    try {
-      final f = File('/tmp/SpeakOut_debug.log');
-      final time = DateTime.now().toIso8601String();
-      f.writeAsStringSync("[$time] [CoreEngine] $msg\n", mode: FileMode.append);
-    } catch (e) {
-      debugPrint("Log write failed: $e");
+    final time = DateTime.now().toIso8601String();
+    File('/tmp/SpeakOut_debug.log')
+        .writeAsString("[$time] [CoreEngine] $msg\n", mode: FileMode.append)
+        .ignore();
+  }
+
+  /// Release all resources. Call when app is shutting down.
+  void dispose() {
+    _statusController.close();
+    _recordingController.close();
+    _rawKeyController.close();
+    _resultController.close();
+    _partialTextController.close();
+    _asrSubscription?.cancel();
+    _nativeCallable?.close();
+    _watchdogTimer?.cancel();
+    _stopAudioPolling();
+    if (_pollBuffer != null) {
+      pkg_ffi.calloc.free(_pollBuffer!);
+      _pollBuffer = null;
     }
+    _asrProvider?.dispose();
   }
 
   /// De-duplicate repeated characters AND phrases
@@ -597,37 +609,13 @@ class CoreEngine {
   void _processAudioData(Uint8List data) {
     if (!_isRecording) return;
     
-    // RAW 16k Int16 -> Float32 with DYNAMIC GAIN (Prevention vs Clipping)
+    // RAW 16k Int16 -> Float32 (direct passthrough, no gain)
     final int sampleCount = data.length ~/ 2;
     final floatSamples = Float32List(sampleCount);
     final byteData = ByteData.sublistView(data);
-    
-    // 1. First Pass: Detect Peak in current 100ms buffer
-    double rawPeak = 0;
-    for (int i = 0; i < sampleCount; i++) {
-      double s = byteData.getInt16(i * 2, Endian.little).abs() / 32768.0;
-      if (s > rawPeak) rawPeak = s;
-    }
 
-    // 2. RAW SIGNAL TEST: Disable all digital gain (using constant 1.0x)
-    // This allows us to see if the engine handles raw microphone levels better
-    // without any risk of digital artifacts or truncation.
-    const double dynamicGain = 1.0;
-    
-    double energy = 0;
-
-    // 3. Process samples with NO gain
     for (int i = 0; i < sampleCount; i++) {
-        double sample = byteData.getInt16(i * 2, Endian.little) / 32768.0;
-        
-        // No gain applied, direct raw signal
-        floatSamples[i] = sample;
-        energy += sample * sample;
-    }
-    
-    // RMS Log
-    if (DateTime.now().millisecond < 20) {
-       _log("RMS: ${(energy / sampleCount).toStringAsFixed(5)} [RAW SIGNAL - NO GAIN]");
+      floatSamples[i] = byteData.getInt16(i * 2, Endian.little) / 32768.0;
     }
 
     if (_asrProvider != null) {
@@ -666,6 +654,7 @@ class CoreEngine {
   }
 
   Future<void> stopRecording() async {
+    if (_isStopping) return; // Prevent re-entry from watchdog + key-up racing
     _isStopping = true;
     _isRecording = false;
     

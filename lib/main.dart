@@ -10,7 +10,6 @@ import 'package:window_manager/window_manager.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/config_service.dart';
-import 'ui/recording_overlay.dart';
 import 'ui/settings_page.dart';
 import 'services/app_service.dart';
 import 'services/chat_service.dart';
@@ -178,6 +177,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   AppNotification? _currentNotification;
   Timer? _notificationTimer;
 
+  // Stream subscriptions — cancelled in dispose
+  StreamSubscription<String>? _statusSub;
+  StreamSubscription<AppNotification>? _notifSub;
+  StreamSubscription<bool>? _recordingSub;
+  StreamSubscription<String>? _resultSub;
+  StreamSubscription<String>? _partialSub;
+
   @override
   void initState() {
     super.initState();
@@ -193,7 +199,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     
     // Listen to Engine status
-    _appService.engine.statusStream.listen((msg) {
+    _statusSub = _appService.engine.statusStream.listen((msg) {
       if (mounted) {
         setState(() {
            if (msg.startsWith("Error")) {
@@ -211,7 +217,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     
     // Subscribe to Notifications
-    NotificationService().stream.listen((n) {
+    _notifSub = NotificationService().stream.listen((n) {
       if (mounted) {
         setState(() => _currentNotification = n);
         _notificationTimer?.cancel();
@@ -223,7 +229,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     });
 
-    _appService.engine.recordingStream.listen((isRecording) {
+    _recordingSub = _appService.engine.recordingStream.listen((isRecording) {
       if (mounted) {
         setState(() {
           _isRecording = isRecording;
@@ -236,7 +242,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     
     // Subscribe to recognized text results (final)
-    _appService.engine.resultStream.listen((text) {
+    _resultSub = _appService.engine.resultStream.listen((text) {
       if (mounted && text.isNotEmpty) {
         setState(() {
           _recognizedText = text;
@@ -263,7 +269,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (_partialSubscribed) return;
     final stream = _appService.engine.partialTextStream;
     if (stream != null) {
-      stream.listen((partialText) {
+      _partialSub = stream.listen((partialText) {
         if (mounted && _isRecording && partialText.isNotEmpty) {
           setState(() {
             _recognizedText = partialText;
@@ -287,7 +293,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
   
   // Waveform Animation State
-  final List<double> _waveHeights = List.generate(5, (_) => 0.3);
+  final List<double> _waveHeights = List.generate(7, (_) => 0.3);
   Timer? _waveTimer;
   
   @override
@@ -317,6 +323,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _waveTimer?.cancel();
+    _notificationTimer?.cancel();
+    _statusSub?.cancel();
+    _notifSub?.cancel();
+    _recordingSub?.cancel();
+    _resultSub?.cancel();
+    _partialSub?.cancel();
     super.dispose();
   }
   

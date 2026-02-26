@@ -121,7 +121,8 @@ class ModelManager {
   }
 
   Future<bool> isModelDownloaded(String id) async {
-    final model = availableModels.firstWhere((m) => m.id == id);
+    final model = availableModels.where((m) => m.id == id).firstOrNull;
+    if (model == null) return false;
     final docDir = await getApplicationDocumentsDirectory();
     final dirName = _getDirNameFromUrl(model.url);
     final finalModelDir = Directory('${docDir.path}/speakout_models/$dirName');
@@ -376,23 +377,24 @@ class ModelManager {
         final sink = destFile.openWrite(mode: existingBytes > 0 ? FileMode.append : FileMode.write);
         int downloadedBytes = existingBytes;
         double lastReportedProgress = existingBytes / (totalBytes > 0 ? totalBytes : 1);
-        
-        await for (final chunk in streamedResponse.stream) {
-          sink.add(chunk);
-          downloadedBytes += chunk.length;
-          
-          if (totalBytes > 0 && onProgress != null) {
-            final currentProgress = downloadedBytes / totalBytes;
-            // Only update if progress changed by at least 1% to avoid flickering
-            if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0) {
-              onProgress(currentProgress);
-              lastReportedProgress = currentProgress;
+
+        try {
+          await for (final chunk in streamedResponse.stream) {
+            sink.add(chunk);
+            downloadedBytes += chunk.length;
+
+            if (totalBytes > 0 && onProgress != null) {
+              final currentProgress = downloadedBytes / totalBytes;
+              if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0) {
+                onProgress(currentProgress);
+                lastReportedProgress = currentProgress;
+              }
             }
           }
+        } finally {
+          await sink.close();
+          client.close();
         }
-        
-        await sink.close();
-        client.close();
         
         // Verify download completed
         final finalSize = await destFile.length();
@@ -415,7 +417,8 @@ class ModelManager {
   }
 
   Future<void> deleteModel(String id) async {
-     final model = availableModels.firstWhere((m) => m.id == id);
+     final model = availableModels.where((m) => m.id == id).firstOrNull;
+     if (model == null) return;
      final docDir = await getApplicationDocumentsDirectory();
      final dirName = _getDirNameFromUrl(model.url);
      final modelDir = Directory('${docDir.path}/speakout_models/$dirName');
