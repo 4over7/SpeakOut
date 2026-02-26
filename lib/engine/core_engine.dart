@@ -104,12 +104,17 @@ class CoreEngine {
   final _overlay = OverlayController();
 
   // Debug Logger - writes to file asynchronously
+  static final _logFile = File('/tmp/SpeakOut.log');
+  static bool _logCleared = false;
+
   void _log(String msg) {
-    debugPrint("[CoreEngine] $msg");
-    final time = DateTime.now().toIso8601String();
-    File('/tmp/SpeakOut_debug.log')
-        .writeAsString("[$time] [CoreEngine] $msg\n", mode: FileMode.append)
-        .ignore();
+    // 每次启动清空旧日志，避免无限增长
+    if (!_logCleared) {
+      _logFile.writeAsStringSync('');
+      _logCleared = true;
+    }
+    final line = "[${DateTime.now().toIso8601String()}] [CoreEngine] $msg\n";
+    _logFile.writeAsStringSync(line, mode: FileMode.append);
   }
 
   /// Release all resources. Call when app is shutting down.
@@ -405,6 +410,7 @@ class CoreEngine {
   // Key state debouncing
   bool _pttKeyHeld = false;
   bool _diaryKeyHeld = false;
+  bool _deferredStop = false;
 
   void _handleKey(int keyCode, bool isDown) {
     // macOS 26+: Globe/Fn key sends keyCode 179 (kCGEventKeyDown) in addition
@@ -437,9 +443,15 @@ class CoreEngine {
       }
     } else {
       setHeld(false);
-      if (_recordingState == RecordingState.recording && _recordingMode == mode) {
-        _log("[${mode.name}] FALLING EDGE → stopRecording");
-        stopRecording();
+      if (_recordingMode == mode) {
+        if (_recordingState == RecordingState.recording) {
+          _log("[${mode.name}] FALLING EDGE → stopRecording");
+          stopRecording();
+        } else if (_recordingState == RecordingState.starting) {
+          // Key released during async startup — schedule stop after startup completes
+          _log("[${mode.name}] FALLING EDGE during starting → deferred stop");
+          _deferredStop = true;
+        }
       }
     }
   }
@@ -516,6 +528,14 @@ class CoreEngine {
       // Transition: starting → recording
       _recordingState = RecordingState.recording;
       _log("Recording started (mode=${mode.name}).");
+
+      // Handle deferred stop (key released during async startup)
+      if (_deferredStop) {
+        _deferredStop = false;
+        _log("Deferred stop triggered.");
+        stopRecording();
+        return;
+      }
     } catch (e) {
       _log("Start Fatal Error: $e");
       _cleanupRecordingState();
@@ -579,6 +599,7 @@ class CoreEngine {
   void _cleanupRecordingState() {
      _recordingState = RecordingState.idle;
      _audioStarted = false;
+     _deferredStop = false;
      _stopAudioPolling();
      _watchdogTimer?.cancel();
      _recordingController.add(false);
@@ -599,6 +620,9 @@ class CoreEngine {
     // Guard: only stop from recording state (prevents watchdog + key-up race)
     if (_recordingState != RecordingState.recording) return;
 
+    final sw = Stopwatch()..start();
+    _log("[PERF] stopRecording BEGIN");
+
     // Transition: recording → stopping
     _recordingState = RecordingState.stopping;
     final mode = _recordingMode; // capture before cleanup
@@ -610,14 +634,19 @@ class CoreEngine {
 
     // Yield to event loop so method channel message is dispatched
     await Future(() {});
+    _log("[PERF] +${sw.elapsedMilliseconds}ms — yield done");
 
-    // HARDWARE SHUTDOWN (provider.stop() handles tail audio internally:
-    // Sherpa injects 0.8s silence padding, Aliyun waits 500ms for final messages)
+    // Give ASR time to process the last audio chunks before stopping hardware
+    await Future.delayed(const Duration(milliseconds: 200));
+    _log("[PERF] +${sw.elapsedMilliseconds}ms — 200ms delay done");
+
+    // HARDWARE SHUTDOWN
     try {
       await _stopAudioSafely();
     } catch (e) {
       _log("Audio Stop Error: $e");
     }
+    _log("[PERF] +${sw.elapsedMilliseconds}ms — audio stopped");
 
     // Transition: stopping → processing
     _recordingState = RecordingState.processing;
@@ -632,24 +661,26 @@ class CoreEngine {
       } catch (e) {
         _log("Provider Stop Error: $e");
       }
-      _log("Raw Text: '$text'");
+      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned: '${text.length > 30 ? '${text.substring(0, 30)}...' : text}'");
+
       String finalText = text;
 
       // Post-processing: De-duplicate
       if (finalText.isNotEmpty && ConfigService().deduplicationEnabled) {
         finalText = _deduplicateText(finalText);
-        _log("After Dedup: '$finalText'");
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — dedup done");
       }
 
       // AI Correction
       if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {
         _statusController.add("AI 优化中...");
         _overlay.updateText("🤖 AI Optimizing...");
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI correction starting...");
         try {
           finalText = await LLMService().correctText(finalText);
-          _log("LLM Result: '$finalText'");
+          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI correction done");
         } catch (e) {
-          _log("Ai Correction Error: $e");
+          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI correction error: $e");
         }
       }
 
@@ -660,9 +691,9 @@ class CoreEngine {
           final temp = addPunctuation(finalText);
           if (temp != finalText) {
             finalText = temp;
-            _log("Local Punctuation Result (Fallback): '$finalText'");
           }
         }
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — punctuation done");
       }
 
       _resultController.add(finalText);
@@ -681,17 +712,20 @@ class CoreEngine {
           });
           ChatService().addUserMessage(finalText);
         } else {
-          _statusController.add("Ready");
           _nativeInput?.inject(finalText);
           ChatService().addDictation(finalText);
+          _statusController.add("Ready");
         }
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — inject/save done");
       } else {
         _statusController.add("🔇 No Speech");
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — no speech detected");
       }
     }
 
     // Transition: processing → idle
     _recordingState = RecordingState.idle;
+    _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");
   }
   
   bool _hasTerminalPunctuation(String text) {

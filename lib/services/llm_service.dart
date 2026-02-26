@@ -24,10 +24,10 @@ class LLMService {
   }
 
   void _log(String msg) {
-    final time = DateTime.now().toIso8601String();
-    File('/tmp/SpeakOut_debug.log')
-        .writeAsString("[$time] [LLM] $msg\n", mode: FileMode.append)
-        .ignore();
+    final line = "[${DateTime.now().toIso8601String()}] [LLM] $msg\n";
+    try {
+      File('/tmp/SpeakOut.log').writeAsStringSync(line, mode: FileMode.append);
+    } catch (_) {}
   }
 
   Future<String> correctText(String input) async {

@@ -71,10 +71,9 @@ static int targetKeyCode = -1; // e.g., 58 for Option, etc.
 static atomic_bool isMonitoring = false;
 
 // macOS 26+: Globe/Fn key sends KeyDown/Up with keyCode=179 in addition to
-// FlagsChanged with keyCode=63. The FlagsChanged events fire DOWN+UP almost
-// simultaneously (useless for push-to-talk hold detection), while KeyDown/Up
-// 179 has proper hold timing. Once we see 179 events, suppress FlagsChanged 63.
-static bool hasGlobeKeyEvents = false;
+// FlagsChanged with keyCode=63. Use timestamp-based dedup: if 179 fired
+// within the last 100ms, skip FlagsChanged 63 to avoid double-event.
+static uint64_t lastGlobe179Time = 0;
 
 // CGEventCallback
 CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
@@ -107,7 +106,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     // Map to legacy Fn keyCode 63 so Dart PTT matching works.
     int mappedKeyCode = (int)keyCode;
     if (keyCode == 179) {
-      hasGlobeKeyEvents = true;
+      lastGlobe179Time = mach_absolute_time();
       mappedKeyCode = 63;
       log_to_file("Globe key 179 -> mapped to Fn 63 (%s)",
                   type == kCGEventKeyDown ? "DOWN" : "UP");
@@ -150,15 +149,20 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     }
     // FN Key: keyCode=63 - use state tracking
     // On macOS 26+, Fn/Globe key also sends KeyDown/Up 179 with proper hold
-    // timing. FlagsChanged 63 fires DOWN+UP almost simultaneously, making it
-    // useless for push-to-talk. Once we detect Globe key 179, suppress this.
+    // timing. FlagsChanged 63 fires DOWN+UP nearly simultaneously. Use
+    // timestamp dedup: if 179 fired within last 100ms, skip this event.
     else if (keyCode == 63) {
-      if (hasGlobeKeyEvents) {
-        // Suppress: KeyDown/Up 179 (mapped to 63) handles this correctly
-        log_to_file("FN FlagsChanged 63: suppressed (Globe key 179 active)");
-        return event;
+      if (lastGlobe179Time > 0) {
+        mach_timebase_info_data_t tbInfo;
+        mach_timebase_info(&tbInfo);
+        uint64_t elapsed = mach_absolute_time() - lastGlobe179Time;
+        double elapsedMs = (double)elapsed * tbInfo.numer / tbInfo.denom / 1000000.0;
+        if (elapsedMs < 100.0) {
+          log_to_file("FN FlagsChanged 63: suppressed (Globe 179 was %.0fms ago)", elapsedMs);
+          return event;
+        }
       }
-      // Legacy path for older macOS without Globe key 179 events
+      // Fallback: no recent 179, handle FlagsChanged 63 directly
       static bool lastFnState = false;
       bool fnFlagSet = (flags & kCGEventFlagMaskSecondaryFn) != 0;
       if (fnFlagSet) {
