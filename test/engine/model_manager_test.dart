@@ -23,7 +23,7 @@ void main() {
   });
 
   test('getPunctuationModelPath should return correct relative path structure', () async {
-    final manager = ModelManager();
+    ModelManager();
     // Since we mocked app doc path to '.', 
     // real existence check would check ./models/punc_ct-transformer_zh-cn-common-vocab-272727-2023-04-12/model.onnx
     // It will likely return false/null because file doesn't exist.

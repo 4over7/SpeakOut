@@ -1,16 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../asr_provider.dart';
 import 'aliyun_token_service.dart';
-import '../../services/config_service.dart';
-
 class AliyunProvider implements ASRProvider {
   WebSocketChannel? _channel;
-  final StreamController<String> _textController = StreamController<String>.broadcast();
+  StreamController<String> _textController = StreamController<String>.broadcast();
   
   // Config
   late String _appKey;
@@ -27,7 +24,6 @@ class AliyunProvider implements ASRProvider {
   Timer? _heartbeatTimer;
   Timer? _idleDisconnectTimer;
   static const Duration _idleTimeout = Duration(minutes: 5);
-  static const Duration _heartbeatInterval = Duration(seconds: 30);
 
   @override
   Stream<String> get textStream => _textController.stream;
@@ -134,8 +130,6 @@ class AliyunProvider implements ASRProvider {
     }
   }
 
-  Completer<void>? _startCompleter;
-
   // Audio Buffering for Handshake Latency (capped to prevent OOM)
   static const int _maxPendingBuffers = 200; // ~10s of audio at 50ms chunks
   final List<Uint8List> _pendingBuffer = [];
@@ -226,7 +220,7 @@ class AliyunProvider implements ASRProvider {
          _textController.add(errMsg);
       }
     } catch (e) {
-      print("[AliyunProvider] Message parse error: $e");
+      debugPrint("[AliyunProvider] Message parse error: $e");
     }
   }
 
@@ -306,5 +300,7 @@ class AliyunProvider implements ASRProvider {
     _channel = null;
     _isConnected = false;
     _textController.close();
+    // Recreate controller so provider can be re-initialized
+    _textController = StreamController<String>.broadcast();
   }
 }

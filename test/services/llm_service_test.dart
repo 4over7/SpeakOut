@@ -4,7 +4,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakout/services/config_service.dart';
 import 'package:speakout/services/llm_service.dart';
-import 'package:speakout/config/app_constants.dart';
+
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

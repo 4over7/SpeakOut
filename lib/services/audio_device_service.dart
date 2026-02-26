@@ -70,9 +70,6 @@ class AudioDeviceService {
   // Native callback holder
   NativeCallable<DeviceChangeCallbackC>? _deviceChangeCallable;
   
-  // Last detected Bluetooth device name (for undo)
-  String? _lastBluetoothDeviceName;
-  
   AudioDeviceService(this._nativeInput);
   
   /// Initialize the service and start listening for device changes
@@ -145,7 +142,6 @@ class AudioDeviceService {
   void _handleBluetoothMicDetected(String bluetoothDeviceName) {
     debugPrint('[AudioDeviceService] Bluetooth mic detected, auto-switching to built-in...');
     
-    _lastBluetoothDeviceName = bluetoothDeviceName;
     final success = switchToBuiltinMic();
     
     if (success && showSwitchNotifications) {

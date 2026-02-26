@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../config/app_constants.dart';
 
@@ -19,9 +16,6 @@ class ConfigService {
 
   static const String kDefaultGatewayUrl = 'https://speakout-gateway.4over7.workers.dev';
   static const String kDefaultTopUpUrl = "https://mianbaoduo.com"; 
-  static const String _kGatewayUrlKey = 'gateway_url';
-  static const String _kTopUpUrlKey = 'top_up_url';
-  
   // Safe field: Nullable prefs
   SharedPreferences? _prefs;
   bool _initialized = false;
@@ -43,7 +37,7 @@ class ConfigService {
       final docDir = await getApplicationDocumentsDirectory();
       _defaultDocPath = "${docDir.path}/SpeakOut_Notes";
     } catch (e) {
-      print("ConfigService: Failed to get doc dir: $e");
+      debugPrint("ConfigService: Failed to get doc dir: $e");
     }
     
     // Load Locale
@@ -113,14 +107,21 @@ class ConfigService {
   String get aliyunAppKey => _prefs?.getString('aliyun_app_key') ?? AppConstants.kDefaultAliyunAppKey;
   
   Future<void> setAliyunCredentials(String id, String secret, String appKey) async {
-    if (id.isEmpty) await _prefs?.remove('aliyun_ak_id'); 
-    else await _prefs?.setString('aliyun_ak_id', id);
-    
-    if (secret.isEmpty) await _prefs?.remove('aliyun_ak_secret');
-    else await _prefs?.setString('aliyun_ak_secret', secret);
-    
-    if (appKey.isEmpty) await _prefs?.remove('aliyun_app_key');
-    else await _prefs?.setString('aliyun_app_key', appKey);
+    if (id.isEmpty) {
+      await _prefs?.remove('aliyun_ak_id');
+    } else {
+      await _prefs?.setString('aliyun_ak_id', id);
+    }
+    if (secret.isEmpty) {
+      await _prefs?.remove('aliyun_ak_secret');
+    } else {
+      await _prefs?.setString('aliyun_ak_secret', secret);
+    }
+    if (appKey.isEmpty) {
+      await _prefs?.remove('aliyun_app_key');
+    } else {
+      await _prefs?.setString('aliyun_app_key', appKey);
+    }
   }
   
   // --- Engine Type ---
@@ -175,9 +176,13 @@ class ConfigService {
 
   void _updateLocaleNotifier() {
     final lang = appLanguage;
-    if (lang == 'en') localeNotifier.value = const Locale('en');
-    else if (lang == 'zh') localeNotifier.value = const Locale('zh');
-    else localeNotifier.value = null; // System
+    if (lang == 'en') {
+      localeNotifier.value = const Locale('en');
+    } else if (lang == 'zh') {
+      localeNotifier.value = const Locale('zh');
+    } else {
+      localeNotifier.value = null; // System
+    }
   }
 
   // --- First Launch / Onboarding ---

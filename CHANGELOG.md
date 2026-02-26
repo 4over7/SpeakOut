@@ -1,5 +1,32 @@
 # SpeakOut Version History
 
+## [1.2.27] - 2026-02-26
+
+### 架构重构: 语音输入管道
+
+- **CoreEngine 录音状态机** — 用 `RecordingState { idle, starting, recording, stopping, processing }` 枚举替换 5 个布尔标记 (`_isRecording`, `_isStopping`, `_isDiaryMode`, `_audioStarted` 部分)，消除非法状态组合。
+- **RecordingMode 参数化** — `startRecording({required RecordingMode mode})` 替代先设标记再调用的模式，PTT 和日记模式统一入口。
+- **提取 OverlayController 单例** — 新增 `lib/services/overlay_controller.dart`，统一 overlay MethodChannel 调用（原散布在 CoreEngine + main.dart 两处），消除双重更新竞态。
+- **统一边沿检测** — 提取 `_handleModeKey()` 方法，PTT 和日记的按键处理共用同一逻辑。
+- **消除硬编码延迟** — 移除 `stopRecording()` 中多余的 10ms/200ms `Future.delayed`，provider 已内含尾部处理。
+
+### 代码清理
+
+- **删除调试残留** — 移除 `_audioDumpSink`、`_audioBuffer`、`_modelPath`、`_startTime`、`_isInit` 等从未使用或仅调试用的字段。
+- **修复 144 个 flutter analyze 问题** — 从 144 issues 降到 0：
+  - 移除 20+ 个 unused import (`dart:io`, `dart:convert`, `dart:typed_data`, `shared_preferences`, `crypto` 等)
+  - 移除 10+ 个 unused field (`_heartbeatInterval`, `_startCompleter`, `_lastBluetoothDeviceName`, `_checkPermission` 等)
+  - `withOpacity()` → `withValues(alpha:)` 全局替换 (28 处，适配 Flutter 3.33+)
+  - `print()` → `debugPrint()` 全局替换 (40+ 处)
+  - 修复 `curly_braces_in_flow_control_structures` (10+ 处)
+  - 修复 `unnecessary_string_interpolations`、`prefer_interpolation_to_compose_strings`
+  - 添加 `path_provider_platform_interface` 和 `plugin_platform_interface` 到 dev_dependencies
+- **CoreEngine 瘦身** — 从 ~800 行降到 ~700 行，删除 ~115 行死代码。
+
+### 测试
+
+- 全部 17 个测试通过，无需修改测试用例（重构未改变 ASRProvider 接口和 Service 层 API）。
+
 ## [1.2.26] - 2026-02-26
 
 ### 安全修复 (P0)

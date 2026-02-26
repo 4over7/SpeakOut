@@ -1,6 +1,5 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../engine/core_engine.dart';
-import 'notification_service.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
 import '../engine/model_manager.dart';
@@ -82,7 +81,7 @@ class AppService {
       
       // If no model, download default
       if (path == null) {
-        print("AppService: Downloading default model...");
+        debugPrint("AppService: Downloading default model...");
         try {
           final defaultId = AppConstants.kDefaultModelId;
           // We can't easily show progress in UI here unless we expose stream.
@@ -91,7 +90,7 @@ class AppService {
           // Update Config
            await ConfigService().setActiveModelId(defaultId);
         } catch (e) {
-          print("AppService: Default download failed: $e");
+          debugPrint("AppService: Default download failed: $e");
         }
       }
       
@@ -102,7 +101,7 @@ class AppService {
          await engine.initASR(path, modelType: type, modelName: name);
       }
     } catch (e) {
-       print("AppService: ASR Init Error: $e");
+       debugPrint("AppService: ASR Init Error: $e");
     }
   }
 
@@ -118,7 +117,7 @@ class AppService {
       // 检查标点模型 - 不再自动下载，由 Onboarding 或 Settings 页面处理
       bool hasModel = await modelManager.isPunctuationModelDownloaded();
       if (!hasModel) {
-        print("Punctuation model not found. User can download from Settings.");
+        debugPrint("Punctuation model not found. User can download from Settings.");
         return; // Skip init if not downloaded
       }
       
@@ -131,7 +130,7 @@ class AppService {
         _isPunctuationInitialized = true;
       }
     } catch (e) {
-      print("AppService: Punctuation init failed: $e. Attempting self-heal.");
+      debugPrint("AppService: Punctuation init failed: $e. Attempting self-heal.");
       // If init failed, the model file is likely corrupted or incompatible.
       // Delete it so it re-downloads on next launch.
       await modelManager.deletePunctuationModel();

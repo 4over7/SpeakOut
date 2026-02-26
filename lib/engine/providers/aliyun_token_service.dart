@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -33,7 +34,7 @@ class AliyunTokenService {
     final stringToSign = "GET&${_percentEncode("/")}&${_percentEncode(canonicalizedQueryString)}";
 
     // 4. Sign
-    final key = "${accessKeySecret}&";
+    final key = "$accessKeySecret&";
     final hmacSha1 = Hmac(sha1, utf8.encode(key));
     final signature = base64Encode(hmacSha1.convert(utf8.encode(stringToSign)).bytes);
 
@@ -48,9 +49,9 @@ class AliyunTokenService {
           return json['Token']['Id'];
         }
       }
-      print("Aliyun Token Error: ${response.body}");
+      debugPrint("Aliyun Token Error: ${response.body}");
     } catch (e) {
-      print("Aliyun Token Network Error: $e");
+      debugPrint("Aliyun Token Network Error: $e");
     }
     return null;
   }

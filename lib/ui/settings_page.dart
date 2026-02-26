@@ -1,18 +1,15 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/config_service.dart';
-import '../services/app_service.dart';
 import '../config/app_constants.dart';
 import '../engine/model_manager.dart';
 import '../engine/core_engine.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:file_picker/file_picker.dart';
 import 'theme.dart';
 import '../services/audio_device_service.dart';
 
@@ -52,7 +49,6 @@ class _SettingsPageState extends State<SettingsPage> {
   String _currentKeyName = AppConstants.kDefaultPttKeyName;
   bool _isCapturingKey = false;
   // Diary Hotkey
-  int _diaryKeyCode = 61;
   String _diaryKeyName = "Right Option";
   bool _isCapturingDiaryKey = false;
   
@@ -60,7 +56,6 @@ class _SettingsPageState extends State<SettingsPage> {
   StreamSubscription<int>? _keySubscription;
 
   // UI State
-  bool _showCustomApi = false;
   String _version = "";
   
   // Audio Device State
@@ -127,7 +122,6 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _currentKeyCode = service.pttKeyCode;
       _currentKeyName = service.pttKeyName;
-      _diaryKeyCode = service.diaryKeyCode;
       _diaryKeyName = service.diaryKeyName;
     });
     _engine.pttKeyCode = _currentKeyCode;
@@ -137,7 +131,6 @@ class _SettingsPageState extends State<SettingsPage> {
     if (_isCapturingDiaryKey) {
        await ConfigService().setDiaryKey(keyCode, keyName);
        setState(() {
-         _diaryKeyCode = keyCode;
          _diaryKeyName = keyName;
          _isCapturingDiaryKey = false;
        });
@@ -155,19 +148,23 @@ class _SettingsPageState extends State<SettingsPage> {
   // --- Key Capture Logic ---
   void _startKeyCapture({bool isDiary = false}) {
     setState(() {
-       if (isDiary) _isCapturingDiaryKey = true;
-       else _isCapturingKey = true;
+       if (isDiary) {
+         _isCapturingDiaryKey = true;
+       } else {
+         _isCapturingKey = true;
+       }
     });
     
     _keySubscription = _engine.rawKeyEventStream.listen((keyCode) {
-       // Simple Key Mapping for Display
-       String keyName = _mapKeyCodeToString(keyCode);
+       final keyName = _mapKeyCodeToString(keyCode);
        _saveHotkeyConfig(keyCode, keyName);
        _stopKeyCapture();
     });
     // Timeout
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && (_isCapturingKey || _isCapturingDiaryKey)) _stopKeyCapture();
+      if (mounted && (_isCapturingKey || _isCapturingDiaryKey)) {
+        _stopKeyCapture();
+      }
     });
   }
   
@@ -228,21 +225,22 @@ class _SettingsPageState extends State<SettingsPage> {
      });
      
      try {
-       await _modelManager.downloadAndExtractModel(model.id, 
-         onProgress: (p) { 
-            if(mounted) setState(() { 
-               _downloadProgressMap[model.id] = p < 0 ? null : p;
-               // -1 means extraction phase (indeterminate progress)
-               _downloadStatusMap[model.id] = p < 0 
-                   ? "解压中..." 
-                   : loc.downloading((p*100).toStringAsFixed(0));
-            }); 
+       await _modelManager.downloadAndExtractModel(model.id,
+         onProgress: (p) {
+            if(mounted) {
+              setState(() {
+                _downloadProgressMap[model.id] = p < 0 ? null : p;
+                _downloadStatusMap[model.id] = p < 0
+                    ? "解压中..."
+                    : loc.downloading((p*100).toStringAsFixed(0));
+              });
+            }
          }
        );
        await _refresh();
      } catch(e) { _showError(e.toString()); }
-     finally { 
-       if(mounted) setState(() { _downloadingIds.remove(model.id); }); 
+     finally {
+       if(mounted) setState(() { _downloadingIds.remove(model.id); });
      }
   }
   
@@ -272,14 +270,18 @@ class _SettingsPageState extends State<SettingsPage> {
       
       try {
         await _modelManager.downloadPunctuationModel(
-          onProgress: (p) { 
-            if(mounted) setState(() { 
-              _downloadProgressMap[punctId] = p; 
-              _downloadStatusMap[punctId] = loc.downloading((p*100).toStringAsFixed(0));
-            }); 
+          onProgress: (p) {
+            if(mounted) {
+              setState(() {
+                _downloadProgressMap[punctId] = p;
+                _downloadStatusMap[punctId] = loc.downloading((p*100).toStringAsFixed(0));
+              });
+            }
           },
           onStatus: (s) {
-             if(mounted) setState(() { _downloadStatusMap[punctId] = s; });
+             if(mounted) {
+               setState(() { _downloadStatusMap[punctId] = s; });
+             }
           }
         );
         await _refresh();
@@ -307,7 +309,7 @@ class _SettingsPageState extends State<SettingsPage> {
     
     // Limits
     if (cleanMsg.length > 300) {
-      cleanMsg = cleanMsg.substring(0, 300) + "...";
+      cleanMsg = "${cleanMsg.substring(0, 300)}...";
     }
     
     showMacosAlertDialog(
@@ -341,7 +343,7 @@ class _SettingsPageState extends State<SettingsPage> {
           return SidebarItems(
             currentIndex: _selectedIndex,
             onChanged: (i) => setState(() => _selectedIndex = i),
-            selectedColor: AppTheme.accentColor.withOpacity(0.2),
+            selectedColor: AppTheme.accentColor.withValues(alpha:0.2),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             items: [
               SidebarItem(
@@ -539,8 +541,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildAudioInputSection(AppLocalizations loc) {
     final isBluetooth = _currentAudioDevice?.isBluetooth ?? false;
-    final deviceName = _currentAudioDevice?.name ?? loc.systemDefault;
-    
     return Column(
       children: [
         SettingsTile(
@@ -670,7 +670,7 @@ class _SettingsPageState extends State<SettingsPage> {
                    Container(
                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                      decoration: BoxDecoration(
-                       color: _isCapturingKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withOpacity(0.2),
+                       color: _isCapturingKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha:0.2),
                        borderRadius: BorderRadius.circular(6),
                      ),
                      child: Text(
@@ -789,7 +789,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: MacosColors.systemGrayColor.withOpacity(0.1),
+                            color: MacosColors.systemGrayColor.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Column(
@@ -856,7 +856,7 @@ class _SettingsPageState extends State<SettingsPage> {
                        Container(
                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                          decoration: BoxDecoration(
-                           color: _isCapturingDiaryKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withOpacity(0.2),
+                           color: _isCapturingDiaryKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha:0.2),
                            borderRadius: BorderRadius.circular(6),
                          ),
                          child: Text(
@@ -923,7 +923,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 6,
-                backgroundColor: MacosColors.systemGrayColor.withOpacity(0.2),
+                backgroundColor: MacosColors.systemGrayColor.withValues(alpha:0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.getAccent(context)),
               ),
             ),
@@ -1007,7 +1007,7 @@ class _SettingsPageState extends State<SettingsPage> {
             decoration: BoxDecoration(
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha:0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 )
@@ -1028,9 +1028,9 @@ class _SettingsPageState extends State<SettingsPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: MacosColors.systemGrayColor.withOpacity(0.1),
+              color: MacosColors.systemGrayColor.withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: MacosColors.systemGrayColor.withOpacity(0.2)),
+              border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
             ),
             child: Text(
               "v$version", 
@@ -1154,7 +1154,7 @@ class SettingsDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Divider(
       height: 1, 
-      color: MacosColors.separatorColor.withOpacity(0.5), 
+      color: MacosColors.separatorColor.withValues(alpha:0.5), 
       indent: 16, 
       endIndent: 0
     );

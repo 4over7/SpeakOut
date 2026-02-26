@@ -95,7 +95,7 @@ class _ChatPageState extends State<ChatPage> {
                       onValueChanged: (v) {
                         setState(() => _selectedFilterIndex = v ?? 0);
                       },
-                      backgroundColor: MacosColors.systemGrayColor.withOpacity(0.2),
+                      backgroundColor: MacosColors.systemGrayColor.withValues(alpha:0.2),
                       thumbColor: MacosTheme.of(context).brightness == Brightness.dark 
                           ? const Color(0xFF636366) 
                           : Colors.white,
@@ -117,7 +117,7 @@ class _ChatPageState extends State<ChatPage> {
                             children: [
                               Icon(
                                 _selectedFilterIndex == 2 ? CupertinoIcons.keyboard : CupertinoIcons.bubble_left,
-                                color: MacosColors.systemGrayColor.withOpacity(0.3),
+                                color: MacosColors.systemGrayColor.withValues(alpha:0.3),
                                 size: 48
                               ),
                               const SizedBox(height: 8),
@@ -158,9 +158,6 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildMessageBubble(ChatMessage msg) {
     final isUser = msg.role == ChatRole.user;
     final isTool = msg.role == ChatRole.tool;
-    // Dictation is conceptually 'User' but system-logged. Let's treat it as system-aligned but with avatar.
-    final isSystem = msg.role == ChatRole.system;
-    
     // Formatting
     final timeStr = DateFormat('HH:mm').format(msg.timestamp);
     
@@ -271,9 +268,9 @@ class _ChatPageState extends State<ChatPage> {
       case ChatRole.tool:
         return const Color(0xFF2C3E50); // Dark Blue
       case ChatRole.dictation:
-        return Colors.blueGrey.withOpacity(0.15); // Light distinct style
+        return Colors.blueGrey.withValues(alpha:0.15); // Light distinct style
       case ChatRole.ai:
-        return MacosColors.systemGrayColor.withOpacity(0.2);
+        return MacosColors.systemGrayColor.withValues(alpha:0.2);
       case ChatRole.system:
         return Colors.transparent; // Special handling maybe?
     }
@@ -308,7 +305,7 @@ class _ChatPageState extends State<ChatPage> {
     
     return CircleAvatar(
       radius: 12,
-      backgroundColor: color.withOpacity(0.2),
+      backgroundColor: color.withValues(alpha:0.2),
       child: Icon(icon, size: 14, color: color),
     );
   }

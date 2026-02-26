@@ -1,25 +1,19 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:system_tray/system_tray.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'services/config_service.dart';
 import 'ui/settings_page.dart';
 import 'services/app_service.dart';
-import 'services/chat_service.dart';
 import 'services/notification_service.dart';
-import 'engine/core_engine.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'ui/theme.dart';
-import 'ui/dialogs/tool_confirmation_dialog.dart';
 import 'ui/chat/chat_page.dart';
 import 'ui/onboarding_page.dart';
 
@@ -49,7 +43,7 @@ void main() {
 
     runApp(const SpeakOutApp());
   }, (error, stack) {
-    print("CRITICAL ERROR: $error\n$stack");
+    debugPrint("CRITICAL ERROR: $error\n$stack");
   });
 }
 
@@ -89,9 +83,6 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
     return ValueListenableBuilder<Locale?>(
       valueListenable: ConfigService().localeNotifier,
       builder: (context, locale, child) {
-        // Fallback to system or English if ConfigService not ready
-        final targetLocale = locale; 
-
         return MacosApp(
           title: 'SpeakOut',
           // Auto-adapt to system light/dark mode
@@ -260,36 +251,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
   }
   
-  bool _partialSubscribed = false;
   String _overlayText = ""; // Separate state for overlay (with auto-clear)
   
-  static const _overlayChannel = MethodChannel('com.SpeakOut/overlay');
-  
   void _subscribeToPartialResults() {
-    if (_partialSubscribed) return;
+    if (_partialSub != null) return;
     final stream = _appService.engine.partialTextStream;
-    if (stream != null) {
-      _partialSub = stream.listen((partialText) {
-        if (mounted && _isRecording && partialText.isNotEmpty) {
-          setState(() {
-            _recognizedText = partialText;
-            _overlayText = partialText;
-          });
-            // UPDATE NATIVE OVERLAY with partial text
-            // Fix: Truncate to display valid tail for long text (Limited to ~12 chars)
-            try {
-              String displayText = partialText;
-              if (displayText.length > 12) {
-                 displayText = "...${displayText.substring(displayText.length - 12)}";
-              }
-              _overlayChannel.invokeMethod('updateStatus', {"text": displayText});
-            } catch (e) {
-              // Ignore
-            }
-        }
-      });
-      _partialSubscribed = true;
-    }
+    _partialSub = stream.listen((partialText) {
+      if (mounted && _isRecording && partialText.isNotEmpty) {
+        setState(() {
+          _recognizedText = partialText;
+          _overlayText = partialText;
+        });
+        // Overlay update now handled by CoreEngine via OverlayController
+      }
+    });
   }
   
   // Waveform Animation State
@@ -346,11 +321,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         });
       }
     });
-  }
-  
-  void _stopWaveAnimation() {
-    _waveTimer?.cancel();
-    _waveTimer = null;
   }
   
   Widget _buildAnimatedWaveform() {
@@ -523,9 +493,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppTheme.errorColor.withOpacity(0.1),
+                          color: AppTheme.errorColor.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+                          border: Border.all(color: AppTheme.errorColor.withValues(alpha:0.3)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -558,7 +528,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                         : MacosColors.systemBlueColor)),
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))
+                              BoxShadow(color: Colors.black.withValues(alpha:0.2), blurRadius: 10, offset: const Offset(0, 4))
                             ]
                           ),
                           child: Row(
@@ -579,7 +549,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.25),
+                                      color: Colors.white.withValues(alpha:0.25),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -623,7 +593,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     color: _ready ? AppTheme.accentColor : MacosColors.systemGrayColor,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.15),
+                                        color: Colors.black.withValues(alpha:0.15),
                                         blurRadius: 8,
                                         offset: const Offset(0, 2),
                                       ),
@@ -728,9 +698,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           constraints: const BoxConstraints(maxWidth: 500),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withOpacity(0.1),
+                            color: AppTheme.accentColor.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+                            border: Border.all(color: AppTheme.accentColor.withValues(alpha:0.3)),
                           ),
                           child: Text(
                             _recognizedText.isEmpty ? " " : _recognizedText,

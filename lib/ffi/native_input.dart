@@ -10,7 +10,6 @@ class NativeInput implements NativeInputBase {
   late StartKeyboardListenerDart _startListener;
   late StopKeyboardListenerDart _stopListener;
   late InjectTextDart _injectText;
-  late CheckPermissionDart _checkPermission;
   late CheckPermissionDart _checkPermissionSilent;
 
   // Debug Logger
@@ -79,10 +78,6 @@ class NativeInput implements NativeInputBase {
 
       _injectText = _dylib
           .lookup<NativeFunction<InjectTextC>>('inject_text')
-          .asFunction();
-
-      _checkPermission = _dylib
-          .lookup<NativeFunction<CheckPermissionC>>('check_permission')
           .asFunction();
 
       _checkPermissionSilent = _dylib

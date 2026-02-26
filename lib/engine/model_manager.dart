@@ -188,18 +188,18 @@ class ModelManager {
               final lines = result.stdout.toString().trim().split('\n');
               if (lines.isNotEmpty) {
                  tokenFile = File(lines.first.trim());
-                 print("[Verification] Native find success: ${tokenFile.path}");
+                 debugPrint("[Verification] Native find success: ${tokenFile.path}");
               }
            }
          } catch (e) {
-           print("[Verification] Native find failed: $e");
+           debugPrint("[Verification] Native find failed: $e");
          }
       }
       
       // Fallback to Dart search if native failed or on Windows
       if (tokenFile == null) {
           final entities = tempExtractDir.listSync(recursive: true);
-          print("[Extraction] Entities: ${entities.length}");
+          debugPrint("[Extraction] Entities: ${entities.length}");
           for (var e in entities) {
             // Check matching filename, loose path check
             if (e.path.contains('tokens.txt')) {
@@ -216,8 +216,8 @@ class ModelManager {
       }
       
       final sourceDir = tokenFile.parent;
-      print("[Extraction] Found tokens.txt in: ${sourceDir.path}");
-      print("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
+      debugPrint("[Extraction] Found tokens.txt in: ${sourceDir.path}");
+      debugPrint("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
       
       // Move sourceDir to finalModelDir
       if (sourceDir.absolute.path == tempExtractDir.absolute.path) {
@@ -248,12 +248,12 @@ class ModelManager {
     if (!await isModelDownloaded(id)) {
        // Debug verification failure
        final finalPath = '${modelsRoot.path}/$dirName';
-       print("[Extraction] Verification Failed!");
-       print("[Extraction] Expected path: $finalPath");
+       debugPrint("[Extraction] Verification Failed!");
+       debugPrint("[Extraction] Expected path: $finalPath");
        if (await Directory(finalPath).exists()) {
-          print("[Extraction] Final Dir Contents: ${Directory(finalPath).listSync()}");
+          debugPrint("[Extraction] Final Dir Contents: ${Directory(finalPath).listSync()}");
        } else {
-          print("[Extraction] Final Dir DOES NOT EXIST!");
+          debugPrint("[Extraction] Final Dir DOES NOT EXIST!");
        }
        throw Exception("校验失败: 最终路径无有效模型文件");
     }
@@ -281,7 +281,7 @@ class ModelManager {
             existingBytes = await destFile.length();
           }
         } catch (e) {
-          print("Warning: Failed to get file length, restarting download: $e");
+          debugPrint("Warning: Failed to get file length, restarting download: $e");
           existingBytes = 0;
           try { if (await destFile.exists()) await destFile.delete(); } catch (_) {}
         }
@@ -318,15 +318,15 @@ class ModelManager {
              final localSize = await destFile.exists() ? await destFile.length() : 0;
              
              if (serverSize != null && localSize == serverSize) {
-                print("[Download] 416 Received. File verified complete ($localSize bytes). Success.");
+                debugPrint("[Download] 416 Received. File verified complete ($localSize bytes). Success.");
                 return; // Actually complete
              } else {
-                print("[Download] 416 but size mismatch (Local: $localSize, Server: $serverSize). Restarting.");
+                debugPrint("[Download] 416 but size mismatch (Local: $localSize, Server: $serverSize). Restarting.");
                 if (await destFile.exists()) await destFile.delete();
                 throw Exception("文件不完整 ($localSize / $serverSize bytes)，重新下载...");
              }
            } catch (headError) {
-              print("[Download] 416 and HEAD request failed: $headError. Restarting.");
+              debugPrint("[Download] 416 and HEAD request failed: $headError. Restarting.");
               if (await destFile.exists()) await destFile.delete();
               throw Exception("文件状态异常，重新下载...");
            }
@@ -353,11 +353,11 @@ class ModelManager {
               if (serverStartByte != existingBytes) {
                 // Server is sending from a different position! Data would be corrupted.
                 client.close();
-                print("[Download] Range mismatch! Requested byte $existingBytes, server sending from $serverStartByte. Restarting.");
+                debugPrint("[Download] Range mismatch! Requested byte $existingBytes, server sending from $serverStartByte. Restarting.");
                 if (await destFile.exists()) await destFile.delete();
                 throw Exception("服务器响应位置不匹配，重新下载...");
               }
-              print("[Download] Range verified: starting from byte $serverStartByte");
+              debugPrint("[Download] Range verified: starting from byte $serverStartByte");
             }
           } else {
             totalBytes = existingBytes + (streamedResponse.contentLength ?? 0);
@@ -365,7 +365,7 @@ class ModelManager {
         } else {
           // Full download
           if (existingBytes > 0) {
-             print("[Download] Server returned 200 (Full), ignoring Range. Restarting...");
+             debugPrint("[Download] Server returned 200 (Full), ignoring Range. Restarting...");
              onStatus?.call("服务器不支持续传，重新下载...");
           }
           totalBytes = streamedResponse.contentLength ?? 0;
@@ -445,30 +445,30 @@ class ModelManager {
     final modelRoot = Directory('${docDir.path}/speakout_models/$dirName');
     
     // Generic find model.onnx
-    print("[Diagnose] Punctuation Root: ${modelRoot.path} (Exists: ${await modelRoot.exists()})");
+    debugPrint("[Diagnose] Punctuation Root: ${modelRoot.path} (Exists: ${await modelRoot.exists()})");
     
     if (!await modelRoot.exists()) return null;
 
     // Robust search: Look for 'model.onnx' in root or 1-level deep
     try {
       if (await File('${modelRoot.path}/model.onnx').exists()) {
-        print("[Diagnose] Found model.onnx at root: ${modelRoot.path}/model.onnx");
+        debugPrint("[Diagnose] Found model.onnx at root: ${modelRoot.path}/model.onnx");
         return modelRoot.path;
       }
       
       final entities = modelRoot.listSync();
-      print("[Diagnose] Root entities: ${entities.map((e) => e.path).toList()}");
+      debugPrint("[Diagnose] Root entities: ${entities.map((e) => e.path).toList()}");
       
       for (var entity in entities) {
         if (entity is Directory) {
            if (await File('${entity.path}/model.onnx').exists()) {
-             print("[Diagnose] Found model.onnx in subfolder: ${entity.path}");
+             debugPrint("[Diagnose] Found model.onnx in subfolder: ${entity.path}");
              return entity.path;
            }
         }
       }
     } catch (e) {
-      print("Warning: Error finding punctuation model: $e");
+      debugPrint("Warning: Error finding punctuation model: $e");
     }
     
     return null;
@@ -534,14 +534,14 @@ Future<void> _extractModelTask(List<String> args) async {
        final result = await Process.run('tar', ['-xf', tarPath, '-C', destDir]);
        
        if (result.exitCode == 0) {
-          print("Native extraction successful.");
+          debugPrint("Native extraction successful.");
           // Fix permissions: Ensure we can read/write everything (some archives have read-only dirs)
           await Process.run('chmod', ['-R', '755', destDir]);
           return;
        }
-       print("Native tar failed (Code ${result.exitCode}): ${result.stderr}. Falling back...");
+       debugPrint("Native tar failed (Code ${result.exitCode}): ${result.stderr}. Falling back...");
      } catch (e) {
-       print("Native tar exception: $e. Falling back...");
+       debugPrint("Native tar exception: $e. Falling back...");
      }
   }
 

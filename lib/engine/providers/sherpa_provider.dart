@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
 
@@ -9,7 +9,7 @@ class SherpaProvider implements ASRProvider {
   sherpa.OnlineStream? _stream;
   bool _isInit = false;
   
-  final StreamController<String> _textController = StreamController<String>.broadcast();
+  StreamController<String> _textController = StreamController<String>.broadcast();
   
   @override
   Stream<String> get textStream => _textController.stream;
@@ -100,7 +100,7 @@ class SherpaProvider implements ASRProvider {
           sherpa.initBindings(); 
        }
     } catch (e) {
-      print("[SherpaProvider] Bindings init warning: $e");
+      debugPrint("[SherpaProvider] Bindings init warning: $e");
     }
   }
 
@@ -128,7 +128,7 @@ class SherpaProvider implements ASRProvider {
       }
     } catch (e) {
       // Prevent FFI exceptions from crashing the app
-      print("[SherpaProvider] acceptWaveform error: $e");
+      debugPrint("[SherpaProvider] acceptWaveform error: $e");
     }
   }
 
@@ -157,7 +157,7 @@ class SherpaProvider implements ASRProvider {
       
       return text;
     } catch (e) {
-      print("[SherpaProvider] stop error: $e");
+      debugPrint("[SherpaProvider] stop error: $e");
       // Cleanup on error
       try { _stream?.free(); } catch (_) {}
       _stream = null;
@@ -195,5 +195,7 @@ class SherpaProvider implements ASRProvider {
     _recognizer = null;
     _isInit = false;
     _textController.close();
+    // Recreate controller so provider can be re-initialized
+    _textController = StreamController<String>.broadcast();
   }
 }

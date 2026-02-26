@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
@@ -7,7 +6,6 @@ import '../services/config_service.dart';
 import '../engine/model_manager.dart';
 import '../engine/core_engine.dart';
 import '../config/app_constants.dart';
-import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'theme.dart';
 
 /// Onboarding flow for first-time users
@@ -90,10 +88,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
       setState(() => _downloadStatus = "下载标点模型...");
       await _modelManager.downloadPunctuationModel(
         onProgress: (p) {
-          if (mounted) setState(() {
-            _downloadProgress = p * 0.3; // 30% for punctuation
-            _downloadStatus = "下载标点模型... ${(p * 100).toStringAsFixed(0)}%";
-          });
+          if (mounted) {
+            setState(() {
+              _downloadProgress = p * 0.3; // 30% for punctuation
+              _downloadStatus = "下载标点模型... ${(p * 100).toStringAsFixed(0)}%";
+            });
+          }
         },
         onStatus: (s) {
           if (mounted) setState(() => _downloadStatus = s);
@@ -110,15 +110,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
       await _modelManager.downloadAndExtractModel(
         defaultModel.id,
         onProgress: (p) {
-          if (mounted) setState(() {
-            // -1 means extraction phase
-            if (p < 0) {
-              _downloadStatus = "解压中...";
-            } else {
-              _downloadProgress = 0.3 + (p * 0.7); // 70% for ASR
-              _downloadStatus = "下载语音识别模型... ${(p * 100).toStringAsFixed(0)}%";
-            }
-          });
+          if (mounted) {
+            setState(() {
+              if (p < 0) {
+                _downloadStatus = "解压中...";
+              } else {
+                _downloadProgress = 0.3 + (p * 0.7); // 70% for ASR
+                _downloadStatus = "下载语音识别模型... ${(p * 100).toStringAsFixed(0)}%";
+              }
+            });
+          }
         },
       );
 
@@ -329,11 +330,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: granted 
-            ? Colors.green.withOpacity(0.1) 
-            : MacosColors.systemGrayColor.withOpacity(0.1),
+            ? Colors.green.withValues(alpha:0.1) 
+            : MacosColors.systemGrayColor.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: granted ? Colors.green.withOpacity(0.3) : Colors.transparent,
+          color: granted ? Colors.green.withValues(alpha:0.3) : Colors.transparent,
         ),
       ),
       child: Row(
@@ -381,7 +382,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: MacosColors.systemGrayColor.withOpacity(0.1),
+            color: MacosColors.systemGrayColor.withValues(alpha:0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -391,7 +392,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 child: LinearProgressIndicator(
                   value: _downloadProgress,
                   minHeight: 12,
-                  backgroundColor: MacosColors.systemGrayColor.withOpacity(0.2),
+                  backgroundColor: MacosColors.systemGrayColor.withValues(alpha:0.2),
                   valueColor: AlwaysStoppedAnimation<Color>(
                     _downloadError != null ? Colors.red : AppTheme.accentColor,
                   ),
@@ -475,7 +476,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.accentColor.withOpacity(0.1),
+            color: AppTheme.accentColor.withValues(alpha:0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -486,7 +487,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: MacosColors.systemGrayColor.withOpacity(0.2),
+                      color: MacosColors.systemGrayColor.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(

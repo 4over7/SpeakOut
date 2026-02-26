@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart' as pkg_ffi;
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../ffi/native_input.dart';
 import '../ffi/native_input_base.dart';
@@ -16,9 +14,13 @@ import 'providers/aliyun_provider.dart';
 import '../services/diary_service.dart';
 import '../services/chat_service.dart';
 import '../services/audio_device_service.dart';
+import '../services/overlay_controller.dart';
 
-// MethodChannel for native overlay control
-const _overlayChannel = MethodChannel('com.SpeakOut/overlay');
+/// Recording pipeline state machine
+enum RecordingState { idle, starting, recording, stopping, processing }
+
+/// Recording mode: PTT (push-to-talk) or diary (flash note)
+enum RecordingMode { ptt, diary }
 
 class CoreEngine {
   static final CoreEngine _instance = CoreEngine._internal();
@@ -43,7 +45,7 @@ class CoreEngine {
       _audioDeviceService = AudioDeviceService(_nativeInput as NativeInput);
       AudioDeviceService.setInstance(_audioDeviceService!);
     } catch (e) {
-      print("[CoreEngine] Warning: Failed to init NativeInput: $e");
+      debugPrint("[CoreEngine] Warning: Failed to init NativeInput: $e");
       _nativeInput = null;
     }
   }
@@ -51,24 +53,17 @@ class CoreEngine {
   // ASR Provider abstraction
   ASRProvider? _asrProvider;
   
-  // Metering State
-  DateTime? _startTime;
   Timer? _watchdogTimer; // Safety mechanism
 
-  // State
-  bool _isRecording = false;
-  bool _isInit = false;
-  bool _isDiaryMode = false;
-  
+  // Recording state machine (replaces _isRecording, _isStopping, _audioStarted, _isDiaryMode)
+  RecordingState _recordingState = RecordingState.idle;
+  RecordingMode _recordingMode = RecordingMode.ptt;
+  bool _audioStarted = false; // hardware-level flag: native audio is running
+
   // Keep Offline Punctuation & Debugging related fields
   sherpa.OfflinePunctuation? _punctuation;
   bool _punctuationEnabled = false;
 
-  // Audio Logging + Offline ASR Comparison (Keep for debugging local engine)
-  final List<Float32List> _audioBuffer = []; 
-  String? _modelPath; // Cache for offline verification if using local
-  IOSink? _audioDumpSink; // For raw audio dump
-  
   // Configuration
   int pttKeyCode = 58; 
   
@@ -100,11 +95,13 @@ class CoreEngine {
   // Subscription to the current provider's stream
   StreamSubscription<String>? _asrSubscription;
   
-  bool get isRecording => _isRecording;
+  bool get isRecording => _recordingState == RecordingState.recording || _recordingState == RecordingState.starting;
   
   /// Check if ASR provider is ready (model loaded)
   bool get isASRReady => _asrProvider != null && _asrProvider!.isReady;
 
+
+  final _overlay = OverlayController();
 
   // Debug Logger - writes to file asynchronously
   void _log(String msg) {
@@ -196,11 +193,11 @@ class CoreEngine {
   /// Check if accessibility permission is granted (for keyboard listener)
   bool checkAccessibilityPermission() {
     if (_nativeInput == null) {
-      print("[CoreEngine] checkAccessibilityPermission: _nativeInput is NULL!");
+      _log("checkAccessibilityPermission: _nativeInput is NULL!");
       return false;
     }
-    final result = _nativeInput!.checkPermission();
-    print("[CoreEngine] checkAccessibilityPermission: $result");
+    final result = _nativeInput.checkPermission();
+    _log("checkAccessibilityPermission: $result");
     return result;
   }
 
@@ -249,13 +246,13 @@ class CoreEngine {
       final hasNativeInput = _nativeInput != null;
       _log("_nativeInput is null: ${!hasNativeInput}");
       if (hasNativeInput) {
-        final started = _nativeInput!.startListener(_nativeCallable!.nativeFunction);
+        final started = _nativeInput.startListener(_nativeCallable!.nativeFunction);
         _log("startListener returned: $started");
         if (started) {
           _isListenerRunning = true;
           _statusController.add("Keyboard Listener Started.");
           _log("Listener start success.");
-          if (_nativeInput?.checkPermission() ?? false) _statusController.add("Accessibility Trusted: true");
+          if (_nativeInput.checkPermission()) _statusController.add("Accessibility Trusted: true");
         } else {
            _statusController.add("Failed to start Keyboard Listener.");
            _log("Listener start FAILED.");
@@ -271,7 +268,7 @@ class CoreEngine {
        rethrow; // Let AppService handle it
     }
 
-    _isInit = true;
+
     _log("Init complete.");
   }
   
@@ -325,16 +322,18 @@ class CoreEngine {
       await provider.initialize(config);
       _asrProvider = provider;
       
-      // CRITICAL FIX: Subscribe to new provider and forward to persistent controller
-      // Added _deduplicateFinal to partial stream to fix real-time stuttering
+      // Forward provider's partial text to persistent hub + overlay
       _asrSubscription = provider.textStream.listen((text) {
          if (!_partialTextController.isClosed) {
             _partialTextController.add(text);
          }
+         // Update overlay with partial text (single source of truth)
+         if (_recordingState == RecordingState.recording && text.isNotEmpty) {
+            _overlay.updateText(text);
+         }
       });
       
-      _isInit = true;
-      _modelPath = modelPath; 
+  
       
       if (type == 'aliyun') {
          _statusController.add("✅ 阿里云就绪 (Aliyun Ready)");
@@ -360,8 +359,9 @@ class CoreEngine {
       String finalPath = modelPath;
       if (await Directory(modelPath).exists()) {
         final candidate = "$modelPath/model.onnx";
-        if (await File(candidate).exists()) finalPath = candidate;
-        else {
+        if (await File(candidate).exists()) {
+          finalPath = candidate;
+        } else {
            final f = Directory(modelPath).listSync().firstWhere((e) => e.path.endsWith('.onnx'), orElse: () => File(""));
            if (f.path.isNotEmpty) finalPath = f.path;
         }
@@ -407,162 +407,119 @@ class CoreEngine {
   bool _diaryKeyHeld = false;
 
   void _handleKey(int keyCode, bool isDown) {
-    final t0 = DateTime.now().millisecondsSinceEpoch;
-    
     // macOS 26+: Globe/Fn key sends keyCode 179 (kCGEventKeyDown) in addition
     // to legacy keyCode 63 (kCGEventFlagsChanged). Normalize so users who
     // configured Fn (63) still get matched when Globe (179) arrives.
+    // NOTE: native_input.m also maps 179→63, but this Dart-side mapping is
+    // retained as defense-in-depth in case native mapping is bypassed.
     if (keyCode == 179) keyCode = 63;
-    
-    // Debug all key events
-    final diaryEnabled = ConfigService().diaryEnabled;
-    final diaryKeyCode = ConfigService().diaryKeyCode;
-    _log("[KeyEvent] code=$keyCode, isDown=$isDown, pttKey=$pttKeyCode, diaryEnabled=$diaryEnabled, diaryKey=$diaryKeyCode");
+
+    _log("[KeyEvent] code=$keyCode, isDown=$isDown, pttKey=$pttKeyCode, state=$_recordingState");
     if (isDown) _rawKeyController.add(keyCode);
-    
-    // Check PTT
+
+    // Match key to mode
     if (keyCode == pttKeyCode) {
-      if (isDown) {
-        if (!_pttKeyHeld) { // RISING EDGE
-           _pttKeyHeld = true;
-           if (!_isRecording) {
-              _isDiaryMode = false;
-              _log("[T+0ms] Key DOWN detected, calling startRecording");
-              startRecording();
-              _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] startRecording returned");
-           }
-        }
-      } else {
-        _pttKeyHeld = false; // FALLING EDGE
-        if (_isRecording && !_isDiaryMode) {
-          _log("[T+0ms] Key UP detected, calling stopRecording");
-          stopRecording();
-          _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] stopRecording returned");
+      _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
+    } else if (ConfigService().diaryEnabled && keyCode == ConfigService().diaryKeyCode) {
+      _handleModeKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
+    }
+  }
+
+  /// Unified edge detection for PTT and diary keys
+  void _handleModeKey(bool isDown, RecordingMode mode, bool wasHeld, void Function(bool) setHeld) {
+    if (isDown) {
+      if (!wasHeld) {
+        setHeld(true);
+        if (_recordingState == RecordingState.idle) {
+          _log("[${mode.name}] RISING EDGE → startRecording");
+          startRecording(mode: mode);
         }
       }
-      return;
-    }
-    
-    // Check Diary
-    if (ConfigService().diaryEnabled && keyCode == ConfigService().diaryKeyCode) {
-      _log("[Diary] Key event: isDown=$isDown, _diaryKeyHeld=$_diaryKeyHeld, _isRecording=$_isRecording, _isDiaryMode=$_isDiaryMode");
-      if (isDown) {
-        if (!_diaryKeyHeld) { // RISING EDGE
-           _diaryKeyHeld = true;
-           _log("[Diary] RISING EDGE - Starting recording in diary mode");
-           if (!_isRecording) {
-              _isDiaryMode = true;
-              startRecording();
-           }
-        }
-      } else {
-        _diaryKeyHeld = false; // FALLING EDGE
-        _log("[Diary] FALLING EDGE - _isRecording=$_isRecording, _isDiaryMode=$_isDiaryMode");
-        if (_isRecording && _isDiaryMode) {
-          _log("[Diary] Stopping recording");
-          stopRecording();
-        }
+    } else {
+      setHeld(false);
+      if (_recordingState == RecordingState.recording && _recordingMode == mode) {
+        _log("[${mode.name}] FALLING EDGE → stopRecording");
+        stopRecording();
       }
     }
   }
 
-  // NATIVE AUDIO PIPELINE (Replaces record package)
-  Future<void> startRecording() async {
-    final t0 = DateTime.now().millisecondsSinceEpoch;
-    _log("[T+0ms] startRecording() BEGIN");
-    
-    // 1. PERMISSION CHECK (Native FFI)
-    if (_nativeInput == null || !_nativeInput!.checkMicrophonePermission()) {
-        _log("Permission DENIED by native check.");
-        _statusController.add("需要麦克风权限");
-        return;
-    }
-    _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] Permission check done");
+  // NATIVE AUDIO PIPELINE
+  Future<void> startRecording({required RecordingMode mode}) async {
+    _log("startRecording(mode=${mode.name}) BEGIN, state=$_recordingState");
 
-    if (_isRecording) {
-      _log("Already recording, ignoring.");
+    // Guard: only start from idle
+    if (_recordingState != RecordingState.idle) {
+      _log("Not idle (state=$_recordingState), ignoring.");
       return;
     }
-    _isRecording = true;
-    _isStopping = false;
-    _recordingController.add(true); 
 
-    // Reset Audio Dump
-    try {
-      final f = File('/tmp/audio_dump.pcm');
-      if (f.existsSync()) f.deleteSync();
-      _audioDumpSink = f.openWrite();
-    } catch (e) {
-      _log("Audio Dump Init Failed: $e");
+    // 1. PERMISSION CHECK
+    if (_nativeInput == null || !_nativeInput.checkMicrophonePermission()) {
+      _log("Permission DENIED by native check.");
+      _statusController.add("需要麦克风权限");
+      return;
     }
-    _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] Audio dump init done");
 
-    // 2. UI FEEDBACK (Show Immediately)
-    try { 
-       if (_isDiaryMode) {
-         _overlayChannel.invokeMethod('updateStatus', {"text": "📝 Note..."});
-         _overlayChannel.invokeMethod('showRecording'); 
-       } else {
-         _overlayChannel.invokeMethod('showRecording'); 
-       }
-    } catch (e) {/*ignore*/}
-    _log("[T+${DateTime.now().millisecondsSinceEpoch - t0}ms] showRecording invoked");
+    // Transition: idle → starting
+    _recordingState = RecordingState.starting;
+    _recordingMode = mode;
+    _recordingController.add(true);
+
+    // 2. UI FEEDBACK (fire-and-forget)
+    if (mode == RecordingMode.diary) {
+      _overlay.updateText("📝 Note...");
+    }
+    _overlay.show();
 
     // 3. AUDIO INIT via Native FFI
     try {
-        // CRITICAL: Start ASR Provider FIRST (Creates internal stream)
-        if (_asrProvider == null || !_asrProvider!.isReady) {
-            _log("ASR Provider not ready!");
-            // Show visible error on overlay BEFORE cleaning up
-            try {
-              _overlayChannel.invokeMethod('updateStatus', {"text": "❌ 请先下载语音模型"});
-            } catch (_) {}
-            _statusController.add("引擎未就绪 - 请下载模型");
-            // Delay to let user see the message
-            await Future.delayed(const Duration(seconds: 2));
-            _cleanupRecordingState();
-            return;
-        }
-        await _asrProvider!.start();
-        _startTime = DateTime.now();
-        _log("ASR Provider Started.");
-
-        // 4. WATCHDOG TIMER (The "Safety Net") - Only for PTT mode
-        // Diary mode has reliable key-up events, so watchdog is not needed
-        _watchdogTimer?.cancel();
-        if (!_isDiaryMode) {
-          _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
-               if (!_isRecording) { timer.cancel(); return; }
-               final targetKey = pttKeyCode;
-               bool isPhysicallyDown = _nativeInput?.isKeyPressed(targetKey) ?? false;
-               if (!isPhysicallyDown) {
-                   _log("🐶 Watchdog: Key $targetKey is UP physically but App is Recording. Forcing Stop.");
-                   timer.cancel();
-                   stopRecording();
-               }
-          });
-        }
-        
-        // 5. START NATIVE RECORDING (Ring Buffer mode - no Dart callback)
-        _log("Starting native audio recording (ring buffer)...");
-        final success = _nativeInput?.startAudioRecording() ?? false;
-        if (!success) {
-            _log("Native audio start failed!");
-            _cleanupRecordingState();
-            _statusController.add("麦克风启动失败");
-            return;
-        }
-        _audioStarted = true;
-        _log("Native audio recording started.");
-        
-        // 6. START POLLING TIMER to read from ring buffer
-        _startAudioPolling();
-        _log("Audio polling timer started (50ms interval).");
-
-    } catch (e) {
-        _log("Start Fatal Error: $e");
+      if (_asrProvider == null || !_asrProvider!.isReady) {
+        _log("ASR Provider not ready!");
+        _overlay.updateText("❌ 请先下载语音模型");
+        _statusController.add("引擎未就绪 - 请下载模型");
+        await Future.delayed(const Duration(seconds: 2));
         _cleanupRecordingState();
-        _statusController.add("启动失败");
+        return;
+      }
+      await _asrProvider!.start();
+      _log("ASR Provider Started.");
+
+      // 4. WATCHDOG (PTT only — diary has reliable key-up)
+      _watchdogTimer?.cancel();
+      if (mode == RecordingMode.ptt) {
+        _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+          if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
+          final isPhysicallyDown = _nativeInput.isKeyPressed(pttKeyCode);
+          if (!isPhysicallyDown) {
+            _log("Watchdog: Key UP physically, forcing stop.");
+            timer.cancel();
+            stopRecording();
+          }
+        });
+      }
+
+      // 5. START NATIVE RECORDING (Ring Buffer)
+      _log("Starting native audio recording (ring buffer)...");
+      final success = _nativeInput.startAudioRecording();
+      if (!success) {
+        _log("Native audio start failed!");
+        _cleanupRecordingState();
+        _statusController.add("麦克风启动失败");
+        return;
+      }
+      _audioStarted = true;
+
+      // 6. START POLLING
+      _startAudioPolling();
+
+      // Transition: starting → recording
+      _recordingState = RecordingState.recording;
+      _log("Recording started (mode=${mode.name}).");
+    } catch (e) {
+      _log("Start Fatal Error: $e");
+      _cleanupRecordingState();
+      _statusController.add("启动失败");
     }
   }
   
@@ -589,9 +546,9 @@ class CoreEngine {
   
   /// Poll the C ring buffer and feed audio to ASR pipeline
   void _pollAudioRingBuffer() {
-    if (!_isRecording || _nativeInput == null || _pollBuffer == null) return;
+    if (_recordingState != RecordingState.recording || _nativeInput == null || _pollBuffer == null) return;
     
-    final samplesRead = _nativeInput!.readAudioBuffer(_pollBuffer!, _pollBufferSamples);
+    final samplesRead = _nativeInput.readAudioBuffer(_pollBuffer!, _pollBufferSamples);
     if (samplesRead <= 0) return;
     
     // Convert Pointer<Int16> to Uint8List (matching _processAudioData interface)
@@ -602,12 +559,8 @@ class CoreEngine {
     _processAudioData(Uint8List.fromList(bytes));
   }
 
-  // Mutex for stopping state
-  bool _isStopping = false;
-  bool _audioStarted = false;
-  
   void _processAudioData(Uint8List data) {
-    if (!_isRecording) return;
+    if (_recordingState != RecordingState.recording) return;
     
     // RAW 16k Int16 -> Float32 (direct passthrough, no gain)
     final int sampleCount = data.length ~/ 2;
@@ -621,26 +574,15 @@ class CoreEngine {
     if (_asrProvider != null) {
       _asrProvider!.acceptWaveform(floatSamples);
     }
-    
-    if (_audioBuffer.length < 100) {
-        _audioBuffer.add(floatSamples);
-    }
-    
-    // Dump Raw Audio
-    try {
-      _audioDumpSink?.add(data);
-    } catch (_) {}
   }
 
   void _cleanupRecordingState() {
-     _isRecording = false;
-     _isStopping = false;
+     _recordingState = RecordingState.idle;
      _audioStarted = false;
-     _stopAudioPolling();  // Cancel ring buffer polling
-     _watchdogTimer?.cancel(); // Kill watchdog
+     _stopAudioPolling();
+     _watchdogTimer?.cancel();
      _recordingController.add(false);
-     try { _overlayChannel.invokeMethod('hideRecording'); } catch(e) {}
-     _isDiaryMode = false;
+     _overlay.hide();
   }
 
   Future<void> _stopAudioSafely() async {
@@ -654,46 +596,38 @@ class CoreEngine {
   }
 
   Future<void> stopRecording() async {
-    if (_isStopping) return; // Prevent re-entry from watchdog + key-up racing
-    _isStopping = true;
-    _isRecording = false;
-    
+    // Guard: only stop from recording state (prevents watchdog + key-up race)
+    if (_recordingState != RecordingState.recording) return;
+
+    // Transition: recording → stopping
+    _recordingState = RecordingState.stopping;
+    final mode = _recordingMode; // capture before cleanup
+
     // 1. UI FIRST (Optimistic Update)
-    // Don't wait for ANY hardware. Hide UI immediately.
-    _recordingController.add(false); 
+    _recordingController.add(false);
     _statusController.add("处理中...");
-    
-    // Fire and forget hide command - don't await native response
-    _overlayChannel.invokeMethod('hideRecording').catchError((e) {
-      _log("Overlay Hide Error: $e");
-    });
-    
-    // Yield to event loop to ensure method channel message is dispatched 
-    // before we hit any potential native blocking code
-    await Future.delayed(const Duration(milliseconds: 10));
-    
-    // 2. GIVE ASR TIME TO PROCESS LAST AUDIO CHUNK
-    // Wait a bit before stopping audio so ASR can process any buffered data
-    await Future.delayed(const Duration(milliseconds: 200));
-    
-    // 3. HARDWARE SHUTDOWN (Native audio is synchronous, no timeout needed)
+    _overlay.hide();
+
+    // Yield to event loop so method channel message is dispatched
+    await Future(() {});
+
+    // HARDWARE SHUTDOWN (provider.stop() handles tail audio internally:
+    // Sherpa injects 0.8s silence padding, Aliyun waits 500ms for final messages)
     try {
       await _stopAudioSafely();
     } catch (e) {
-       _log("Audio Stop Error: $e");
+      _log("Audio Stop Error: $e");
     }
-    
-    try { await _audioDumpSink?.close(); _audioDumpSink = null; } catch(_) {}
-    
-    _isStopping = false;
-    
+
+    // Transition: stopping → processing
+    _recordingState = RecordingState.processing;
+
     if (_asrProvider != null) {
       String text = "";
       try {
-        // Enforce timeout on Provider Stop as well (Sherpa FFI could block)
         text = await _asrProvider!.stop().timeout(const Duration(seconds: 2), onTimeout: () {
-             _log("⚠️ ASR Provider Stop Timeout!");
-             return "";
+          _log("ASR Provider Stop Timeout!");
+          return "";
         });
       } catch (e) {
         _log("Provider Stop Error: $e");
@@ -701,74 +635,63 @@ class CoreEngine {
       _log("Raw Text: '$text'");
       String finalText = text;
 
-      // Post-processing: De-duplicate consecutive repeated characters
+      // Post-processing: De-duplicate
       if (finalText.isNotEmpty && ConfigService().deduplicationEnabled) {
         finalText = _deduplicateText(finalText);
         _log("After Dedup: '$finalText'");
       }
 
-      // AI Correction Logic
+      // AI Correction
       if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {
-         _statusController.add("AI 优化中...");
-         try { _overlayChannel.invokeMethod('updateStatus', {"text": "🤖 AI Optimizing..."}); } catch(_) {}
-         
-         try {
-            finalText = await LLMService().correctText(finalText);
-            _log("LLM Result: '$finalText'");
-         } catch(e) {
-            _log("Ai Correction Error: $e");
-         }
+        _statusController.add("AI 优化中...");
+        _overlay.updateText("🤖 AI Optimizing...");
+        try {
+          finalText = await LLMService().correctText(finalText);
+          _log("LLM Result: '$finalText'");
+        } catch (e) {
+          _log("Ai Correction Error: $e");
+        }
       }
-      
-      // Fallback: Local Punctuation
-      // Strategy: Trust LLM first. Only use local model if LLM failed to provide terminal punctuation.
-      // AND only if using Local Engine (Sherpa). Cloud engines usually provide punctuation.
+
+      // Fallback: Local Punctuation (Sherpa only)
       final bool isLocalEngine = ConfigService().asrEngineType == 'sherpa';
-      
       if (finalText.isNotEmpty && _punctuationEnabled && isLocalEngine) {
-          if (!_hasTerminalPunctuation(finalText)) {
-              final temp = addPunctuation(finalText);
-              if (temp != finalText) {
-                 finalText = temp;
-                 _log("Local Punctuation Result (Fallback): '$finalText'");
-              }
+        if (!_hasTerminalPunctuation(finalText)) {
+          final temp = addPunctuation(finalText);
+          if (temp != finalText) {
+            finalText = temp;
+            _log("Local Punctuation Result (Fallback): '$finalText'");
           }
+        }
       }
 
       _resultController.add(finalText);
-      
+
       if (finalText.isNotEmpty) {
-        if (_isDiaryMode) {
-           // DIARY MODE: Save to file
-           _statusController.add("Saving Note...");
-           DiaryService().appendNote(finalText).then((err) {
-               if (err == null) {
-                 _statusController.add("✅ Saved Note");
-                 try { _overlayChannel.invokeMethod('updateStatus', {"text": "✅ Saved Note"}); } catch (_) {}
-                 // Hide overlay after delay
-                 Future.delayed(const Duration(seconds: 2), () {
-                    try { _overlayChannel.invokeMethod('updateStatus', {"text": ""}); } catch(_){}
-                 });
-               } else {
-                 _statusController.add("❌ Save Failed");
-                 _log("Diary Save Error: $err");
-               }
-           });
-            // 1. Add to Unified Log
-            ChatService().addUserMessage(finalText);
+        if (mode == RecordingMode.diary) {
+          _statusController.add("Saving Note...");
+          DiaryService().appendNote(finalText).then((err) {
+            if (err == null) {
+              _statusController.add("✅ Saved Note");
+              _overlay.showThenClear("✅ Saved Note", const Duration(seconds: 2));
+            } else {
+              _statusController.add("❌ Save Failed");
+              _log("Diary Save Error: $err");
+            }
+          });
+          ChatService().addUserMessage(finalText);
         } else {
-           // STANDARD MODE: Inject
-           _statusController.add("Ready");
-           _nativeInput?.inject(finalText);
-           
-           // Unified History: Log dictation
-           ChatService().addDictation(finalText);
+          _statusController.add("Ready");
+          _nativeInput?.inject(finalText);
+          ChatService().addDictation(finalText);
         }
       } else {
         _statusController.add("🔇 No Speech");
       }
-      _audioBuffer.clear();
     }
+
+    // Transition: processing → idle
+    _recordingState = RecordingState.idle;
   }
   
   bool _hasTerminalPunctuation(String text) {
