@@ -9,7 +9,7 @@ class AppConstants {
   // Defaults
   static const int kDefaultPttKeyCode = 58; // Left Option
   static const String kDefaultPttKeyName = "Left Option";
-  static const String kDefaultModelId = 'paraformer_bi_zh_en';
+  static const String kDefaultModelId = 'sensevoice_zh_en_int8';
   
   // Aliyun Defaults (Loaded from assets/aliyun_config.json)
   static String kDefaultAliyunAppKey = '';

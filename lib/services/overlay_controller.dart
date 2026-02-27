@@ -10,8 +10,11 @@ class OverlayController {
 
   static const _channel = MethodChannel('com.SpeakOut/overlay');
 
+  /// Whether the current ASR is offline (no real-time subtitles)
+  bool isOfflineMode = false;
+
   Future<void> show() async {
-    _invoke('showRecording');
+    _invoke('showRecording', {"mode": isOfflineMode ? "offline" : "streaming"});
   }
 
   Future<void> hide() async {

@@ -98,7 +98,8 @@ class AppService {
          final info = await modelManager.getActiveModelInfo();
          final type = info?.type ?? 'zipformer'; 
          final name = info?.name ?? 'Local Model';
-         await engine.initASR(path, modelType: type, modelName: name);
+         final hasPunct = info?.hasPunctuation ?? false;
+         await engine.initASR(path, modelType: type, modelName: name, hasPunctuation: hasPunct);
       }
     } catch (e) {
        debugPrint("AppService: ASR Init Error: $e");
@@ -106,8 +107,8 @@ class AppService {
   }
 
   /// ASR Init Wrapper
-  Future<void> initASR({required String modelPath, String? type, String? modelName}) async {
-    await engine.initASR(modelPath, modelType: type ?? 'zipformer', modelName: modelName ?? 'Local Model');
+  Future<void> initASR({required String modelPath, String? type, String? modelName, bool hasPunctuation = false}) async {
+    await engine.initASR(modelPath, modelType: type ?? 'zipformer', modelName: modelName ?? 'Local Model', hasPunctuation: hasPunctuation);
   }
 
   Future<void> _initPunctuation() async {

@@ -8,6 +8,7 @@ class AppDelegate: FlutterAppDelegate {
   var waveTimer: Timer?
   var statusLabel: NSTextField?
   var isShowingRecording = false
+  var currentOverlayMode: String = "streaming" // "streaming" or "offline"
 
   // Mint Green accent color (#2ECC71)
   let accentColor = NSColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 1.0)
@@ -26,11 +27,10 @@ class AppDelegate: FlutterAppDelegate {
 
         switch call.method {
         case "showRecording":
-          if let args = call.arguments as? [String: Any], let text = args["text"] as? String {
-            self?.showRecordingOverlay(initialText: text)
-          } else {
-            self?.showRecordingOverlay(initialText: "")
-          }
+          let args = call.arguments as? [String: Any]
+          let text = args?["text"] as? String ?? ""
+          let mode = args?["mode"] as? String ?? "streaming"
+          self?.showRecordingOverlay(initialText: text, mode: mode)
           result(nil)
         case "updateStatus":
           if let args = call.arguments as? [String: Any], let text = args["text"] as? String {
@@ -49,8 +49,10 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
-  private func showRecordingOverlay(initialText: String) {
-    NSLog("[Overlay] showRecordingOverlay called with text: %@", initialText)
+  private func showRecordingOverlay(initialText: String, mode: String = "streaming") {
+    NSLog("[Overlay] showRecordingOverlay called with text: %@, mode: %@", initialText, mode)
+    currentOverlayMode = mode
+
     // 1. Always calculate target position logic FIRST (Dynamic Multi-Monitor Support)
     let mouseLoc = NSEvent.mouseLocation
     let screen =
@@ -58,24 +60,32 @@ class AppDelegate: FlutterAppDelegate {
 
     guard let targetScreen = screen else { return }
 
-    let panelWidth: CGFloat = 400
+    let isOffline = (mode == "offline")
+    // Offline: compact (waveform only), Streaming: full width (waveform + subtitle)
+    let panelWidth: CGFloat = isOffline ? 120 : 400
     let panelHeight: CGFloat = 50
 
     // Calculate position relative to the target screen
     let xPos = targetScreen.frame.origin.x + (targetScreen.frame.width - panelWidth) / 2
     let yPos = targetScreen.frame.origin.y + 60
 
-    // 2. Reuse Existing Window if available
-    if let panel = recordingOverlayWindow {
-      // CRITICAL FIX: Move window to the new cursor screen
+    // 2. If mode changed or window doesn't exist, recreate
+    if let panel = recordingOverlayWindow, panel.frame.width == panelWidth {
+      // Same mode, reuse existing window
       panel.setFrameOrigin(NSPoint(x: xPos, y: yPos))
       panel.orderFront(nil)
-      updateStatusLabel(initialText)  // ensure text is fresh
+      if !isOffline { updateStatusLabel(initialText) }
       startWaveAnimation()
       return
     }
 
-    // 3. Create New Window (First Time)
+    // Tear down old window if mode changed
+    if recordingOverlayWindow != nil {
+      hideRecordingOverlay()
+      recordingOverlayWindow = nil
+    }
+
+    // 3. Create New Window
     let panel = NSPanel(
       contentRect: NSRect(x: xPos, y: yPos, width: panelWidth, height: panelHeight),
       styleMask: [.borderless, .nonactivatingPanel],
@@ -89,7 +99,6 @@ class AppDelegate: FlutterAppDelegate {
     panel.hasShadow = false
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-    // Create transparent background (User request: ~30% opacity, no blur) -> Updated to 15%
     let backgroundView = NSView(frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
     backgroundView.wantsLayer = true
     backgroundView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.15).cgColor
@@ -101,7 +110,10 @@ class AppDelegate: FlutterAppDelegate {
     let barWidth: CGFloat = 5
     let barSpacing: CGFloat = 6
     let waveGroupWidth = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * barSpacing
-    let waveStartX: CGFloat = 24
+    // Offline: center waveform in compact panel; Streaming: left-aligned
+    let waveStartX: CGFloat = isOffline
+      ? (panelWidth - waveGroupWidth) / 2
+      : 24
     let waveY: CGFloat = (panelHeight - 24) / 2
 
     waveformViews.removeAll()
@@ -116,22 +128,25 @@ class AppDelegate: FlutterAppDelegate {
       waveformViews.append(barView)
     }
 
-    // === STATUS LABEL ===
-    let labelX = waveStartX + waveGroupWidth + 20
-    let labelWidth = panelWidth - labelX - 24
-    let label = NSTextField(
-      frame: NSRect(x: labelX, y: (panelHeight - 20) / 2, width: labelWidth, height: 20))
-    label.stringValue = initialText
-    label.alignment = .left
-    label.isEditable = false
-    label.isBordered = false
-    label.drawsBackground = false
-    // User request: Text opacity 70%
-    label.textColor = NSColor.white.withAlphaComponent(0.7)
-    label.font = NSFont.systemFont(ofSize: 14, weight: .medium)
-    label.lineBreakMode = .byTruncatingTail
-    backgroundView.addSubview(label)
-    statusLabel = label
+    // === STATUS LABEL (streaming mode only) ===
+    if !isOffline {
+      let labelX = waveStartX + waveGroupWidth + 20
+      let labelWidth = panelWidth - labelX - 24
+      let label = NSTextField(
+        frame: NSRect(x: labelX, y: (panelHeight - 20) / 2, width: labelWidth, height: 20))
+      label.stringValue = initialText
+      label.alignment = .left
+      label.isEditable = false
+      label.isBordered = false
+      label.drawsBackground = false
+      label.textColor = NSColor.white.withAlphaComponent(0.7)
+      label.font = NSFont.systemFont(ofSize: 14, weight: .medium)
+      label.lineBreakMode = .byTruncatingTail
+      backgroundView.addSubview(label)
+      statusLabel = label
+    } else {
+      statusLabel = nil
+    }
 
     panel.contentView = backgroundView
     recordingOverlayWindow = panel
