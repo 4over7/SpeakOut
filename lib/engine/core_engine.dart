@@ -10,6 +10,7 @@ import '../services/config_service.dart';
 import '../services/llm_service.dart';
 import 'asr_provider.dart';
 import 'providers/sherpa_provider.dart';
+import 'providers/offline_sherpa_provider.dart';
 import 'providers/aliyun_provider.dart';
 import '../services/diary_service.dart';
 import '../services/chat_service.dart';
@@ -52,6 +53,8 @@ class CoreEngine {
   
   // ASR Provider abstraction
   ASRProvider? _asrProvider;
+  bool _isOfflineASR = false;
+  bool _activeModelHasPunctuation = false;
   
   Timer? _watchdogTimer; // Safety mechanism
 
@@ -297,7 +300,7 @@ class CoreEngine {
   }
 
   // Switch Provider Logic
-  Future<void> initASR(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model'}) async {
+  Future<void> initASR(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model', bool hasPunctuation = false}) async {
     // Determine provider type
     final type = ConfigService().asrEngineType;
     ASRProvider provider;
@@ -314,6 +317,9 @@ class CoreEngine {
     
     Map<String, dynamic> config = {};
     
+    // Check if this is an offline model type
+    final isOfflineModel = modelType == 'sense_voice' || modelType == 'offline_paraformer' || modelType == 'whisper' || modelType == 'fire_red_asr';
+
     if (type == 'aliyun') {
       provider = AliyunProvider();
       config = {
@@ -323,12 +329,21 @@ class CoreEngine {
       };
       _log("Initializing Aliyun Provider...");
       _statusController.add("☁️ 连接阿里云 (Connecting)...");
+    } else if (isOfflineModel) {
+      // Offline Sherpa (non-streaming, batch recognition)
+      provider = OfflineSherpaProvider();
+      config = {
+        'modelPath': modelPath,
+        'modelType': modelType,
+      };
+      _log("Initializing Offline Sherpa Provider...");
+      _statusController.add("⏳ 加载模型: $modelName...");
     } else {
-      // Default: Sherpa Local
+      // Default: Sherpa Local (streaming)
       provider = SherpaProvider();
       config = {
         'modelPath': modelPath,
-        'modelType': modelType, 
+        'modelType': modelType,
       };
       _log("Initializing Sherpa Provider (Local)...");
       _statusController.add("⏳ 加载模型: $modelName...");
@@ -344,10 +359,15 @@ class CoreEngine {
             _partialTextController.add(text);
          }
          // Update overlay with partial text (single source of truth)
+         // Offline providers only emit on stop(), so this still works
          if (_recordingState == RecordingState.recording && text.isNotEmpty) {
             _overlay.updateText(text);
          }
       });
+
+      _isOfflineASR = provider is OfflineSherpaProvider;
+      _activeModelHasPunctuation = hasPunctuation;
+      _overlay.isOfflineMode = _isOfflineASR;
       
   
       
@@ -695,9 +715,9 @@ class CoreEngine {
         }
       }
 
-      // Fallback: Local Punctuation (Sherpa only)
+      // Fallback: Local Punctuation (Sherpa only, skip if model has built-in punctuation)
       final bool isLocalEngine = ConfigService().asrEngineType == 'sherpa';
-      if (finalText.isNotEmpty && _punctuationEnabled && isLocalEngine) {
+      if (finalText.isNotEmpty && _punctuationEnabled && isLocalEngine && !_activeModelHasPunctuation) {
         if (!_hasTerminalPunctuation(finalText)) {
           final temp = addPunctuation(finalText);
           if (temp != finalText) {
