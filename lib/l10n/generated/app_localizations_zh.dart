@@ -233,4 +233,93 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get permAccessibilityDesc => '用于将文字输入到应用程序';
+
+  @override
+  String get streamingModels => '流式模型（实时显示）';
+
+  @override
+  String get streamingModelsDesc => '边说边出字，适合长段听写。';
+
+  @override
+  String get offlineModels => '离线模型（高精度）';
+
+  @override
+  String get offlineModelsDesc => '松开按键后一次性识别，精度更高，录音时无实时字幕。';
+
+  @override
+  String get switchToOfflineTitle => '切换到离线模式？';
+
+  @override
+  String get switchToOfflineBody =>
+      '离线模型在松开按键后才开始识别，录音过程中不会显示实时字幕，但识别精度更高。是否继续？';
+
+  @override
+  String get switchToStreamingTitle => '切换到流式模式？';
+
+  @override
+  String get switchToStreamingBody => '流式模型会在说话时实时显示文字，精度可能略低。是否继续？';
+
+  @override
+  String get confirm => '确认';
+
+  @override
+  String get modelSenseVoiceName => 'SenseVoice 2024（推荐）';
+
+  @override
+  String get modelSenseVoiceDesc => '阿里达摩院，中英日韩粤，自带标点。~228MB';
+
+  @override
+  String get modelSenseVoice2025Name => 'SenseVoice 2025';
+
+  @override
+  String get modelSenseVoice2025Desc => '粤语增强版，无内置标点。~158MB';
+
+  @override
+  String get modelOfflineParaformerName => 'Paraformer 离线版';
+
+  @override
+  String get modelOfflineParaformerDesc => '中英双语，成熟稳定。~217MB';
+
+  @override
+  String get modelParaformerDialectName => 'Paraformer 方言 2025';
+
+  @override
+  String get modelParaformerDialectDesc => '中英+四川话/重庆话方言。~218MB';
+
+  @override
+  String get modelWhisperName => 'Whisper Large-v3';
+
+  @override
+  String get modelWhisperDesc =>
+      'OpenAI Whisper，中英日韩法德西俄等主流语言优秀，共 99 种语言。~1.0GB';
+
+  @override
+  String get modelFireRedName => 'FireRedASR Large';
+
+  @override
+  String get modelFireRedDesc => '中英+方言，最大容量。~1.4GB';
+
+  @override
+  String get builtInPunctuation => '自带标点';
+
+  @override
+  String get needsPunctuationModel => '需要标点模型';
+
+  @override
+  String get recognizing => '识别中...';
+
+  @override
+  String get modeStreaming => '流式';
+
+  @override
+  String get modeOffline => '离线';
+
+  @override
+  String get chooseModel => '选择语音模型';
+
+  @override
+  String get chooseModelDesc => '选择要下载的模型，之后可在设置中更改。';
+
+  @override
+  String get recommended => '推荐';
 }

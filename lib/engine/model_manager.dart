@@ -93,7 +93,7 @@ class ModelManager {
     ModelInfo(
       id: "whisper_large_v3",
       name: "Whisper Large-v3",
-      description: "OpenAI Whisper, multilingual, very large. ~1.0GB",
+      description: "OpenAI Whisper, best for: Zh/En/Ja/Ko/Fr/De/Es/Ru + 90 more. ~1.0GB",
       url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-large-v3.tar.bz2",
       type: "whisper",
       lang: "multilingual",

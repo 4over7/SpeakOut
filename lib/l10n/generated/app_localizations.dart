@@ -541,6 +541,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'For typing text into applications'**
   String get permAccessibilityDesc;
+
+  /// No description provided for @streamingModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming Models (Real-time)'**
+  String get streamingModels;
+
+  /// No description provided for @streamingModelsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Shows text in real-time as you speak. Best for long dictation.'**
+  String get streamingModelsDesc;
+
+  /// No description provided for @offlineModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Models (High Accuracy)'**
+  String get offlineModels;
+
+  /// No description provided for @offlineModelsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognizes after recording stops. Higher accuracy, no real-time subtitles.'**
+  String get offlineModelsDesc;
+
+  /// No description provided for @switchToOfflineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Offline Mode?'**
+  String get switchToOfflineTitle;
+
+  /// No description provided for @switchToOfflineBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline models recognize after you release the key — no real-time subtitles during recording. Accuracy is higher. Continue?'**
+  String get switchToOfflineBody;
+
+  /// No description provided for @switchToStreamingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Streaming Mode?'**
+  String get switchToStreamingTitle;
+
+  /// No description provided for @switchToStreamingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming models show text in real-time as you speak. Accuracy may be slightly lower. Continue?'**
+  String get switchToStreamingBody;
+
+  /// No description provided for @confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
+
+  /// No description provided for @modelSenseVoiceName.
+  ///
+  /// In en, this message translates to:
+  /// **'SenseVoice 2024 (Recommended)'**
+  String get modelSenseVoiceName;
+
+  /// No description provided for @modelSenseVoiceDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Alibaba DAMO, Zh/En/Ja/Ko/Yue, built-in punctuation. ~228MB'**
+  String get modelSenseVoiceDesc;
+
+  /// No description provided for @modelSenseVoice2025Name.
+  ///
+  /// In en, this message translates to:
+  /// **'SenseVoice 2025'**
+  String get modelSenseVoice2025Name;
+
+  /// No description provided for @modelSenseVoice2025Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantonese enhanced, no built-in punctuation. ~158MB'**
+  String get modelSenseVoice2025Desc;
+
+  /// No description provided for @modelOfflineParaformerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Paraformer Offline'**
+  String get modelOfflineParaformerName;
+
+  /// No description provided for @modelOfflineParaformerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Zh/En, mature & stable. ~217MB'**
+  String get modelOfflineParaformerDesc;
+
+  /// No description provided for @modelParaformerDialectName.
+  ///
+  /// In en, this message translates to:
+  /// **'Paraformer Dialect 2025'**
+  String get modelParaformerDialectName;
+
+  /// No description provided for @modelParaformerDialectDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Zh/En + Sichuan/Chongqing dialects. ~218MB'**
+  String get modelParaformerDialectDesc;
+
+  /// No description provided for @modelWhisperName.
+  ///
+  /// In en, this message translates to:
+  /// **'Whisper Large-v3'**
+  String get modelWhisperName;
+
+  /// No description provided for @modelWhisperDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Whisper, great for Zh/En/Ja/Ko/Fr/De/Es/Ru + 90 more languages. ~1.0GB'**
+  String get modelWhisperDesc;
+
+  /// No description provided for @modelFireRedName.
+  ///
+  /// In en, this message translates to:
+  /// **'FireRedASR Large'**
+  String get modelFireRedName;
+
+  /// No description provided for @modelFireRedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Zh/En + dialects, highest capacity. ~1.4GB'**
+  String get modelFireRedDesc;
+
+  /// No description provided for @builtInPunctuation.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in punctuation'**
+  String get builtInPunctuation;
+
+  /// No description provided for @needsPunctuationModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires punctuation model'**
+  String get needsPunctuationModel;
+
+  /// No description provided for @recognizing.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognizing...'**
+  String get recognizing;
+
+  /// No description provided for @modeStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming'**
+  String get modeStreaming;
+
+  /// No description provided for @modeOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get modeOffline;
+
+  /// No description provided for @chooseModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a Voice Model'**
+  String get chooseModel;
+
+  /// No description provided for @chooseModelDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a model to download. You can change it later in Settings.'**
+  String get chooseModelDesc;
+
+  /// No description provided for @recommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get recommended;
 }
 
 class _AppLocalizationsDelegate

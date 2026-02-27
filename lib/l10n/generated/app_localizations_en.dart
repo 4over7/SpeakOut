@@ -240,4 +240,100 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get permAccessibilityDesc => 'For typing text into applications';
+
+  @override
+  String get streamingModels => 'Streaming Models (Real-time)';
+
+  @override
+  String get streamingModelsDesc =>
+      'Shows text in real-time as you speak. Best for long dictation.';
+
+  @override
+  String get offlineModels => 'Offline Models (High Accuracy)';
+
+  @override
+  String get offlineModelsDesc =>
+      'Recognizes after recording stops. Higher accuracy, no real-time subtitles.';
+
+  @override
+  String get switchToOfflineTitle => 'Switch to Offline Mode?';
+
+  @override
+  String get switchToOfflineBody =>
+      'Offline models recognize after you release the key — no real-time subtitles during recording. Accuracy is higher. Continue?';
+
+  @override
+  String get switchToStreamingTitle => 'Switch to Streaming Mode?';
+
+  @override
+  String get switchToStreamingBody =>
+      'Streaming models show text in real-time as you speak. Accuracy may be slightly lower. Continue?';
+
+  @override
+  String get confirm => 'Confirm';
+
+  @override
+  String get modelSenseVoiceName => 'SenseVoice 2024 (Recommended)';
+
+  @override
+  String get modelSenseVoiceDesc =>
+      'Alibaba DAMO, Zh/En/Ja/Ko/Yue, built-in punctuation. ~228MB';
+
+  @override
+  String get modelSenseVoice2025Name => 'SenseVoice 2025';
+
+  @override
+  String get modelSenseVoice2025Desc =>
+      'Cantonese enhanced, no built-in punctuation. ~158MB';
+
+  @override
+  String get modelOfflineParaformerName => 'Paraformer Offline';
+
+  @override
+  String get modelOfflineParaformerDesc => 'Zh/En, mature & stable. ~217MB';
+
+  @override
+  String get modelParaformerDialectName => 'Paraformer Dialect 2025';
+
+  @override
+  String get modelParaformerDialectDesc =>
+      'Zh/En + Sichuan/Chongqing dialects. ~218MB';
+
+  @override
+  String get modelWhisperName => 'Whisper Large-v3';
+
+  @override
+  String get modelWhisperDesc =>
+      'OpenAI Whisper, great for Zh/En/Ja/Ko/Fr/De/Es/Ru + 90 more languages. ~1.0GB';
+
+  @override
+  String get modelFireRedName => 'FireRedASR Large';
+
+  @override
+  String get modelFireRedDesc => 'Zh/En + dialects, highest capacity. ~1.4GB';
+
+  @override
+  String get builtInPunctuation => 'Built-in punctuation';
+
+  @override
+  String get needsPunctuationModel => 'Requires punctuation model';
+
+  @override
+  String get recognizing => 'Recognizing...';
+
+  @override
+  String get modeStreaming => 'Streaming';
+
+  @override
+  String get modeOffline => 'Offline';
+
+  @override
+  String get chooseModel => 'Choose a Voice Model';
+
+  @override
+  String get chooseModelDesc =>
+      'Select a model to download. You can change it later in Settings.';
+
+  @override
+  String get recommended => 'Recommended';
 }
