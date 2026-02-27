@@ -353,7 +353,7 @@ abstract class AppLocalizations {
   /// No description provided for @modelZipformerDesc.
   ///
   /// In en, this message translates to:
-  /// **'Balanced streaming model (Zh/En). ~85MB'**
+  /// **'Balanced streaming model (Zh/En). Download: ~490MB'**
   String get modelZipformerDesc;
 
   /// No description provided for @modelParaformerName.
@@ -365,7 +365,7 @@ abstract class AppLocalizations {
   /// No description provided for @modelParaformerDesc.
   ///
   /// In en, this message translates to:
-  /// **'High accuracy Zh/En streaming model. ~230MB'**
+  /// **'High accuracy Zh/En streaming model with lookahead. ~1GB'**
   String get modelParaformerDesc;
 
   /// No description provided for @change.
@@ -715,6 +715,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recommended'**
   String get recommended;
+
+  /// No description provided for @onboardingWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to SpeakOut'**
+  String get onboardingWelcome;
+
+  /// No description provided for @onboardingWelcomeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold a hotkey to speak, release to auto-type\nSupports multilingual recognition'**
+  String get onboardingWelcomeDesc;
+
+  /// No description provided for @onboardingStartSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Started'**
+  String get onboardingStartSetup;
+
+  /// No description provided for @onboardingPermTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions Required'**
+  String get onboardingPermTitle;
+
+  /// No description provided for @onboardingPermDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'SpeakOut needs the following permissions to work properly'**
+  String get onboardingPermDesc;
+
+  /// No description provided for @permMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get permMicrophone;
+
+  /// No description provided for @permMicrophoneDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'For recording voice for recognition'**
+  String get permMicrophoneDesc;
+
+  /// No description provided for @permGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant'**
+  String get permGrant;
+
+  /// No description provided for @permGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted'**
+  String get permGranted;
+
+  /// No description provided for @permRefreshStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Status'**
+  String get permRefreshStatus;
+
+  /// No description provided for @permRestartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted? Restart app for permissions to take effect'**
+  String get permRestartHint;
+
+  /// No description provided for @onboardingContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get onboardingContinue;
+
+  /// No description provided for @onboardingGrantFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Please grant permissions first'**
+  String get onboardingGrantFirst;
+
+  /// No description provided for @onboardingSetupLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up later'**
+  String get onboardingSetupLater;
+
+  /// No description provided for @onboardingCustomSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Selection'**
+  String get onboardingCustomSelect;
+
+  /// No description provided for @onboardingBrowseModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse all {count} models, including dialects and large models'**
+  String onboardingBrowseModels(Object count);
+
+  /// No description provided for @onboardingModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Zh/En/Ja/Ko/Yue, built-in punctuation, ~228MB'**
+  String get onboardingModelSubtitle;
+
+  /// No description provided for @onboardingBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get onboardingBack;
+
+  /// No description provided for @onboardingDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Voice Model'**
+  String get onboardingDownloadTitle;
+
+  /// No description provided for @onboardingDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {name}'**
+  String onboardingDownloading(Object name);
+
+  /// No description provided for @onboardingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing download...'**
+  String get onboardingPreparing;
+
+  /// No description provided for @onboardingDownloadPunct.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading punctuation model...'**
+  String get onboardingDownloadPunct;
+
+  /// No description provided for @onboardingDownloadPunctPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading punctuation model... {percent}%'**
+  String onboardingDownloadPunctPercent(Object percent);
+
+  /// No description provided for @onboardingDownloadASR.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading ASR model...'**
+  String get onboardingDownloadASR;
+
+  /// No description provided for @onboardingDownloadASRPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading ASR model... {percent}%'**
+  String onboardingDownloadASRPercent(Object percent);
+
+  /// No description provided for @onboardingActivating.
+  ///
+  /// In en, this message translates to:
+  /// **'Activating model...'**
+  String get onboardingActivating;
+
+  /// No description provided for @onboardingDownloadDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Download complete!'**
+  String get onboardingDownloadDone;
+
+  /// No description provided for @onboardingDownloadFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get onboardingDownloadFail;
+
+  /// No description provided for @onboardingRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get onboardingRetry;
+
+  /// No description provided for @onboardingSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onboardingSkip;
+
+  /// No description provided for @onboardingStartDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Download'**
+  String get onboardingStartDownload;
+
+  /// No description provided for @onboardingDoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup Complete!'**
+  String get onboardingDoneTitle;
+
+  /// No description provided for @onboardingHoldToSpeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to speak'**
+  String get onboardingHoldToSpeak;
+
+  /// No description provided for @onboardingDoneDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Release to auto-type at cursor position'**
+  String get onboardingDoneDesc;
+
+  /// No description provided for @onboardingBegin.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Using'**
+  String get onboardingBegin;
 }
 
 class _AppLocalizationsDelegate

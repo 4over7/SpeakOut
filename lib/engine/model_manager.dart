@@ -454,7 +454,14 @@ class ModelManager {
         double lastReportedProgress = existingBytes / (totalBytes > 0 ? totalBytes : 1);
 
         try {
-          await for (final chunk in streamedResponse.stream) {
+          // Add inactivity timeout: if no data received for 30s, treat as stalled
+          await for (final chunk in streamedResponse.stream.timeout(
+            const Duration(seconds: 30),
+            onTimeout: (sink) {
+              sink.addError(Exception("数据传输超时 (30s 无数据)"));
+              sink.close();
+            },
+          )) {
             sink.add(chunk);
             downloadedBytes += chunk.length;
 

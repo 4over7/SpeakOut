@@ -90,11 +90,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
     await _checkPermissions();
   }
 
+  AppLocalizations get _l10n => AppLocalizations.of(context)!;
+
   Future<void> _downloadSelectedModel() async {
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0;
-      _downloadStatus = "准备下载...";
+      _downloadStatus = _l10n.onboardingPreparing;
       _downloadError = null;
     });
 
@@ -106,13 +108,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
       // Step 1: Download punctuation model if needed
       if (needsPunctuation) {
-        setState(() => _downloadStatus = "下载标点模型...");
+        setState(() => _downloadStatus = _l10n.onboardingDownloadPunct);
         await _modelManager.downloadPunctuationModel(
           onProgress: (p) {
             if (mounted) {
               setState(() {
                 _downloadProgress = p * 0.25; // 25% for punctuation
-                _downloadStatus = "下载标点模型... ${(p * 100).toStringAsFixed(0)}%";
+                _downloadStatus = _l10n.onboardingDownloadPunctPercent((p * 100).toStringAsFixed(0));
               });
             }
           },
@@ -126,7 +128,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       final asrStart = needsPunctuation ? 0.25 : 0.0;
       final asrRange = needsPunctuation ? 0.75 : 1.0;
       setState(() {
-        _downloadStatus = "下载语音识别模型...";
+        _downloadStatus = _l10n.onboardingDownloadASR;
         _downloadProgress = asrStart;
       });
 
@@ -136,10 +138,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
           if (mounted) {
             setState(() {
               if (p < 0) {
-                _downloadStatus = "解压中...";
+                _downloadStatus = _l10n.unzipping;
               } else {
                 _downloadProgress = asrStart + (p * asrRange);
-                _downloadStatus = "下载语音识别模型... ${(p * 100).toStringAsFixed(0)}%";
+                _downloadStatus = _l10n.onboardingDownloadASRPercent((p * 100).toStringAsFixed(0));
               }
             });
           }
@@ -147,7 +149,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       );
 
       // Step 3: Activate model
-      setState(() => _downloadStatus = "激活模型...");
+      setState(() => _downloadStatus = _l10n.onboardingActivating);
       await _modelManager.setActiveModel(selectedModel.id);
       final path = await _modelManager.getActiveModelPath();
       if (path != null) {
@@ -167,13 +169,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _isDownloading = false;
         _downloadComplete = true;
         _downloadProgress = 1.0;
-        _downloadStatus = "下载完成!";
+        _downloadStatus = _l10n.onboardingDownloadDone;
       });
     } catch (e) {
       setState(() {
         _isDownloading = false;
         _downloadError = e.toString();
-        _downloadStatus = "下载失败";
+        _downloadStatus = _l10n.onboardingDownloadFail;
       });
     }
   }
@@ -253,13 +255,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
         const SizedBox(height: 32),
 
         Text(
-          "欢迎使用子曰",
+          _l10n.onboardingWelcome,
           style: AppTheme.display(context).copyWith(fontSize: 28),
         ),
         const SizedBox(height: 16),
 
         Text(
-          "按住快捷键说话，松开后自动输入文字\n支持中英文混合识别",
+          _l10n.onboardingWelcomeDesc,
           textAlign: TextAlign.center,
           style: AppTheme.body(context).copyWith(
             color: MacosColors.systemGrayColor,
@@ -271,7 +273,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         PushButton(
           controlSize: ControlSize.large,
           onPressed: _nextStep,
-          child: const Text("开始设置"),
+          child: Text(_l10n.onboardingStartSetup),
         ),
       ],
     );
@@ -287,15 +289,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
         const MacosIcon(CupertinoIcons.shield_lefthalf_fill, size: 64, color: MacosColors.systemGrayColor),
         const SizedBox(height: 24),
 
-        Text("需要授权权限", style: AppTheme.display(context).copyWith(fontSize: 24)),
+        Text(_l10n.onboardingPermTitle, style: AppTheme.display(context).copyWith(fontSize: 24)),
         const SizedBox(height: 8),
-        Text("为了正常工作，子曰需要以下权限", style: AppTheme.caption(context)),
+        Text(_l10n.onboardingPermDesc, style: AppTheme.caption(context)),
         const SizedBox(height: 32),
 
         _buildPermissionTile(
           icon: CupertinoIcons.keyboard,
-          title: "输入监控",
-          description: "用于监听快捷键触发录音",
+          title: _l10n.permInputMonitoring,
+          description: _l10n.permInputMonitoringDesc,
           granted: _inputMonitoringGranted,
           needsRestart: _inputMonitoringAttempted && !_inputMonitoringGranted,
           onRequest: _openInputMonitoringSettings,
@@ -304,8 +306,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
         _buildPermissionTile(
           icon: CupertinoIcons.text_cursor,
-          title: "辅助功能",
-          description: "用于将文字输入到应用程序",
+          title: _l10n.permAccessibility,
+          description: _l10n.permAccessibilityDesc,
           granted: _accessibilityGranted,
           needsRestart: _accessibilityAttempted && !_accessibilityGranted,
           onRequest: _openAccessibilitySettings,
@@ -314,8 +316,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
         _buildPermissionTile(
           icon: CupertinoIcons.mic,
-          title: "麦克风",
-          description: "用于录制语音进行识别",
+          title: _l10n.permMicrophone,
+          description: _l10n.permMicrophoneDesc,
           granted: _microphoneGranted,
           needsRestart: _microphoneAttempted && !_microphoneGranted,
           onRequest: _openMicrophoneSettings,
@@ -334,13 +336,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   controlSize: ControlSize.regular,
                   secondary: true,
                   onPressed: _checkPermissions,
-                  child: const Text("刷新状态"),
+                  child: Text(_l10n.permRefreshStatus),
                 ),
               const SizedBox(width: 12),
               PushButton(
                 controlSize: ControlSize.large,
                 onPressed: allGranted ? _nextStep : null,
-                child: Text(allGranted ? "继续" : "请先授权"),
+                child: Text(allGranted ? _l10n.onboardingContinue : _l10n.onboardingGrantFirst),
               ),
             ],
           ),
@@ -349,7 +351,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         if (!allGranted)
           TextButton(
             onPressed: _nextStep,
-            child: Text("稍后设置", style: TextStyle(color: MacosColors.systemGrayColor)),
+            child: Text(_l10n.onboardingSetupLater, style: TextStyle(color: MacosColors.systemGrayColor)),
           ),
       ],
     );
@@ -394,7 +396,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      "已授权？请重启应用使权限生效",
+                      _l10n.permRestartHint,
                       style: AppTheme.caption(context).copyWith(
                         color: Colors.orange,
                         fontSize: 11,
@@ -411,7 +413,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               controlSize: ControlSize.small,
               secondary: true,
               onPressed: onRequest,
-              child: const Text("授权"),
+              child: Text(_l10n.permGrant),
             ),
         ],
       ),
@@ -439,7 +441,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             icon: CupertinoIcons.star_fill,
             iconColor: Colors.amber,
             title: l10n.modelSenseVoiceName,
-            subtitle: "中英日韩粤 · 自带标点 · ~228MB",
+            subtitle: l10n.onboardingModelSubtitle,
             highlighted: true,
             badge: l10n.recommended,
             onTap: () {
@@ -451,8 +453,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
           _buildModeCard(
             icon: CupertinoIcons.slider_horizontal_3,
             iconColor: MacosColors.systemGrayColor,
-            title: "自定义选择",
-            subtitle: "浏览全部 ${ModelManager.offlineModels.length} 个模型，包含方言和大容量模型",
+            title: l10n.onboardingCustomSelect,
+            subtitle: l10n.onboardingBrowseModels(ModelManager.offlineModels.length.toString()),
             highlighted: false,
             onTap: () => setState(() {
               _showCustomModels = true;
@@ -478,13 +480,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 controlSize: ControlSize.regular,
                 secondary: true,
                 onPressed: () => setState(() => _showCustomModels = false),
-                child: const Text("返回"),
+                child: Text(l10n.onboardingBack),
               ),
               const SizedBox(width: 12),
               PushButton(
                 controlSize: ControlSize.large,
                 onPressed: _nextStep,
-                child: const Text("继续"),
+                child: Text(l10n.onboardingContinue),
               ),
             ],
           ),
@@ -733,7 +735,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
   // Step 3: Download
   Widget _buildDownloadStep() {
     final selectedModel = _modelManager.getModelById(_selectedModelId);
-    final modelName = selectedModel?.name ?? _selectedModelId;
+    final modelName = selectedModel != null
+        ? _localizedModelName(selectedModel, _l10n)
+        : _selectedModelId;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -741,9 +745,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
         const MacosIcon(CupertinoIcons.cloud_download, size: 64, color: MacosColors.systemGrayColor),
         const SizedBox(height: 24),
 
-        Text("下载语音模型", style: AppTheme.display(context).copyWith(fontSize: 24)),
+        Text(_l10n.onboardingDownloadTitle, style: AppTheme.display(context).copyWith(fontSize: 24)),
         const SizedBox(height: 8),
-        Text("正在下载 $modelName", style: AppTheme.caption(context)),
+        Text(_l10n.onboardingDownloading(modelName), style: AppTheme.caption(context)),
         const SizedBox(height: 32),
 
         // Progress
@@ -792,7 +796,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           PushButton(
             controlSize: ControlSize.large,
             onPressed: _nextStep,
-            child: const Text("继续"),
+            child: Text(_l10n.onboardingContinue),
           )
         else if (_downloadError != null)
           Row(
@@ -802,12 +806,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 controlSize: ControlSize.regular,
                 secondary: true,
                 onPressed: _downloadSelectedModel,
-                child: const Text("重试"),
+                child: Text(_l10n.onboardingRetry),
               ),
               const SizedBox(width: 12),
               TextButton(
                 onPressed: _nextStep,
-                child: Text("跳过", style: TextStyle(color: MacosColors.systemGrayColor)),
+                child: Text(_l10n.onboardingSkip, style: TextStyle(color: MacosColors.systemGrayColor)),
               ),
             ],
           )
@@ -817,7 +821,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           PushButton(
             controlSize: ControlSize.large,
             onPressed: _downloadSelectedModel,
-            child: const Text("开始下载"),
+            child: Text(_l10n.onboardingStartDownload),
           ),
       ],
     );
@@ -839,7 +843,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         ),
         const SizedBox(height: 32),
 
-        Text("设置完成!", style: AppTheme.display(context).copyWith(fontSize: 28)),
+        Text(_l10n.onboardingDoneTitle, style: AppTheme.display(context).copyWith(fontSize: 28)),
         const SizedBox(height: 16),
 
         Container(
@@ -865,12 +869,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text("按住说话", style: AppTheme.body(context)),
+                  Text(_l10n.onboardingHoldToSpeak, style: AppTheme.body(context)),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
-                "松开后自动输入到当前光标位置",
+                _l10n.onboardingDoneDesc,
                 style: AppTheme.caption(context),
               ),
             ],
@@ -882,7 +886,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         PushButton(
           controlSize: ControlSize.large,
           onPressed: _finish,
-          child: const Text("开始使用"),
+          child: Text(_l10n.onboardingBegin),
         ),
       ],
     );

@@ -6,6 +6,7 @@ DMG_NAME="SpeakOut.dmg"
 DMG_TEMP="SpeakOut_temp.dmg"
 VOLUME_NAME="SpeakOut"
 STAGING_DIR="build/dmg_staging"
+SIGN_IDENTITY="Apple Development: 4over7@gmail.com (G6X3766L63)"
 
 PWD=$(pwd)
 DMG_TEMP_PATH="${PWD}/${DMG_TEMP}"
@@ -26,6 +27,17 @@ mkdir -p "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib"
 cp "native_lib/libnative_input.dylib" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/"
 
 ln -s /Applications "${STAGING_DIR}/Applications"
+
+# 2.5. Code Sign
+if security find-identity -v -p codesigning | grep -q "$SIGN_IDENTITY"; then
+    echo "Signing with: $SIGN_IDENTITY"
+    codesign -f -s "$SIGN_IDENTITY" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/libnative_input.dylib"
+    codesign -f --deep -s "$SIGN_IDENTITY" "${STAGING_DIR}/${APP_NAME}.app"
+else
+    echo "⚠️  Signing identity not found, using ad-hoc signing"
+    codesign -f -s "-" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/libnative_input.dylib"
+    codesign -f --deep -s "-" "${STAGING_DIR}/${APP_NAME}.app"
+fi
 
 # 3. Create Temp DMG
 echo "Creating temp DMG..."

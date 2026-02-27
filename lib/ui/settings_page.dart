@@ -206,7 +206,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _refresh() async {
-    for (var m in ModelManager.availableModels) {
+    for (var m in ModelManager.allModels) {
       _downloadedStatus[m.id] = await _modelManager.isModelDownloaded(m.id);
     }
     _downloadedStatus[ModelManager.punctuationModelId] = await _modelManager.isPunctuationModelDownloaded();
@@ -245,10 +245,43 @@ class _SettingsPageState extends State<SettingsPage> {
   }
   
   Future<void> _activate(ModelInfo model) async {
+    // Check if switching between streaming ↔ offline mode
+    final currentModel = _modelManager.getModelById(_activeModelId ?? '');
+    final isCrossModeSwitch = currentModel != null && currentModel.isOffline != model.isOffline;
+
+    if (isCrossModeSwitch && mounted) {
+      final loc = AppLocalizations.of(context)!;
+      final title = model.isOffline ? loc.switchToOfflineTitle : loc.switchToStreamingTitle;
+      final body = model.isOffline ? loc.switchToOfflineBody : loc.switchToStreamingBody;
+
+      final confirmed = await showMacosAlertDialog<bool>(
+        context: context,
+        builder: (_) => MacosAlertDialog(
+          appIcon: MacosIcon(
+            model.isOffline ? CupertinoIcons.waveform_path_ecg : CupertinoIcons.waveform,
+            size: 48,
+          ),
+          title: Text(title),
+          message: Text(body),
+          primaryButton: PushButton(
+            controlSize: ControlSize.large,
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(loc.confirm),
+          ),
+          secondaryButton: PushButton(
+            controlSize: ControlSize.large,
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(loc.cancel),
+          ),
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
     setState(() => _activatingId = model.id);
     await _modelManager.setActiveModel(model.id);
     final path = await _modelManager.getActiveModelPath();
-    if (path != null) await _engine.initASR(path, modelType: model.type);
+    if (path != null) await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
     await ConfigService().setActiveModelId(model.id);
     setState(() { _activatingId = null; _activeModelId = model.id; });
   }
@@ -457,47 +490,58 @@ class _SettingsPageState extends State<SettingsPage> {
              ],
            )
         else ...[
-           // 标点模型（必需）
-           SettingsGroup(
-             title: "${loc.punctuationModel} (${loc.required})",
-             children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                  child: Text(loc.punctuationModelDesc, style: AppTheme.caption(context)),
-                ),
-                SettingsTile(
-                  label: loc.punctuationModel,
-                  child: _buildActionBtn(
-                    context,
-                    isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
-                    isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
-                    progress: _downloadProgressMap[ModelManager.punctuationModelId],
-                    statusText: _downloadStatusMap[ModelManager.punctuationModelId],
-                    isActive: true, // Always active if present
-                    onDownload: _downloadPunctuation,
-                    onDelete: _deletePunctuation,
-                    onActivate: () {},
+           // 标点模型（根据当前模型决定是否必需）
+           Builder(builder: (_) {
+             final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+             final modelHasPunct = activeModel?.hasPunctuation ?? false;
+             final punctLabel = modelHasPunct
+                 ? loc.punctuationModel
+                 : "${loc.punctuationModel} (${loc.required})";
+             final punctDesc = modelHasPunct
+                 ? loc.builtInPunctuation
+                 : loc.punctuationModelDesc;
+             return SettingsGroup(
+               title: punctLabel,
+               children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                    child: Text(punctDesc, style: AppTheme.caption(context)),
                   ),
-                ),
-             ],
-           ),
+                  if (!modelHasPunct)
+                    SettingsTile(
+                      label: loc.punctuationModel,
+                      child: _buildActionBtn(
+                        context,
+                        isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
+                        isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
+                        progress: _downloadProgressMap[ModelManager.punctuationModelId],
+                        statusText: _downloadStatusMap[ModelManager.punctuationModelId],
+                        isActive: true,
+                        onDownload: _downloadPunctuation,
+                        onDelete: _deletePunctuation,
+                        onActivate: () {},
+                      ),
+                    ),
+               ],
+             );
+           }),
            
            const SizedBox(height: 24),
            
-           // 语音识别模型（二选一）
+           // 流式模型（实时显示）
            SettingsGroup(
-             title: "${loc.asrModels} (${loc.pickOne})",
+             title: loc.streamingModels,
              children: [
                 Padding(
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                  child: Text(loc.asrModelsDesc, style: AppTheme.caption(context)),
+                  child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
                 ),
                 ...ModelManager.availableModels.map((m) {
                    return Column(
                      children: [
                        SettingsTile(
-                         label: m.name,
-                         subtitle: m.description,
+                         label: _localizedModelName(m, loc),
+                         subtitle: _localizedModelDesc(m, loc),
                          child: _buildActionBtn(
                           context,
                            isDownloaded: _downloadedStatus[m.id] ?? false,
@@ -505,6 +549,7 @@ class _SettingsPageState extends State<SettingsPage> {
                            progress: _downloadProgressMap[m.id],
                            statusText: _downloadStatusMap[m.id],
                            isActive: _activeModelId == m.id,
+                           isOffline: false,
                            onDownload: () => _download(m),
                            onDelete: () => _delete(m),
                            onActivate: () => _activate(m),
@@ -516,9 +561,73 @@ class _SettingsPageState extends State<SettingsPage> {
                 }),
              ],
            ),
+
+           const SizedBox(height: 24),
+
+           // 离线模型（高精度）
+           SettingsGroup(
+             title: loc.offlineModels,
+             children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                  child: Text(loc.offlineModelsDesc, style: AppTheme.caption(context)),
+                ),
+                ...ModelManager.offlineModels.map((m) {
+                   return Column(
+                     children: [
+                       SettingsTile(
+                         label: _localizedModelName(m, loc),
+                         subtitle: _localizedModelDesc(m, loc),
+                         child: _buildActionBtn(
+                          context,
+                           isDownloaded: _downloadedStatus[m.id] ?? false,
+                           isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                           progress: _downloadProgressMap[m.id],
+                           statusText: _downloadStatusMap[m.id],
+                           isActive: _activeModelId == m.id,
+                           isOffline: true,
+                           onDownload: () => _download(m),
+                           onDelete: () => _delete(m),
+                           onActivate: () => _activate(m),
+                         ),
+                       ),
+                       if (m != ModelManager.offlineModels.last) const SettingsDivider(),
+                     ],
+                   );
+                }),
+             ],
+           ),
         ],
       ],
     );
+  }
+
+  String _localizedModelName(ModelInfo model, AppLocalizations loc) {
+    switch (model.id) {
+      case 'zipformer_bi_2023_02_20': return loc.modelZipformerName;
+      case 'paraformer_bi_zh_en': return loc.modelParaformerName;
+      case 'sensevoice_zh_en_int8': return loc.modelSenseVoiceName;
+      case 'sensevoice_zh_en_int8_2025': return loc.modelSenseVoice2025Name;
+      case 'offline_paraformer_zh': return loc.modelOfflineParaformerName;
+      case 'offline_paraformer_dialect_2025': return loc.modelParaformerDialectName;
+      case 'whisper_large_v3': return loc.modelWhisperName;
+      case 'fire_red_asr_large': return loc.modelFireRedName;
+      default: return model.name;
+    }
+  }
+
+  String _localizedModelDesc(ModelInfo model, AppLocalizations loc) {
+    switch (model.id) {
+      case 'zipformer_bi_2023_02_20': return loc.modelZipformerDesc;
+      case 'paraformer_bi_zh_en': return loc.modelParaformerDesc;
+      case 'sensevoice_zh_en_int8': return loc.modelSenseVoiceDesc;
+      case 'sensevoice_zh_en_int8_2025': return loc.modelSenseVoice2025Desc;
+      case 'offline_paraformer_zh': return loc.modelOfflineParaformerDesc;
+      case 'offline_paraformer_dialect_2025': return loc.modelParaformerDialectDesc;
+      case 'whisper_large_v3': return loc.modelWhisperDesc;
+      case 'fire_red_asr_large': return loc.modelFireRedDesc;
+      default: return model.description;
+    }
   }
 
   // --- View: General ---
@@ -960,7 +1069,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildActionBtn(BuildContext context, {
     required bool isDownloaded, required bool isLoading, required bool isActive,
     required VoidCallback onDownload, required VoidCallback onDelete, required VoidCallback onActivate,
-    double? progress, String? statusText
+    double? progress, String? statusText, bool isOffline = false,
   }) {
     final loc = AppLocalizations.of(context)!;
     if (isLoading) {
@@ -991,7 +1100,7 @@ class _SettingsPageState extends State<SettingsPage> {
        return PushButton(
          controlSize: ControlSize.regular,
          // Use Primary Color (Teal) for Download
-         color: AppTheme.getAccent(context), 
+         color: AppTheme.getAccent(context),
          onPressed: onDownload,
          child: Text(loc.download, style: const TextStyle(color: Colors.white)),
        );
@@ -999,19 +1108,37 @@ class _SettingsPageState extends State<SettingsPage> {
     // Downloaded
     return Row(
       children: [
-        if (isActive) 
+        if (isActive)
            Row(
              children: [
                const Icon(CupertinoIcons.checkmark_alt_circle_fill, color: AppTheme.successColor),
                const SizedBox(width: 4),
                Text(loc.active, style: const TextStyle(color: AppTheme.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
+               const SizedBox(width: 6),
+               Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                 decoration: BoxDecoration(
+                   color: isOffline
+                       ? Colors.orange.withValues(alpha: 0.15)
+                       : AppTheme.getAccent(context).withValues(alpha: 0.15),
+                   borderRadius: BorderRadius.circular(4),
+                 ),
+                 child: Text(
+                   isOffline ? loc.modeOffline : loc.modeStreaming,
+                   style: TextStyle(
+                     fontSize: 10,
+                     fontWeight: FontWeight.w600,
+                     color: isOffline ? Colors.orange : AppTheme.getAccent(context),
+                   ),
+                 ),
+               ),
              ],
            )
         else
            PushButton(
              controlSize: ControlSize.regular,
              color: MacosColors.controlColor.resolveFrom(context),
-             onPressed: onActivate, 
+             onPressed: onActivate,
              child: Text(loc.activate)
            ),
         const SizedBox(width: 12),

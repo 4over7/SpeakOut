@@ -1,5 +1,22 @@
 # SpeakOut Version History
 
+## [1.2.28] - 2026-02-27
+
+### 国际化 (i18n)
+
+- **引导页全量 l10n** — 提取 ~40 个硬编码中文字符串到 ARB 文件，覆盖欢迎、权限、模型选择、下载、完成全部 5 个步骤。英文系统全英文，中文系统全中文，不再混杂。
+- **设置页模型列表 l10n** — 流式模型和离线模型的名称/描述从 `model.name` 改为 `_localizedModelName()` / `_localizedModelDesc()`，中文环境正确显示中文。
+- **新增 ~30 个 l10n 键** — 包含参数化字符串 (`onboardingBrowseModels(count)`, `onboardingDownloading(name)`, 下载百分比等)。
+- **修正 ARB 模型大小描述** — Zipformer ~85MB→~490MB, Paraformer ~230MB→~1GB，与实际下载一致。
+
+### 下载可靠性
+
+- **数据流超时保护** — `_downloadWithResume` 添加 30 秒无活动超时 (`stream.timeout`)，防止 GitHub 传输卡住时 UI 永远停在"下载中"。超时后自动重试（最多 5 次，间隔递增）。
+
+### 构建与分发
+
+- **DMG 代码签名** — `create_styled_dmg.sh` 加入 Apple Development 证书签名流程（dylib 先签、app bundle 后签），分发给他人后权限可跨重装保留。
+
 ## [1.2.27] - 2026-02-26
 
 ### 架构重构: 语音输入管道

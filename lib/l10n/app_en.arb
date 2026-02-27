@@ -51,9 +51,9 @@
   "ok": "OK",
   "cancel": "Cancel",
   "modelZipformerName": "Zipformer Bilingual (Recommended)",
-  "modelZipformerDesc": "Balanced streaming model (Zh/En). ~85MB",
+  "modelZipformerDesc": "Balanced streaming model (Zh/En). Download: ~490MB",
   "modelParaformerName": "Paraformer Bilingual (Streaming)",
-  "modelParaformerDesc": "High accuracy Zh/En streaming model. ~230MB",
+  "modelParaformerDesc": "High accuracy Zh/En streaming model with lookahead. ~1GB",
   "change": "Change",
   "tabAbout": "About",
   "aboutTagline": "Your Local AI Speech Assistant",
@@ -112,5 +112,60 @@
   "modeOffline": "Offline",
   "chooseModel": "Choose a Voice Model",
   "chooseModelDesc": "Select a model to download. You can change it later in Settings.",
-  "recommended": "Recommended"
+  "recommended": "Recommended",
+  "onboardingWelcome": "Welcome to SpeakOut",
+  "onboardingWelcomeDesc": "Hold a hotkey to speak, release to auto-type\nSupports multilingual recognition",
+  "onboardingStartSetup": "Get Started",
+  "onboardingPermTitle": "Permissions Required",
+  "onboardingPermDesc": "SpeakOut needs the following permissions to work properly",
+  "permMicrophone": "Microphone",
+  "permMicrophoneDesc": "For recording voice for recognition",
+  "permGrant": "Grant",
+  "permGranted": "Granted",
+  "permRefreshStatus": "Refresh Status",
+  "permRestartHint": "Granted? Restart app for permissions to take effect",
+  "onboardingContinue": "Continue",
+  "onboardingGrantFirst": "Please grant permissions first",
+  "onboardingSetupLater": "Set up later",
+  "onboardingCustomSelect": "Custom Selection",
+  "onboardingBrowseModels": "Browse all {count} models, including dialects and large models",
+  "@onboardingBrowseModels": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "onboardingModelSubtitle": "Zh/En/Ja/Ko/Yue, built-in punctuation, ~228MB",
+  "onboardingBack": "Back",
+  "onboardingDownloadTitle": "Download Voice Model",
+  "onboardingDownloading": "Downloading {name}",
+  "@onboardingDownloading": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "onboardingPreparing": "Preparing download...",
+  "onboardingDownloadPunct": "Downloading punctuation model...",
+  "onboardingDownloadPunctPercent": "Downloading punctuation model... {percent}%",
+  "@onboardingDownloadPunctPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "onboardingDownloadASR": "Downloading ASR model...",
+  "onboardingDownloadASRPercent": "Downloading ASR model... {percent}%",
+  "@onboardingDownloadASRPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "onboardingActivating": "Activating model...",
+  "onboardingDownloadDone": "Download complete!",
+  "onboardingDownloadFail": "Download failed",
+  "onboardingRetry": "Retry",
+  "onboardingSkip": "Skip",
+  "onboardingStartDownload": "Start Download",
+  "onboardingDoneTitle": "Setup Complete!",
+  "onboardingHoldToSpeak": "Hold to speak",
+  "onboardingDoneDesc": "Release to auto-type at cursor position",
+  "onboardingBegin": "Start Using"
 }

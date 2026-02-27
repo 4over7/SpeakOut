@@ -143,14 +143,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelZipformerName => 'Zipformer Bilingual (Recommended)';
 
   @override
-  String get modelZipformerDesc => 'Balanced streaming model (Zh/En). ~85MB';
+  String get modelZipformerDesc =>
+      'Balanced streaming model (Zh/En). Download: ~490MB';
 
   @override
   String get modelParaformerName => 'Paraformer Bilingual (Streaming)';
 
   @override
   String get modelParaformerDesc =>
-      'High accuracy Zh/En streaming model. ~230MB';
+      'High accuracy Zh/En streaming model with lookahead. ~1GB';
 
   @override
   String get change => 'Change';
@@ -336,4 +337,121 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recommended => 'Recommended';
+
+  @override
+  String get onboardingWelcome => 'Welcome to SpeakOut';
+
+  @override
+  String get onboardingWelcomeDesc =>
+      'Hold a hotkey to speak, release to auto-type\nSupports multilingual recognition';
+
+  @override
+  String get onboardingStartSetup => 'Get Started';
+
+  @override
+  String get onboardingPermTitle => 'Permissions Required';
+
+  @override
+  String get onboardingPermDesc =>
+      'SpeakOut needs the following permissions to work properly';
+
+  @override
+  String get permMicrophone => 'Microphone';
+
+  @override
+  String get permMicrophoneDesc => 'For recording voice for recognition';
+
+  @override
+  String get permGrant => 'Grant';
+
+  @override
+  String get permGranted => 'Granted';
+
+  @override
+  String get permRefreshStatus => 'Refresh Status';
+
+  @override
+  String get permRestartHint =>
+      'Granted? Restart app for permissions to take effect';
+
+  @override
+  String get onboardingContinue => 'Continue';
+
+  @override
+  String get onboardingGrantFirst => 'Please grant permissions first';
+
+  @override
+  String get onboardingSetupLater => 'Set up later';
+
+  @override
+  String get onboardingCustomSelect => 'Custom Selection';
+
+  @override
+  String onboardingBrowseModels(Object count) {
+    return 'Browse all $count models, including dialects and large models';
+  }
+
+  @override
+  String get onboardingModelSubtitle =>
+      'Zh/En/Ja/Ko/Yue, built-in punctuation, ~228MB';
+
+  @override
+  String get onboardingBack => 'Back';
+
+  @override
+  String get onboardingDownloadTitle => 'Download Voice Model';
+
+  @override
+  String onboardingDownloading(Object name) {
+    return 'Downloading $name';
+  }
+
+  @override
+  String get onboardingPreparing => 'Preparing download...';
+
+  @override
+  String get onboardingDownloadPunct => 'Downloading punctuation model...';
+
+  @override
+  String onboardingDownloadPunctPercent(Object percent) {
+    return 'Downloading punctuation model... $percent%';
+  }
+
+  @override
+  String get onboardingDownloadASR => 'Downloading ASR model...';
+
+  @override
+  String onboardingDownloadASRPercent(Object percent) {
+    return 'Downloading ASR model... $percent%';
+  }
+
+  @override
+  String get onboardingActivating => 'Activating model...';
+
+  @override
+  String get onboardingDownloadDone => 'Download complete!';
+
+  @override
+  String get onboardingDownloadFail => 'Download failed';
+
+  @override
+  String get onboardingRetry => 'Retry';
+
+  @override
+  String get onboardingSkip => 'Skip';
+
+  @override
+  String get onboardingStartDownload => 'Start Download';
+
+  @override
+  String get onboardingDoneTitle => 'Setup Complete!';
+
+  @override
+  String get onboardingHoldToSpeak => 'Hold to speak';
+
+  @override
+  String get onboardingDoneDesc => 'Release to auto-type at cursor position';
+
+  @override
+  String get onboardingBegin => 'Start Using';
 }

@@ -139,13 +139,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelZipformerName => 'Zipformer 双语模型 (推荐)';
 
   @override
-  String get modelZipformerDesc => '平衡流式模型 (中英). ~85MB';
+  String get modelZipformerDesc => '平衡流式模型 (中英). 下载: ~490MB';
 
   @override
   String get modelParaformerName => 'Paraformer 双语模型 (高精)';
 
   @override
-  String get modelParaformerDesc => '高精度流式模型 (中英). ~230MB';
+  String get modelParaformerDesc => '高精度前瞻流式模型 (中英). ~1GB';
 
   @override
   String get change => '更改';
@@ -322,4 +322,117 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get recommended => '推荐';
+
+  @override
+  String get onboardingWelcome => '欢迎使用子曰';
+
+  @override
+  String get onboardingWelcomeDesc => '按住快捷键说话，松开后自动输入文字\n支持中英文混合识别';
+
+  @override
+  String get onboardingStartSetup => '开始设置';
+
+  @override
+  String get onboardingPermTitle => '需要授权权限';
+
+  @override
+  String get onboardingPermDesc => '为了正常工作，子曰需要以下权限';
+
+  @override
+  String get permMicrophone => '麦克风';
+
+  @override
+  String get permMicrophoneDesc => '用于录制语音进行识别';
+
+  @override
+  String get permGrant => '授权';
+
+  @override
+  String get permGranted => '已授权';
+
+  @override
+  String get permRefreshStatus => '刷新状态';
+
+  @override
+  String get permRestartHint => '已授权？请重启应用使权限生效';
+
+  @override
+  String get onboardingContinue => '继续';
+
+  @override
+  String get onboardingGrantFirst => '请先授权';
+
+  @override
+  String get onboardingSetupLater => '稍后设置';
+
+  @override
+  String get onboardingCustomSelect => '自定义选择';
+
+  @override
+  String onboardingBrowseModels(Object count) {
+    return '浏览全部 $count 个模型，包含方言和大容量模型';
+  }
+
+  @override
+  String get onboardingModelSubtitle => '中英日韩粤 · 自带标点 · ~228MB';
+
+  @override
+  String get onboardingBack => '返回';
+
+  @override
+  String get onboardingDownloadTitle => '下载语音模型';
+
+  @override
+  String onboardingDownloading(Object name) {
+    return '正在下载 $name';
+  }
+
+  @override
+  String get onboardingPreparing => '准备下载...';
+
+  @override
+  String get onboardingDownloadPunct => '下载标点模型...';
+
+  @override
+  String onboardingDownloadPunctPercent(Object percent) {
+    return '下载标点模型... $percent%';
+  }
+
+  @override
+  String get onboardingDownloadASR => '下载语音识别模型...';
+
+  @override
+  String onboardingDownloadASRPercent(Object percent) {
+    return '下载语音识别模型... $percent%';
+  }
+
+  @override
+  String get onboardingActivating => '激活模型...';
+
+  @override
+  String get onboardingDownloadDone => '下载完成!';
+
+  @override
+  String get onboardingDownloadFail => '下载失败';
+
+  @override
+  String get onboardingRetry => '重试';
+
+  @override
+  String get onboardingSkip => '跳过';
+
+  @override
+  String get onboardingStartDownload => '开始下载';
+
+  @override
+  String get onboardingDoneTitle => '设置完成!';
+
+  @override
+  String get onboardingHoldToSpeak => '按住说话';
+
+  @override
+  String get onboardingDoneDesc => '松开后自动输入到当前光标位置';
+
+  @override
+  String get onboardingBegin => '开始使用';
 }
