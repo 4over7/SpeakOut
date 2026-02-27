@@ -25,6 +25,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final CoreEngine _engine = CoreEngine();
   
   // Permission state
+  bool _inputMonitoringGranted = false;
   bool _accessibilityGranted = false;
   bool _microphoneGranted = false;
   bool _checkingPermissions = false;
@@ -44,23 +45,33 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Future<void> _checkPermissions() async {
     setState(() => _checkingPermissions = true);
-    
-    // Check accessibility (keyboard listener)
+
+    // Check input monitoring (keyboard listener)
+    _inputMonitoringGranted = _engine.checkInputMonitoringPermission();
+
+    // Check accessibility (text injection)
     _accessibilityGranted = _engine.checkAccessibilityPermission();
-    
+
     // Check microphone
     _microphoneGranted = _engine.checkMicPermission();
-    
+
     setState(() => _checkingPermissions = false);
   }
 
+  Future<void> _openInputMonitoringSettings() async {
+    final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+    await Future.delayed(const Duration(seconds: 2));
+    await _checkPermissions();
+  }
+
   Future<void> _openAccessibilitySettings() async {
-    // Open System Preferences -> Security & Privacy -> Accessibility
     final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
-    // Re-check after user returns
     await Future.delayed(const Duration(seconds: 2));
     await _checkPermissions();
   }
@@ -253,29 +264,39 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   // Step 1: Permissions
   Widget _buildPermissionsStep() {
-    final allGranted = _accessibilityGranted && _microphoneGranted;
-    
+    final allGranted = _inputMonitoringGranted && _accessibilityGranted && _microphoneGranted;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const MacosIcon(CupertinoIcons.shield_lefthalf_fill, size: 64, color: MacosColors.systemGrayColor),
         const SizedBox(height: 24),
-        
+
         Text("需要授权权限", style: AppTheme.display(context).copyWith(fontSize: 24)),
         const SizedBox(height: 8),
         Text("为了正常工作，子曰需要以下权限", style: AppTheme.caption(context)),
         const SizedBox(height: 32),
-        
-        // Accessibility Permission
+
+        // Input Monitoring Permission
         _buildPermissionTile(
           icon: CupertinoIcons.keyboard,
-          title: "辅助功能",
+          title: "输入监控",
           description: "用于监听快捷键触发录音",
+          granted: _inputMonitoringGranted,
+          onRequest: _openInputMonitoringSettings,
+        ),
+        const SizedBox(height: 12),
+
+        // Accessibility Permission
+        _buildPermissionTile(
+          icon: CupertinoIcons.text_cursor,
+          title: "辅助功能",
+          description: "用于将文字输入到应用程序",
           granted: _accessibilityGranted,
           onRequest: _openAccessibilitySettings,
         ),
-        const SizedBox(height: 16),
-        
+        const SizedBox(height: 12),
+
         // Microphone Permission
         _buildPermissionTile(
           icon: CupertinoIcons.mic,

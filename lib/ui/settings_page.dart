@@ -1076,16 +1076,32 @@ class _SettingsPageState extends State<SettingsPage> {
             )
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
-            ),
-            child: Text(
-              "v$version", 
-              style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.secondaryLabelColor)
+          GestureDetector(
+            onDoubleTap: () {
+              Clipboard.setData(ClipboardData(text: version));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("已复制版本号: v$version"),
+                  duration: const Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                  width: 220,
+                ),
+              );
+            },
+            child: Tooltip(
+              message: "双击复制版本号",
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
+                ),
+                child: Text(
+                  "v$version",
+                  style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.secondaryLabelColor),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 32),

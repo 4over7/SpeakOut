@@ -228,4 +228,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ollamaModel => 'Model Name';
+
+  @override
+  String get permInputMonitoring => 'Input Monitoring';
+
+  @override
+  String get permInputMonitoringDesc => 'For listening to hotkey triggers';
+
+  @override
+  String get permAccessibility => 'Accessibility';
+
+  @override
+  String get permAccessibilityDesc => 'For typing text into applications';
 }

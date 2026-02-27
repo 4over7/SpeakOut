@@ -517,6 +517,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Model Name'**
   String get ollamaModel;
+
+  /// No description provided for @permInputMonitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Monitoring'**
+  String get permInputMonitoring;
+
+  /// No description provided for @permInputMonitoringDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'For listening to hotkey triggers'**
+  String get permInputMonitoringDesc;
+
+  /// No description provided for @permAccessibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility'**
+  String get permAccessibility;
+
+  /// No description provided for @permAccessibilityDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'For typing text into applications'**
+  String get permAccessibilityDesc;
 }
 
 class _AppLocalizationsDelegate

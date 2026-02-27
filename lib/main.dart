@@ -280,10 +280,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
   
   Future<void> _recheckPermissions() async {
-    // Check if accessibility permission was granted
-    final hasPermission = _appService.engine.checkAccessibilityPermission();
-    if (hasPermission && _lastError.contains("Accessibility")) {
-      // Permission granted - restart engine listener
+    // Check if both input monitoring and accessibility permissions were granted
+    final hasInputMonitoring = _appService.engine.checkInputMonitoringPermission();
+    final hasAccessibility = _appService.engine.checkAccessibilityPermission();
+    if (hasInputMonitoring && hasAccessibility && _lastError.contains("Accessibility")) {
+      // Permissions granted - restart engine listener
       await _appService.engine.init();
       if (mounted) {
         setState(() {

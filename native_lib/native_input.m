@@ -451,6 +451,24 @@ bool check_permission_silent() {
   return trusted;
 }
 
+// 4c. Check Input Monitoring permission (macOS 10.15+)
+// Uses CGPreflightListenEventAccess() for precise detection
+int check_input_monitoring_permission() {
+  if (@available(macOS 10.15, *)) {
+    return CGPreflightListenEventAccess() ? 1 : 0;
+  }
+  return 1; // Pre-10.15: no separate input monitoring permission
+}
+
+// 4d. Check Accessibility permission (macOS 10.15+)
+// Uses CGPreflightPostEventAccess() for precise detection
+int check_accessibility_permission() {
+  if (@available(macOS 10.15, *)) {
+    return CGPreflightPostEventAccess() ? 1 : 0;
+  }
+  return 1; // Pre-10.15: no separate post event permission
+}
+
 // 3. Check Key State (Watchdog)
 // Returns 1 if key is physically down, 0 if up.
 int check_key_pressed(int keyCode) {

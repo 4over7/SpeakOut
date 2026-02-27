@@ -121,6 +121,45 @@ class NativeInput implements NativeInputBase {
     return result;  // result is already bool, not int!
   }
 
+  // Granular permission checks
+  late CheckInputMonitoringPermissionDart _checkInputMonitoringPerm;
+  late CheckAccessibilityPermissionDart _checkAccessibilityPerm;
+  bool _permBound = false;
+
+  void _bindPermFunctions() {
+    if (_permBound) return;
+    try {
+      _checkInputMonitoringPerm = _dylib
+          .lookup<NativeFunction<CheckInputMonitoringPermissionC>>('check_input_monitoring_permission')
+          .asFunction();
+      _checkAccessibilityPerm = _dylib
+          .lookup<NativeFunction<CheckAccessibilityPermissionC>>('check_accessibility_permission')
+          .asFunction();
+      _permBound = true;
+      _log("Permission FFI bindings SUCCESS");
+    } catch (e) {
+      _log("Permission FFI bindings FAILED: $e");
+    }
+  }
+
+  @override
+  bool checkInputMonitoringPermission() {
+    _bindPermFunctions();
+    if (!_permBound) return false;
+    final result = _checkInputMonitoringPerm();
+    _log("Dart: check_input_monitoring_permission returned $result");
+    return result == 1;
+  }
+
+  @override
+  bool checkAccessibilityPermission() {
+    _bindPermFunctions();
+    if (!_permBound) return false;
+    final result = _checkAccessibilityPerm();
+    _log("Dart: check_accessibility_permission returned $result");
+    return result == 1;
+  }
+
   // New Watchdog binding
   late CheckKeyPressedDart _checkKeyPressed;
   bool _watchdogBound = false;

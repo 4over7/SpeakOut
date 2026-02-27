@@ -221,4 +221,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ollamaModel => '模型名称';
+
+  @override
+  String get permInputMonitoring => '输入监控';
+
+  @override
+  String get permInputMonitoringDesc => '用于监听快捷键触发录音';
+
+  @override
+  String get permAccessibility => '辅助功能';
+
+  @override
+  String get permAccessibilityDesc => '用于将文字输入到应用程序';
 }

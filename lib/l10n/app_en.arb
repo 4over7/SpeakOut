@@ -79,5 +79,9 @@
   "llmProviderCloud": "Cloud API",
   "llmProviderOllama": "Ollama (Local)",
   "ollamaUrl": "Ollama URL",
-  "ollamaModel": "Model Name"
+  "ollamaModel": "Model Name",
+  "permInputMonitoring": "Input Monitoring",
+  "permInputMonitoringDesc": "For listening to hotkey triggers",
+  "permAccessibility": "Accessibility",
+  "permAccessibilityDesc": "For typing text into applications"
 }

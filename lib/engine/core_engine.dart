@@ -195,13 +195,24 @@ class CoreEngine {
   /// Check if NativeInput (native library) loaded successfully
   bool get isNativeInputReady => _nativeInput != null;
 
-  /// Check if accessibility permission is granted (for keyboard listener)
+  /// Check if input monitoring permission is granted (for keyboard listener)
+  bool checkInputMonitoringPermission() {
+    if (_nativeInput == null) {
+      _log("checkInputMonitoringPermission: _nativeInput is NULL!");
+      return false;
+    }
+    final result = _nativeInput.checkInputMonitoringPermission();
+    _log("checkInputMonitoringPermission: $result");
+    return result;
+  }
+
+  /// Check if accessibility permission is granted (for text injection)
   bool checkAccessibilityPermission() {
     if (_nativeInput == null) {
       _log("checkAccessibilityPermission: _nativeInput is NULL!");
       return false;
     }
-    final result = _nativeInput.checkPermission();
+    final result = _nativeInput.checkAccessibilityPermission();
     _log("checkAccessibilityPermission: $result");
     return result;
   }

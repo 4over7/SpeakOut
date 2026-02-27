@@ -82,12 +82,23 @@ typedef AnalyzeAudioQualityDart = Pointer<Utf8> Function(Pointer<Int16> samples,
 typedef IsLikelyTelephoneQualityC = Int32 Function();
 typedef IsLikelyTelephoneQualityDart = int Function();
 
+// Permission check types (reuse Int32 → int pattern)
+typedef CheckInputMonitoringPermissionC = Int32 Function();
+typedef CheckInputMonitoringPermissionDart = int Function();
+
+typedef CheckAccessibilityPermissionC = Int32 Function();
+typedef CheckAccessibilityPermissionDart = int Function();
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
   void inject(String text);
   bool checkPermission();
   bool isKeyPressed(int keyCode);
+
+  // Granular permission checks (macOS 10.15+)
+  bool checkInputMonitoringPermission();
+  bool checkAccessibilityPermission();
   
   // Audio Recording (Ring Buffer API)
   bool startAudioRecording();

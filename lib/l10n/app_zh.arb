@@ -70,5 +70,9 @@
   "llmProviderCloud": "云端 API",
   "llmProviderOllama": "Ollama (本地)",
   "ollamaUrl": "Ollama 地址",
-  "ollamaModel": "模型名称"
+  "ollamaModel": "模型名称",
+  "permInputMonitoring": "输入监控",
+  "permInputMonitoringDesc": "用于监听快捷键触发录音",
+  "permAccessibility": "辅助功能",
+  "permAccessibilityDesc": "用于将文字输入到应用程序"
 }
