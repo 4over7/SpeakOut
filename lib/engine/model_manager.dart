@@ -11,10 +11,10 @@ class ModelInfo {
   final String name;
   final String description;
   final String url;
-  final String type; // 'zipformer', 'whisper'
+  final String type; // 'zipformer', 'paraformer', 'sense_voice', 'offline_paraformer', 'whisper', 'fire_red_asr'
   final String lang;
-  // File naming conventions can vary, so we might need hooks.
-  // For simplicity, we assume standard Sherpa layouts or handle in CoreEngine.
+  final bool isOffline; // true = non-streaming (batch recognition after recording)
+  final bool hasPunctuation; // true = model outputs punctuation, no need for punctuation model
 
   const ModelInfo({
     required this.id,
@@ -23,6 +23,8 @@ class ModelInfo {
     required this.url,
     required this.type,
     required this.lang,
+    this.isOffline = false,
+    this.hasPunctuation = false,
   });
 }
 
@@ -46,7 +48,71 @@ class ModelManager {
       lang: "zh-en",
     ),
   ];
-  
+
+  static const List<ModelInfo> offlineModels = [
+    // --- Recommended ---
+    ModelInfo(
+      id: "sensevoice_zh_en_int8",
+      name: "SenseVoice 2024 (Recommended)",
+      description: "Alibaba DAMO, Zh/En/Ja/Ko/Yue, built-in punctuation. ~228MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+      type: "sense_voice",
+      lang: "zh-en-ja-ko-yue",
+      isOffline: true,
+      hasPunctuation: true,
+    ),
+    ModelInfo(
+      id: "sensevoice_zh_en_int8_2025",
+      name: "SenseVoice 2025",
+      description: "Cantonese enhanced (21.8k hrs), no built-in punctuation. ~158MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2",
+      type: "sense_voice",
+      lang: "zh-en-ja-ko-yue",
+      isOffline: true,
+    ),
+    // --- Paraformer ---
+    ModelInfo(
+      id: "offline_paraformer_zh",
+      name: "Paraformer Offline",
+      description: "Zh/En, mature & stable. ~217MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2",
+      type: "offline_paraformer",
+      lang: "zh-en",
+      isOffline: true,
+    ),
+    ModelInfo(
+      id: "offline_paraformer_dialect_2025",
+      name: "Paraformer Dialect 2025",
+      description: "Zh/En + Sichuan/Chongqing dialects. ~218MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-int8-2025-10-07.tar.bz2",
+      type: "offline_paraformer",
+      lang: "zh-en-dialect",
+      isOffline: true,
+    ),
+    // --- Large models ---
+    ModelInfo(
+      id: "whisper_large_v3",
+      name: "Whisper Large-v3",
+      description: "OpenAI Whisper, multilingual, very large. ~1.0GB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-large-v3.tar.bz2",
+      type: "whisper",
+      lang: "multilingual",
+      isOffline: true,
+      hasPunctuation: true,
+    ),
+    ModelInfo(
+      id: "fire_red_asr_large",
+      name: "FireRedASR Large",
+      description: "Zh/En + Sichuan/Henan dialects, highest capacity. ~1.4GB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr-large-zh_en-2025-02-16.tar.bz2",
+      type: "fire_red_asr",
+      lang: "zh-en-dialect",
+      isOffline: true,
+    ),
+  ];
+
+  static List<ModelInfo> get allModels => [...availableModels, ...offlineModels];
+
   // Punctuation model for adding punctuation to ASR output
   static const punctuationModelUrl = 
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2";
@@ -54,7 +120,7 @@ class ModelManager {
   
   ModelInfo? getModelById(String id) {
     try {
-      return availableModels.firstWhere((m) => m.id == id);
+      return allModels.firstWhere((m) => m.id == id);
     } catch (_) {
       return null;
     }
@@ -64,28 +130,34 @@ class ModelManager {
     final prefs = await SharedPreferences.getInstance();
     String activeId = prefs.getString('active_model_id') ?? AppConstants.kDefaultModelId;
     try {
-      return availableModels.firstWhere((m) => m.id == activeId);
+      return allModels.firstWhere((m) => m.id == activeId);
     } catch (_) {
       return null;
     }
   }
 
+  /// 返回模型根目录: ~/Library/Application Support/com.speakout.speakout/Models/
+  Future<Directory> _getModelsRoot() async {
+    final appSupportDir = await getApplicationSupportDirectory();
+    return Directory('${appSupportDir.path}/Models');
+  }
+
   Future<String?> getActiveModelPath() async {
-    final docDir = await getApplicationDocumentsDirectory();
+    final modelsRoot = await _getModelsRoot();
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Default to bilingual if not set
     String activeId = prefs.getString('active_model_id') ?? AppConstants.kDefaultModelId;
-    
+
     // Check if valid
     ModelInfo? model;
     try {
-      model = availableModels.firstWhere((m) => m.id == activeId);
+      model = allModels.firstWhere((m) => m.id == activeId);
     } catch (_) {
       return null;
     }
 
-    final modelRoot = Directory('${docDir.path}/speakout_models/${_getDirNameFromUrl(model.url)}');
+    final modelRoot = Directory('${modelsRoot.path}/${_getDirNameFromUrl(model.url)}');
     
     // 1. Direct check
     if (await File('${modelRoot.path}/tokens.txt').exists()) return modelRoot.path;
@@ -121,11 +193,11 @@ class ModelManager {
   }
 
   Future<bool> isModelDownloaded(String id) async {
-    final model = availableModels.where((m) => m.id == id).firstOrNull;
+    final model = allModels.where((m) => m.id == id).firstOrNull;
     if (model == null) return false;
-    final docDir = await getApplicationDocumentsDirectory();
+    final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(model.url);
-    final finalModelDir = Directory('${docDir.path}/speakout_models/$dirName');
+    final finalModelDir = Directory('${modelsRoot.path}/$dirName');
     
     if (!await finalModelDir.exists()) return false;
     
@@ -135,9 +207,8 @@ class ModelManager {
   }
   
   Future<String> downloadAndExtractModel(String id, {Function(String)? onStatus, Function(double)? onProgress}) async {
-    final model = availableModels.firstWhere((m) => m.id == id);
-    final docDir = await getApplicationDocumentsDirectory();
-    final modelsRoot = Directory('${docDir.path}/speakout_models');
+    final model = allModels.firstWhere((m) => m.id == id);
+    final modelsRoot = await _getModelsRoot();
     if (!await modelsRoot.exists()) {
       await modelsRoot.create(recursive: true);
     }
@@ -417,11 +488,11 @@ class ModelManager {
   }
 
   Future<void> deleteModel(String id) async {
-     final model = availableModels.where((m) => m.id == id).firstOrNull;
+     final model = allModels.where((m) => m.id == id).firstOrNull;
      if (model == null) return;
-     final docDir = await getApplicationDocumentsDirectory();
+     final modelsRoot = await _getModelsRoot();
      final dirName = _getDirNameFromUrl(model.url);
-     final modelDir = Directory('${docDir.path}/speakout_models/$dirName');
+     final modelDir = Directory('${modelsRoot.path}/$dirName');
      if (await modelDir.exists()) {
        await modelDir.delete(recursive: true);
      }
@@ -430,9 +501,9 @@ class ModelManager {
   // ============ Punctuation Model Methods ============
   
   Future<bool> isPunctuationModelDownloaded() async {
-    final docDir = await getApplicationDocumentsDirectory();
+    final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(punctuationModelUrl);
-    final modelDir = Directory('${docDir.path}/speakout_models/$dirName');
+    final modelDir = Directory('${modelsRoot.path}/$dirName');
     
     if (!await modelDir.exists()) return false;
     // Check for model.onnx file
@@ -440,9 +511,9 @@ class ModelManager {
   }
   
   Future<String?> getPunctuationModelPath() async {
-    final docDir = await getApplicationDocumentsDirectory();
+    final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(punctuationModelUrl);
-    final modelRoot = Directory('${docDir.path}/speakout_models/$dirName');
+    final modelRoot = Directory('${modelsRoot.path}/$dirName');
     
     // Generic find model.onnx
     debugPrint("[Diagnose] Punctuation Root: ${modelRoot.path} (Exists: ${await modelRoot.exists()})");
@@ -475,8 +546,7 @@ class ModelManager {
   }
   
   Future<String> downloadPunctuationModel({Function(String)? onStatus, Function(double)? onProgress}) async {
-    final docDir = await getApplicationDocumentsDirectory();
-    final modelsRoot = Directory('${docDir.path}/speakout_models');
+    final modelsRoot = await _getModelsRoot();
     if (!await modelsRoot.exists()) {
       await modelsRoot.create(recursive: true);
     }
@@ -509,9 +579,9 @@ class ModelManager {
   }
   
   Future<void> deletePunctuationModel() async {
-    final docDir = await getApplicationDocumentsDirectory();
+    final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(punctuationModelUrl);
-    final modelDir = Directory('${docDir.path}/speakout_models/$dirName');
+    final modelDir = Directory('${modelsRoot.path}/$dirName');
     
     if (await modelDir.exists()) {
       await modelDir.delete(recursive: true);

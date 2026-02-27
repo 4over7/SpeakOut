@@ -5,7 +5,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 // Path Config
 const dylibPath = "/Users/leon/Apps/speakout/build/macos/Build/Products/Release/SpeakOut.app/Contents/Frameworks";
-const modelBasePath = "/Users/leon/Documents/speakout_models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20";
+const modelBasePath = "/Users/leon/Library/Application Support/com.speakout.speakout/Models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20";
 const audioPath = "/tmp/audio_dump.pcm"; // Created by v3.5.18+
 
 void main() async {

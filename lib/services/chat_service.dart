@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'notification_service.dart';
 import '../models/chat_model.dart';
-import 'config_service.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -82,11 +82,16 @@ class ChatService {
 
   // --- Persistence ---
 
+  Future<Directory> _getChatDir() async {
+    final appSupportDir = await getApplicationSupportDirectory();
+    return Directory(appSupportDir.path);
+  }
+
   Future<void> _loadHistory() async {
     try {
-      final dir = Directory(ConfigService().diaryDirectory);
-      if (!dir.existsSync()) return; // No custom dir yet
-      
+      final dir = await _getChatDir();
+      if (!dir.existsSync()) return;
+
       final file = File("${dir.path}/chat_history.json");
       if (await file.exists()) {
         final content = await file.readAsString();
@@ -109,9 +114,9 @@ class ChatService {
         _streamController.add(_messages); // Notify UI of truncation
       }
       
-      final dir = Directory(ConfigService().diaryDirectory);
+      final dir = await _getChatDir();
       if (!dir.existsSync()) dir.createSync(recursive: true);
-      
+
       final file = File("${dir.path}/chat_history.json");
       final jsonList = _messages.map((e) => e.toJson()).toList();
       await file.writeAsString(jsonEncode(jsonList));
