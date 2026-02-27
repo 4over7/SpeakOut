@@ -2,285 +2,208 @@
 
   <img src="assets/app_icon_rounded.png" width="160" height="160" alt="SpeakOut Icon" />
 
-# 子曰 SpeakOut 🎙️
+# 子曰 SpeakOut
 
-  **Your Voice, Your AI Operating System.**  
-  *Offline-First. Privacy-Focused. Limitless Capabilities.*
+  **Offline-First AI Voice Input for macOS**
+  *Hold a key. Speak. Auto-type.*
+
+  [Download Latest Release](https://github.com/4over7/SpeakOut/releases/latest)
 
 </div>
 
-SpeakOut is not just a dictation tool. It is a **Next-Generation AI Assistant** that lives on your Mac, turning your voice into structured notes, actionable commands, and high-quality text—completely private by default.
+---
+
+## Features
+
+### Voice Input (Offline)
+
+Press and hold a hotkey (default: `Left Option`), speak, release — text is typed at your cursor.
+
+- **8 ASR Models** — SenseVoice, Paraformer, Whisper Large-v3, FireRedASR, and more. Choose by accuracy, size, or language.
+- **Streaming & Offline Modes** — Real-time subtitles while speaking (streaming), or higher accuracy after release (offline).
+- **Multilingual** — Chinese, English, Japanese, Korean, Cantonese, dialects, and 90+ languages (Whisper).
+- **Fully Offline** — Powered by [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx). No audio leaves your device.
+
+### Flash Notes
+
+Capture thoughts without switching apps.
+
+- **Dedicated Hotkey** — `Right Option` (configurable). Speak, release, auto-saved.
+- **Daily Markdown** — Timestamped entries appended to `YYYY-MM-DD.md`.
+- **Custom Save Directory** — Choose where notes are stored.
+
+### AI Smart Correction (Beta)
+
+Optional LLM post-processing to remove filler words and polish text.
+
+- **Cloud API** — Any OpenAI-compatible endpoint.
+- **Ollama (Local)** — Run LLM locally for full privacy. Latency as low as 130ms.
+
+### Cloud ASR (Optional)
+
+Switch to Aliyun Smart Voice for cloud-based recognition when needed.
 
 ---
 
-## 🌟 Core Features
+## Install
 
-### 1. ⚡️ Instant Voice Input (Offline)
+1. Download `SpeakOut.dmg` from [Releases](https://github.com/4over7/SpeakOut/releases/latest).
+2. Drag to `/Applications`.
+3. First launch: run `xattr -cr /Applications/SpeakOut.app` in Terminal (required until we have Developer ID signing).
+4. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**.
+5. Follow the onboarding wizard to download a voice model.
 
-Press a hotkey (default: `Left Option`). Speak. Done.
+### System Requirements
 
-- **Ultra-Low Latency**: Powered by **Sherpa-ONNX** running locally on CPU/GPU.
-- **Multilingual**: Supports mixed Chinese/English recognition with high accuracy.
-- **Privacy Core**: No audio leaves your device by default.
-
-### 2. 📝 Flash Notes (Diary Mode)
-
-Capture fleeting thoughts without context switching.
-
-- **Hotkey**: `Right Option` (Configurable).
-- **Auto-Save**: Thoughts are automatically timestamped and appended to a daily Markdown file (e.g., `2024-01-10.md`).
-- **AI Correction**: Optional LLM post-processing to fix homophones and punctuation.
-
-### 3. 🤖 MCP Agent Platform (New in v3.5)
-
-> ⚠️ **Beta Feature**: This module is currently **experimental**. APIs may change without notice. Please use with caution in production environments.
-
-SpeakOut acts as a "Universal Dispatcher" for the **Model Context Protocol (MCP)**.
-
-- **Natural Language Actions**: "Add a meeting tomorrow at 2pm" -> Executes Calendar Script.
-- **Extensible Skills**: Add any Python/Node.js script as a "Tool". SpeakOut handles the intent parsing.
-- **HITL Security**: "Human-in-the-Loop" confirmation ensures the AI never executes dangerous commands without your approval.
-
-### 4. 💎 Pro Features (Coming Soon)
-
-> 🚧 **Under Construction**: The payment and license verification system is currently internally tested and **not yet ready for public use**.
-
-- **Hybrid Payment**: Support for Global (Stripe) and China (CD-Key) payments.
-- **Cloud Sync**: Sync your diary and settings across devices (Planned).
-
-### 5. 💬 Unified Chat Interface
-
-A timeline of your digital life.
-
-- View all your voice notes, agent execution results, and AI dialogues in one place.
-- Manually archive interesting chat bubbles to your Diary.
-- **Persistent History**: Conversations are saved locally and securely.
+- macOS 13+ (Ventura or later)
+- ~230MB disk space for default model (SenseVoice), up to ~1.4GB for large models
 
 ---
 
-## 🛠️ Architecture
+## Architecture
 
-### The "Tri-Force" Engine
-
-1. **Audio Native (Sherpa)**: Converts speech to text in <0.2s.
-2. **LLM Router (Qwen/Aliyun)**: Analyzes text intent.
-    - If "Note" -> Save to Diary.
-    - If "Command" -> Construct JSON-RPC call.
-3. **MCP Client**: Connects to local or remote agents via Stodio/SSE.
-
-```mermaid
-graph TD
-    User((User))
-    User --> |Left Option| InputKey[Input Mode]
-    User --> |Right Option| SmartKey[Smart Mode]
-    
-    InputKey & SmartKey --> Mic[Microphone]
-    Mic --> AudioEngine[Audio Engine]
-    AudioEngine --> VAD[VAD]
-    VAD --> |Speech| ASRRouter{ASR Engine?}
-    
-    ASRRouter --> |Local| LocalASR["Sherpa-ONNX (Offline)"]
-    ASRRouter --> |Cloud| CloudASR["Aliyun ASR (Via Gateway)"]
-    
-    LocalASR & CloudASR --> |Text| ModeSwitch{Switch}
-    
-    InputKey -.-> |Selects| ModeSwitch
-    SmartKey -.-> |Selects| ModeSwitch
-    
-    ModeSwitch --> |Input| Inject["Text Injection ⌨️"]
-    ModeSwitch --> |Smart| LLM[LLM Agent]
-    
-    LLM --> |Command| MCP["MCP Client (Tools)"]
-    LLM --> |Note| Diary[Diary Service]
-    
-    MCP --> |Execute| LocalServer[Local Server]
-    MCP --> |Action| CloudAPI[Cloud API]
+```
+Hotkey → native_input.m (CGEventTap)
+  → C Ring Buffer (16kHz PCM audio)
+  → CoreEngine FFI polling → VAD/AGC
+  → ASR (Sherpa offline / Aliyun cloud)
+  → LLM correction (optional)
+  → Text injection (Accessibility API) | Flash Note | Agent (planned)
 ```
 
-### Privacy by Design
-
-- **Local First**: ASR is 100% offline.
-- **Sandboxed**: App runs in macOS Sandbox, accessing only authorized directories.
-- **Transparency**: You see exactly what tool is being called and with what arguments.
-
----
-
-## 🚀 Getting Started
-
-1. **Install**: Download the latest `.dmg` from Releases.
-2. **Grant Permissions**: Allow Microphone and Accessibility (for text injection).
-3. **Configure**:
-    - **Models**: improved accuracy? Switch to Aliyun Cloud Engine (Optional).
-    - **Intelligence**: Set up your LLM (Local or Remote) for smarter routing.
-4. **Add Skills**:
-    - Go to `Settings -> Agent Tools`.
-    - Add a local script (e.g., `python3 scripts/mcp_calendar.py`).
+| Layer | Path | Description |
+|-------|------|-------------|
+| Engine | `lib/engine/` | CoreEngine orchestrator, ASR providers, model management |
+| Service | `lib/services/` | Config, LLM, diary, audio devices, app lifecycle |
+| UI | `lib/ui/` | macOS-native UI (macos_ui), settings, onboarding, overlay |
+| Native | `native_lib/native_input.m` | Objective-C: CGEventTap keyboard + AudioQueue ring buffer |
+| Gateway | `gateway/` | Cloudflare Workers backend (Hono) |
 
 ---
 
-## 🔧 Developer Guide
-
-### Building from Source
+## Build from Source
 
 ```bash
-# 1. Install Flutter (3.10+) & Rust (for FFI)
-brew install flutter rust
-
-# 2. Get Dependencies
+# Dependencies
 flutter pub get
 
-# 3. Build & Install
+# Static analysis
+flutter analyze
+
+# Run tests
+flutter test
+
+# Build
+flutter build macos --release
+
+# Install to /Applications (with code signing)
 ./scripts/install.sh
-```
 
-### Running Tests
+# Create DMG
+./scripts/create_styled_dmg.sh
 
-```bash
-flutter test test/agent_suite_test.dart
+# Compile native library (after modifying native_input.m)
+cd native_lib && clang -dynamiclib -framework Cocoa -framework Carbon \
+  -framework AVFoundation -framework AudioToolbox -framework CoreAudio \
+  -framework Accelerate -o libnative_input.dylib native_input.m -fobjc-arc
 ```
 
 ---
 
-*Made with ❤️ by Leon. Powered by Flutter & Sherpa-ONNX.*
+## Supported Models
+
+### Streaming (Real-time)
+
+| Model | Languages | Size |
+|-------|-----------|------|
+| Zipformer Bilingual | Zh/En | ~490MB |
+| Paraformer Bilingual | Zh/En | ~1GB |
+
+### Offline (High Accuracy)
+
+| Model | Languages | Size | Notes |
+|-------|-----------|------|-------|
+| **SenseVoice 2024** | Zh/En/Ja/Ko/Yue | ~228MB | Built-in punctuation (default) |
+| SenseVoice 2025 | Zh/En/Ja/Ko/Yue | ~158MB | Cantonese enhanced |
+| Paraformer Offline | Zh/En | ~217MB | Mature & stable |
+| Paraformer Dialect 2025 | Zh/En + dialects | ~218MB | Sichuan/Chongqing |
+| Whisper Large-v3 | 99 languages | ~1.0GB | Best multilingual |
+| FireRedASR Large | Zh/En + dialects | ~1.4GB | Highest capacity |
+
+---
+
+## i18n
+
+Full Chinese and English localization. Language follows system setting or can be manually set in Settings.
+
+---
+
+## License
+
+Copyright © 2026 Leon. All Rights Reserved.
 
 ---
 
 <div align="center">
 
-  <img src="assets/app_icon_rounded.png" width="160" height="160" alt="SpeakOut Icon" />
+# 子曰 SpeakOut
 
-# 子曰 SpeakOut 🎙️
+  **macOS 离线优先 AI 语音输入**
+  *按住按键，说话，自动输入。*
 
-  **你的声音，你的 AI 操作系统。**  
-  *离线优先。隐私至上。无限可能。*
+  [下载最新版](https://github.com/4over7/SpeakOut/releases/latest)
+
 </div>
 
-SpeakOut 不仅仅是一个语音输入法。它是运行在你 Mac 上的 **下一代 AI 助手**，能将你的语音转化为结构化的笔记、可执行的指令和高质量的文本——而且默认情况下完全私密。
+---
+
+## 功能
+
+### 语音输入（离线）
+
+按住快捷键（默认 `Left Option`），说话，松开——文字自动输入到光标处。
+
+- **8 款语音模型** — SenseVoice、Paraformer、Whisper Large-v3、FireRedASR 等，按精度、体积或语言自由选择。
+- **流式 & 离线模式** — 边说边出字（流式），或松开后高精度识别（离线）。
+- **多语言** — 中、英、日、韩、粤语、方言，以及 90+ 种语言（Whisper）。
+- **完全离线** — 基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，音频不出设备。
+
+### 闪念笔记
+
+无需切换应用即可捕捉灵感。
+
+- **独立热键** — `Right Option`（可配置），说完松开，自动保存。
+- **每日 Markdown** — 带时间戳，追加写入 `YYYY-MM-DD.md`。
+- **自定义保存目录** — 自由选择笔记存放位置。
+
+### AI 智能纠错（Beta）
+
+可选的 LLM 后处理，去除口水词、润色文本。
+
+- **云端 API** — 支持任何 OpenAI 兼容接口。
+- **Ollama 本地** — 本地运行 LLM，完全私密，延迟低至 130ms。
+
+### 云端识别（可选）
+
+需要时可切换到阿里云智能语音进行云端识别。
 
 ---
 
-## 🌟 核心功能
+## 安装
 
-### 1. ⚡️ 瞬时语音输入 (离线)
+1. 从 [Releases](https://github.com/4over7/SpeakOut/releases/latest) 下载 `SpeakOut.dmg`。
+2. 拖到 `/Applications`。
+3. 首次启动前在终端执行：`xattr -cr /Applications/SpeakOut.app`（无 Developer ID 签名前必需）。
+4. 授权权限：**输入监控**、**辅助功能**、**麦克风**。
+5. 按引导流程下载语音模型即可使用。
 
-按下快捷键（默认：`Left Option`）。说话。完成。
+### 系统要求
 
-- ⚡️ **超低延迟**：由本地 CPU/GPU 运行的 **Sherpa-ONNX** 引擎驱动。
-- 🌍 **混合识别**：支持中英文混合识别，准确率极高。
-- 🔒 **隐私核心**：默认情况下，没有任何音频数据会离开你的设备。
-
-### 2. 📝 闪念笔记 (日记模式)
-
-无需切换上下文即可捕捉转瞬即逝的想法。
-
-- ⌨️ **快捷键**：`Right Option`（可配置）。
-- 💾 **自动保存**：想法会自动打上时间戳并追加到每日 Markdown 文件中（例如 `2024-01-10.md`）。
-- ✨ **AI 纠错**：可选的 LLM 后处理，用于修复同音字和标点符号。
-
-### 3. 🤖 MCP 智能代理平台 (v3.5 新增)
-
-> ⚠️ **Beta 功能**：此模块目前处于 **实验阶段**。API 可能会随时更改。请在生产环境中谨慎使用。
-
-SpeakOut 充当 **Model Context Protocol (MCP)** 的“通用调度器”。
-
-- 🗣️ **自然语言操作**：“明天下午2点添加一个会议” -> 执行日历脚本。
-- 🔌 **可扩展技能**：将任何 Python/Node.js 脚本添加为“工具”。SpeakOut 负责意图解析。
-- 🛡️ **安全确认 (HITL)**：“人机交互”确认机制确保 AI 在未经你批准的情况下绝不执行危险命令。
-
-### 4. 💎 付费功能 (即将推出)
-
-> 🚧 **施工中**：支付和许可证验证系统目前仅供内部测试，**尚未对公众开放**。
-
-- **混合支付**：支持全球 (Stripe) 和中国 (CD-Key/激活码) 支付体系。
-- **云端同步**：多设备同步您的日记和设置（规划中）。
-
-### 5. 💬 统一聊天界面
-
-你数字生活的时间轴。
-
-- 👁️ 在一个地方查看所有的语音笔记、Agent 执行结果和 AI 对话。
-- 📂 手动将有趣的聊天气泡归档到你的日记中。
-- 🕰️ **持久化历史**：对话记录安全地保存在本地。
+- macOS 13+（Ventura 或更高）
+- 磁盘空间：默认模型（SenseVoice）约 230MB，最大模型（FireRedASR）约 1.4GB
 
 ---
 
-## 🛠️ 架构设计
-
-### "三位一体" 引擎 (The "Tri-Force" Engine)
-
-1. **音频原生 (Sherpa)**：在 <0.2秒内将语音转换为文本。
-2. **LLM 路由 (Qwen/Aliyun)**：分析文本意图。
-    - 如果是“笔记” -> 保存到日记。
-    - 如果是“命令” -> 构造 JSON-RPC 调用。
-3. **MCP 客户端**：通过 Stdio/SSE 模接本地或远程代理。
-
-```mermaid
-graph TD
-    User((用户))
-    User --> |Left Option| InputKey[输入模式]
-    User --> |Right Option| SmartKey[智能模式]
-    
-    InputKey & SmartKey --> Mic[麦克风]
-    Mic --> AudioEngine[音频引擎]
-    AudioEngine --> VAD[VAD]
-    VAD --> |语音流| ASRRouter{ASR 引擎}
-    
-    ASRRouter --> |本地| LocalASR["Sherpa-ONNX (离线)"]
-    ASRRouter --> |云端| CloudASR["阿里云 ASR (经网关)"]
-    
-    LocalASR & CloudASR --> |文本| ModeSwitch{模式分发}
-    
-    InputKey -.-> |选择| ModeSwitch
-    SmartKey -.-> |选择| ModeSwitch
-    
-    ModeSwitch --> |输入模式| Inject["文本注入 ⌨️"]
-    ModeSwitch --> |智能模式| LLM[LLM 智能体]
-    
-    LLM --> |指令| MCP["MCP 客户端 (工具)"]
-    LLM --> |笔记| Diary[日记服务]
-    
-    MCP --> |执行| LocalServer[本地服务]
-    MCP --> |调用| CloudAPI[云端 API]
-```
-
-### 隐私设计
-
-- **本地优先**：ASR 100% 离线运行。
-- **沙盒运行**：App 在 macOS Sandbox 中运行，仅访问授权的目录。
-- **透明度**：你可以确切地看到正在调用什么工具以及使用什么参数。
-
----
-
-## 🚀 快速入门
-
-1. **安装**：从 Releases 下载最新的 `.dmg`。
-2. **授权**：允许麦克风和辅助功能（用于文本注入）。
-3. **配置**：
-    - **模型**：想要更高的准确率？切换到阿里云云端引擎（可选）。
-    - **智能**：设置你的 LLM（本地或远程）以实现更智能的路由。
-4. **添加技能**：
-    -前往 `设置 -> Agent 工具`。
-    - 添加一个本地脚本（例如 `python3 scripts/mcp_calendar.py`）。
-
----
-
-## 🔧 开发者指南
-
-### 源码构建
-
-```bash
-# 1. 安装 Flutter (3.10+) & Rust (用于 FFI)
-brew install flutter rust
-
-# 2. 获取依赖
-flutter pub get
-
-# 3. 构建与安装
-./scripts/install.sh
-```
-
-### 运行测试
-
-```bash
-flutter test test/agent_suite_test.dart
-```
+*Made with ❤️ by Leon. Powered by Flutter & Sherpa-ONNX.*
+</content>
+</invoke>
