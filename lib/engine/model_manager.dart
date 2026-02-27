@@ -158,28 +158,39 @@ class ModelManager {
     }
 
     final modelRoot = Directory('${modelsRoot.path}/${_getDirNameFromUrl(model.url)}');
-    
+
     // 1. Direct check
-    if (await File('${modelRoot.path}/tokens.txt').exists()) return modelRoot.path;
-    
-    // 2. Recursive check
+    if (await _hasTokensFile(modelRoot.path)) return modelRoot.path;
+
+    // 2. Recursive check (one level deep)
     if (await modelRoot.exists()) {
       try {
         final entities = modelRoot.listSync();
         for (var entity in entities) {
           if (entity is Directory) {
-             if (await File('${entity.path}/tokens.txt').exists()) return entity.path;
+             if (await _hasTokensFile(entity.path)) return entity.path;
           }
         }
       } catch (_) {}
     }
-    
+
     return null;
   }
 
   Future<void> setActiveModel(String id) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('active_model_id', id);
+  }
+
+  /// 检查目录下是否有 tokens 文件 (tokens.txt 或 *-tokens.txt，如 large-v3-tokens.txt)
+  Future<bool> _hasTokensFile(String dirPath) async {
+    if (await File('$dirPath/tokens.txt').exists()) return true;
+    try {
+      final entries = Directory(dirPath).listSync();
+      return entries.any((e) => e is File && e.path.endsWith('-tokens.txt'));
+    } catch (_) {
+      return false;
+    }
   }
 
   String _getDirNameFromUrl(String url) {
@@ -198,12 +209,9 @@ class ModelManager {
     final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(model.url);
     final finalModelDir = Directory('${modelsRoot.path}/$dirName');
-    
+
     if (!await finalModelDir.exists()) return false;
-    
-    // Simple check (since we normalized the directory structure)
-    // We expect tokens.txt to be in the root of the model dir now.
-    return await File('${finalModelDir.path}/tokens.txt').exists();
+    return _hasTokensFile(finalModelDir.path);
   }
   
   Future<String> downloadAndExtractModel(String id, {Function(String)? onStatus, Function(double)? onProgress}) async {
@@ -248,14 +256,12 @@ class ModelManager {
       if (await finalModelDir.exists()) await finalModelDir.delete(recursive: true);
       
       // Analyze tempExtractDir content
-      // 3. Verification using Native Find (Bypass Dart listSync issues)
-      // tokens.txt is critical. We search for it natively.
+      // Find tokens file: tokens.txt or *-tokens.txt (e.g. large-v3-tokens.txt for Whisper)
       File? tokenFile;
       if (Platform.isMacOS || Platform.isLinux) {
          try {
-           final result = await Process.run('find', [tempExtractDir.path, '-name', 'tokens.txt']);
+           final result = await Process.run('find', [tempExtractDir.path, '-name', '*tokens.txt']);
            if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
-              // Found!
               final lines = result.stdout.toString().trim().split('\n');
               if (lines.isNotEmpty) {
                  tokenFile = File(lines.first.trim());
@@ -266,28 +272,26 @@ class ModelManager {
            debugPrint("[Verification] Native find failed: $e");
          }
       }
-      
-      // Fallback to Dart search if native failed or on Windows
+
+      // Fallback to Dart search
       if (tokenFile == null) {
           final entities = tempExtractDir.listSync(recursive: true);
           debugPrint("[Extraction] Entities: ${entities.length}");
           for (var e in entities) {
-            // Check matching filename, loose path check
-            if (e.path.contains('tokens.txt')) {
-               tokenFile = File(e.path); // Assuming File if contains tokens.txt? Safer to create File obj
+            if (e.path.endsWith('tokens.txt')) {
+               tokenFile = File(e.path);
                break;
             }
           }
-           
+
           if (tokenFile == null) {
-             // Debug info
              final fileList = entities.map((e) => e.path.split(Platform.pathSeparator).last).take(10).join(', ');
-             throw Exception("Invalid Model: tokens.txt not found. Found: $fileList...");
+             throw Exception("Invalid Model: *tokens.txt not found. Found: $fileList...");
           }
       }
-      
+
       final sourceDir = tokenFile.parent;
-      debugPrint("[Extraction] Found tokens.txt in: ${sourceDir.path}");
+      debugPrint("[Extraction] Found tokens in: ${sourceDir.path}");
       debugPrint("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
       
       // Move sourceDir to finalModelDir

@@ -460,13 +460,11 @@ int check_input_monitoring_permission() {
   return 1; // Pre-10.15: no separate input monitoring permission
 }
 
-// 4d. Check Accessibility permission (macOS 10.15+)
-// Uses CGPreflightPostEventAccess() for precise detection
+// 4d. Check Accessibility permission
+// AXIsProcessTrusted() is the canonical check for Accessibility.
+// CGPreflightPostEventAccess() can lag behind on macOS 26+.
 int check_accessibility_permission() {
-  if (@available(macOS 10.15, *)) {
-    return CGPreflightPostEventAccess() ? 1 : 0;
-  }
-  return 1; // Pre-10.15: no separate post event permission
+  return AXIsProcessTrusted() ? 1 : 0;
 }
 
 // 3. Check Key State (Watchdog)
