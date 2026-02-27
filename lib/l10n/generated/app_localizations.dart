@@ -487,6 +487,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick One'**
   String get pickOne;
+
+  /// No description provided for @llmProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM Provider'**
+  String get llmProvider;
+
+  /// No description provided for @llmProviderCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud API'**
+  String get llmProviderCloud;
+
+  /// No description provided for @llmProviderOllama.
+  ///
+  /// In en, this message translates to:
+  /// **'Ollama (Local)'**
+  String get llmProviderOllama;
+
+  /// No description provided for @ollamaUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Ollama URL'**
+  String get ollamaUrl;
+
+  /// No description provided for @ollamaModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model Name'**
+  String get ollamaModel;
 }
 
 class _AppLocalizationsDelegate

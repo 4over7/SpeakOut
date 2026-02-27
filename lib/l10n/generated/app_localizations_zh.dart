@@ -206,4 +206,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pickOne => '二选一';
+
+  @override
+  String get llmProvider => 'LLM 提供方';
+
+  @override
+  String get llmProviderCloud => '云端 API';
+
+  @override
+  String get llmProviderOllama => 'Ollama (本地)';
+
+  @override
+  String get ollamaUrl => 'Ollama 地址';
+
+  @override
+  String get ollamaModel => '模型名称';
 }

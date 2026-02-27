@@ -74,5 +74,10 @@
   "asrModels": "Speech Recognition Models",
   "asrModelsDesc": "Please download and activate at least one ASR model to use voice input.",
   "required": "Required",
-  "pickOne": "Pick One"
+  "pickOne": "Pick One",
+  "llmProvider": "LLM Provider",
+  "llmProviderCloud": "Cloud API",
+  "llmProviderOllama": "Ollama (Local)",
+  "ollamaUrl": "Ollama URL",
+  "ollamaModel": "Model Name"
 }

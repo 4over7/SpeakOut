@@ -213,4 +213,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pickOne => 'Pick One';
+
+  @override
+  String get llmProvider => 'LLM Provider';
+
+  @override
+  String get llmProviderCloud => 'Cloud API';
+
+  @override
+  String get llmProviderOllama => 'Ollama (Local)';
+
+  @override
+  String get ollamaUrl => 'Ollama URL';
+
+  @override
+  String get ollamaModel => 'Model Name';
 }

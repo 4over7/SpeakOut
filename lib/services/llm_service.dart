@@ -36,7 +36,15 @@ class LLMService {
       _log("RAW INPUT (AI OFF): $input");
       return input;
     }
-    
+
+    final providerType = ConfigService().llmProviderType;
+    if (providerType == 'ollama') {
+      return _correctTextOllama(input);
+    }
+    return _correctTextCloud(input);
+  }
+
+  Future<String> _correctTextCloud(String input) async {
     final apiKey = ConfigService().llmApiKey;
     final baseUrl = ConfigService().llmBaseUrl;
     final model = ConfigService().llmModel;
@@ -48,19 +56,19 @@ class LLMService {
     }
 
     _log("RAW INPUT: $input");
-    _log("Calling LLM: $baseUrl, model=$model, inputLen=${input.length}");
+    _log("Calling Cloud LLM: $baseUrl, model=$model, inputLen=${input.length}");
 
     try {
       final client = _effectiveClient;
       final uri = Uri.parse('$baseUrl/chat/completions');
-      
+
       final body = {
         "model": model,
         "messages": [
           {"role": "system", "content": systemPrompt},
           {"role": "user", "content": "<speech_text>\n$input\n</speech_text>"}
         ],
-        "temperature": 0.3, // Low temperature for deterministic cleanup
+        "temperature": 0.3,
       };
 
       final response = await client.post(
@@ -70,7 +78,7 @@ class LLMService {
           "Authorization": "Bearer $apiKey",
         },
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10)); // Safety timeout
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
@@ -87,7 +95,55 @@ class LLMService {
       _log("LLM EXCEPTION: $e");
     }
 
-    // Fallback: return original input if anything fails
+    return input;
+  }
+
+  Future<String> _correctTextOllama(String input) async {
+    final baseUrl = ConfigService().ollamaBaseUrl;
+    final model = ConfigService().ollamaModel;
+    final systemPrompt = ConfigService().aiCorrectionPrompt;
+
+    _log("RAW INPUT: $input");
+    _log("Calling Ollama: $baseUrl, model=$model, inputLen=${input.length}");
+
+    try {
+      final client = _effectiveClient;
+      final uri = Uri.parse('$baseUrl/api/chat');
+
+      final body = {
+        "model": model,
+        "messages": [
+          {"role": "system", "content": systemPrompt},
+          {"role": "user", "content": "<speech_text>\n$input\n</speech_text>"}
+        ],
+        "stream": false,
+        "think": false,
+        "options": {
+          "temperature": 0.3,
+        },
+      };
+
+      final response = await client.post(
+        uri,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(response.bodyBytes));
+        final content = json['message']?['content']?.toString();
+        if (content != null && content.isNotEmpty) {
+          _log("Ollama SUCCESS. Output differs: ${content.trim() != input}");
+          return content.trim();
+        }
+        _log("Ollama returned empty content.");
+      } else {
+        _log("Ollama ERROR: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      _log("Ollama EXCEPTION: $e");
+    }
+
     return input;
   }
   

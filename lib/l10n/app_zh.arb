@@ -65,5 +65,10 @@
   "asrModels": "语音识别模型",
   "asrModelsDesc": "请下载并激活至少一个语音识别模型才能使用语音输入功能。",
   "required": "必需",
-  "pickOne": "二选一"
+  "pickOne": "二选一",
+  "llmProvider": "LLM 提供方",
+  "llmProviderCloud": "云端 API",
+  "llmProviderOllama": "Ollama (本地)",
+  "ollamaUrl": "Ollama 地址",
+  "ollamaModel": "模型名称"
 }

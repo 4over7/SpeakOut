@@ -18,6 +18,11 @@ class AppConstants {
   
   // AI Correction Defaults (Aliyun DashScope recommended)
   static const bool kDefaultAiCorrectionEnabled = false;
+  static const String kDefaultLlmProviderType = 'cloud'; // 'cloud' | 'ollama'
+
+  // Ollama Defaults
+  static const String kDefaultOllamaBaseUrl = 'http://localhost:11434';
+  static const String kDefaultOllamaModel = 'qwen3:0.6b';
   static String kDefaultLlmBaseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
   static String kDefaultLlmApiKey = '';
   static String kDefaultLlmModel = 'qwen-turbo';

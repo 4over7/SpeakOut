@@ -722,6 +722,25 @@ class _SettingsPageState extends State<SettingsPage> {
              ),
              if (ConfigService().aiCorrectionEnabled) ...[
                const SettingsDivider(),
+               // Provider selector
+               SettingsTile(
+                 label: loc.llmProvider,
+                 icon: CupertinoIcons.arrow_right_arrow_left,
+                 child: MacosPopupButton<String>(
+                   value: ConfigService().llmProviderType,
+                   items: [
+                     MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+                     MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+                   ],
+                   onChanged: (v) async {
+                     if (v != null) {
+                       await ConfigService().setLlmProviderType(v);
+                       setState(() {});
+                     }
+                   },
+                 ),
+               ),
+               const SettingsDivider(),
                Padding(
                  padding: const EdgeInsets.all(16),
                  child: Column(
@@ -755,66 +774,98 @@ class _SettingsPageState extends State<SettingsPage> {
                        ),
                        onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
                      ),
-                     
+
                      const SizedBox(height: 16),
-                     
-                     // 3. API Config Section (Required when AI correction is enabled)
-                     Row(
-                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                       children: [
-                          Text(loc.apiConfig, style: AppTheme.body(context)),
-                          GestureDetector(
-                            onTap: () async {
-                              final uri = Uri.parse("https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen");
-                              if (await canLaunchUrl(uri)) await launchUrl(uri);
-                            },
-                            child: Row(
-                              children: [
-                                MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
-                                const SizedBox(width: 4),
-                                Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
-                              ],
+
+                     if (ConfigService().llmProviderType == 'cloud') ...[
+                       // Cloud API Config
+                       Row(
+                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                         children: [
+                            Text(loc.apiConfig, style: AppTheme.body(context)),
+                            GestureDetector(
+                              onTap: () async {
+                                final uri = Uri.parse("https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen");
+                                if (await canLaunchUrl(uri)) await launchUrl(uri);
+                              },
+                              child: Row(
+                                children: [
+                                  MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
+                                  const SizedBox(width: 4),
+                                  Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                                ],
+                              ),
                             ),
-                          ),
-                       ],
-                     ),
-                     const SizedBox(height: 4),
-                     Text(
-                       "需要 OpenAI 兼容的 API（推荐阿里云百炼）",
-                       style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
-                     ),
-                     
-                     // 4. API Fields
-                     const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                               _buildApiItem(
-                                 context,
-                                 "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride, 
-                                 (v) => ConfigService().setLlmApiKey(v), isSecret: true
-                               ),
-                               const SizedBox(height: 8),
-                               _buildApiItem(
-                                 context,
-                                 "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride, 
-                                 (v) => ConfigService().setLlmBaseUrl(v)
-                               ),
-                               const SizedBox(height: 8),
-                               _buildApiItem(
-                                 context,
-                                 "Model Name", CupertinoIcons.cube_box, ConfigService().llmModelOverride, 
-                                 (v) => ConfigService().setLlmModel(v), placeholder: "model-name"
-                               ),
-                            ],
-                          ),
-                        ),
+                         ],
+                       ),
+                       const SizedBox(height: 4),
+                       Text(
+                         "需要 OpenAI 兼容的 API（推荐阿里云百炼）",
+                         style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
+                       ),
+                       const SizedBox(height: 12),
+                       Container(
+                         padding: const EdgeInsets.all(12),
+                         decoration: BoxDecoration(
+                           color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                           borderRadius: BorderRadius.circular(8),
+                         ),
+                         child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                              _buildApiItem(
+                                context,
+                                "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride,
+                                (v) => ConfigService().setLlmApiKey(v), isSecret: true
+                              ),
+                              const SizedBox(height: 8),
+                              _buildApiItem(
+                                context,
+                                "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride,
+                                (v) => ConfigService().setLlmBaseUrl(v)
+                              ),
+                              const SizedBox(height: 8),
+                              _buildApiItem(
+                                context,
+                                "Model Name", CupertinoIcons.cube_box, ConfigService().llmModelOverride,
+                                (v) => ConfigService().setLlmModel(v), placeholder: "model-name"
+                              ),
+                           ],
+                         ),
+                       ),
+                     ] else ...[
+                       // Ollama Config
+                       Text(loc.ollamaUrl, style: AppTheme.body(context)),
+                       const SizedBox(height: 4),
+                       Text(
+                         "确保 Ollama 已启动（ollama serve）",
+                         style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
+                       ),
+                       const SizedBox(height: 12),
+                       Container(
+                         padding: const EdgeInsets.all(12),
+                         decoration: BoxDecoration(
+                           color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                           borderRadius: BorderRadius.circular(8),
+                         ),
+                         child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                              _buildApiItem(
+                                context,
+                                loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl,
+                                (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"
+                              ),
+                              const SizedBox(height: 8),
+                              _buildApiItem(
+                                context,
+                                loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel,
+                                (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"
+                              ),
+                           ],
+                         ),
+                       ),
+                     ],
                     ],
                  ),
                ),

@@ -154,6 +154,16 @@ class ConfigService {
   Future<void> setLlmApiKey(String key) async => await _prefs?.setString('llm_api_key', key);
   Future<void> setLlmModel(String model) async => await _prefs?.setString('llm_model', model);
 
+  // --- LLM Provider Type ---
+  String get llmProviderType => _prefs?.getString('llm_provider_type') ?? AppConstants.kDefaultLlmProviderType;
+  Future<void> setLlmProviderType(String type) async => await _prefs?.setString('llm_provider_type', type);
+
+  // --- Ollama Config ---
+  String get ollamaBaseUrl => _getStringWithDefault('ollama_base_url', AppConstants.kDefaultOllamaBaseUrl);
+  String get ollamaModel => _getStringWithDefault('ollama_model', AppConstants.kDefaultOllamaModel);
+  Future<void> setOllamaBaseUrl(String url) async => await _prefs?.setString('ollama_base_url', url);
+  Future<void> setOllamaModel(String model) async => await _prefs?.setString('ollama_model', model);
+
   // --- ASR De-duplication Config ---
   bool get deduplicationEnabled => _prefs?.getBool('dedup_enabled') ?? AppConstants.kDefaultDeduplicationEnabled;
   Future<void> setDeduplicationEnabled(bool enabled) async => await _prefs?.setBool('dedup_enabled', enabled);
