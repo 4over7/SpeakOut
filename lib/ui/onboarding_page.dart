@@ -7,12 +7,13 @@ import '../engine/model_manager.dart';
 import '../engine/core_engine.dart';
 import '../config/app_constants.dart';
 import 'theme.dart';
+import 'package:speakout/l10n/generated/app_localizations.dart';
 
 /// Onboarding flow for first-time users
-/// Steps: Welcome -> Permissions -> Model Download -> Done
+/// Steps: Welcome -> Permissions -> Model Selection -> Download -> Done
 class OnboardingPage extends StatefulWidget {
   final VoidCallback onComplete;
-  
+
   const OnboardingPage({super.key, required this.onComplete});
 
   @override
@@ -23,13 +24,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
   int _currentStep = 0;
   final ModelManager _modelManager = ModelManager();
   final CoreEngine _engine = CoreEngine();
-  
+
   // Permission state
   bool _inputMonitoringGranted = false;
   bool _accessibilityGranted = false;
   bool _microphoneGranted = false;
   bool _checkingPermissions = false;
-  
+  // 记录用户已点击"授权"，用于检测"授权后仍需重启"
+  bool _inputMonitoringAttempted = false;
+  bool _accessibilityAttempted = false;
+  bool _microphoneAttempted = false;
+
+  // Model selection state
+  String _selectedModelId = AppConstants.kDefaultModelId;
+  bool _showCustomModels = false;
+
   // Download state
   bool _isDownloading = false;
   double _downloadProgress = 0;
@@ -45,20 +54,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Future<void> _checkPermissions() async {
     setState(() => _checkingPermissions = true);
-
-    // Check input monitoring (keyboard listener)
     _inputMonitoringGranted = _engine.checkInputMonitoringPermission();
-
-    // Check accessibility (text injection)
     _accessibilityGranted = _engine.checkAccessibilityPermission();
-
-    // Check microphone
     _microphoneGranted = _engine.checkMicPermission();
-
     setState(() => _checkingPermissions = false);
   }
 
   Future<void> _openInputMonitoringSettings() async {
+    setState(() => _inputMonitoringAttempted = true);
     final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -68,6 +71,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Future<void> _openAccessibilitySettings() async {
+    setState(() => _accessibilityAttempted = true);
     final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -77,7 +81,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Future<void> _openMicrophoneSettings() async {
-    // Open System Preferences -> Security & Privacy -> Microphone
+    setState(() => _microphoneAttempted = true);
     final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -86,7 +90,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     await _checkPermissions();
   }
 
-  Future<void> _downloadDefaultModels() async {
+  Future<void> _downloadSelectedModel() async {
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0;
@@ -95,38 +99,46 @@ class _OnboardingPageState extends State<OnboardingPage> {
     });
 
     try {
-      // Step 1: Download punctuation model (required)
-      setState(() => _downloadStatus = "下载标点模型...");
-      await _modelManager.downloadPunctuationModel(
-        onProgress: (p) {
-          if (mounted) {
-            setState(() {
-              _downloadProgress = p * 0.3; // 30% for punctuation
-              _downloadStatus = "下载标点模型... ${(p * 100).toStringAsFixed(0)}%";
-            });
-          }
-        },
-        onStatus: (s) {
-          if (mounted) setState(() => _downloadStatus = s);
-        },
-      );
+      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
-      // Step 2: Download ASR model (using default from AppConstants)
-      final defaultModel = _modelManager.getModelById(AppConstants.kDefaultModelId) ?? ModelManager.availableModels.first;
+      final needsPunctuation = !selectedModel.hasPunctuation;
+
+      // Step 1: Download punctuation model if needed
+      if (needsPunctuation) {
+        setState(() => _downloadStatus = "下载标点模型...");
+        await _modelManager.downloadPunctuationModel(
+          onProgress: (p) {
+            if (mounted) {
+              setState(() {
+                _downloadProgress = p * 0.25; // 25% for punctuation
+                _downloadStatus = "下载标点模型... ${(p * 100).toStringAsFixed(0)}%";
+              });
+            }
+          },
+          onStatus: (s) {
+            if (mounted) setState(() => _downloadStatus = s);
+          },
+        );
+      }
+
+      // Step 2: Download ASR model
+      final asrStart = needsPunctuation ? 0.25 : 0.0;
+      final asrRange = needsPunctuation ? 0.75 : 1.0;
       setState(() {
         _downloadStatus = "下载语音识别模型...";
-        _downloadProgress = 0.3;
+        _downloadProgress = asrStart;
       });
-      
+
       await _modelManager.downloadAndExtractModel(
-        defaultModel.id,
+        selectedModel.id,
         onProgress: (p) {
           if (mounted) {
             setState(() {
               if (p < 0) {
                 _downloadStatus = "解压中...";
               } else {
-                _downloadProgress = 0.3 + (p * 0.7); // 70% for ASR
+                _downloadProgress = asrStart + (p * asrRange);
                 _downloadStatus = "下载语音识别模型... ${(p * 100).toStringAsFixed(0)}%";
               }
             });
@@ -136,17 +148,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
       // Step 3: Activate model
       setState(() => _downloadStatus = "激活模型...");
-      await _modelManager.setActiveModel(defaultModel.id);
+      await _modelManager.setActiveModel(selectedModel.id);
       final path = await _modelManager.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: defaultModel.type);
+        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
-      await ConfigService().setActiveModelId(defaultModel.id);
-      
-      // Initialize punctuation
-      final punctPath = await _modelManager.getPunctuationModelPath();
-      if (punctPath != null) {
-        await _engine.initPunctuation(punctPath);
+      await ConfigService().setActiveModelId(selectedModel.id);
+
+      // Initialize punctuation if downloaded
+      if (needsPunctuation) {
+        final punctPath = await _modelManager.getPunctuationModelPath();
+        if (punctPath != null) {
+          await _engine.initPunctuation(punctPath, activeModelName: selectedModel.name);
+        }
       }
 
       setState(() {
@@ -165,12 +179,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   void _nextStep() {
-    if (_currentStep < 3) {
+    if (_currentStep < 4) {
       setState(() => _currentStep++);
-      
-      // Auto-start download when reaching download step
-      if (_currentStep == 2 && !_downloadComplete && !_isDownloading) {
-        _downloadDefaultModels();
+
+      // Auto-start download when reaching download step (step 3)
+      if (_currentStep == 3 && !_downloadComplete && !_isDownloading) {
+        _downloadSelectedModel();
       }
     }
   }
@@ -192,7 +206,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 color: AppTheme.getBackground(context),
                 child: Center(
                   child: Container(
-                    width: 500,
+                    width: 520,
                     padding: const EdgeInsets.all(40),
                     child: _buildCurrentStep(),
                   ),
@@ -212,8 +226,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
       case 1:
         return _buildPermissionsStep();
       case 2:
-        return _buildDownloadStep();
+        return _buildModelSelectionStep();
       case 3:
+        return _buildDownloadStep();
+      case 4:
         return _buildDoneStep();
       default:
         return _buildWelcomeStep();
@@ -225,7 +241,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // App Icon
         Container(
           width: 100,
           height: 100,
@@ -236,13 +251,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
           child: const Icon(CupertinoIcons.mic_fill, size: 48, color: Colors.white),
         ),
         const SizedBox(height: 32),
-        
+
         Text(
           "欢迎使用子曰",
           style: AppTheme.display(context).copyWith(fontSize: 28),
         ),
         const SizedBox(height: 16),
-        
+
         Text(
           "按住快捷键说话，松开后自动输入文字\n支持中英文混合识别",
           textAlign: TextAlign.center,
@@ -252,7 +267,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           ),
         ),
         const SizedBox(height: 48),
-        
+
         PushButton(
           controlSize: ControlSize.large,
           onPressed: _nextStep,
@@ -277,37 +292,37 @@ class _OnboardingPageState extends State<OnboardingPage> {
         Text("为了正常工作，子曰需要以下权限", style: AppTheme.caption(context)),
         const SizedBox(height: 32),
 
-        // Input Monitoring Permission
         _buildPermissionTile(
           icon: CupertinoIcons.keyboard,
           title: "输入监控",
           description: "用于监听快捷键触发录音",
           granted: _inputMonitoringGranted,
+          needsRestart: _inputMonitoringAttempted && !_inputMonitoringGranted,
           onRequest: _openInputMonitoringSettings,
         ),
         const SizedBox(height: 12),
 
-        // Accessibility Permission
         _buildPermissionTile(
           icon: CupertinoIcons.text_cursor,
           title: "辅助功能",
           description: "用于将文字输入到应用程序",
           granted: _accessibilityGranted,
+          needsRestart: _accessibilityAttempted && !_accessibilityGranted,
           onRequest: _openAccessibilitySettings,
         ),
         const SizedBox(height: 12),
 
-        // Microphone Permission
         _buildPermissionTile(
           icon: CupertinoIcons.mic,
           title: "麦克风",
           description: "用于录制语音进行识别",
           granted: _microphoneGranted,
+          needsRestart: _microphoneAttempted && !_microphoneGranted,
           onRequest: _openMicrophoneSettings,
         ),
-        
+
         const SizedBox(height: 32),
-        
+
         if (_checkingPermissions)
           const CupertinoActivityIndicator()
         else
@@ -329,7 +344,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ],
           ),
-        
+
         const SizedBox(height: 16),
         if (!allGranted)
           TextButton(
@@ -346,21 +361,28 @@ class _OnboardingPageState extends State<OnboardingPage> {
     required String description,
     required bool granted,
     required VoidCallback onRequest,
+    bool needsRestart = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: granted 
-            ? Colors.green.withValues(alpha:0.1) 
-            : MacosColors.systemGrayColor.withValues(alpha:0.1),
+        color: granted
+            ? Colors.green.withValues(alpha:0.1)
+            : needsRestart
+                ? Colors.orange.withValues(alpha:0.08)
+                : MacosColors.systemGrayColor.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: granted ? Colors.green.withValues(alpha:0.3) : Colors.transparent,
+          color: granted
+              ? Colors.green.withValues(alpha:0.3)
+              : needsRestart
+                  ? Colors.orange.withValues(alpha:0.3)
+                  : Colors.transparent,
         ),
       ),
       child: Row(
         children: [
-          MacosIcon(icon, size: 28, color: granted ? Colors.green : MacosColors.systemGrayColor),
+          MacosIcon(icon, size: 28, color: granted ? Colors.green : needsRestart ? Colors.orange : MacosColors.systemGrayColor),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -368,6 +390,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
               children: [
                 Text(title, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600)),
                 Text(description, style: AppTheme.caption(context)),
+                if (needsRestart)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      "已授权？请重启应用使权限生效",
+                      style: AppTheme.caption(context).copyWith(
+                        color: Colors.orange,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -385,19 +418,334 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  // Step 2: Download
+  // Step 2: Model Selection — two-tier: Recommended vs Custom
+  Widget _buildModelSelectionStep() {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const MacosIcon(CupertinoIcons.waveform, size: 64, color: MacosColors.systemGrayColor),
+        const SizedBox(height: 24),
+
+        Text(l10n.chooseModel, style: AppTheme.display(context).copyWith(fontSize: 24)),
+        const SizedBox(height: 8),
+        Text(l10n.chooseModelDesc, style: AppTheme.caption(context)),
+        const SizedBox(height: 28),
+
+        if (!_showCustomModels) ...[
+          // --- Two big cards ---
+          _buildModeCard(
+            icon: CupertinoIcons.star_fill,
+            iconColor: Colors.amber,
+            title: l10n.modelSenseVoiceName,
+            subtitle: "中英日韩粤 · 自带标点 · ~228MB",
+            highlighted: true,
+            badge: l10n.recommended,
+            onTap: () {
+              setState(() => _selectedModelId = AppConstants.kDefaultModelId);
+              _nextStep();
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildModeCard(
+            icon: CupertinoIcons.slider_horizontal_3,
+            iconColor: MacosColors.systemGrayColor,
+            title: "自定义选择",
+            subtitle: "浏览全部 ${ModelManager.offlineModels.length} 个模型，包含方言和大容量模型",
+            highlighted: false,
+            onTap: () => setState(() {
+              _showCustomModels = true;
+              _selectedModelId = AppConstants.kDefaultModelId;
+            }),
+          ),
+        ] else ...[
+          // --- Custom model list ---
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                children: ModelManager.offlineModels
+                    .map((model) => _buildModelOption(model, l10n))
+                    .toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              PushButton(
+                controlSize: ControlSize.regular,
+                secondary: true,
+                onPressed: () => setState(() => _showCustomModels = false),
+                child: const Text("返回"),
+              ),
+              const SizedBox(width: 12),
+              PushButton(
+                controlSize: ControlSize.large,
+                onPressed: _nextStep,
+                child: const Text("继续"),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildModeCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool highlighted,
+    required VoidCallback onTap,
+    String? badge,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: highlighted
+                ? AppTheme.accentColor.withValues(alpha: 0.08)
+                : MacosColors.systemGrayColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: highlighted
+                  ? AppTheme.accentColor.withValues(alpha: 0.35)
+                  : MacosColors.systemGrayColor.withValues(alpha: 0.15),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (highlighted ? AppTheme.accentColor : MacosColors.systemGrayColor)
+                      .withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 22, color: iconColor),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: AppTheme.body(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (badge != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              badge,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.accentColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: AppTheme.caption(context).copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(CupertinoIcons.chevron_right, size: 16, color: MacosColors.systemGrayColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelOption(ModelInfo model, AppLocalizations l10n) {
+    final isSelected = _selectedModelId == model.id;
+    final isDefault = model.id == AppConstants.kDefaultModelId;
+    final name = _localizedModelName(model, l10n);
+    final desc = _localizedModelDesc(model, l10n);
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedModelId = model.id),
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.accentColor.withValues(alpha: 0.12)
+              : MacosColors.systemGrayColor.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.accentColor.withValues(alpha: 0.5)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppTheme.accentColor : MacosColors.systemGrayColor,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? Center(
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.accentColor,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          style: AppTheme.body(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      if (isDefault) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            l10n.recommended,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.accentColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          desc,
+                          style: AppTheme.caption(context).copyWith(fontSize: 11),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: model.hasPunctuation
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          model.hasPunctuation ? l10n.builtInPunctuation : l10n.needsPunctuationModel,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: model.hasPunctuation ? Colors.green : Colors.orange,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _localizedModelName(ModelInfo model, AppLocalizations l10n) {
+    switch (model.id) {
+      case 'sensevoice_zh_en_int8': return l10n.modelSenseVoiceName;
+      case 'sensevoice_zh_en_int8_2025': return l10n.modelSenseVoice2025Name;
+      case 'offline_paraformer_zh': return l10n.modelOfflineParaformerName;
+      case 'offline_paraformer_dialect_2025': return l10n.modelParaformerDialectName;
+      case 'whisper_large_v3': return l10n.modelWhisperName;
+      case 'fire_red_asr_large': return l10n.modelFireRedName;
+      default: return model.name;
+    }
+  }
+
+  String _localizedModelDesc(ModelInfo model, AppLocalizations l10n) {
+    switch (model.id) {
+      case 'sensevoice_zh_en_int8': return l10n.modelSenseVoiceDesc;
+      case 'sensevoice_zh_en_int8_2025': return l10n.modelSenseVoice2025Desc;
+      case 'offline_paraformer_zh': return l10n.modelOfflineParaformerDesc;
+      case 'offline_paraformer_dialect_2025': return l10n.modelParaformerDialectDesc;
+      case 'whisper_large_v3': return l10n.modelWhisperDesc;
+      case 'fire_red_asr_large': return l10n.modelFireRedDesc;
+      default: return model.description;
+    }
+  }
+
+  // Step 3: Download
   Widget _buildDownloadStep() {
+    final selectedModel = _modelManager.getModelById(_selectedModelId);
+    final modelName = selectedModel?.name ?? _selectedModelId;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const MacosIcon(CupertinoIcons.cloud_download, size: 64, color: MacosColors.systemGrayColor),
         const SizedBox(height: 24),
-        
+
         Text("下载语音模型", style: AppTheme.display(context).copyWith(fontSize: 24)),
         const SizedBox(height: 8),
-        Text("首次使用需要下载约 1GB 的语音识别模型", style: AppTheme.caption(context)),
+        Text("正在下载 $modelName", style: AppTheme.caption(context)),
         const SizedBox(height: 32),
-        
+
         // Progress
         Container(
           width: double.infinity,
@@ -427,8 +775,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
               if (_downloadError != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  _downloadError!.length > 100 
-                      ? "${_downloadError!.substring(0, 100)}..." 
+                  _downloadError!.length > 100
+                      ? "${_downloadError!.substring(0, 100)}..."
                       : _downloadError!,
                   style: AppTheme.caption(context).copyWith(color: Colors.red),
                   textAlign: TextAlign.center,
@@ -437,9 +785,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 32),
-        
+
         if (_downloadComplete)
           PushButton(
             controlSize: ControlSize.large,
@@ -453,7 +801,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               PushButton(
                 controlSize: ControlSize.regular,
                 secondary: true,
-                onPressed: _downloadDefaultModels,
+                onPressed: _downloadSelectedModel,
                 child: const Text("重试"),
               ),
               const SizedBox(width: 12),
@@ -468,14 +816,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
         else
           PushButton(
             controlSize: ControlSize.large,
-            onPressed: _downloadDefaultModels,
+            onPressed: _downloadSelectedModel,
             child: const Text("开始下载"),
           ),
       ],
     );
   }
 
-  // Step 3: Done
+  // Step 4: Done
   Widget _buildDoneStep() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -490,10 +838,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
           child: const Icon(CupertinoIcons.checkmark_alt, size: 48, color: Colors.white),
         ),
         const SizedBox(height: 32),
-        
+
         Text("设置完成!", style: AppTheme.display(context).copyWith(fontSize: 28)),
         const SizedBox(height: 16),
-        
+
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -528,9 +876,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 48),
-        
+
         PushButton(
           controlSize: ControlSize.large,
           onPressed: _finish,
