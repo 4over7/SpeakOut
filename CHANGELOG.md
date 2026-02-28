@@ -1,5 +1,22 @@
 # SpeakOut Version History
 
+## [1.3.0] - 2026-02-28
+
+### 新功能: Toggle 模式
+
+- **单击切换录音** — 新增 Toggle 录音模式：单击开始录音，再次单击结束并自动输出文字。适合走动、站立等不方便长按的场景。
+- **双 Toggle 快捷键** — 支持「文本注入」和「闪念笔记」两个独立 Toggle 快捷键，各自独立配置。
+- **共用键智能判定** — Toggle 键可与 PTT 键设为同一个键，系统用时间阈值自动区分：按住 < 1 秒释放为 Toggle 模式（录音继续），按住 ≥ 1 秒释放为 PTT 模式（立即停止）。
+- **最大录音时长保护** — 可选 1/3/5/10 分钟上限，到时自动停止录音，防止忘记关闭。设为「不限制」则无上限。
+- **设置页 UI** — 在「触发按键」下方新增「Toggle 模式」设置组，含快捷键编辑/清除、时长下拉、操作提示。
+- **完整 i18n** — 中英文 8 个新增 l10n 键。
+
+### 测试
+
+- **测试体系扩展** — 新增 ~117 个测试用例（总计 134），覆盖 CoreEngine、ChatService、DiaryService、LLM Golden。
+- **共享测试基础设施** — 提取 `test/helpers/` (MockPathProvider, FakeASRProvider)、Golden 测试锁定 LLM prompt。
+- **新增脚本** — `scripts/test_all.sh` (analyze + test + 覆盖率)、`docs/release_checklist.md`。
+
 ## [1.2.28] - 2026-02-27
 
 ### 国际化 (i18n)
