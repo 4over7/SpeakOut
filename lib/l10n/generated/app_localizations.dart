@@ -925,6 +925,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start Using'**
   String get onboardingBegin;
+
+  /// No description provided for @toggleMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Mode'**
+  String get toggleMode;
+
+  /// No description provided for @toggleInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Text Input'**
+  String get toggleInput;
+
+  /// No description provided for @toggleDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash Note'**
+  String get toggleDiary;
+
+  /// No description provided for @toggleMaxDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Recording Duration'**
+  String get toggleMaxDuration;
+
+  /// No description provided for @toggleMaxNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No Limit'**
+  String get toggleMaxNone;
+
+  /// No description provided for @toggleMaxMin.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String toggleMaxMin(Object count);
+
+  /// No description provided for @toggleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to start, tap again to stop. If same key as PTT, hold >1s for PTT mode.'**
+  String get toggleHint;
+
+  /// No description provided for @notSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Set'**
+  String get notSet;
 }
 
 class _AppLocalizationsDelegate

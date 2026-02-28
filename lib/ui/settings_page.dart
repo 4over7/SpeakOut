@@ -51,6 +51,12 @@ class _SettingsPageState extends State<SettingsPage> {
   // Diary Hotkey
   String _diaryKeyName = "Right Option";
   bool _isCapturingDiaryKey = false;
+  // Toggle Hotkeys
+  String _toggleInputKeyName = "";
+  String _toggleDiaryKeyName = "";
+  bool _isCapturingToggleInputKey = false;
+  bool _isCapturingToggleDiaryKey = false;
+  int _toggleMaxDuration = 0;
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
   StreamSubscription<int>? _keySubscription;
@@ -123,12 +129,27 @@ class _SettingsPageState extends State<SettingsPage> {
       _currentKeyCode = service.pttKeyCode;
       _currentKeyName = service.pttKeyName;
       _diaryKeyName = service.diaryKeyName;
+      _toggleInputKeyName = service.toggleInputKeyName;
+      _toggleDiaryKeyName = service.toggleDiaryKeyName;
+      _toggleMaxDuration = service.toggleMaxDuration;
     });
     _engine.pttKeyCode = _currentKeyCode;
   }
   
   Future<void> _saveHotkeyConfig(int keyCode, String keyName) async {
-    if (_isCapturingDiaryKey) {
+    if (_isCapturingToggleInputKey) {
+       await ConfigService().setToggleInputKey(keyCode, keyName);
+       setState(() {
+         _toggleInputKeyName = keyName;
+         _isCapturingToggleInputKey = false;
+       });
+    } else if (_isCapturingToggleDiaryKey) {
+       await ConfigService().setToggleDiaryKey(keyCode, keyName);
+       setState(() {
+         _toggleDiaryKeyName = keyName;
+         _isCapturingToggleDiaryKey = false;
+       });
+    } else if (_isCapturingDiaryKey) {
        await ConfigService().setDiaryKey(keyCode, keyName);
        setState(() {
          _diaryKeyName = keyName;
@@ -146,15 +167,19 @@ class _SettingsPageState extends State<SettingsPage> {
   }
   
   // --- Key Capture Logic ---
-  void _startKeyCapture({bool isDiary = false}) {
+  void _startKeyCapture({bool isDiary = false, bool isToggleInput = false, bool isToggleDiary = false}) {
     setState(() {
-       if (isDiary) {
+       if (isToggleInput) {
+         _isCapturingToggleInputKey = true;
+       } else if (isToggleDiary) {
+         _isCapturingToggleDiaryKey = true;
+       } else if (isDiary) {
          _isCapturingDiaryKey = true;
        } else {
          _isCapturingKey = true;
        }
     });
-    
+
     _keySubscription = _engine.rawKeyEventStream.listen((keyCode) {
        final keyName = _mapKeyCodeToString(keyCode);
        _saveHotkeyConfig(keyCode, keyName);
@@ -162,7 +187,7 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     // Timeout
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && (_isCapturingKey || _isCapturingDiaryKey)) {
+      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey)) {
         _stopKeyCapture();
       }
     });
@@ -189,7 +214,14 @@ class _SettingsPageState extends State<SettingsPage> {
   void _stopKeyCapture() {
     _keySubscription?.cancel();
     _keySubscription = null;
-    if (mounted) setState(() { _isCapturingKey = false; _isCapturingDiaryKey = false; });
+    if (mounted) {
+      setState(() {
+        _isCapturingKey = false;
+        _isCapturingDiaryKey = false;
+        _isCapturingToggleInputKey = false;
+        _isCapturingToggleDiaryKey = false;
+      });
+    }
   }
 
   Future<void> _pickDiaryFolder() async {
@@ -799,7 +831,125 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
            ],
         ),
-        
+
+        const SizedBox(height: 32),
+        // 3.2 Toggle Mode
+        SettingsGroup(
+          title: loc.toggleMode,
+          children: [
+            // Toggle Input key
+            SettingsTile(
+              label: loc.toggleInput,
+              icon: CupertinoIcons.text_cursor,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _isCapturingToggleInputKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _isCapturingToggleInputKey ? loc.pressAnyKey : (_toggleInputKeyName.isEmpty ? loc.notSet : _toggleInputKeyName),
+                      style: AppTheme.mono(context).copyWith(
+                        color: _isCapturingToggleInputKey ? Colors.white : (_toggleInputKeyName.isEmpty ? MacosColors.systemGrayColor : null),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  MacosIconButton(
+                    icon: const MacosIcon(CupertinoIcons.pencil),
+                    onPressed: () => _startKeyCapture(isToggleInput: true),
+                  ),
+                  if (_toggleInputKeyName.isNotEmpty)
+                    MacosIconButton(
+                      icon: const MacosIcon(CupertinoIcons.trash),
+                      onPressed: () async {
+                        await ConfigService().clearToggleInputKey();
+                        setState(() => _toggleInputKeyName = "");
+                      },
+                    ),
+                ],
+              ),
+            ),
+            const SettingsDivider(),
+            // Toggle Diary key
+            SettingsTile(
+              label: loc.toggleDiary,
+              icon: CupertinoIcons.book,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _isCapturingToggleDiaryKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _isCapturingToggleDiaryKey ? loc.pressAnyKey : (_toggleDiaryKeyName.isEmpty ? loc.notSet : _toggleDiaryKeyName),
+                      style: AppTheme.mono(context).copyWith(
+                        color: _isCapturingToggleDiaryKey ? Colors.white : (_toggleDiaryKeyName.isEmpty ? MacosColors.systemGrayColor : null),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  MacosIconButton(
+                    icon: const MacosIcon(CupertinoIcons.pencil),
+                    onPressed: () => _startKeyCapture(isToggleDiary: true),
+                  ),
+                  if (_toggleDiaryKeyName.isNotEmpty)
+                    MacosIconButton(
+                      icon: const MacosIcon(CupertinoIcons.trash),
+                      onPressed: () async {
+                        await ConfigService().clearToggleDiaryKey();
+                        setState(() => _toggleDiaryKeyName = "");
+                      },
+                    ),
+                ],
+              ),
+            ),
+            const SettingsDivider(),
+            // Max recording duration
+            SettingsTile(
+              label: loc.toggleMaxDuration,
+              icon: CupertinoIcons.timer,
+              child: MacosPopupButton<int>(
+                value: _toggleMaxDuration,
+                items: [
+                  MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
+                  MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
+                  MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
+                  MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
+                  MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
+                ],
+                onChanged: (v) async {
+                  if (v != null) {
+                    await ConfigService().setToggleMaxDuration(v);
+                    setState(() => _toggleMaxDuration = v);
+                  }
+                },
+              ),
+            ),
+            const SettingsDivider(),
+            // Hint text
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  MacosIcon(CupertinoIcons.info_circle, color: MacosColors.systemGrayColor, size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.toggleHint,
+                      style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
         const SizedBox(height: 32),
         // 3.5 ASR Post-processing (De-duplication)
         SettingsGroup(

@@ -89,6 +89,36 @@ class ConfigService {
   }
   Future<void> setDiaryDirectory(String path) async => await _prefs?.setString('diary_directory', path);
 
+  // --- Toggle Input (Text Injection) ---
+  bool get toggleInputEnabled => toggleInputKeyCode != 0;
+  int get toggleInputKeyCode => _prefs?.getInt('toggle_input_key_code') ?? AppConstants.kDefaultToggleInputKeyCode;
+  String get toggleInputKeyName => _prefs?.getString('toggle_input_key_name') ?? AppConstants.kDefaultToggleInputKeyName;
+  Future<void> setToggleInputKey(int code, String name) async {
+    await _prefs?.setInt('toggle_input_key_code', code);
+    await _prefs?.setString('toggle_input_key_name', name);
+  }
+  Future<void> clearToggleInputKey() async {
+    await _prefs?.remove('toggle_input_key_code');
+    await _prefs?.remove('toggle_input_key_name');
+  }
+
+  // --- Toggle Diary (Flash Note) ---
+  bool get toggleDiaryEnabled => toggleDiaryKeyCode != 0;
+  int get toggleDiaryKeyCode => _prefs?.getInt('toggle_diary_key_code') ?? AppConstants.kDefaultToggleDiaryKeyCode;
+  String get toggleDiaryKeyName => _prefs?.getString('toggle_diary_key_name') ?? AppConstants.kDefaultToggleDiaryKeyName;
+  Future<void> setToggleDiaryKey(int code, String name) async {
+    await _prefs?.setInt('toggle_diary_key_code', code);
+    await _prefs?.setString('toggle_diary_key_name', name);
+  }
+  Future<void> clearToggleDiaryKey() async {
+    await _prefs?.remove('toggle_diary_key_code');
+    await _prefs?.remove('toggle_diary_key_name');
+  }
+
+  // --- Toggle Shared Config ---
+  int get toggleMaxDuration => _prefs?.getInt('toggle_max_duration') ?? AppConstants.kDefaultToggleMaxDuration;
+  Future<void> setToggleMaxDuration(int seconds) async => await _prefs?.setInt('toggle_max_duration', seconds);
+
   // --- Model ---
 
   String get activeModelId => _prefs?.getString(AppConstants.kKeyActiveModelId) ?? AppConstants.kDefaultModelId;

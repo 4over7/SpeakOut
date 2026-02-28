@@ -41,6 +41,14 @@ class AppConstants {
 3. 增加标点。
 4. 仅输出修复后的文本内容，不要输出标签。""";
 
+  // Toggle Mode Defaults
+  static const int kDefaultToggleInputKeyCode = 0;   // 0 = disabled
+  static const String kDefaultToggleInputKeyName = "";
+  static const int kDefaultToggleDiaryKeyCode = 0;   // 0 = disabled
+  static const String kDefaultToggleDiaryKeyName = "";
+  static const int kDefaultToggleMaxDuration = 0;     // 0 = no limit (seconds)
+  static const int kToggleThresholdMs = 1000;          // PTT/Toggle threshold
+
   // ASR De-duplication (post-processing)
   static const bool kDefaultDeduplicationEnabled = true;
 

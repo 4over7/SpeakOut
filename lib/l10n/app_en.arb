@@ -167,5 +167,18 @@
   "onboardingDoneTitle": "Setup Complete!",
   "onboardingHoldToSpeak": "Hold to speak",
   "onboardingDoneDesc": "Release to auto-type at cursor position",
-  "onboardingBegin": "Start Using"
+  "onboardingBegin": "Start Using",
+  "toggleMode": "Toggle Mode",
+  "toggleInput": "Text Input",
+  "toggleDiary": "Flash Note",
+  "toggleMaxDuration": "Max Recording Duration",
+  "toggleMaxNone": "No Limit",
+  "toggleMaxMin": "{count} min",
+  "@toggleMaxMin": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "toggleHint": "Tap to start, tap again to stop. If same key as PTT, hold >1s for PTT mode.",
+  "notSet": "Not Set"
 }

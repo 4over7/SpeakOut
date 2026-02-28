@@ -454,4 +454,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingBegin => 'Start Using';
+
+  @override
+  String get toggleMode => 'Toggle Mode';
+
+  @override
+  String get toggleInput => 'Text Input';
+
+  @override
+  String get toggleDiary => 'Flash Note';
+
+  @override
+  String get toggleMaxDuration => 'Max Recording Duration';
+
+  @override
+  String get toggleMaxNone => 'No Limit';
+
+  @override
+  String toggleMaxMin(Object count) {
+    return '$count min';
+  }
+
+  @override
+  String get toggleHint =>
+      'Tap to start, tap again to stop. If same key as PTT, hold >1s for PTT mode.';
+
+  @override
+  String get notSet => 'Not Set';
 }

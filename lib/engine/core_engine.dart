@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../ffi/native_input.dart';
 import '../ffi/native_input_base.dart';
+import '../config/app_constants.dart';
 import '../services/config_service.dart';
 import '../services/llm_service.dart';
 import 'asr_provider.dart';
@@ -130,6 +131,7 @@ class CoreEngine {
     _asrSubscription?.cancel();
     _nativeCallable?.close();
     _watchdogTimer?.cancel();
+    _toggleMaxTimer?.cancel();
     _stopAudioPolling();
     if (_pollBuffer != null) {
       pkg_ffi.calloc.free(_pollBuffer!);
@@ -140,13 +142,14 @@ class CoreEngine {
 
   /// De-duplicate repeated characters AND phrases
   /// Handles: "识识别" → "识别", "还是还是" → "还是", "一下一下" → "一下"
-  String _deduplicateText(String text) {
+  @visibleForTesting
+  static String deduplicateText(String text) {
     if (text.length < 2) return text;
     String result = text;
     
     // Phase 1: Remove repeated phrases (longest first: 4, 3, 2 chars)
     for (int phraseLen = 4; phraseLen >= 2; phraseLen--) {
-      result = _removeRepeatedPhrases(result, phraseLen);
+      result = removeRepeatedPhrases(result, phraseLen);
     }
     
     // Phase 2: Remove consecutive identical characters
@@ -164,7 +167,8 @@ class CoreEngine {
   
   /// Remove immediately repeated phrases of given length
   /// e.g., for len=2: "还是还是好" → "还是好"
-  String _removeRepeatedPhrases(String text, int len) {
+  @visibleForTesting
+  static String removeRepeatedPhrases(String text, int len) {
     if (text.length < len * 2) return text;
     final buffer = StringBuffer();
     int i = 0;
@@ -438,6 +442,11 @@ class CoreEngine {
     CoreEngine()._handleKey(keyCode, isDown);
   }
 
+  // Toggle mode state
+  bool _isToggleMode = false;        // Current recording was started by toggle
+  Timer? _toggleMaxTimer;            // Max recording duration timer
+  DateTime? _keyDownTime;            // Shared-key press timestamp for PTT vs Toggle
+
   // Key state debouncing
   bool _pttKeyHeld = false;
   bool _diaryKeyHeld = false;
@@ -447,18 +456,116 @@ class CoreEngine {
     // macOS 26+: Globe/Fn key sends keyCode 179 (kCGEventKeyDown) in addition
     // to legacy keyCode 63 (kCGEventFlagsChanged). Normalize so users who
     // configured Fn (63) still get matched when Globe (179) arrives.
-    // NOTE: native_input.m also maps 179→63, but this Dart-side mapping is
-    // retained as defense-in-depth in case native mapping is bypassed.
     if (keyCode == 179) keyCode = 63;
 
-    _log("[KeyEvent] code=$keyCode, isDown=$isDown, pttKey=$pttKeyCode, state=$_recordingState");
+    _log("[KeyEvent] code=$keyCode, isDown=$isDown, pttKey=$pttKeyCode, state=$_recordingState, toggle=$_isToggleMode");
     if (isDown) _rawKeyController.add(keyCode);
 
-    // Match key to mode
+    final config = ConfigService();
+    final toggleInputCode = config.toggleInputKeyCode;
+    final toggleDiaryCode = config.toggleDiaryKeyCode;
+
+    // 1. Toggle stop: if toggle recording is active and the same toggle key is pressed again
+    if (isDown && _isToggleMode && _recordingState == RecordingState.recording) {
+      if ((_recordingMode == RecordingMode.ptt && toggleInputCode == keyCode) ||
+          (_recordingMode == RecordingMode.diary && toggleDiaryCode == keyCode)) {
+        _log("[Toggle] Second tap → stopRecording");
+        stopRecording();
+        return;
+      }
+    }
+
+    // 2. Shared key: toggle key == PTT/diary key → use time-threshold logic
+    final bool isSharedPtt = toggleInputCode != 0 && toggleInputCode == pttKeyCode && keyCode == pttKeyCode;
+    final bool isSharedDiary = toggleDiaryCode != 0 && config.diaryEnabled && toggleDiaryCode == config.diaryKeyCode && keyCode == config.diaryKeyCode;
+
+    if (isSharedPtt) {
+      _handleSharedKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
+      return;
+    }
+    if (isSharedDiary) {
+      _handleSharedKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
+      return;
+    }
+
+    // 3. Independent toggle keys (not shared with PTT/diary)
+    if (isDown && toggleInputCode != 0 && keyCode == toggleInputCode) {
+      _handleToggleKey(RecordingMode.ptt);
+      return;
+    }
+    if (isDown && toggleDiaryCode != 0 && keyCode == toggleDiaryCode) {
+      _handleToggleKey(RecordingMode.diary);
+      return;
+    }
+
+    // 4. Pure PTT / diary keys (existing logic)
     if (keyCode == pttKeyCode) {
       _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
-    } else if (ConfigService().diaryEnabled && keyCode == ConfigService().diaryKeyCode) {
+    } else if (config.diaryEnabled && keyCode == config.diaryKeyCode) {
       _handleModeKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
+    }
+  }
+
+  /// Handle independent toggle key (only responds to keyDown)
+  void _handleToggleKey(RecordingMode mode) {
+    if (_recordingState == RecordingState.idle) {
+      _log("[Toggle] Independent key → startRecording (mode=${mode.name})");
+      _isToggleMode = true;
+      startRecording(mode: mode);
+      _startToggleMaxTimer();
+    }
+    // If already recording in toggle mode, stop is handled at the top of _handleKey
+  }
+
+  /// Handle shared key (toggle key == PTT/diary key) with time-threshold
+  void _handleSharedKey(bool isDown, RecordingMode mode, bool wasHeld, void Function(bool) setHeld) {
+    if (isDown) {
+      if (!wasHeld) {
+        setHeld(true);
+        _keyDownTime = DateTime.now();
+        if (_recordingState == RecordingState.idle) {
+          _log("[Shared] Key down → startRecording (mode=${mode.name})");
+          startRecording(mode: mode);
+        }
+      }
+    } else {
+      setHeld(false);
+      if (_recordingMode == mode && (_recordingState == RecordingState.recording || _recordingState == RecordingState.starting)) {
+        final holdMs = _keyDownTime != null
+            ? DateTime.now().difference(_keyDownTime!).inMilliseconds
+            : AppConstants.kToggleThresholdMs; // default to PTT if no timestamp
+        _keyDownTime = null;
+
+        if (holdMs < AppConstants.kToggleThresholdMs) {
+          // Short press → toggle mode (keep recording)
+          _log("[Shared] Short press (${holdMs}ms) → Toggle mode");
+          _isToggleMode = true;
+          _watchdogTimer?.cancel(); // No watchdog for toggle
+          _startToggleMaxTimer();
+        } else {
+          // Long press → PTT mode (stop recording)
+          _log("[Shared] Long press (${holdMs}ms) → PTT stop");
+          if (_recordingState == RecordingState.recording) {
+            stopRecording();
+          } else if (_recordingState == RecordingState.starting) {
+            _deferredStop = true;
+          }
+        }
+      }
+    }
+  }
+
+  /// Start max duration timer for toggle mode
+  void _startToggleMaxTimer() {
+    _toggleMaxTimer?.cancel();
+    final maxSec = ConfigService().toggleMaxDuration;
+    if (maxSec > 0) {
+      _toggleMaxTimer = Timer(Duration(seconds: maxSec), () {
+        if (_isToggleMode && _recordingState == RecordingState.recording) {
+          _log("[Toggle] Max duration ($maxSec s) reached → auto stop");
+          stopRecording();
+        }
+      });
     }
   }
 
@@ -528,9 +635,9 @@ class CoreEngine {
       await _asrProvider!.start();
       _log("ASR Provider Started.");
 
-      // 4. WATCHDOG (PTT only — diary has reliable key-up)
+      // 4. WATCHDOG (PTT only — diary has reliable key-up, toggle doesn't need it)
       _watchdogTimer?.cancel();
-      if (mode == RecordingMode.ptt) {
+      if (mode == RecordingMode.ptt && !_isToggleMode) {
         _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
           if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
           final isPhysicallyDown = _nativeInput.isKeyPressed(pttKeyCode);
@@ -631,6 +738,9 @@ class CoreEngine {
      _recordingState = RecordingState.idle;
      _audioStarted = false;
      _deferredStop = false;
+     _isToggleMode = false;
+     _toggleMaxTimer?.cancel();
+     _toggleMaxTimer = null;
      _stopAudioPolling();
      _watchdogTimer?.cancel();
      _recordingController.add(false);
@@ -653,6 +763,11 @@ class CoreEngine {
 
     final sw = Stopwatch()..start();
     _log("[PERF] stopRecording BEGIN");
+
+    // Clean up toggle state
+    _isToggleMode = false;
+    _toggleMaxTimer?.cancel();
+    _toggleMaxTimer = null;
 
     // Transition: recording → stopping
     _recordingState = RecordingState.stopping;
@@ -696,9 +811,9 @@ class CoreEngine {
 
       String finalText = text;
 
-      // Post-processing: De-duplicate
-      if (finalText.isNotEmpty && ConfigService().deduplicationEnabled) {
-        finalText = _deduplicateText(finalText);
+      // Post-processing: De-duplicate (仅流式 ASR 需要，离线和云端不会产生滑动窗口重复)
+      if (finalText.isNotEmpty && ConfigService().deduplicationEnabled && !_isOfflineASR && ConfigService().asrEngineType != 'aliyun') {
+        finalText = deduplicateText(finalText);
         _log("[PERF] +${sw.elapsedMilliseconds}ms — dedup done");
       }
 
@@ -718,7 +833,7 @@ class CoreEngine {
       // Fallback: Local Punctuation (Sherpa only, skip if model has built-in punctuation)
       final bool isLocalEngine = ConfigService().asrEngineType == 'sherpa';
       if (finalText.isNotEmpty && _punctuationEnabled && isLocalEngine && !_activeModelHasPunctuation) {
-        if (!_hasTerminalPunctuation(finalText)) {
+        if (!hasTerminalPunctuation(finalText)) {
           final temp = addPunctuation(finalText);
           if (temp != finalText) {
             finalText = temp;
@@ -759,7 +874,8 @@ class CoreEngine {
     _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");
   }
   
-  bool _hasTerminalPunctuation(String text) {
+  @visibleForTesting
+  static bool hasTerminalPunctuation(String text) {
     if (text.trim().isEmpty) return false;
     final trimmed = text.trim();
     final lastChar = trimmed[trimmed.length - 1]; // standard string indexing

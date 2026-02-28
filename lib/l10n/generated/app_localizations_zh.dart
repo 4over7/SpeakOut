@@ -435,4 +435,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onboardingBegin => '开始使用';
+
+  @override
+  String get toggleMode => 'Toggle 模式';
+
+  @override
+  String get toggleInput => '文本注入';
+
+  @override
+  String get toggleDiary => '闪念笔记';
+
+  @override
+  String get toggleMaxDuration => '最大录音时长';
+
+  @override
+  String get toggleMaxNone => '不限制';
+
+  @override
+  String toggleMaxMin(Object count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get toggleHint => '单击开始录音，再次单击结束。若与 PTT 同键，按住超过 1 秒为长按模式。';
+
+  @override
+  String get notSet => '未设置';
 }
