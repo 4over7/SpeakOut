@@ -1,5 +1,16 @@
 # SpeakOut Version History
 
+## [1.3.3] - 2026-02-28
+
+### 新功能: 模型手动导入
+
+- **手动导入** — 下载失败时可选择本地 `.tar.bz2` 文件导入，解决 GitHub 访问受限或网络不稳定的问题。
+- **设置页增强** — 语音模型 tab 未下载状态新增「导入」按钮和 GitHub 直链图标，方便用户在浏览器中手动下载。
+- **引导页增强** — 下载失败 UI 新增「导入」按钮和「手动下载」链接，提供完整备用方案。
+- **ModelManager 重构** — 提取 `_extractAndInstallModel` 公共方法，下载和导入共用解压→验证→激活流程。
+- **原生文件选择器** — AppDelegate 新增 `pickFile` 方法（NSOpenPanel），过滤 `.bz2` 文件类型。
+- **i18n** — 新增 4 个国际化键 (`importModel`, `manualDownload`, `importModelDesc`, `importing`)。
+
 ## [1.3.2] - 2026-02-28
 
 ### Bug 修复: FN 键 Toggle 模式无响应
