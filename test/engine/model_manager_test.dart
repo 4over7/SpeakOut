@@ -264,7 +264,9 @@ void main() {
     test('TOKENS.txt (大写) → macOS HFS+ 大小写不敏感，仍匹配', () async {
       createFakeModelDir(model, tokenFileName: 'TOKENS.txt');
       // macOS 默认文件系统大小写不敏感，所以 TOKENS.txt == tokens.txt
-      expect(await manager.isModelDownloaded(model.id), isTrue);
+      // Linux/Windows 文件系统大小写敏感，TOKENS.txt ≠ tokens.txt
+      expect(await manager.isModelDownloaded(model.id),
+          Platform.isMacOS ? isTrue : isFalse);
     });
 
     test('tokens.json (错误扩展名) → false', () async {
