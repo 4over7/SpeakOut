@@ -135,7 +135,8 @@ void main() {
         goldenFile.writeAsStringSync(actual);
       }
 
-      final goldenContent = goldenFile.readAsStringSync().trim();
+      // 统一行尾为 \n，避免 Windows (\r\n) vs Unix (\n) 差异导致误报
+      final goldenContent = goldenFile.readAsStringSync().trim().replaceAll('\r\n', '\n');
       // If mismatch, update golden and fail so developer notices the change
       if (actual != goldenContent) {
         goldenFile.writeAsStringSync(actual);
