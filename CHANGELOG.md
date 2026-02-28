@@ -1,5 +1,23 @@
 # SpeakOut Version History
 
+## [1.4.0] - 2026-02-28
+
+### 新功能: 跨平台架构 + CI/CD
+
+#### 跨平台架构 (Phase 0 + Phase 1)
+- **NativeInputFFI 共用基类** — 提取 FFI 绑定公共代码，消除 macOS/Windows 间 ~400 行重复。所有平台只需实现动态库路径查找。
+- **工厂方法分发** — `createNativeInput()` 按 `Platform` 自动选择 `NativeInput` (macOS) 或 `NativeInputWindows` (Windows)。
+- **Windows 原生库** — `native_input.cpp` (~550 行 C++) 实现全部 21 个导出函数：WH_KEYBOARD_LL 键盘监听、SendInput 文本注入、WASAPI 音频采集、IMMDeviceEnumerator 设备管理。
+- **Windows UI** — 4 个 fluent_ui 页面 (FluentApp + NavigationView)：首页、设置、聊天、系统托盘。
+- **Windows 平台 runner** — `flutter create --platforms=windows` 生成标准 runner 配置。
+- **ConfigService 条件化** — `MacOsOptions` 仅在 macOS 生效，其他平台使用默认 SecureStorage。
+- **OverlayController 兼容** — 非 macOS 平台 no-op，不依赖 NSPanel。
+
+#### GitHub Actions CI
+- **三平台 CI** — macOS / Windows / Linux 并行构建：静态分析 → 测试 → 原生库编译 → Flutter 构建。
+- **全部 134 测试通过** — 三个平台测试全绿。
+- **跨平台测试兼容** — 修复文件系统大小写敏感性差异 (NTFS/HFS+/ext4) 和行尾格式差异 (CRLF/LF)。
+
 ## [1.3.3] - 2026-02-28
 
 ### 新功能: 模型手动导入
