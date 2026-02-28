@@ -926,23 +926,35 @@ abstract class AppLocalizations {
   /// **'Start Using'**
   String get onboardingBegin;
 
-  /// No description provided for @toggleMode.
+  /// No description provided for @tabTrigger.
   ///
   /// In en, this message translates to:
-  /// **'Toggle Mode'**
-  String get toggleMode;
+  /// **'Triggers'**
+  String get tabTrigger;
 
-  /// No description provided for @toggleInput.
+  /// No description provided for @pttMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to Speak (PTT)'**
+  String get pttMode;
+
+  /// No description provided for @toggleModeTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to Toggle'**
+  String get toggleModeTip;
+
+  /// No description provided for @textInjection.
   ///
   /// In en, this message translates to:
   /// **'Text Input'**
-  String get toggleInput;
+  String get textInjection;
 
-  /// No description provided for @toggleDiary.
+  /// No description provided for @recordingProtection.
   ///
   /// In en, this message translates to:
-  /// **'Flash Note'**
-  String get toggleDiary;
+  /// **'Recording Protection'**
+  String get recordingProtection;
 
   /// No description provided for @toggleMaxDuration.
   ///

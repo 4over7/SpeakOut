@@ -437,13 +437,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingBegin => '开始使用';
 
   @override
-  String get toggleMode => 'Toggle 模式';
+  String get tabTrigger => '触发方式';
 
   @override
-  String get toggleInput => '文本注入';
+  String get pttMode => '长按说话 (PTT)';
 
   @override
-  String get toggleDiary => '闪念笔记';
+  String get toggleModeTip => '单击切换 (Toggle)';
+
+  @override
+  String get textInjection => '文本注入';
+
+  @override
+  String get recordingProtection => '录音保护';
 
   @override
   String get toggleMaxDuration => '最大录音时长';

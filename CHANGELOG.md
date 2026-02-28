@@ -1,5 +1,14 @@
 # SpeakOut Version History
 
+## [1.3.1] - 2026-02-28
+
+### 设置页分类重组
+
+- **通用 tab 精简** — 移走 PTT 快捷键、Toggle 模式、ASR 去重 3 个分组，仅保留语言、音频输入、AI 纠错。
+- **新增「触发方式」tab** — 原「闪念笔记」tab 扩展重命名，合并所有触发相关设置：文本注入组（PTT + Toggle）、闪念笔记组（启用 + PTT + Toggle + 保存目录）、录音保护组（最大时长 + ASR 去重 + 提示）。
+- **提取 `_buildKeyCaptureTile` 辅助方法** — 消除快捷键 UI 重复代码，5 处快捷键编辑复用同一组件。
+- **i18n 新增 5 个键** — `tabTrigger`、`pttMode`、`toggleModeTip`、`textInjection`、`recordingProtection`；移除 3 个旧键。
+
 ## [1.3.0] - 2026-02-28
 
 ### 新功能: Toggle 模式

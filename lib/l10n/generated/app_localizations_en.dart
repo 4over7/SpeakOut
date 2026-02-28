@@ -456,13 +456,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingBegin => 'Start Using';
 
   @override
-  String get toggleMode => 'Toggle Mode';
+  String get tabTrigger => 'Triggers';
 
   @override
-  String get toggleInput => 'Text Input';
+  String get pttMode => 'Hold to Speak (PTT)';
 
   @override
-  String get toggleDiary => 'Flash Note';
+  String get toggleModeTip => 'Tap to Toggle';
+
+  @override
+  String get textInjection => 'Text Input';
+
+  @override
+  String get recordingProtection => 'Recording Protection';
 
   @override
   String get toggleMaxDuration => 'Max Recording Duration';

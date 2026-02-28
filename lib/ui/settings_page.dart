@@ -420,8 +420,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabModels, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 2 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 2 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
@@ -448,7 +448,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Builder(builder: (_) {
                        if (_selectedIndex == 0) return _buildGeneralView();
                        if (_selectedIndex == 1) return _buildModelsView();
-                       if (_selectedIndex == 2) return _buildDiaryView();
+                       if (_selectedIndex == 2) return _buildTriggerView();
                        return _buildAboutView(context, _version);
                     }),
                   ),
@@ -798,174 +798,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         
 
-        const SizedBox(height: 32),
-        // 3. Shortcuts
-        SettingsGroup(
-          title: loc.triggerKey,
-          children: [
-            SettingsTile(
-              label: loc.triggerKeyDesc,
-              icon: CupertinoIcons.keyboard,
-              child: Row(
-                children: [
-                   Container(
-                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                     decoration: BoxDecoration(
-                       color: _isCapturingKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha:0.2),
-                       borderRadius: BorderRadius.circular(6),
-                     ),
-                     child: Text(
-                       _isCapturingKey ? loc.pressAnyKey : _currentKeyName,
-                       style: AppTheme.mono(context).copyWith(
-                         color: _isCapturingKey ? Colors.white : null
-                       ),
-                     ),
-                   ),
-                   const SizedBox(width: 8),
-                   MacosIconButton(
-                     icon: const MacosIcon(CupertinoIcons.pencil),
-                     onPressed: _startKeyCapture,
-                   ),
-                ],
-              ),
-            ),
-           ],
-        ),
 
-        const SizedBox(height: 32),
-        // 3.2 Toggle Mode
-        SettingsGroup(
-          title: loc.toggleMode,
-          children: [
-            // Toggle Input key
-            SettingsTile(
-              label: loc.toggleInput,
-              icon: CupertinoIcons.text_cursor,
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _isCapturingToggleInputKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _isCapturingToggleInputKey ? loc.pressAnyKey : (_toggleInputKeyName.isEmpty ? loc.notSet : _toggleInputKeyName),
-                      style: AppTheme.mono(context).copyWith(
-                        color: _isCapturingToggleInputKey ? Colors.white : (_toggleInputKeyName.isEmpty ? MacosColors.systemGrayColor : null),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  MacosIconButton(
-                    icon: const MacosIcon(CupertinoIcons.pencil),
-                    onPressed: () => _startKeyCapture(isToggleInput: true),
-                  ),
-                  if (_toggleInputKeyName.isNotEmpty)
-                    MacosIconButton(
-                      icon: const MacosIcon(CupertinoIcons.trash),
-                      onPressed: () async {
-                        await ConfigService().clearToggleInputKey();
-                        setState(() => _toggleInputKeyName = "");
-                      },
-                    ),
-                ],
-              ),
-            ),
-            const SettingsDivider(),
-            // Toggle Diary key
-            SettingsTile(
-              label: loc.toggleDiary,
-              icon: CupertinoIcons.book,
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _isCapturingToggleDiaryKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _isCapturingToggleDiaryKey ? loc.pressAnyKey : (_toggleDiaryKeyName.isEmpty ? loc.notSet : _toggleDiaryKeyName),
-                      style: AppTheme.mono(context).copyWith(
-                        color: _isCapturingToggleDiaryKey ? Colors.white : (_toggleDiaryKeyName.isEmpty ? MacosColors.systemGrayColor : null),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  MacosIconButton(
-                    icon: const MacosIcon(CupertinoIcons.pencil),
-                    onPressed: () => _startKeyCapture(isToggleDiary: true),
-                  ),
-                  if (_toggleDiaryKeyName.isNotEmpty)
-                    MacosIconButton(
-                      icon: const MacosIcon(CupertinoIcons.trash),
-                      onPressed: () async {
-                        await ConfigService().clearToggleDiaryKey();
-                        setState(() => _toggleDiaryKeyName = "");
-                      },
-                    ),
-                ],
-              ),
-            ),
-            const SettingsDivider(),
-            // Max recording duration
-            SettingsTile(
-              label: loc.toggleMaxDuration,
-              icon: CupertinoIcons.timer,
-              child: MacosPopupButton<int>(
-                value: _toggleMaxDuration,
-                items: [
-                  MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
-                  MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
-                  MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
-                  MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
-                  MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
-                ],
-                onChanged: (v) async {
-                  if (v != null) {
-                    await ConfigService().setToggleMaxDuration(v);
-                    setState(() => _toggleMaxDuration = v);
-                  }
-                },
-              ),
-            ),
-            const SettingsDivider(),
-            // Hint text
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  MacosIcon(CupertinoIcons.info_circle, color: MacosColors.systemGrayColor, size: 14),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      loc.toggleHint,
-                      style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 32),
-        // 3.5 ASR Post-processing (De-duplication)
-        SettingsGroup(
-          title: "ASR Post-processing",
-          children: [
-            SettingsTile(
-              label: "De-duplicate (去重)",
-              icon: CupertinoIcons.textformat_abc,
-              child: MacosSwitch(
-                value: ConfigService().deduplicationEnabled,
-                onChanged: (v) async { await ConfigService().setDeduplicationEnabled(v); setState((){}); },
-              ),
-            ),
-          ],
-        ),
-        
         const SizedBox(height: 32),
         // 4. Config (AI Correction)
         SettingsGroup(
@@ -1141,75 +974,188 @@ class _SettingsPageState extends State<SettingsPage> {
 
 
   
-  Widget _buildDiaryView() {
+  Widget _buildKeyCaptureTile(String label, IconData icon, {
+    required bool isCapturing,
+    required String keyName,
+    required VoidCallback onEdit,
+    VoidCallback? onClear,
+  }) {
+    final loc = AppLocalizations.of(context)!;
+    final displayName = keyName.isEmpty ? loc.notSet : keyName;
+    return SettingsTile(
+      label: label,
+      icon: icon,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isCapturing ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              isCapturing ? loc.pressAnyKey : displayName,
+              style: AppTheme.mono(context).copyWith(
+                color: isCapturing ? Colors.white : (keyName.isEmpty ? MacosColors.systemGrayColor : null),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          MacosIconButton(
+            icon: const MacosIcon(CupertinoIcons.pencil),
+            onPressed: onEdit,
+          ),
+          if (onClear != null && keyName.isNotEmpty)
+            MacosIconButton(
+              icon: const MacosIcon(CupertinoIcons.trash),
+              onPressed: onClear,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTriggerView() {
     final loc = AppLocalizations.of(context)!;
     return Column(
       children: [
+        // 1. Text Injection group
+        SettingsGroup(
+          title: loc.textInjection,
+          children: [
+            _buildKeyCaptureTile(
+              loc.pttMode, CupertinoIcons.keyboard,
+              isCapturing: _isCapturingKey,
+              keyName: _currentKeyName,
+              onEdit: _startKeyCapture,
+            ),
+            const SettingsDivider(),
+            _buildKeyCaptureTile(
+              loc.toggleModeTip, CupertinoIcons.text_cursor,
+              isCapturing: _isCapturingToggleInputKey,
+              keyName: _toggleInputKeyName,
+              onEdit: () => _startKeyCapture(isToggleInput: true),
+              onClear: () async {
+                await ConfigService().clearToggleInputKey();
+                setState(() => _toggleInputKeyName = "");
+              },
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // 2. Flash Note group
         SettingsGroup(
           title: loc.diaryMode,
           children: [
-             SettingsTile(
-               label: loc.enabled,
-               icon: CupertinoIcons.book,
-               child: MacosSwitch(
-                 value: ConfigService().diaryEnabled,
-                 onChanged: (v) async { await ConfigService().setDiaryEnabled(v); setState((){}); },
-               ),
-             ),
-             if (ConfigService().diaryEnabled) ...[
-                const SettingsDivider(),
-                SettingsTile(
-                  label: loc.diaryTrigger,
-                  icon: CupertinoIcons.keyboard_chevron_compact_down,
-                  child: Row(
-                    children: [
-                       Container(
-                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                         decoration: BoxDecoration(
-                           color: _isCapturingDiaryKey ? AppTheme.getAccent(context) : MacosColors.systemGrayColor.withValues(alpha:0.2),
-                           borderRadius: BorderRadius.circular(6),
-                         ),
-                         child: Text(
-                           _isCapturingDiaryKey ? loc.pressAnyKey : _diaryKeyName,
-                           style: AppTheme.mono(context).copyWith(
-                             color: _isCapturingDiaryKey ? Colors.white : null
-                           ),
-                         ),
-                       ),
-                       const SizedBox(width: 8),
-                       MacosIconButton(
-                         icon: const MacosIcon(CupertinoIcons.pencil),
-                         onPressed: () => _startKeyCapture(isDiary: true),
-                       ),
-                    ],
-                  ),
+            SettingsTile(
+              label: loc.enabled,
+              icon: CupertinoIcons.book,
+              child: MacosSwitch(
+                value: ConfigService().diaryEnabled,
+                onChanged: (v) async { await ConfigService().setDiaryEnabled(v); setState((){}); },
+              ),
+            ),
+            if (ConfigService().diaryEnabled) ...[
+              const SettingsDivider(),
+              _buildKeyCaptureTile(
+                loc.pttMode, CupertinoIcons.keyboard_chevron_compact_down,
+                isCapturing: _isCapturingDiaryKey,
+                keyName: _diaryKeyName,
+                onEdit: () => _startKeyCapture(isDiary: true),
+              ),
+              const SettingsDivider(),
+              _buildKeyCaptureTile(
+                loc.toggleModeTip, CupertinoIcons.book,
+                isCapturing: _isCapturingToggleDiaryKey,
+                keyName: _toggleDiaryKeyName,
+                onEdit: () => _startKeyCapture(isToggleDiary: true),
+                onClear: () async {
+                  await ConfigService().clearToggleDiaryKey();
+                  setState(() => _toggleDiaryKeyName = "");
+                },
+              ),
+              const SettingsDivider(),
+              SettingsTile(
+                label: loc.diaryPath,
+                icon: CupertinoIcons.folder,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 150),
+                      child: Text(
+                        ConfigService().diaryDirectory.split('/').last,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.caption(context),
+                        maxLines: 1,
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    MacosIconButton(
+                      icon: const MacosIcon(CupertinoIcons.folder_open),
+                      onPressed: _pickDiaryFolder,
+                    ),
+                  ],
                 ),
-                const SettingsDivider(),
-                SettingsTile(
-                   label: loc.diaryPath, 
-                   icon: CupertinoIcons.folder,
-                   child: Row(
-                     mainAxisSize: MainAxisSize.min,
-                     children: [
-                        Container(
-                           constraints: const BoxConstraints(maxWidth: 150),
-                           child: Text(
-                              ConfigService().diaryDirectory.split('/').last,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTheme.caption(context),
-                              maxLines: 1,
-                              textAlign: TextAlign.end,
-                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        MacosIconButton(
-                          icon: const MacosIcon(CupertinoIcons.folder_open),
-                          onPressed: _pickDiaryFolder,
-                        ),
-                     ],
-                   ),
-                )
-             ]
+              ),
+            ],
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // 3. Recording Protection group
+        SettingsGroup(
+          title: loc.recordingProtection,
+          children: [
+            SettingsTile(
+              label: loc.toggleMaxDuration,
+              icon: CupertinoIcons.timer,
+              child: MacosPopupButton<int>(
+                value: _toggleMaxDuration,
+                items: [
+                  MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
+                  MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
+                  MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
+                  MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
+                  MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
+                ],
+                onChanged: (v) async {
+                  if (v != null) {
+                    await ConfigService().setToggleMaxDuration(v);
+                    setState(() => _toggleMaxDuration = v);
+                  }
+                },
+              ),
+            ),
+            const SettingsDivider(),
+            SettingsTile(
+              label: "ASR De-duplicate",
+              icon: CupertinoIcons.textformat_abc,
+              child: MacosSwitch(
+                value: ConfigService().deduplicationEnabled,
+                onChanged: (v) async { await ConfigService().setDeduplicationEnabled(v); setState((){}); },
+              ),
+            ),
+            const SettingsDivider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  MacosIcon(CupertinoIcons.info_circle, color: MacosColors.systemGrayColor, size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.toggleHint,
+                      style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ],
