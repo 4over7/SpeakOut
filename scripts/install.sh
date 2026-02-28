@@ -7,6 +7,14 @@ DEST_DIR="/Applications"
 DEST_APP="${DEST_DIR}/${APP_NAME}.app"
 SIGN_IDENTITY="Apple Development: 4over7@gmail.com (G6X3766L63)"
 
+# Build first
+echo "🔨 Building ${APP_NAME} (Release)..."
+flutter build macos --release
+if [ $? -ne 0 ]; then
+    echo "❌ Build failed!"
+    exit 1
+fi
+
 # Check if source exists
 if [ ! -d "$SOURCE_APP" ]; then
     echo "Error: Source app not found at $SOURCE_APP"
