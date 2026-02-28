@@ -20,6 +20,18 @@ class ChatService {
 
   bool _isInit = false;
   Future<void>? _pendingSave; // Serialize writes to prevent concurrent file I/O
+  String? _testDirPath;
+
+  @visibleForTesting
+  static void resetForTest() {
+    _instance._messages.clear();
+    _instance._isInit = false;
+    _instance._pendingSave = null;
+    _instance._testDirPath = null;
+  }
+
+  @visibleForTesting
+  void setTestDirectory(String path) => _testDirPath = path;
 
   Future<void> init() async {
     if (_isInit) return;
@@ -83,6 +95,7 @@ class ChatService {
   // --- Persistence ---
 
   Future<Directory> _getChatDir() async {
+    if (_testDirPath != null) return Directory(_testDirPath!);
     final appSupportDir = await getApplicationSupportDirectory();
     return Directory(appSupportDir.path);
   }

@@ -26,7 +26,7 @@ class ChatMessage {
     return {
       'id': id,
       'text': text,
-      'role': role.index,
+      'role': role.name,
       'timestamp': timestamp.toIso8601String(),
       'metadata': metadata,
     };
@@ -36,7 +36,9 @@ class ChatMessage {
     return ChatMessage(
       id: json['id'] as String,
       text: json['text'] as String,
-      role: ChatRole.values[json['role'] as int],
+      role: json['role'] is int
+          ? ChatRole.values[json['role'] as int]
+          : ChatRole.values.firstWhere((r) => r.name == json['role'] as String),
       timestamp: DateTime.parse(json['timestamp'] as String),
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
