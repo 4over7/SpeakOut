@@ -446,7 +446,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toggleModeTip => '单击切换 (Toggle)';
 
   @override
-  String get textInjection => '文本注入';
+  String get textInjection => '文本注入（输入法）';
+
+  @override
+  String get asrDedup => 'ASR 去重';
 
   @override
   String get recordingProtection => '录音保护';

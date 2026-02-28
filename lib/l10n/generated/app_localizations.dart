@@ -947,8 +947,14 @@ abstract class AppLocalizations {
   /// No description provided for @textInjection.
   ///
   /// In en, this message translates to:
-  /// **'Text Input'**
+  /// **'Text Input (IME)'**
   String get textInjection;
+
+  /// No description provided for @asrDedup.
+  ///
+  /// In en, this message translates to:
+  /// **'ASR De-duplicate'**
+  String get asrDedup;
 
   /// No description provided for @recordingProtection.
   ///

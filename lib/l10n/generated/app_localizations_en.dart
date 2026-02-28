@@ -465,7 +465,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toggleModeTip => 'Tap to Toggle';
 
   @override
-  String get textInjection => 'Text Input';
+  String get textInjection => 'Text Input (IME)';
+
+  @override
+  String get asrDedup => 'ASR De-duplicate';
 
   @override
   String get recordingProtection => 'Recording Protection';

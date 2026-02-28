@@ -1133,7 +1133,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SettingsDivider(),
             SettingsTile(
-              label: "ASR De-duplicate",
+              label: loc.asrDedup,
               icon: CupertinoIcons.textformat_abc,
               child: MacosSwitch(
                 value: ConfigService().deduplicationEnabled,
@@ -1348,12 +1348,17 @@ class _SettingsPageState extends State<SettingsPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("sherpa-onnx", style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600)),
+                  Text("Sherpa-ONNX", style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Text("•", style: TextStyle(color: MacosColors.tertiaryLabelColor)),
                   ),
-                  Text("Alibaba Qwen", style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600)),
+                  Text("Aliyun NLS", style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text("•", style: TextStyle(color: MacosColors.tertiaryLabelColor)),
+                  ),
+                  Text("Ollama", style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600)),
                 ],
               ),
             ],
