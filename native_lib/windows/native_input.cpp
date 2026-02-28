@@ -8,7 +8,7 @@
  *   - 音频采集: WASAPI (IAudioClient + IAudioCaptureClient)
  *   - 设备管理: IMMDeviceEnumerator
  *
- * 编译: 参见同目录 CMakeLists.txt
+ * 编译: 参见同目录 CMakeLists.txt (MSVC C++)
  */
 
 #define WIN32_LEAN_AND_MEAN
@@ -17,7 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdatomic.h>
+#include <math.h>
+#include <atomic>
 
 // WASAPI headers
 #include <mmdeviceapi.h>
@@ -32,9 +33,7 @@
 // For _beginthreadex
 #include <process.h>
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 // ============================================================
 // DLL Export macro
@@ -109,7 +108,7 @@ static HANDLE g_hookThread = NULL;
 static DWORD g_hookThreadId = 0;
 
 // Audio
-static atomic_int g_isRecording = 0;
+static std::atomic<int> g_isRecording(0);
 static HANDLE g_audioThread = NULL;
 static IMMDeviceEnumerator* g_deviceEnumerator = NULL;
 
@@ -251,26 +250,24 @@ EXPORT int check_accessibility_permission(void) {
 }
 
 EXPORT int check_microphone_permission(void) {
-    // On Windows 10+, microphone access is controlled by Settings > Privacy
-    // Check by attempting to enumerate capture devices
     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     int needUninit = SUCCEEDED(hr);
 
     IMMDeviceEnumerator* enumerator = NULL;
     hr = CoCreateInstance(
-        &CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL,
-        &IID_IMMDeviceEnumerator, (void**)&enumerator
+        __uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL,
+        __uuidof(IMMDeviceEnumerator), (void**)&enumerator
     );
 
     int result = 0;
     if (SUCCEEDED(hr) && enumerator) {
         IMMDevice* device = NULL;
-        hr = enumerator->lpVtbl->GetDefaultAudioEndpoint(enumerator, eCapture, eConsole, &device);
+        hr = enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
         if (SUCCEEDED(hr) && device) {
             result = 1;
-            device->lpVtbl->Release(device);
+            device->Release();
         }
-        enumerator->lpVtbl->Release(enumerator);
+        enumerator->Release();
     }
 
     if (needUninit) CoUninitialize();
@@ -287,7 +284,7 @@ static unsigned __stdcall audio_capture_thread(void* param) {
     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(hr)) {
         fprintf(stderr, "[Audio] CoInitializeEx failed\n");
-        atomic_store(&g_isRecording, 0);
+        g_isRecording.store(0);
         return 1;
     }
 
@@ -297,56 +294,56 @@ static unsigned __stdcall audio_capture_thread(void* param) {
     IAudioCaptureClient* captureClient = NULL;
 
     hr = CoCreateInstance(
-        &CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL,
-        &IID_IMMDeviceEnumerator, (void**)&enumerator
+        __uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL,
+        __uuidof(IMMDeviceEnumerator), (void**)&enumerator
     );
     if (FAILED(hr)) goto cleanup;
 
-    hr = enumerator->lpVtbl->GetDefaultAudioEndpoint(enumerator, eCapture, eConsole, &device);
+    hr = enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
     if (FAILED(hr)) goto cleanup;
 
-    hr = device->lpVtbl->Activate(device, &IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&audioClient);
+    hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&audioClient);
     if (FAILED(hr)) goto cleanup;
 
     // Configure for 16kHz mono 16-bit PCM
-    WAVEFORMATEX wfx;
-    memset(&wfx, 0, sizeof(wfx));
-    wfx.wFormatTag = WAVE_FORMAT_PCM;
-    wfx.nChannels = 1;
-    wfx.nSamplesPerSec = 16000;
-    wfx.wBitsPerSample = 16;
-    wfx.nBlockAlign = wfx.nChannels * wfx.wBitsPerSample / 8;
-    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+    {
+        WAVEFORMATEX wfx;
+        memset(&wfx, 0, sizeof(wfx));
+        wfx.wFormatTag = WAVE_FORMAT_PCM;
+        wfx.nChannels = 1;
+        wfx.nSamplesPerSec = 16000;
+        wfx.wBitsPerSample = 16;
+        wfx.nBlockAlign = wfx.nChannels * wfx.wBitsPerSample / 8;
+        wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
 
-    // 50ms buffer (REFERENCE_TIME is in 100-nanosecond units)
-    REFERENCE_TIME bufferDuration = 500000; // 50ms
-    hr = audioClient->lpVtbl->Initialize(
-        audioClient,
-        AUDCLNT_SHAREMODE_SHARED,
-        0,
-        bufferDuration,
-        0,
-        &wfx,
-        NULL
-    );
-    if (FAILED(hr)) {
-        // If 16kHz mono isn't supported, try the device's mix format and resample
-        fprintf(stderr, "[Audio] WASAPI Initialize failed (hr=0x%08lX), trying mix format\n", hr);
-        goto cleanup;
+        // 50ms buffer (REFERENCE_TIME is in 100-nanosecond units)
+        REFERENCE_TIME bufferDuration = 500000; // 50ms
+        hr = audioClient->Initialize(
+            AUDCLNT_SHAREMODE_SHARED,
+            0,
+            bufferDuration,
+            0,
+            &wfx,
+            NULL
+        );
+        if (FAILED(hr)) {
+            fprintf(stderr, "[Audio] WASAPI Initialize failed (hr=0x%08lX), trying mix format\n", hr);
+            goto cleanup;
+        }
     }
 
-    hr = audioClient->lpVtbl->GetService(audioClient, &IID_IAudioCaptureClient, (void**)&captureClient);
+    hr = audioClient->GetService(__uuidof(IAudioCaptureClient), (void**)&captureClient);
     if (FAILED(hr)) goto cleanup;
 
-    hr = audioClient->lpVtbl->Start(audioClient);
+    hr = audioClient->Start();
     if (FAILED(hr)) goto cleanup;
 
     // Capture loop
-    while (atomic_load(&g_isRecording)) {
+    while (g_isRecording.load()) {
         Sleep(20); // ~50 polls per second
 
         UINT32 packetLength = 0;
-        hr = captureClient->lpVtbl->GetNextPacketSize(captureClient, &packetLength);
+        hr = captureClient->GetNextPacketSize(&packetLength);
         if (FAILED(hr)) break;
 
         while (packetLength > 0) {
@@ -354,42 +351,42 @@ static unsigned __stdcall audio_capture_thread(void* param) {
             UINT32 numFrames = 0;
             DWORD flags = 0;
 
-            hr = captureClient->lpVtbl->GetBuffer(captureClient, &data, &numFrames, &flags, NULL, NULL);
+            hr = captureClient->GetBuffer(&data, &numFrames, &flags, NULL, NULL);
             if (FAILED(hr)) break;
 
             if (!(flags & AUDCLNT_BUFFERFLAGS_SILENT) && data && numFrames > 0) {
                 ring_write((const int16_t*)data, (int)numFrames);
             }
 
-            captureClient->lpVtbl->ReleaseBuffer(captureClient, numFrames);
+            captureClient->ReleaseBuffer(numFrames);
 
-            hr = captureClient->lpVtbl->GetNextPacketSize(captureClient, &packetLength);
+            hr = captureClient->GetNextPacketSize(&packetLength);
             if (FAILED(hr)) break;
         }
     }
 
-    audioClient->lpVtbl->Stop(audioClient);
+    audioClient->Stop();
 
 cleanup:
-    if (captureClient) captureClient->lpVtbl->Release(captureClient);
-    if (audioClient) audioClient->lpVtbl->Release(audioClient);
-    if (device) device->lpVtbl->Release(device);
-    if (enumerator) enumerator->lpVtbl->Release(enumerator);
+    if (captureClient) captureClient->Release();
+    if (audioClient) audioClient->Release();
+    if (device) device->Release();
+    if (enumerator) enumerator->Release();
     CoUninitialize();
 
-    atomic_store(&g_isRecording, 0);
+    g_isRecording.store(0);
     return 0;
 }
 
 EXPORT int start_audio_recording(void) {
-    if (atomic_load(&g_isRecording)) return 1; // Already recording
+    if (g_isRecording.load()) return 1; // Already recording
 
     ring_init();
-    atomic_store(&g_isRecording, 1);
+    g_isRecording.store(1);
 
     g_audioThread = (HANDLE)_beginthreadex(NULL, 0, audio_capture_thread, NULL, 0, NULL);
     if (!g_audioThread) {
-        atomic_store(&g_isRecording, 0);
+        g_isRecording.store(0);
         return 0;
     }
 
@@ -397,7 +394,7 @@ EXPORT int start_audio_recording(void) {
 }
 
 EXPORT void stop_audio_recording(void) {
-    atomic_store(&g_isRecording, 0);
+    g_isRecording.store(0);
     if (g_audioThread) {
         WaitForSingleObject(g_audioThread, 3000);
         CloseHandle(g_audioThread);
@@ -406,7 +403,7 @@ EXPORT void stop_audio_recording(void) {
 }
 
 EXPORT int is_audio_recording(void) {
-    return atomic_load(&g_isRecording) ? 1 : 0;
+    return g_isRecording.load() ? 1 : 0;
 }
 
 EXPORT int get_available_audio_samples(void) {
@@ -431,8 +428,8 @@ static IMMDeviceEnumerator* get_enumerator(void) {
     if (!g_deviceEnumerator) {
         CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
         CoCreateInstance(
-            &CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL,
-            &IID_IMMDeviceEnumerator, (void**)&g_deviceEnumerator
+            __uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL,
+            __uuidof(IMMDeviceEnumerator), (void**)&g_deviceEnumerator
         );
     }
     return g_deviceEnumerator;
@@ -456,38 +453,38 @@ EXPORT const char* get_audio_input_devices(void) {
     if (!enumerator) return "[]";
 
     IMMDeviceCollection* collection = NULL;
-    HRESULT hr = enumerator->lpVtbl->EnumAudioEndpoints(enumerator, eCapture, DEVICE_STATE_ACTIVE, &collection);
+    HRESULT hr = enumerator->EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE, &collection);
     if (FAILED(hr) || !collection) return "[]";
 
     UINT count = 0;
-    collection->lpVtbl->GetCount(collection, &count);
+    collection->GetCount(&count);
 
     int offset = 0;
     offset += snprintf(g_jsonBuffer + offset, sizeof(g_jsonBuffer) - offset, "[");
 
     for (UINT i = 0; i < count && offset < (int)sizeof(g_jsonBuffer) - 256; i++) {
         IMMDevice* device = NULL;
-        collection->lpVtbl->Item(collection, i, &device);
+        collection->Item(i, &device);
         if (!device) continue;
 
         // Get device ID
         LPWSTR deviceId = NULL;
-        device->lpVtbl->GetId(device, &deviceId);
+        device->GetId(&deviceId);
 
         // Get device name from properties
         IPropertyStore* props = NULL;
-        device->lpVtbl->OpenPropertyStore(device, STGM_READ, &props);
+        device->OpenPropertyStore(STGM_READ, &props);
 
         char* name = NULL;
         if (props) {
             PROPVARIANT varName;
             PropVariantInit(&varName);
-            props->lpVtbl->GetValue(props, &PKEY_Device_FriendlyName, &varName);
+            props->GetValue(PKEY_Device_FriendlyName, &varName);
             if (varName.vt == VT_LPWSTR) {
                 name = wchar_to_utf8(varName.pwszVal);
             }
             PropVariantClear(&varName);
-            props->lpVtbl->Release(props);
+            props->Release();
         }
 
         char* id_utf8 = wchar_to_utf8(deviceId);
@@ -502,11 +499,11 @@ EXPORT const char* get_audio_input_devices(void) {
         if (id_utf8) free(id_utf8);
         if (name) free(name);
         if (deviceId) CoTaskMemFree(deviceId);
-        device->lpVtbl->Release(device);
+        device->Release();
     }
 
     offset += snprintf(g_jsonBuffer + offset, sizeof(g_jsonBuffer) - offset, "]");
-    collection->lpVtbl->Release(collection);
+    collection->Release();
 
     return g_jsonBuffer;
 }
@@ -516,25 +513,25 @@ EXPORT const char* get_current_input_device(void) {
     if (!enumerator) return "{}";
 
     IMMDevice* device = NULL;
-    HRESULT hr = enumerator->lpVtbl->GetDefaultAudioEndpoint(enumerator, eCapture, eConsole, &device);
+    HRESULT hr = enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
     if (FAILED(hr) || !device) return "{}";
 
     LPWSTR deviceId = NULL;
-    device->lpVtbl->GetId(device, &deviceId);
+    device->GetId(&deviceId);
 
     IPropertyStore* props = NULL;
-    device->lpVtbl->OpenPropertyStore(device, STGM_READ, &props);
+    device->OpenPropertyStore(STGM_READ, &props);
 
     char* name = NULL;
     if (props) {
         PROPVARIANT varName;
         PropVariantInit(&varName);
-        props->lpVtbl->GetValue(props, &PKEY_Device_FriendlyName, &varName);
+        props->GetValue(PKEY_Device_FriendlyName, &varName);
         if (varName.vt == VT_LPWSTR) {
             name = wchar_to_utf8(varName.pwszVal);
         }
         PropVariantClear(&varName);
-        props->lpVtbl->Release(props);
+        props->Release();
     }
 
     char* id_utf8 = wchar_to_utf8(deviceId);
@@ -548,35 +545,26 @@ EXPORT const char* get_current_input_device(void) {
     if (id_utf8) free(id_utf8);
     if (name) free(name);
     if (deviceId) CoTaskMemFree(deviceId);
-    device->lpVtbl->Release(device);
+    device->Release();
 
     return g_jsonBuffer;
 }
 
 EXPORT int set_input_device(const char* deviceUID) {
-    // Windows doesn't support per-app input device selection via simple API.
-    // The default capture device is system-wide.
-    // For now, return success — future: use IAudioClient with specific device.
     (void)deviceUID;
     return 1;
 }
 
 EXPORT int switch_to_builtin_mic(void) {
-    // On Windows, "built-in mic" concept doesn't map directly.
-    // No-op; user manages default device via Windows Settings.
     return 1;
 }
 
 EXPORT int is_current_input_bluetooth(void) {
-    // TODO: Check device properties for Bluetooth endpoint
-    // For now, return false
     return 0;
 }
 
 EXPORT int start_device_change_listener(DeviceChangeCallback callback) {
     g_deviceChangeCallback = callback;
-    // TODO: Implement IMMNotificationClient for device change events
-    // For MVP, device changes are detected by polling in Dart
     return 1;
 }
 
@@ -585,13 +573,11 @@ EXPORT void stop_device_change_listener(void) {
 }
 
 EXPORT const char* get_preferred_device_uid(void) {
-    // Not applicable on Windows — return empty
     return "";
 }
 
 EXPORT void set_preferred_device_uid(const char* uid) {
     (void)uid;
-    // Not applicable on Windows
 }
 
 // ============================================================
@@ -618,7 +604,7 @@ EXPORT const char* analyze_audio_quality(int16_t* samples, int sampleCount, int 
 }
 
 EXPORT int is_likely_telephone_quality(void) {
-    return 0; // Not applicable on Windows desktop
+    return 0;
 }
 
 // ============================================================
@@ -637,7 +623,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
         stop_keyboard_listener();
         stop_audio_recording();
         if (g_deviceEnumerator) {
-            g_deviceEnumerator->lpVtbl->Release(g_deviceEnumerator);
+            g_deviceEnumerator->Release();
             g_deviceEnumerator = NULL;
         }
         if (g_ringLockInitialized) {
@@ -649,6 +635,4 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
     return TRUE;
 }
 
-#ifdef __cplusplus
-}
-#endif
+} // extern "C"
