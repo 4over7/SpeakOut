@@ -183,5 +183,9 @@
     }
   },
   "toggleHint": "Tap to start, tap again to stop. If same key as PTT, hold >1s for PTT mode.",
-  "notSet": "Not Set"
+  "notSet": "Not Set",
+  "importModel": "Import",
+  "manualDownload": "Manual Download",
+  "importModelDesc": "Select a downloaded .tar.bz2 model file",
+  "importing": "Importing..."
 }

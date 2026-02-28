@@ -490,4 +490,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notSet => 'Not Set';
+
+  @override
+  String get importModel => 'Import';
+
+  @override
+  String get manualDownload => 'Manual Download';
+
+  @override
+  String get importModelDesc => 'Select a downloaded .tar.bz2 model file';
+
+  @override
+  String get importing => 'Importing...';
 }

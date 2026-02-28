@@ -223,10 +223,10 @@ class ModelManager {
 
     final tarPath = '${modelsRoot.path}/temp_${model.id}.tar.bz2';
     final file = File(tarPath);
-    
+
     // Download with resume and retry
     if (onStatus != null) onStatus("正在下载 ${model.name}...");
-    
+
     await _downloadWithResume(
       url: model.url,
       destFile: file,
@@ -234,27 +234,54 @@ class ModelManager {
       onStatus: onStatus,
       modelName: model.name,
     );
-    
-    // Note: We previously had a bzip2 -t integrity check here, but it fails in App Sandbox.
-    // Instead, we rely on the tar extraction itself as the integrity check.
-    // If extraction fails, it means the file is corrupted.
-    
+
+    return _extractAndInstallModel(id, file, onStatus: onStatus, onProgress: onProgress);
+  }
+
+  /// 手动导入模型：从用户选择的 .tar.bz2 文件导入
+  Future<String> importModel(String id, String sourcePath, {Function(String)? onStatus, Function(double)? onProgress}) async {
+    final modelsRoot = await _getModelsRoot();
+    if (!await modelsRoot.exists()) {
+      await modelsRoot.create(recursive: true);
+    }
+
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) {
+      throw Exception("文件不存在: $sourcePath");
+    }
+
+    // Copy to Models directory to avoid sandbox permission issues
+    onStatus?.call("复制文件...");
+    final model = allModels.firstWhere((m) => m.id == id);
+    final tarPath = '${modelsRoot.path}/temp_${model.id}.tar.bz2';
+    final destFile = File(tarPath);
+    await sourceFile.copy(destFile.path);
+
+    return _extractAndInstallModel(id, destFile, onStatus: onStatus, onProgress: onProgress);
+  }
+
+  /// 共用解压+验证+激活逻辑
+  Future<String> _extractAndInstallModel(String id, File tarFile, {Function(String)? onStatus, Function(double)? onProgress}) async {
+    final model = allModels.firstWhere((m) => m.id == id);
+    final modelsRoot = await _getModelsRoot();
+    final tarPath = tarFile.path;
+
     // Extract to a unique temp directory to handle unknown internal folder names
     final tempExtractDir = Directory('${modelsRoot.path}/temp_extract_${model.id}');
     if (await tempExtractDir.exists()) await tempExtractDir.delete(recursive: true);
     await tempExtractDir.create(recursive: true);
 
-    if (onStatus != null) onStatus("正在解压...");
-    if (onProgress != null) onProgress(-1); 
-    
+    onStatus?.call("正在解压...");
+    if (onProgress != null) onProgress(-1);
+
     try {
       await compute(_extractModelTask, [tarPath, tempExtractDir.path]);
-      
+
       // Normalize: Find where the content is and move to final 'dirName'
       final dirName = _getDirNameFromUrl(model.url); // Standard name
       final finalModelDir = Directory('${modelsRoot.path}/$dirName');
       if (await finalModelDir.exists()) await finalModelDir.delete(recursive: true);
-      
+
       // Analyze tempExtractDir content
       // Find tokens file: tokens.txt or *-tokens.txt (e.g. large-v3-tokens.txt for Whisper)
       File? tokenFile;
@@ -293,20 +320,20 @@ class ModelManager {
       final sourceDir = tokenFile.parent;
       debugPrint("[Extraction] Found tokens in: ${sourceDir.path}");
       debugPrint("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
-      
+
       // Move sourceDir to finalModelDir
       if (sourceDir.absolute.path == tempExtractDir.absolute.path) {
          await tempExtractDir.rename(finalModelDir.path);
       } else {
          await sourceDir.rename(finalModelDir.path);
       }
-      
+
       // Cleanup residue
       if (await tempExtractDir.exists()) await tempExtractDir.delete(recursive: true);
-      
+
       // Delete tarball
-      if (await file.exists()) await file.delete();
-      
+      if (await tarFile.exists()) await tarFile.delete();
+
     } catch (e) {
       // Cleanup temp
       if (await tempExtractDir.exists()) await tempExtractDir.delete(recursive: true);
@@ -315,10 +342,10 @@ class ModelManager {
 
     // Set as active
     await setActiveModel(id);
-    
+
     // Return path
     final dirName = _getDirNameFromUrl(model.url);
-    
+
     // Verify
     if (!await isModelDownloaded(id)) {
        // Debug verification failure
@@ -332,7 +359,7 @@ class ModelManager {
        }
        throw Exception("校验失败: 最终路径无有效模型文件");
     }
-    
+
     return '${modelsRoot.path}/$dirName';
   }
   

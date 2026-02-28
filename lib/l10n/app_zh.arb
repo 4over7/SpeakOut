@@ -154,5 +154,9 @@
     }
   },
   "toggleHint": "单击开始录音，再次单击结束。若与 PTT 同键，按住超过 1 秒为长按模式。",
-  "notSet": "未设置"
+  "notSet": "未设置",
+  "importModel": "导入",
+  "manualDownload": "手动下载",
+  "importModelDesc": "选择已下载的 .tar.bz2 模型文件",
+  "importing": "导入中..."
 }

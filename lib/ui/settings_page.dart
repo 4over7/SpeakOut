@@ -322,7 +322,41 @@ class _SettingsPageState extends State<SettingsPage> {
      await _modelManager.deleteModel(model.id);
      await _refresh();
   }
-  
+
+  Future<void> _importModel(ModelInfo model) async {
+    final loc = AppLocalizations.of(context)!;
+    try {
+      final result = await const MethodChannel('com.SpeakOut/overlay')
+          .invokeMethod<String>('pickFile');
+      if (result == null || result.isEmpty) return;
+
+      setState(() {
+        _downloadingIds.add(model.id);
+        _downloadProgressMap[model.id] = null;
+        _downloadStatusMap[model.id] = loc.importing;
+      });
+
+      await _modelManager.importModel(model.id, result,
+        onProgress: (p) {
+          if (mounted) {
+            setState(() {
+              _downloadProgressMap[model.id] = p < 0 ? null : p;
+              _downloadStatusMap[model.id] = p < 0 ? loc.unzipping : loc.importing;
+            });
+          }
+        },
+        onStatus: (s) {
+          if (mounted) setState(() => _downloadStatusMap[model.id] = s);
+        },
+      );
+      await _refresh();
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() { _downloadingIds.remove(model.id); });
+    }
+  }
+
   Future<void> _downloadPunctuation() async {
       final loc = AppLocalizations.of(context)!;
       final punctId = ModelManager.punctuationModelId;
@@ -585,6 +619,8 @@ class _SettingsPageState extends State<SettingsPage> {
                            onDownload: () => _download(m),
                            onDelete: () => _delete(m),
                            onActivate: () => _activate(m),
+                           modelUrl: m.url,
+                           onImport: () => _importModel(m),
                          ),
                        ),
                        if (m != ModelManager.availableModels.last) const SettingsDivider(),
@@ -621,6 +657,8 @@ class _SettingsPageState extends State<SettingsPage> {
                            onDownload: () => _download(m),
                            onDelete: () => _delete(m),
                            onActivate: () => _activate(m),
+                           modelUrl: m.url,
+                           onImport: () => _importModel(m),
                          ),
                        ),
                        if (m != ModelManager.offlineModels.last) const SettingsDivider(),
@@ -1166,6 +1204,7 @@ class _SettingsPageState extends State<SettingsPage> {
     required bool isDownloaded, required bool isLoading, required bool isActive,
     required VoidCallback onDownload, required VoidCallback onDelete, required VoidCallback onActivate,
     double? progress, String? statusText, bool isOffline = false,
+    String? modelUrl, VoidCallback? onImport,
   }) {
     final loc = AppLocalizations.of(context)!;
     if (isLoading) {
@@ -1193,12 +1232,32 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     }
     if (!isDownloaded) {
-       return PushButton(
-         controlSize: ControlSize.regular,
-         // Use Primary Color (Teal) for Download
-         color: AppTheme.getAccent(context),
-         onPressed: onDownload,
-         child: Text(loc.download, style: const TextStyle(color: Colors.white)),
+       return Row(
+         mainAxisSize: MainAxisSize.min,
+         children: [
+           PushButton(
+             controlSize: ControlSize.regular,
+             color: AppTheme.getAccent(context),
+             onPressed: onDownload,
+             child: Text(loc.download, style: const TextStyle(color: Colors.white)),
+           ),
+           if (onImport != null) ...[
+             const SizedBox(width: 6),
+             PushButton(
+               controlSize: ControlSize.regular,
+               secondary: true,
+               onPressed: onImport,
+               child: Text(loc.importModel),
+             ),
+           ],
+           if (modelUrl != null) ...[
+             const SizedBox(width: 4),
+             MacosIconButton(
+               icon: const MacosIcon(CupertinoIcons.link, size: 16),
+               onPressed: () => launchUrl(Uri.parse(modelUrl)),
+             ),
+           ],
+         ],
        );
     }
     // Downloaded

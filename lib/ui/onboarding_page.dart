@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/config_service.dart';
@@ -164,6 +165,65 @@ class _OnboardingPageState extends State<OnboardingPage> {
           await _engine.initPunctuation(punctPath, activeModelName: selectedModel.name);
         }
       }
+
+      setState(() {
+        _isDownloading = false;
+        _downloadComplete = true;
+        _downloadProgress = 1.0;
+        _downloadStatus = _l10n.onboardingDownloadDone;
+      });
+    } catch (e) {
+      setState(() {
+        _isDownloading = false;
+        _downloadError = e.toString();
+        _downloadStatus = _l10n.onboardingDownloadFail;
+      });
+    }
+  }
+
+  Future<void> _importSelectedModel() async {
+    try {
+      final result = await const MethodChannel('com.SpeakOut/overlay')
+          .invokeMethod<String>('pickFile');
+      if (result == null || result.isEmpty) return;
+
+      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
+
+      setState(() {
+        _isDownloading = true;
+        _downloadProgress = 0;
+        _downloadStatus = _l10n.importing;
+        _downloadError = null;
+      });
+
+      await _modelManager.importModel(
+        selectedModel.id,
+        result,
+        onProgress: (p) {
+          if (mounted) {
+            setState(() {
+              if (p < 0) {
+                _downloadStatus = _l10n.unzipping;
+              } else {
+                _downloadProgress = p;
+              }
+            });
+          }
+        },
+        onStatus: (s) {
+          if (mounted) setState(() => _downloadStatus = s);
+        },
+      );
+
+      // Activate model
+      setState(() => _downloadStatus = _l10n.onboardingActivating);
+      await _modelManager.setActiveModel(selectedModel.id);
+      final path = await _modelManager.getActiveModelPath();
+      if (path != null) {
+        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+      }
+      await ConfigService().setActiveModelId(selectedModel.id);
 
       setState(() {
         _isDownloading = false;
@@ -799,19 +859,41 @@ class _OnboardingPageState extends State<OnboardingPage> {
             child: Text(_l10n.onboardingContinue),
           )
         else if (_downloadError != null)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Column(
             children: [
-              PushButton(
-                controlSize: ControlSize.regular,
-                secondary: true,
-                onPressed: _downloadSelectedModel,
-                child: Text(_l10n.onboardingRetry),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  PushButton(
+                    controlSize: ControlSize.regular,
+                    secondary: true,
+                    onPressed: _downloadSelectedModel,
+                    child: Text(_l10n.onboardingRetry),
+                  ),
+                  const SizedBox(width: 12),
+                  PushButton(
+                    controlSize: ControlSize.regular,
+                    secondary: true,
+                    onPressed: _importSelectedModel,
+                    child: Text(_l10n.importModel),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: _nextStep,
+                    child: Text(_l10n.onboardingSkip, style: TextStyle(color: MacosColors.systemGrayColor)),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 12),
               TextButton(
-                onPressed: _nextStep,
-                child: Text(_l10n.onboardingSkip, style: TextStyle(color: MacosColors.systemGrayColor)),
+                onPressed: () {
+                  final model = _modelManager.getModelById(_selectedModelId);
+                  if (model != null) launchUrl(Uri.parse(model.url));
+                },
+                child: Text(
+                  _l10n.manualDownload,
+                  style: TextStyle(color: AppTheme.accentColor, fontSize: 12),
+                ),
               ),
             ],
           )

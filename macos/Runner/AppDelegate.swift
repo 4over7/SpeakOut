@@ -42,6 +42,8 @@ class AppDelegate: FlutterAppDelegate {
           result(nil)
         case "pickDirectory":
           self?.pickDirectory(result: result)
+        case "pickFile":
+          self?.pickFile(result: result)
         default:
           result(FlutterMethodNotImplemented)
         }
@@ -200,6 +202,24 @@ class AppDelegate: FlutterAppDelegate {
     waveTimer?.invalidate()
     waveTimer = nil
     recordingOverlayWindow?.orderOut(nil)
+  }
+
+  private func pickFile(result: @escaping FlutterResult) {
+    let panel = NSOpenPanel()
+    panel.allowsMultipleSelection = false
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowedContentTypes = [.init(filenameExtension: "bz2")!]
+    panel.prompt = "Import"
+    panel.message = "Select a .tar.bz2 model file"
+
+    panel.begin { response in
+      if response == .OK, let url = panel.url {
+        result(url.path)
+      } else {
+        result(nil)
+      }
+    }
   }
 
   private func pickDirectory(result: @escaping FlutterResult) {

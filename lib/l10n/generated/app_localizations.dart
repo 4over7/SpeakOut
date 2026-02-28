@@ -991,6 +991,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not Set'**
   String get notSet;
+
+  /// No description provided for @importModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importModel;
+
+  /// No description provided for @manualDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Download'**
+  String get manualDownload;
+
+  /// No description provided for @importModelDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a downloaded .tar.bz2 model file'**
+  String get importModelDesc;
+
+  /// No description provided for @importing.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing...'**
+  String get importing;
 }
 
 class _AppLocalizationsDelegate

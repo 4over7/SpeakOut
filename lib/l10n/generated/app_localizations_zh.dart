@@ -470,4 +470,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get notSet => '未设置';
+
+  @override
+  String get importModel => '导入';
+
+  @override
+  String get manualDownload => '手动下载';
+
+  @override
+  String get importModelDesc => '选择已下载的 .tar.bz2 模型文件';
+
+  @override
+  String get importing => '导入中...';
 }
