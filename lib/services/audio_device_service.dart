@@ -4,7 +4,6 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
-import '../ffi/native_input.dart';
 import '../ffi/native_input_base.dart';
 import 'notification_service.dart';
 
@@ -54,7 +53,7 @@ class AudioDeviceEvent {
 /// Service for managing audio input devices
 /// Automatically detects Bluetooth microphones and switches to high-quality mic
 class AudioDeviceService {
-  final NativeInput _nativeInput;
+  final NativeInputBase _nativeInput;
   
   // Stream controller for device change events
   final _deviceChangeController = StreamController<AudioDeviceEvent>.broadcast();

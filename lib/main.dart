@@ -17,12 +17,15 @@ import 'ui/theme.dart';
 import 'ui/chat/chat_page.dart';
 import 'ui/onboarding_page.dart';
 
+// Platform-specific UI imports
+import 'ui/windows/windows_app.dart';
+
 // Global Error Catcher
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     await windowManager.ensureInitialized();
-    
+
     // Catch Build Errors
     ErrorWidget.builder = (FlutterErrorDetails details) {
       return MaterialApp(
@@ -41,7 +44,12 @@ void main() {
       );
     };
 
-    runApp(const SpeakOutApp());
+    // Platform dispatch
+    if (Platform.isWindows) {
+      runApp(const WindowsAppWrapper());
+    } else {
+      runApp(const SpeakOutApp()); // macOS (现有)
+    }
   }, (error, stack) {
     debugPrint("CRITICAL ERROR: $error\n$stack");
   });

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -25,13 +26,13 @@ class ConfigService {
   String _defaultDocPath = "";
 
   // Keychain storage for sensitive credentials
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions.defaultOptions,
-    iOptions: IOSOptions.defaultOptions,
-    mOptions: MacOsOptions(
-      accessibility: KeychainAccessibility.unlocked,
-    ),
-  );
+  static final _secureStorage = Platform.isMacOS
+      ? const FlutterSecureStorage(
+          mOptions: MacOsOptions(
+            accessibility: KeychainAccessibility.unlocked,
+          ),
+        )
+      : const FlutterSecureStorage();
   // In-memory cache for Keychain values (avoid async reads on hot path)
   String? _cachedAliyunAkId;
   String? _cachedAliyunAkSecret;

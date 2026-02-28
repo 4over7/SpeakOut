@@ -4,8 +4,8 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
-import '../ffi/native_input.dart';
 import '../ffi/native_input_base.dart';
+import '../ffi/native_input_factory.dart';
 import '../config/app_constants.dart';
 import '../services/config_service.dart';
 import '../services/llm_service.dart';
@@ -42,9 +42,9 @@ class CoreEngine {
   
   CoreEngine._internal() {
     try {
-      _nativeInput = NativeInput();
-      // Initialize AudioDeviceService with NativeInput
-      _audioDeviceService = AudioDeviceService(_nativeInput as NativeInput);
+      _nativeInput = createNativeInput();
+      // Initialize AudioDeviceService
+      _audioDeviceService = AudioDeviceService(_nativeInput!);
       AudioDeviceService.setInstance(_audioDeviceService!);
     } catch (e) {
       debugPrint("[CoreEngine] Warning: Failed to init NativeInput: $e");
