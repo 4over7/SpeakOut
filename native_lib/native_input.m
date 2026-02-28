@@ -70,10 +70,12 @@ static DartKeyCallback dartCallback = NULL;
 static int targetKeyCode = -1; // e.g., 58 for Option, etc.
 static atomic_bool isMonitoring = false;
 
-// macOS 26+: Globe/Fn key sends KeyDown/Up with keyCode=179 in addition to
-// FlagsChanged with keyCode=63. Use timestamp-based dedup: if 179 fired
-// within the last 100ms, skip FlagsChanged 63 to avoid double-event.
+// macOS 26+: Globe/Fn key sends KeyDown/Up with keyCode=179 AND
+// FlagsChanged with keyCode=63. Order is NOT guaranteed — either may arrive
+// first. Use bidirectional timestamp dedup: whichever fires first wins,
+// the second one within 100ms is suppressed.
 static uint64_t lastGlobe179Time = 0;
+static uint64_t lastFn63Time = 0;
 
 // CGEventCallback
 CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
@@ -106,6 +108,17 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     // Map to legacy Fn keyCode 63 so Dart PTT matching works.
     int mappedKeyCode = (int)keyCode;
     if (keyCode == 179) {
+      // Reverse dedup: if FlagsChanged 63 already fired within 100ms, suppress 179
+      if (lastFn63Time > 0) {
+        mach_timebase_info_data_t tbInfo;
+        mach_timebase_info(&tbInfo);
+        uint64_t elapsed = mach_absolute_time() - lastFn63Time;
+        double elapsedMs = (double)elapsed * tbInfo.numer / tbInfo.denom / 1000000.0;
+        if (elapsedMs < 100.0) {
+          log_to_file("Globe key 179: suppressed (FlagsChanged 63 was %.0fms ago)", elapsedMs);
+          return event;
+        }
+      }
       lastGlobe179Time = mach_absolute_time();
       mappedKeyCode = 63;
       log_to_file("Globe key 179 -> mapped to Fn 63 (%s)",
@@ -177,6 +190,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
           lastFnState = true;
         }
       }
+      lastFn63Time = mach_absolute_time();
       log_to_file("FN Key 63 (legacy): flags=0x%llx, fnFlagSet=%d, isDown=%d",
                   (unsigned long long)flags, fnFlagSet, isDown);
     }

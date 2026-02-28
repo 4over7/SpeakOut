@@ -499,6 +499,10 @@ class CoreEngine {
     }
 
     // 4. Pure PTT / diary keys (existing logic)
+    // Guard: if toggle mode is active, ignore keyUp from PTT/diary keys
+    // to prevent the keyUp from a toggle-start tap from stopping recording.
+    if (_isToggleMode && !isDown) return;
+
     if (keyCode == pttKeyCode) {
       _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
     } else if (config.diaryEnabled && keyCode == config.diaryKeyCode) {

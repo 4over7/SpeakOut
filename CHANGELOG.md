@@ -1,5 +1,12 @@
 # SpeakOut Version History
 
+## [1.3.2] - 2026-02-28
+
+### Bug 修复: FN 键 Toggle 模式无响应
+
+- **FN 键双事件去重** — macOS 26 的 FN/Globe 键同时产生 `FlagsChanged 63` 和 `KeyDown/Up 179` 两种事件，到达顺序不固定。原去重仅处理「179 先到」场景，导致「63 先到」时 179 的 keyDown 被误判为 Toggle 二次点击而立即停止录音。改为双向去重：先到者处理并记录时间戳，100ms 内到达的另一方抑制。
+- **Toggle keyUp 守卫** — Toggle 模式下忽略 PTT/diary 的 keyUp 事件，防止同键 keyUp 穿透到 PTT 停止逻辑。
+
 ## [1.3.1] - 2026-02-28
 
 ### 设置页分类重组

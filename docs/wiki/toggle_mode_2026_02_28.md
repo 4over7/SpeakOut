@@ -98,3 +98,19 @@ DateTime? _keyDownTime;            // 共用键按下时间戳
 - `flutter analyze` — 0 issues
 - `flutter test` — 134 tests passed
 - 手动场景覆盖：纯 PTT / 独立 Toggle / 共用键短按 / 共用键长按 / 最大时长保护
+
+## FN/Globe 键双事件去重 (v1.3.2)
+
+macOS 26+ 的 FN/Globe 键同时产生两种事件：
+- `FlagsChanged` (keyCode=63) — 传统修饰键事件
+- `KeyDown/KeyUp` (keyCode=179) — macOS 26 新增
+
+**问题**：到达顺序不固定。若 FlagsChanged 先到并启动 Toggle 录音，随后到达的 KeyDown 179 会被 Toggle stop 逻辑误判为"第二次点击"而立即停止。
+
+**修复**：原生层双向时间戳去重 (`native_input.m`)：
+- `lastGlobe179Time` — 179 事件记录时间戳，100ms 内到达的 63 被抑制
+- `lastFn63Time` — 63 事件记录时间戳，100ms 内到达的 179 被抑制
+- 先到者赢，后到者静默丢弃
+
+Dart 层额外守卫 (`core_engine.dart`):
+- Toggle 模式下，`_handleKey` 第 4 步 PTT/diary keyUp 被 `_isToggleMode && !isDown` 拦截
