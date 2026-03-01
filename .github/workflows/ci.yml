@@ -47,6 +47,13 @@ jobs:
       - name: Build macOS app
         run: flutter build macos --release
 
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: speakout-macos
+          path: build/macos/Build/Products/Release/speakout.app
+          retention-days: 30
+
   # ============================================================
   # Windows: 分析 + 测试 + 编译原生库 + 编译 Flutter
   # ============================================================
@@ -81,6 +88,13 @@ jobs:
 
       - name: Build Windows app
         run: flutter build windows --release
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: speakout-windows
+          path: build/windows/x64/runner/Release/
+          retention-days: 30
 
   # ============================================================
   # Linux: 分析 + 测试 + 编译原生库 + 编译 Flutter
@@ -123,3 +137,10 @@ jobs:
 
       - name: Build Linux app
         run: flutter build linux --release
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: speakout-linux
+          path: build/linux/x64/release/bundle/
+          retention-days: 30
