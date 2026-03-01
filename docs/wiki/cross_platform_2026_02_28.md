@@ -35,7 +35,21 @@
 3. **C++ 编译: COM 风格** — MSVC 编译为 C++，不支持 C 风格 `lpVtbl` 调用和 C11 `<stdatomic.h>` → 改用 C++ COM 直接调用 + `std::atomic`
 4. **Flutter 构建: 缺少 runner** — 需要 `flutter create --platforms=windows` 生成 `windows/` 目录
 
-### Phase 2: Linux — 待实施
+### Phase 2: Linux — ✅ 已完成
+- `native_lib/linux/native_input.c`: Linux C 实现 (~350 行)
+  - 键盘: evdev `/dev/input/eventN` + `select()` 轮询
+  - 文本注入: `xdotool` (X11) / `wtype`/`ydotool` (Wayland)
+  - 音频: PulseAudio `pa_simple` API (16kHz mono 16-bit PCM, 20ms chunks)
+  - Ring Buffer: pthread_mutex 保护
+  - 设备: `pactl` 命令行工具
+- `native_lib/linux/CMakeLists.txt`: gcc 编译配置 (libpulse, pthread)
+- `lib/ffi/native_input_linux.dart`: Linux FFI 绑定 (NativeInputFFI 子类)
+- `lib/ui/linux/`: 4 个 Material Design 3 页面 (app/home/settings/chat)
+- `linux/`: Flutter Linux runner 平台文件
+- `main.dart` + `native_input_factory.dart`: 添加 Linux 分发
+- CI: Linux job 增加原生库 CMake 编译 + `flutter build linux`
+- 验证: 0 errors, 134 tests passed
+
 ### Phase 3: 鸿蒙 — 独立项目
 
 ## 核心发现
@@ -63,7 +77,7 @@
 
 macOS:  分析 → 测试 → clang 编译 dylib → flutter build macos
 Windows: 分析 → 测试 → CMake/MSVC 编译 dll → flutter build windows
-Linux:  分析 → 测试 (编译待 Phase 2)
+Linux:  分析 → 测试 → CMake/gcc 编译 so → flutter build linux
 ```
 
 详细方案见计划文件 `/Users/leon/.claude/plans/nifty-painting-rossum.md`。

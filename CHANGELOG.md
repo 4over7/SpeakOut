@@ -1,15 +1,17 @@
 # SpeakOut Version History
 
-## [1.4.0] - 2026-02-28
+## [1.4.0] - 2026-03-01
 
 ### 新功能: 跨平台架构 + CI/CD
 
-#### 跨平台架构 (Phase 0 + Phase 1)
+#### 跨平台架构 (Phase 0 + Phase 1 + Phase 2)
 - **NativeInputFFI 共用基类** — 提取 FFI 绑定公共代码，消除 macOS/Windows 间 ~400 行重复。所有平台只需实现动态库路径查找。
-- **工厂方法分发** — `createNativeInput()` 按 `Platform` 自动选择 `NativeInput` (macOS) 或 `NativeInputWindows` (Windows)。
+- **工厂方法分发** — `createNativeInput()` 按 `Platform` 自动选择 `NativeInput` (macOS) / `NativeInputWindows` (Windows) / `NativeInputLinux` (Linux)。
 - **Windows 原生库** — `native_input.cpp` (~550 行 C++) 实现全部 21 个导出函数：WH_KEYBOARD_LL 键盘监听、SendInput 文本注入、WASAPI 音频采集、IMMDeviceEnumerator 设备管理。
 - **Windows UI** — 4 个 fluent_ui 页面 (FluentApp + NavigationView)：首页、设置、聊天、系统托盘。
-- **Windows 平台 runner** — `flutter create --platforms=windows` 生成标准 runner 配置。
+- **Linux 原生库** — `native_input.c` (~350 行 C) 实现全部 21 个导出函数：evdev 键盘监听、xdotool/wtype 文本注入、PulseAudio 音频采集、Ring Buffer。
+- **Linux UI** — 4 个 Material Design 3 页面 (MaterialApp + TabBar)：首页、设置、聊天、系统托盘。
+- **Linux 平台 runner** — `flutter create --platforms=linux` 生成标准 runner 配置。
 - **ConfigService 条件化** — `MacOsOptions` 仅在 macOS 生效，其他平台使用默认 SecureStorage。
 - **OverlayController 兼容** — 非 macOS 平台 no-op，不依赖 NSPanel。
 
