@@ -19,6 +19,7 @@ import 'ui/onboarding_page.dart';
 
 // Platform-specific UI imports
 import 'ui/windows/windows_app.dart';
+import 'ui/linux/linux_app.dart';
 
 // Global Error Catcher
 void main() {
@@ -47,6 +48,8 @@ void main() {
     // Platform dispatch
     if (Platform.isWindows) {
       runApp(const WindowsAppWrapper());
+    } else if (Platform.isLinux) {
+      runApp(const LinuxAppWrapper());
     } else {
       runApp(const SpeakOutApp()); // macOS (现有)
     }
