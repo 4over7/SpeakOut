@@ -87,6 +87,14 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# Copy the native_input.dll into the bundle (same directory as speakout.exe)
+set(NATIVE_INPUT_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../native_lib/native_input.dll")
+if(EXISTS "${NATIVE_INPUT_DLL}")
+  install(FILES "${NATIVE_INPUT_DLL}"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
