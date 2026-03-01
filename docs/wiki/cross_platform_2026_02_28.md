@@ -50,6 +50,10 @@
 - CI: Linux job 增加原生库 CMake 编译 + `flutter build linux`
 - 验证: 0 errors, 134 tests passed
 
+### Phase 2 CI 调试记录
+1. **缺少 libsecret-1-dev** — `flutter_secure_storage_linux` 插件需要 `libsecret-1 >= 0.18.4` → CI 添加 `libsecret-1-dev`
+2. **缺少 libayatana-appindicator3-dev** — `system_tray` 插件需要 `ayatana-appindicator3-0.1` → CI 添加 `libayatana-appindicator3-dev`
+
 ### Phase 3: 鸿蒙 — 独立项目
 
 ## 核心发现
