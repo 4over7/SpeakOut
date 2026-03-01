@@ -26,8 +26,12 @@ class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
   }
 
   Future<void> _init() async {
-    await ConfigService().init();
-    await _initWindow();
+    try {
+      await ConfigService().init();
+      await _initWindow();
+    } catch (e) {
+      debugPrint('[WindowsApp] Init error: $e');
+    }
     if (mounted) setState(() => _initialized = true);
   }
 
@@ -46,7 +50,11 @@ class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
       await windowManager.focus();
     });
 
-    await _initSystemTray();
+    try {
+      await _initSystemTray();
+    } catch (e) {
+      debugPrint('[WindowsApp] System tray init failed: $e');
+    }
   }
 
   Future<void> _initSystemTray() async {
