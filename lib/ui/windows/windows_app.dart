@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
 import 'windows_home.dart';
+import 'windows_onboarding.dart';
 
 /// Windows 平台入口 Widget
 ///
@@ -18,6 +19,7 @@ class WindowsAppWrapper extends StatefulWidget {
 
 class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
   bool _initialized = false;
+  bool _showOnboarding = false;
 
   @override
   void initState() {
@@ -32,7 +34,12 @@ class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
     } catch (e) {
       debugPrint('[WindowsApp] Init error: $e');
     }
-    if (mounted) setState(() => _initialized = true);
+    if (mounted) {
+      setState(() {
+        _showOnboarding = ConfigService().isFirstLaunch;
+        _initialized = true;
+      });
+    }
   }
 
   Future<void> _initWindow() async {
@@ -116,7 +123,11 @@ class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const WindowsHomePage(),
+          home: _showOnboarding
+              ? WindowsOnboardingPage(onComplete: () {
+                  setState(() => _showOnboarding = false);
+                })
+              : const WindowsHomePage(),
         );
       },
     );
