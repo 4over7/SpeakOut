@@ -43,6 +43,7 @@ class NativeInputFFI implements NativeInputBase {
   late StopDeviceChangeListenerDart _stopDeviceChangeListener;
   late GetPreferredDeviceUidDart _getPreferredDeviceUid;
   late SetPreferredDeviceUidDart _setPreferredDeviceUid;
+  late IsDeviceAvailableDart _isDeviceAvailable;
 
   bool _qualityBound = false;
   late AnalyzeAudioQualityDart _analyzeAudioQuality;
@@ -281,6 +282,9 @@ class NativeInputFFI implements NativeInputBase {
       _setPreferredDeviceUid = _dylib
           .lookup<NativeFunction<SetPreferredDeviceUidC>>('set_preferred_device_uid')
           .asFunction();
+      _isDeviceAvailable = _dylib
+          .lookup<NativeFunction<IsDeviceAvailableC>>('is_device_available')
+          .asFunction();
       _deviceBound = true;
       _log("Device FFI bindings SUCCESS");
     } catch (e) {
@@ -361,6 +365,16 @@ class NativeInputFFI implements NativeInputBase {
     final ptr = uid.toNativeUtf8();
     _setPreferredDeviceUid(ptr);
     calloc.free(ptr);
+  }
+
+  @override
+  bool isDeviceAvailable(String deviceUID) {
+    _bindDeviceFunctions();
+    if (!_deviceBound) return false;
+    final ptr = deviceUID.toNativeUtf8();
+    final result = _isDeviceAvailable(ptr);
+    calloc.free(ptr);
+    return result == 1;
   }
 
   // ============ SIGNAL QUALITY ANALYSIS ============

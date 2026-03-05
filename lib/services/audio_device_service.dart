@@ -120,20 +120,34 @@ class AudioDeviceService {
   
   void _handleDeviceChange(String deviceId, String deviceName, bool isBluetooth) {
     debugPrint('[AudioDeviceService] Device changed: $deviceName (bluetooth=$isBluetooth)');
-    
-    // Refresh cached devices
-    refreshDevices();
-    
-    // Emit event
-    final event = AudioDeviceEvent(
+
+    // Invalidate cache — will be lazily rebuilt next time devices are accessed
+    // (e.g. when user opens settings). Do NOT call refreshDevices() here:
+    // enumerating all devices while Bluetooth is negotiating blocks the main
+    // thread for minutes, freezing CGEventTap keyboard events.
+    _devices = [];
+    _currentDevice = null;
+
+    // Emit event immediately
+    _deviceChangeController.add(AudioDeviceEvent(
       deviceId: deviceId,
       deviceName: deviceName,
       isBluetooth: isBluetooth,
-    );
-    _deviceChangeController.add(event);
-    
-    // Auto-manage: switch away from Bluetooth mic if enabled
-    if (autoManageEnabled && isBluetooth) {
+    ));
+
+    // Check only the device we actually care about: is our preferred device
+    // still available? Uses O(1) UID lookup — no device enumeration, no blocking.
+    final preferred = getPreferredDeviceUid();
+    if (preferred.isNotEmpty) {
+      if (_nativeInput.isDeviceAvailable(preferred)) {
+        debugPrint('[AudioDeviceService] Preferred device still available, no action needed');
+        return;
+      }
+      debugPrint('[AudioDeviceService] Preferred device gone, falling back to built-in');
+    }
+
+    // Preferred device is gone (or none set) — fall back to built-in mic
+    if (autoManageEnabled) {
       _handleBluetoothMicDetected(deviceName);
     }
   }

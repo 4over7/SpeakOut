@@ -1012,6 +1012,31 @@ int set_input_device(const char *deviceUID) {
   }
 }
 
+// Check if a device with the given UID is currently available.
+// Uses kAudioHardwarePropertyTranslateUIDToDevice for O(1) lookup —
+// does NOT enumerate all devices, safe to call during BT negotiation.
+// Returns 1 if available, 0 if not found or UID is empty.
+int is_device_available(const char *deviceUID) {
+  if (deviceUID == NULL || deviceUID[0] == 0) return 0;
+
+  CFStringRef uidRef =
+      CFStringCreateWithCString(NULL, deviceUID, kCFStringEncodingUTF8);
+  if (!uidRef) return 0;
+
+  AudioObjectPropertyAddress propAddr = {
+      kAudioHardwarePropertyTranslateUIDToDevice,
+      kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+
+  AudioObjectID deviceID = kAudioObjectUnknown;
+  UInt32 size = sizeof(AudioObjectID);
+  OSStatus status =
+      AudioObjectGetPropertyData(kAudioObjectSystemObject, &propAddr,
+                                 sizeof(CFStringRef), &uidRef, &size, &deviceID);
+  CFRelease(uidRef);
+
+  return (status == noErr && deviceID != kAudioObjectUnknown) ? 1 : 0;
+}
+
 // Switch to built-in microphone
 // Returns 1 on success, 0 if already built-in or failed
 int switch_to_builtin_mic() {
