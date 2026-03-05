@@ -18,6 +18,8 @@ class _VocabSettingsPageState extends State<VocabSettingsPage> {
   late Map<String, bool> _packEnabled;
   late bool _userEnabled;
   List<VocabEntry> _userEntries = [];
+  late bool _phoneticEnabled;
+  late double _phoneticThreshold;
 
   @override
   void initState() {
@@ -33,6 +35,8 @@ class _VocabSettingsPageState extends State<VocabSettingsPage> {
       'education': config.vocabEducationEnabled,
     };
     _userEntries = List.from(VocabService().userEntries);
+    _phoneticEnabled = config.vocabPhoneticEnabled;
+    _phoneticThreshold = config.vocabPhoneticThreshold;
 
     // 预加载行业包
     VocabService().ensurePacksLoaded();
@@ -157,6 +161,74 @@ class _VocabSettingsPageState extends State<VocabSettingsPage> {
                     ),
 
                     if (_vocabEnabled) ...[
+                      const SizedBox(height: 24),
+
+                      // 音近匹配 Phase 2
+                      SettingsGroup(
+                        title: loc.vocabPhoneticMatching,
+                        children: [
+                          SettingsTile(
+                            label: loc.vocabPhoneticEnabled,
+                            icon: CupertinoIcons.waveform,
+                            child: MacosSwitch(
+                              value: _phoneticEnabled,
+                              onChanged: (v) async {
+                                await ConfigService().setVocabPhoneticEnabled(v);
+                                VocabService().invalidatePinyinCache();
+                                setState(() => _phoneticEnabled = v);
+                              },
+                            ),
+                          ),
+                          if (_phoneticEnabled) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(left: 40, bottom: 4),
+                              child: Text(
+                                loc.vocabPhoneticEnabledNote,
+                                style: AppTheme.caption(context).copyWith(
+                                  color: MacosColors.systemGrayColor,
+                                ),
+                              ),
+                            ),
+                            const SettingsDivider(),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const MacosIcon(CupertinoIcons.slider_horizontal_3, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(loc.vocabPhoneticThreshold, style: AppTheme.body(context)),
+                                      const Spacer(),
+                                      Text(
+                                        _phoneticThreshold.toStringAsFixed(1),
+                                        style: AppTheme.caption(context),
+                                      ),
+                                    ],
+                                  ),
+                                  MacosSlider(
+                                    value: _phoneticThreshold,
+                                    min: 1.0,
+                                    max: 3.0,
+                                    onChanged: (v) async {
+                                      await ConfigService().setVocabPhoneticThreshold(v);
+                                      setState(() => _phoneticThreshold = v);
+                                    },
+                                  ),
+                                  Text(
+                                    loc.vocabPhoneticThresholdNote,
+                                    style: AppTheme.caption(context).copyWith(
+                                      color: MacosColors.systemGrayColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+
                       const SizedBox(height: 24),
 
                       // 行业预设

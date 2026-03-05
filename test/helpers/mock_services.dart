@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:speakout/engine/asr_provider.dart';
+import 'package:speakout/engine/asr_result.dart';
 
 /// Fake ASR provider with programmable results.
 /// Extracted from integration_test.dart for reuse.
@@ -39,7 +40,7 @@ class FakeASRProvider implements ASRProvider {
   }
 
   @override
-  Future<String> stop() async => stopResult;
+  Future<ASRResult> stop() async => ASRResult.textOnly(stopResult);
 
   @override
   Future<void> dispose() async {

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/engine/asr_provider.dart';
+import 'package:speakout/engine/asr_result.dart';
 import 'dart:typed_data';
 import 'dart:async';
 
@@ -37,8 +38,8 @@ class FakeASRProvider implements ASRProvider {
   }
 
   @override
-  Future<String> stop() async {
-    return "Final transcription result";
+  Future<ASRResult> stop() async {
+    return ASRResult.textOnly("Final transcription result");
   }
 
   @override
@@ -110,7 +111,7 @@ void main() {
       provider.acceptWaveform(Float32List(1600));
       
       final result = await provider.stop();
-      expect(result, "Final transcription result");
+      expect(result.text, "Final transcription result");
       
       await provider.dispose();
     });
@@ -140,7 +141,7 @@ void main() {
       expect(provider.receivedSamples.length, 300);
       
       final result = await provider.stop();
-      expect(result, isNotEmpty);
+      expect(result.text, isNotEmpty);
       
       await provider.dispose();
     });
@@ -171,7 +172,7 @@ void main() {
       // Don't call start()
       
       final result = await provider.stop();
-      expect(result, isNotEmpty);
+      expect(result.text, isNotEmpty);
       
       await provider.dispose();
     });

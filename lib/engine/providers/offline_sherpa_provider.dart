@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
+import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
 
 /// Offline (non-streaming) ASR Provider using sherpa-onnx OfflineRecognizer.
@@ -134,8 +135,8 @@ class OfflineSherpaProvider implements ASRProvider {
   }
 
   @override
-  Future<String> stop() async {
-    if (_recognizer == null) return "";
+  Future<ASRResult> stop() async {
+    if (_recognizer == null) return ASRResult.textOnly("");
 
     try {
       // Merge all audio chunks into a single buffer
@@ -144,7 +145,7 @@ class OfflineSherpaProvider implements ASRProvider {
         totalSamples += chunk.length;
       }
 
-      if (totalSamples == 0) return "";
+      if (totalSamples == 0) return ASRResult.textOnly("");
 
       final merged = Float32List(totalSamples);
       int offset = 0;
@@ -170,11 +171,20 @@ class OfflineSherpaProvider implements ASRProvider {
         _textController.add(text);
       }
 
-      return text;
+      // 未来：当 modelArch == transducerOffline 时，可从 C API 读取 ys_log_probs
+      // if (_currentModelArch == ModelArch.transducerOffline) {
+      //   confidence = extractConfidenceFromJson(stream);
+      // }
+      return ASRResult(
+        text: text,
+        tokens: result.tokens,
+        timestamps: result.timestamps.map((t) => t.toDouble()).toList(),
+        tokenConfidence: null, // 当前所有离线模型均无置信度
+      );
     } catch (e) {
       AppLog.d("[OfflineSherpaProvider] stop error: $e");
       _audioChunks.clear();
-      return "";
+      return ASRResult.textOnly("");
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../asr_provider.dart';
+import '../asr_result.dart';
 import 'aliyun_token_service.dart';
 import 'package:speakout/config/app_log.dart';
 class AliyunProvider implements ASRProvider {
@@ -255,9 +256,9 @@ class AliyunProvider implements ASRProvider {
   // ...
 
   @override
-  Future<String> stop() async {
-    if (_channel == null) return "";
-    
+  Future<ASRResult> stop() async {
+    if (_channel == null) return ASRResult.textOnly("");
+
     // Wait for handshake to complete (up to 2s) before sending stop
     if (!_isHandshakeComplete) {
       await Future.any([
@@ -268,7 +269,7 @@ class AliyunProvider implements ASRProvider {
         Future.delayed(const Duration(seconds: 2)),
       ]);
     }
-    
+
     // Send Stop (but DON'T close the connection - keep it for reuse)
     final stopCmd = {
       "header": {
@@ -279,17 +280,16 @@ class AliyunProvider implements ASRProvider {
         "appkey": _appKey
       }
     };
-    
+
     _channel!.sink.add(jsonEncode(stopCmd));
-    
+
     // Wait briefly for any final messages
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     // Reset idle timer (connection stays open)
     _resetIdleTimer();
-    
-    // Return final accumulated text
-    return _committedText + _currentSentence; 
+
+    return ASRResult.textOnly(_committedText + _currentSentence);
   }
 
   @override

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/engine/asr_provider.dart';
+import 'package:speakout/engine/asr_result.dart';
 
 // Mock Implementation to verify interface stability
 class MockCloudProvider implements ASRProvider {
@@ -38,9 +39,9 @@ class MockCloudProvider implements ASRProvider {
   }
 
   @override
-  Future<String> stop() async {
+  Future<ASRResult> stop() async {
     stopCalled = true;
-    return "Final Result";
+    return ASRResult.textOnly("Final Result");
   }
 
   @override
@@ -71,7 +72,7 @@ void main() {
       expectLater(provider.textStream, emitsInOrder(["Started", "Received 1600 samples"]));
       
       final result = await provider.stop();
-      expect(result, "Final Result");
+      expect(result.text, "Final Result");
       expect(provider.stopCalled, true);
     });
   });

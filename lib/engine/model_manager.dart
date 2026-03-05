@@ -7,6 +7,15 @@ import 'package:flutter/foundation.dart';
 import 'package:speakout/config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
 
+/// 模型架构分类，用于确定 Phase 2 置信度支持能力
+enum ModelArch {
+  transducerStreaming, // 流式 Transducer（Zipformer 双语）
+  transducerOffline,  // 离线 Transducer（未来新增）— C API 可读 ys_log_probs
+  ctcStreaming,        // 流式 CTC（Paraformer 双语）
+  ctcOffline,         // 离线 CTC（Paraformer/SenseVoice/FireRedASR）
+  whisperLike,        // Encoder-Decoder（Whisper）
+}
+
 class ModelInfo {
   final String id;
   final String name;
@@ -16,6 +25,7 @@ class ModelInfo {
   final String lang;
   final bool isOffline; // true = non-streaming (batch recognition after recording)
   final bool hasPunctuation; // true = model outputs punctuation, no need for punctuation model
+  final ModelArch arch; // 模型架构分类
 
   const ModelInfo({
     required this.id,
@@ -26,7 +36,11 @@ class ModelInfo {
     required this.lang,
     this.isOffline = false,
     this.hasPunctuation = false,
+    this.arch = ModelArch.ctcOffline,
   });
+
+  /// 是否支持 per-token 置信度（当前仅未来离线 Transducer 模型支持）
+  bool get supportsConfidence => arch == ModelArch.transducerOffline;
 }
 
 class ModelManager {
@@ -39,6 +53,7 @@ class ModelManager {
       url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
       type: "zipformer",
       lang: "zh-en",
+      arch: ModelArch.transducerStreaming,
     ),
     ModelInfo(
       id: "paraformer_bi_zh_en",
@@ -47,6 +62,7 @@ class ModelManager {
       url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
       type: "paraformer",
       lang: "zh-en",
+      arch: ModelArch.ctcStreaming,
     ),
   ];
 
@@ -61,6 +77,7 @@ class ModelManager {
       lang: "zh-en-ja-ko-yue",
       isOffline: true,
       hasPunctuation: true,
+      arch: ModelArch.ctcOffline,
     ),
     ModelInfo(
       id: "sensevoice_zh_en_int8_2025",
@@ -70,6 +87,7 @@ class ModelManager {
       type: "sense_voice",
       lang: "zh-en-ja-ko-yue",
       isOffline: true,
+      arch: ModelArch.ctcOffline,
     ),
     // --- Paraformer ---
     ModelInfo(
@@ -80,6 +98,7 @@ class ModelManager {
       type: "offline_paraformer",
       lang: "zh-en",
       isOffline: true,
+      arch: ModelArch.ctcOffline,
     ),
     ModelInfo(
       id: "offline_paraformer_dialect_2025",
@@ -89,6 +108,7 @@ class ModelManager {
       type: "offline_paraformer",
       lang: "zh-en-dialect",
       isOffline: true,
+      arch: ModelArch.ctcOffline,
     ),
     // --- Large models ---
     ModelInfo(
@@ -100,6 +120,7 @@ class ModelManager {
       lang: "multilingual",
       isOffline: true,
       hasPunctuation: true,
+      arch: ModelArch.whisperLike,
     ),
     ModelInfo(
       id: "fire_red_asr_large",
@@ -109,6 +130,7 @@ class ModelManager {
       type: "fire_red_asr",
       lang: "zh-en-dialect",
       isOffline: true,
+      arch: ModelArch.ctcOffline,
     ),
   ];
 

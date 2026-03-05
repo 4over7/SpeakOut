@@ -202,5 +202,10 @@
   "vocabLegal": "Legal",
   "vocabFinance": "Finance",
   "vocabEducation": "Education",
-  "vocabEnabledNote": "When enabled, vocab substitution runs before AI correction"
+  "vocabEnabledNote": "When enabled, vocab substitution runs before AI correction",
+  "vocabPhoneticMatching": "Phonetic Matching",
+  "vocabPhoneticEnabled": "Enable Phonetic Matching",
+  "vocabPhoneticEnabledNote": "Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")",
+  "vocabPhoneticThreshold": "Match Threshold",
+  "vocabPhoneticThresholdNote": "Lower = stricter (fewer false positives); Higher = broader coverage"
 }

@@ -11,6 +11,7 @@ import '../services/config_service.dart';
 import '../services/llm_service.dart';
 import '../services/vocab_service.dart';
 import 'asr_provider.dart';
+import 'asr_result.dart';
 import 'providers/sherpa_provider.dart';
 import 'providers/offline_sherpa_provider.dart';
 import 'providers/aliyun_provider.dart';
@@ -807,18 +808,18 @@ class CoreEngine {
     _recordingState = RecordingState.processing;
 
     if (_asrProvider != null) {
-      String text = "";
+      ASRResult asrResult = ASRResult.textOnly("");
       try {
-        text = await _asrProvider!.stop().timeout(const Duration(seconds: 2), onTimeout: () {
+        asrResult = await _asrProvider!.stop().timeout(const Duration(seconds: 2), onTimeout: () {
           _log("ASR Provider Stop Timeout!");
-          return "";
+          return ASRResult.textOnly("");
         });
       } catch (e) {
         _log("Provider Stop Error: $e");
       }
-      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned: '${text.length > 30 ? '${text.substring(0, 30)}...' : text}'");
+      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned: '${asrResult.text.length > 30 ? '${asrResult.text.substring(0, 30)}...' : asrResult.text}'");
 
-      String finalText = text;
+      String finalText = asrResult.text;
 
       // Post-processing: De-duplicate (仅流式 ASR 需要，离线和云端不会产生滑动窗口重复)
       if (finalText.isNotEmpty && ConfigService().deduplicationEnabled && !_isOfflineASR && ConfigService().asrEngineType != 'aliyun') {
@@ -830,6 +831,16 @@ class CoreEngine {
       if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
         finalText = VocabService().applyReplacements(finalText);
         _log("[PERF] +${sw.elapsedMilliseconds}ms — vocab replacement done");
+      }
+
+      // Vocab Enhancement (Phase 2: phonetic soft matching)
+      if (finalText.isNotEmpty && ConfigService().vocabEnabled && ConfigService().vocabPhoneticEnabled) {
+        finalText = await VocabService().applyWithPhonetic(
+          finalText,
+          tokens: asrResult.tokens,
+          confidence: asrResult.tokenConfidence,
+        );
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — vocab phonetic done");
       }
 
       // AI Correction

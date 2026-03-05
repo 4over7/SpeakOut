@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:lpinyin/lpinyin.dart';
 import 'config_service.dart';
 
 /// 词汇表条目：错误形式 → 正确形式
@@ -53,6 +54,10 @@ class VocabService {
   final Map<String, VocabPack> _loadedPacks = {};
   bool _packsLoaded = false;
 
+  // Phase 2：拼音缓存（wrong 汉字 → 拼音字符串）
+  final Map<String, String> _pinyinCache = {};
+  bool _pinyinCacheReady = false;
+
   /// 所有可用行业包（含元信息，不一定已加载词条）
   static List<({String id, String nameZh, String nameEn})> get availablePacks =>
       _packDefs.map((d) => (id: d.id, nameZh: d.nameZh, nameEn: d.nameEn)).toList();
@@ -100,6 +105,7 @@ class VocabService {
     final current = userEntries;
     current.add(entry);
     await _saveUserEntries(current);
+    invalidatePinyinCache();
   }
 
   Future<void> deleteUserEntry(int index) async {
@@ -107,6 +113,7 @@ class VocabService {
     if (index < 0 || index >= current.length) return;
     current.removeAt(index);
     await _saveUserEntries(current);
+    invalidatePinyinCache();
   }
 
   Future<void> _saveUserEntries(List<VocabEntry> entries) async {
@@ -128,9 +135,115 @@ class VocabService {
     return result;
   }
 
-  /// Phase 2 预留接口（当前透传 Phase 1 结果）
-  String applyWithPhonetic(String text, {List<String>? tokens}) {
-    return applyReplacements(text);
+  /// Phase 2：音近软匹配替换
+  ///
+  /// 先做 Phase 1 精确替换，再对文本做滑动窗口拼音距离匹配。
+  /// [tokens] — ASR 分词列表（当前仅用于未来置信度门控）
+  /// [confidence] — per-token 对数概率，仅离线 Transducer 模型有值
+  Future<String> applyWithPhonetic(
+    String text, {
+    List<String>? tokens,
+    List<double>? confidence,
+  }) async {
+    // Phase 1 已在 CoreEngine 执行，此处直接处理传入文本
+    if (text.isEmpty) return text;
+
+    await _ensurePinyinCache();
+    if (_pinyinCache.isEmpty) return text;
+
+    final threshold = ConfigService().vocabPhoneticThreshold;
+    final entries = getActiveEntries();
+    if (entries.isEmpty) return text;
+
+    String result = text;
+
+    // 对每个有 wrong 字段的词条，尝试在文本中找音近子串
+    for (final entry in entries) {
+      if (entry.wrong.isEmpty || entry.correct.isEmpty) continue;
+
+      final wrongPinyin = _pinyinCache[entry.wrong];
+      if (wrongPinyin == null) continue;
+
+      final wrongLen = entry.wrong.length;
+      if (wrongLen < 2 || wrongLen > 6) continue; // 只做 2~6 字窗口
+
+      // 在 result 中滑动相同长度窗口，寻找音近子串
+      int i = 0;
+      while (i <= result.length - wrongLen) {
+        final window = result.substring(i, i + wrongLen);
+        // 跳过已是正确词的位置
+        if (window == entry.correct) {
+          i++;
+          continue;
+        }
+        final windowPinyin = PinyinHelper.getPinyin(window, separator: ' ');
+        final dist = _phoneticDistance(wrongPinyin, windowPinyin);
+        if (dist <= threshold) {
+          result = result.substring(0, i) + entry.correct + result.substring(i + wrongLen);
+          i += entry.correct.length; // 跳过替换后的正确词
+        } else {
+          i++;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// 使词条拼音缓存失效（词条变更或开关切换时调用）
+  void invalidatePinyinCache() {
+    _pinyinCache.clear();
+    _pinyinCacheReady = false;
+  }
+
+  Future<void> _ensurePinyinCache() async {
+    if (_pinyinCacheReady) return;
+    final entries = getActiveEntries();
+    for (final e in entries) {
+      if (e.wrong.isNotEmpty) {
+        _pinyinCache[e.wrong] = PinyinHelper.getPinyin(e.wrong, separator: ' ');
+      }
+    }
+    _pinyinCacheReady = true;
+  }
+
+  /// 方言标准化：将平翘舌、前后鼻音等视为等价
+  String _normalizeDialect(String pinyin) {
+    return pinyin
+        .replaceAll('zh', 'z')
+        .replaceAll('ch', 'c')
+        .replaceAll('sh', 's')
+        .replaceAll('l', 'n');
+  }
+
+  /// 音近距离：拼音归一化后的 Levenshtein 编辑距离（按音节空格分隔）
+  double _phoneticDistance(String pinyinA, String pinyinB) {
+    final a = _normalizeDialect(pinyinA);
+    final b = _normalizeDialect(pinyinB);
+    return _levenshtein(a, b).toDouble();
+  }
+
+  /// 标准 Levenshtein 编辑距离
+  int _levenshtein(String s, String t) {
+    if (s == t) return 0;
+    if (s.isEmpty) return t.length;
+    if (t.isEmpty) return s.length;
+
+    final dp = List.generate(s.length + 1, (i) => List.filled(t.length + 1, 0));
+    for (int i = 0; i <= s.length; i++) { dp[i][0] = i; }
+    for (int j = 0; j <= t.length; j++) { dp[0][j] = j; }
+
+    for (int i = 1; i <= s.length; i++) {
+      for (int j = 1; j <= t.length; j++) {
+        final cost = s[i - 1] == t[j - 1] ? 0 : 1;
+        dp[i][j] = [
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost,
+        ].reduce((a, b) => a < b ? a : b);
+      }
+    }
+    return dp[s.length][t.length];
   }
 
   /// 初始化：预加载所有启用的行业包（懒加载，首次调用时执行）

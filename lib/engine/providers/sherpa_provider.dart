@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
+import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
 
 class SherpaProvider implements ASRProvider {
@@ -134,35 +135,39 @@ class SherpaProvider implements ASRProvider {
   }
 
   @override
-  Future<String> stop() async {
-    if (_stream == null || _recognizer == null) return "";
-    
+  Future<ASRResult> stop() async {
+    if (_stream == null || _recognizer == null) return ASRResult.textOnly("");
+
     try {
       // Inject silence padding for Sherpa's decoder quirks
       // Padding (Increased to 0.8s to fix tail truncation)
       final silence = Float32List(12800); // 0.8s @ 16k
       acceptWaveform(silence);
-      
+
       _stream!.inputFinished();
-      
+
       // Final Decode
       while (_recognizer!.isReady(_stream!)) {
         _recognizer!.decode(_stream!);
       }
-      
+
       final result = _recognizer!.getResult(_stream!);
       final text = result.text.trim();
-      
+
       _stream!.free();
       _stream = null;
-      
-      return text;
+
+      return ASRResult(
+        text: text,
+        tokens: result.tokens,
+        timestamps: result.timestamps.map((t) => t.toDouble()).toList(),
+        tokenConfidence: null, // 流式模型无 per-token 置信度
+      );
     } catch (e) {
       AppLog.d("[SherpaProvider] stop error: $e");
-      // Cleanup on error
       try { _stream?.free(); } catch (_) {}
       _stream = null;
-      return "";
+      return ASRResult.textOnly("");
     }
   }
 
