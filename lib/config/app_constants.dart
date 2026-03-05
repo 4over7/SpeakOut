@@ -46,7 +46,7 @@ class AppConstants {
   static const String kDefaultToggleInputKeyName = "";
   static const int kDefaultToggleDiaryKeyCode = 0;   // 0 = disabled
   static const String kDefaultToggleDiaryKeyName = "";
-  static const int kDefaultToggleMaxDuration = 0;     // 0 = no limit (seconds)
+  static const int kDefaultToggleMaxDuration = 300;   // 5 minutes (seconds)
   static const int kToggleThresholdMs = 1000;          // PTT/Toggle threshold
 
   // ASR De-duplication (post-processing)
