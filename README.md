@@ -21,7 +21,7 @@ Two trigger modes: **Hold to Speak (PTT)** — hold a key, speak, release to typ
 
 - **8 ASR Models** — SenseVoice, Paraformer, Whisper Large-v3, FireRedASR, and more. Choose by accuracy, size, or language.
 - **Streaming & Offline Modes** — Real-time subtitles while speaking (streaming), or higher accuracy after release (offline).
-- **Toggle Mode** — Tap once to start recording, tap again to stop. Ideal for hands-free or walking scenarios. Supports max duration protection.
+- **Toggle Mode** — Tap once to start recording, tap again to stop. Ideal for hands-free or walking scenarios. Default max duration: 5 minutes.
 - **Multilingual** — Chinese, English, Japanese, Korean, Cantonese, dialects, and 90+ languages (Whisper).
 - **Fully Offline** — Powered by [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx). No audio leaves your device.
 
@@ -44,6 +44,10 @@ Optional LLM post-processing to remove filler words and polish text.
 ### Cloud ASR (Optional)
 
 Switch to Aliyun Smart Voice for cloud-based recognition when needed.
+
+### Smart Audio Device Management
+
+Detects Bluetooth headset connect/disconnect events instantly. Optionally auto-switches back to the built-in mic for better quality — without blocking keyboard events.
 
 ---
 
@@ -167,7 +171,7 @@ Copyright © 2026 Leon. All Rights Reserved.
 
 - **8 款语音模型** — SenseVoice、Paraformer、Whisper Large-v3、FireRedASR 等，按精度、体积或语言自由选择。
 - **流式 & 离线模式** — 边说边出字（流式），或松开后高精度识别（离线）。
-- **Toggle 模式** — 单击开始录音，再次单击结束。适合走动、站立等不方便长按的场景，支持最大时长保护。
+- **Toggle 模式** — 单击开始录音，再次单击结束。适合走动、站立等不方便长按的场景，默认最大时长 5 分钟保护。
 - **多语言** — 中、英、日、韩、粤语、方言，以及 90+ 种语言（Whisper）。
 - **完全离线** — 基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，音频不出设备。
 
@@ -190,6 +194,10 @@ Copyright © 2026 Leon. All Rights Reserved.
 ### 云端识别（可选）
 
 需要时可切换到阿里云智能语音进行云端识别。
+
+### 智能音频设备管理
+
+蓝牙耳机插拔时自动检测当前使用的麦克风是否仍可用，可选自动切回内置麦克风，全程不影响键盘响应。
 
 ---
 
