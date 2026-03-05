@@ -13,8 +13,10 @@ import '../engine/core_engine.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'theme.dart';
+import 'widgets/settings_widgets.dart';
 import '../services/audio_device_service.dart';
 import 'package:speakout/config/app_log.dart';
+import 'vocab_settings_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -1008,6 +1010,28 @@ class _SettingsPageState extends State<SettingsPage> {
         
         const SizedBox(height: 24),
 
+        // Vocab Enhancement Entry
+        SettingsGroup(
+          title: loc.vocabEnhancement,
+          children: [
+            SettingsTile(
+              label: loc.vocabEnhancement,
+              subtitle: loc.vocabEnhancementSubtitle,
+              icon: CupertinoIcons.textformat_abc_dottedunderline,
+              child: MacosIconButton(
+                icon: const MacosIcon(CupertinoIcons.chevron_right),
+                backgroundColor: MacosColors.transparent,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VocabSettingsPage()),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
         // Developer / Debug
         SettingsGroup(
           title: '开发者',
@@ -1498,84 +1522,3 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-class SettingsGroup extends StatelessWidget {
-  final String? title;
-  final List<Widget> children;
-  
-  const SettingsGroup({super.key, this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (title != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(title!, style: AppTheme.heading(context)),
-          ),
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppTheme.getCardBackground(context),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.getBorder(context)),
-          ),
-          child: Column(children: children),
-        ),
-      ],
-    );
-  }
-}
-
-class SettingsTile extends StatelessWidget {
-  final String label;
-  final String? subtitle;
-  final Widget child;
-  final IconData? icon; // Added Icon support
-
-  const SettingsTile({super.key, required this.label, this.subtitle, required this.child, this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            MacosIcon(icon, size: 20, color: MacosColors.systemGrayColor),
-            const SizedBox(width: 12),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppTheme.body(context)),
-                if (subtitle != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(subtitle!, style: AppTheme.caption(context)),
-                  ),
-              ],
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class SettingsDivider extends StatelessWidget {
-  const SettingsDivider({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Divider(
-      height: 1, 
-      color: MacosColors.separatorColor.withValues(alpha:0.5), 
-      indent: 16, 
-      endIndent: 0
-    );
-  }
-}

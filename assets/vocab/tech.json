@@ -1,0 +1,28 @@
+{
+  "id": "tech",
+  "name_zh": "软件/IT",
+  "name_en": "Software/IT",
+  "has_lm": false,
+  "entries": [
+    {"wrong": "科博斯", "correct": "Kubernetes"},
+    {"wrong": "库伯耐斯", "correct": "Kubernetes"},
+    {"wrong": "库伯奈特斯", "correct": "Kubernetes"},
+    {"wrong": "多克儿", "correct": "Docker"},
+    {"wrong": "阿皮", "correct": "API"},
+    {"wrong": "佛拉特", "correct": "Flutter"},
+    {"wrong": "结图波", "correct": "GitHub"},
+    {"wrong": "结宋", "correct": "JSON"},
+    {"wrong": "皮阿尔", "correct": "PR"},
+    {"wrong": "吉特", "correct": "Git"},
+    {"wrong": "达特", "correct": "Dart"},
+    {"wrong": "派森", "correct": "Python"},
+    {"wrong": "林苦斯", "correct": "Linux"},
+    {"wrong": "按装", "correct": "安装"},
+    {"wrong": "软间", "correct": "软件"},
+    {"wrong": "诶派艾", "correct": "API"},
+    {"wrong": "雷迪斯", "correct": "Redis"},
+    {"wrong": "麦可服", "correct": "微服"},
+    {"wrong": "数据裤", "correct": "数据库"},
+    {"wrong": "姐口", "correct": "接口"}
+  ]
+}

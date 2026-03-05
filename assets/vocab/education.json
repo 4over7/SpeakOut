@@ -1,0 +1,22 @@
+{
+  "id": "education",
+  "name_zh": "教育",
+  "name_en": "Education",
+  "has_lm": false,
+  "entries": [
+    {"wrong": "高考分", "correct": "高考分数"},
+    {"wrong": "毕业论", "correct": "毕业论文"},
+    {"wrong": "学习力", "correct": "学习能力"},
+    {"wrong": "教学法", "correct": "教学方法"},
+    {"wrong": "课外辅", "correct": "课外辅导"},
+    {"wrong": "教育部", "correct": "教育部"},
+    {"wrong": "素质教", "correct": "素质教育"},
+    {"wrong": "职业技", "correct": "职业技能"},
+    {"wrong": "在线课", "correct": "在线课程"},
+    {"wrong": "奖学金", "correct": "奖学金"},
+    {"wrong": "论文答", "correct": "论文答辩"},
+    {"wrong": "学位证", "correct": "学位证书"},
+    {"wrong": "研究生", "correct": "研究生"},
+    {"wrong": "教材版", "correct": "教材版本"}
+  ]
+}

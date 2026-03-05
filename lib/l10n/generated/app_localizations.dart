@@ -1015,6 +1015,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Importing...'**
   String get importing;
+
+  /// No description provided for @vocabEnhancement.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocab Enhancement'**
+  String get vocabEnhancement;
+
+  /// No description provided for @vocabEnhancementSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix ASR homophones and technical term substitutions'**
+  String get vocabEnhancementSubtitle;
+
+  /// No description provided for @vocabEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Vocab Enhancement'**
+  String get vocabEnabled;
+
+  /// No description provided for @vocabIndustryPresets.
+  ///
+  /// In en, this message translates to:
+  /// **'Industry Preset Dictionaries'**
+  String get vocabIndustryPresets;
+
+  /// No description provided for @vocabCustomVocab.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Entries'**
+  String get vocabCustomVocab;
+
+  /// No description provided for @vocabAddEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Entry'**
+  String get vocabAddEntry;
+
+  /// No description provided for @vocabWrongForm.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong form (ASR output)'**
+  String get vocabWrongForm;
+
+  /// No description provided for @vocabCorrectForm.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct form'**
+  String get vocabCorrectForm;
+
+  /// No description provided for @vocabDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get vocabDelete;
+
+  /// No description provided for @vocabTech.
+  ///
+  /// In en, this message translates to:
+  /// **'Software/IT'**
+  String get vocabTech;
+
+  /// No description provided for @vocabMedical.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical'**
+  String get vocabMedical;
+
+  /// No description provided for @vocabLegal.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal'**
+  String get vocabLegal;
+
+  /// No description provided for @vocabFinance.
+  ///
+  /// In en, this message translates to:
+  /// **'Finance'**
+  String get vocabFinance;
+
+  /// No description provided for @vocabEducation.
+  ///
+  /// In en, this message translates to:
+  /// **'Education'**
+  String get vocabEducation;
+
+  /// No description provided for @vocabEnabledNote.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, vocab substitution runs before AI correction'**
+  String get vocabEnabledNote;
 }
 
 class _AppLocalizationsDelegate

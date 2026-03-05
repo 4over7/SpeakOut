@@ -1,0 +1,22 @@
+{
+  "id": "medical",
+  "name_zh": "医疗",
+  "name_en": "Medical",
+  "has_lm": false,
+  "entries": [
+    {"wrong": "心脏变快", "correct": "心率加快"},
+    {"wrong": "心脏变慢", "correct": "心率减慢"},
+    {"wrong": "打底针", "correct": "打点滴"},
+    {"wrong": "量血", "correct": "量血压"},
+    {"wrong": "血糖高", "correct": "血糖升高"},
+    {"wrong": "核磁", "correct": "核磁共振"},
+    {"wrong": "摄线", "correct": "X射线"},
+    {"wrong": "B超", "correct": "B超"},
+    {"wrong": "住院部", "correct": "住院部"},
+    {"wrong": "骨折了", "correct": "骨折"},
+    {"wrong": "过敏原", "correct": "过敏原"},
+    {"wrong": "消炎药", "correct": "消炎药"},
+    {"wrong": "抗生素", "correct": "抗生素"},
+    {"wrong": "血惯", "correct": "血管"}
+  ]
+}

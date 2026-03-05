@@ -9,6 +9,7 @@ import '../ffi/native_input_factory.dart';
 import '../config/app_constants.dart';
 import '../services/config_service.dart';
 import '../services/llm_service.dart';
+import '../services/vocab_service.dart';
 import 'asr_provider.dart';
 import 'providers/sherpa_provider.dart';
 import 'providers/offline_sherpa_provider.dart';
@@ -823,6 +824,12 @@ class CoreEngine {
       if (finalText.isNotEmpty && ConfigService().deduplicationEnabled && !_isOfflineASR && ConfigService().asrEngineType != 'aliyun') {
         finalText = deduplicateText(finalText);
         _log("[PERF] +${sw.elapsedMilliseconds}ms — dedup done");
+      }
+
+      // Vocab Enhancement (Phase 1: exact replacement)
+      if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
+        finalText = VocabService().applyReplacements(finalText);
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — vocab replacement done");
       }
 
       // AI Correction

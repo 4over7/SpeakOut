@@ -482,4 +482,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importing => '导入中...';
+
+  @override
+  String get vocabEnhancement => '词汇增强';
+
+  @override
+  String get vocabEnhancementSubtitle => '修正 ASR 音近字错误，支持专业术语替换';
+
+  @override
+  String get vocabEnabled => '启用词汇增强';
+
+  @override
+  String get vocabIndustryPresets => '行业预设词典';
+
+  @override
+  String get vocabCustomVocab => '自定义词条';
+
+  @override
+  String get vocabAddEntry => '添加词条';
+
+  @override
+  String get vocabWrongForm => '错误形式（ASR 识别结果）';
+
+  @override
+  String get vocabCorrectForm => '正确形式';
+
+  @override
+  String get vocabDelete => '删除';
+
+  @override
+  String get vocabTech => '软件/IT';
+
+  @override
+  String get vocabMedical => '医疗';
+
+  @override
+  String get vocabLegal => '法律';
+
+  @override
+  String get vocabFinance => '金融';
+
+  @override
+  String get vocabEducation => '教育';
+
+  @override
+  String get vocabEnabledNote => '开启后，ASR 结果将在 AI 纠错之前进行词汇替换';
 }

@@ -502,4 +502,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importing => 'Importing...';
+
+  @override
+  String get vocabEnhancement => 'Vocab Enhancement';
+
+  @override
+  String get vocabEnhancementSubtitle =>
+      'Fix ASR homophones and technical term substitutions';
+
+  @override
+  String get vocabEnabled => 'Enable Vocab Enhancement';
+
+  @override
+  String get vocabIndustryPresets => 'Industry Preset Dictionaries';
+
+  @override
+  String get vocabCustomVocab => 'Custom Entries';
+
+  @override
+  String get vocabAddEntry => 'Add Entry';
+
+  @override
+  String get vocabWrongForm => 'Wrong form (ASR output)';
+
+  @override
+  String get vocabCorrectForm => 'Correct form';
+
+  @override
+  String get vocabDelete => 'Delete';
+
+  @override
+  String get vocabTech => 'Software/IT';
+
+  @override
+  String get vocabMedical => 'Medical';
+
+  @override
+  String get vocabLegal => 'Legal';
+
+  @override
+  String get vocabFinance => 'Finance';
+
+  @override
+  String get vocabEducation => 'Education';
+
+  @override
+  String get vocabEnabledNote =>
+      'When enabled, vocab substitution runs before AI correction';
 }

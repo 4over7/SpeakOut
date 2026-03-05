@@ -1,0 +1,22 @@
+{
+  "id": "finance",
+  "name_zh": "金融",
+  "name_en": "Finance",
+  "has_lm": false,
+  "entries": [
+    {"wrong": "股票市", "correct": "股票市场"},
+    {"wrong": "基金会", "correct": "基金"},
+    {"wrong": "债卷", "correct": "债券"},
+    {"wrong": "通货膨", "correct": "通货膨胀"},
+    {"wrong": "央行利率", "correct": "央行利率"},
+    {"wrong": "GDP增长", "correct": "GDP增长"},
+    {"wrong": "外汇率", "correct": "外汇汇率"},
+    {"wrong": "市值蒸", "correct": "市值蒸发"},
+    {"wrong": "上市公", "correct": "上市公司"},
+    {"wrong": "私募基", "correct": "私募基金"},
+    {"wrong": "风险控", "correct": "风险控制"},
+    {"wrong": "资产负", "correct": "资产负债"},
+    {"wrong": "流动性", "correct": "流动性"},
+    {"wrong": "比特币", "correct": "比特币"}
+  ]
+}

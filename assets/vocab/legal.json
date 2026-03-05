@@ -1,0 +1,22 @@
+{
+  "id": "legal",
+  "name_zh": "法律",
+  "name_en": "Legal",
+  "has_lm": false,
+  "entries": [
+    {"wrong": "诉讼费", "correct": "诉讼费"},
+    {"wrong": "判决书", "correct": "判决书"},
+    {"wrong": "起诉状", "correct": "起诉状"},
+    {"wrong": "被告人", "correct": "被告人"},
+    {"wrong": "原告人", "correct": "原告人"},
+    {"wrong": "律师费", "correct": "律师费"},
+    {"wrong": "合同书", "correct": "合同"},
+    {"wrong": "证据链", "correct": "证据链"},
+    {"wrong": "检察院", "correct": "检察院"},
+    {"wrong": "法院判", "correct": "法院判决"},
+    {"wrong": "仲裁委", "correct": "仲裁委员会"},
+    {"wrong": "知识权", "correct": "知识产权"},
+    {"wrong": "侵权了", "correct": "侵权"},
+    {"wrong": "赔偿金", "correct": "赔偿金额"}
+  ]
+}

@@ -93,6 +93,11 @@ flutter:
     # Note: aliyun_config.json and llm_config.json removed for security
     # Credentials are stored in SharedPreferences (user's Library folder)
     - native_lib/libnative_input.dylib
+    - assets/vocab/tech.json
+    - assets/vocab/medical.json
+    - assets/vocab/legal.json
+    - assets/vocab/finance.json
+    - assets/vocab/education.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

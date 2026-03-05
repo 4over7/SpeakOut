@@ -319,6 +319,32 @@ class ConfigService {
     }
   }
 
+  // --- Vocab Enhancement ---
+  bool get vocabEnabled => _prefs?.getBool('vocab_enabled') ?? false;
+  Future<void> setVocabEnabled(bool v) async => await _prefs?.setBool('vocab_enabled', v);
+
+  bool get vocabTechEnabled => _prefs?.getBool('vocab_tech') ?? false;
+  bool get vocabMedicalEnabled => _prefs?.getBool('vocab_medical') ?? false;
+  bool get vocabLegalEnabled => _prefs?.getBool('vocab_legal') ?? false;
+  bool get vocabFinanceEnabled => _prefs?.getBool('vocab_finance') ?? false;
+  bool get vocabEducationEnabled => _prefs?.getBool('vocab_education') ?? false;
+
+  Future<void> setVocabTechEnabled(bool v) async => await _prefs?.setBool('vocab_tech', v);
+  Future<void> setVocabMedicalEnabled(bool v) async => await _prefs?.setBool('vocab_medical', v);
+  Future<void> setVocabLegalEnabled(bool v) async => await _prefs?.setBool('vocab_legal', v);
+  Future<void> setVocabFinanceEnabled(bool v) async => await _prefs?.setBool('vocab_finance', v);
+  Future<void> setVocabEducationEnabled(bool v) async => await _prefs?.setBool('vocab_education', v);
+
+  bool get vocabUserEnabled => _prefs?.getBool('vocab_user') ?? true;
+  Future<void> setVocabUserEnabled(bool v) async => await _prefs?.setBool('vocab_user', v);
+
+  String get vocabUserEntriesJson => _prefs?.getString('vocab_user_entries') ?? '[]';
+  Future<void> setVocabUserEntriesJson(String json) async => await _prefs?.setString('vocab_user_entries', json);
+
+  // Phase 2 配置（存储，Phase 2 才在 UI 暴露）
+  double get vocabPhoneticThreshold => _prefs?.getDouble('vocab_phonetic_threshold') ?? 2.0;
+  Future<void> setVocabPhoneticThreshold(double v) async => await _prefs?.setDouble('vocab_phonetic_threshold', v);
+
   // --- First Launch / Onboarding ---
   static const String _kOnboardingCompleted = 'onboarding_completed';
   

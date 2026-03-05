@@ -187,5 +187,20 @@
   "importModel": "Import",
   "manualDownload": "Manual Download",
   "importModelDesc": "Select a downloaded .tar.bz2 model file",
-  "importing": "Importing..."
+  "importing": "Importing...",
+  "vocabEnhancement": "Vocab Enhancement",
+  "vocabEnhancementSubtitle": "Fix ASR homophones and technical term substitutions",
+  "vocabEnabled": "Enable Vocab Enhancement",
+  "vocabIndustryPresets": "Industry Preset Dictionaries",
+  "vocabCustomVocab": "Custom Entries",
+  "vocabAddEntry": "Add Entry",
+  "vocabWrongForm": "Wrong form (ASR output)",
+  "vocabCorrectForm": "Correct form",
+  "vocabDelete": "Delete",
+  "vocabTech": "Software/IT",
+  "vocabMedical": "Medical",
+  "vocabLegal": "Legal",
+  "vocabFinance": "Finance",
+  "vocabEducation": "Education",
+  "vocabEnabledNote": "When enabled, vocab substitution runs before AI correction"
 }

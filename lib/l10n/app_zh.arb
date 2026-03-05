@@ -158,5 +158,20 @@
   "importModel": "导入",
   "manualDownload": "手动下载",
   "importModelDesc": "选择已下载的 .tar.bz2 模型文件",
-  "importing": "导入中..."
+  "importing": "导入中...",
+  "vocabEnhancement": "词汇增强",
+  "vocabEnhancementSubtitle": "修正 ASR 音近字错误，支持专业术语替换",
+  "vocabEnabled": "启用词汇增强",
+  "vocabIndustryPresets": "行业预设词典",
+  "vocabCustomVocab": "自定义词条",
+  "vocabAddEntry": "添加词条",
+  "vocabWrongForm": "错误形式（ASR 识别结果）",
+  "vocabCorrectForm": "正确形式",
+  "vocabDelete": "删除",
+  "vocabTech": "软件/IT",
+  "vocabMedical": "医疗",
+  "vocabLegal": "法律",
+  "vocabFinance": "金融",
+  "vocabEducation": "教育",
+  "vocabEnabledNote": "开启后，ASR 结果将在 AI 纠错之前进行词汇替换"
 }
