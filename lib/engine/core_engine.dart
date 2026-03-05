@@ -17,6 +17,7 @@ import '../services/diary_service.dart';
 import '../services/chat_service.dart';
 import '../services/audio_device_service.dart';
 import '../services/overlay_controller.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Recording pipeline state machine
 enum RecordingState { idle, starting, recording, stopping, processing }
@@ -47,7 +48,7 @@ class CoreEngine {
       _audioDeviceService = AudioDeviceService(_nativeInput!);
       AudioDeviceService.setInstance(_audioDeviceService!);
     } catch (e) {
-      debugPrint("[CoreEngine] Warning: Failed to init NativeInput: $e");
+      AppLog.d("[CoreEngine] Warning: Failed to init NativeInput: $e");
       _nativeInput = null;
     }
   }
@@ -201,6 +202,9 @@ class CoreEngine {
 
   /// Check if NativeInput (native library) loaded successfully
   bool get isNativeInputReady => _nativeInput != null;
+
+  /// Expose native input for debug logging control
+  NativeInputBase? get nativeInput => _nativeInput;
 
   /// Check if input monitoring permission is granted (for keyboard listener)
   bool checkInputMonitoringPermission() {

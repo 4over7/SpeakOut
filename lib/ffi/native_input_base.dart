@@ -92,6 +92,12 @@ typedef CheckInputMonitoringPermissionDart = int Function();
 typedef CheckAccessibilityPermissionC = Int32 Function();
 typedef CheckAccessibilityPermissionDart = int Function();
 
+typedef SetDebugLoggingC = Void Function(Int32 enabled);
+typedef SetDebugLoggingDart = void Function(int enabled);
+
+typedef SetLogDirectoryC = Void Function(Pointer<Utf8> dir);
+typedef SetLogDirectoryDart = void Function(Pointer<Utf8> dir);
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
@@ -123,6 +129,8 @@ abstract class NativeInputBase {
   String getPreferredDeviceUid();
   void setPreferredDeviceUid(String uid);
   bool isDeviceAvailable(String deviceUID);
+  void setDebugLogging(bool enabled);
+  void setLogDirectory(String dir);
   
   // Signal Quality Analysis
   String analyzeAudioQuality(Pointer<Int16> samples, int sampleCount, int sampleRate);

@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../config/app_constants.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// 管理应用程序配置 (SharedPreferences)
 /// Singleton Pattern.
@@ -53,7 +54,7 @@ class ConfigService {
       final docDir = await getApplicationDocumentsDirectory();
       _defaultDocPath = "${docDir.path}/SpeakOut_Notes";
     } catch (e) {
-      debugPrint("ConfigService: Failed to get doc dir: $e");
+      AppLog.d("ConfigService: Failed to get doc dir: $e");
     }
     
     // Load Locale
@@ -228,6 +229,14 @@ class ConfigService {
   bool get deduplicationEnabled => _prefs?.getBool('dedup_enabled') ?? AppConstants.kDefaultDeduplicationEnabled;
   Future<void> setDeduplicationEnabled(bool enabled) async => await _prefs?.setBool('dedup_enabled', enabled);
 
+  // Verbose logging (debug mode) — default false, never committed as true
+  bool get verboseLogging => _prefs?.getBool('verbose_logging') ?? AppConstants.kVerboseLogging;
+  Future<void> setVerboseLogging(bool enabled) async => await _prefs?.setBool('verbose_logging', enabled);
+
+  // Log file directory — defaults to ~/Downloads
+  String get logDirectory => _prefs?.getString('log_directory') ?? '';
+  Future<void> setLogDirectory(String dir) async => await _prefs?.setString('log_directory', dir);
+
   String? get llmBaseUrlOverride => _prefs?.getString('llm_base_url');
   String? get llmApiKeyOverride => _cachedLlmApiKey;
   String? get llmModelOverride => _prefs?.getString('llm_model');
@@ -256,7 +265,7 @@ class ConfigService {
       _cachedAliyunAppKey = await _secureStorage.read(key: 'aliyun_app_key');
       _cachedLlmApiKey = await _secureStorage.read(key: 'llm_api_key');
     } catch (e) {
-      debugPrint("ConfigService: Keychain unavailable, falling back to SharedPreferences: $e");
+      AppLog.d("ConfigService: Keychain unavailable, falling back to SharedPreferences: $e");
       keychainAvailable = false;
     }
 

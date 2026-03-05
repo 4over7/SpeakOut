@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Centralized controller for the recording overlay.
 ///
@@ -54,7 +54,7 @@ class OverlayController {
     try {
       _channel.invokeMethod(method, args);
     } catch (e) {
-      debugPrint("[OverlayController] $method error: $e");
+      AppLog.d("[OverlayController] $method error: $e");
     }
   }
 }

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'notification_service.dart';
 import '../models/chat_model.dart';
+import 'package:speakout/config/app_log.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -114,7 +115,7 @@ class ChatService {
         _streamController.add(_messages);
       }
     } catch (e) {
-      debugPrint("Error loading chat history: $e");
+      AppLog.d("Error loading chat history: $e");
       NotificationService().notifyError("Failed to load chat history: $e");
     }
   }
@@ -134,7 +135,7 @@ class ChatService {
       final jsonList = _messages.map((e) => e.toJson()).toList();
       await file.writeAsString(jsonEncode(jsonList));
     } catch (e) {
-      debugPrint("Error saving chat history: $e");
+      AppLog.d("Error saving chat history: $e");
       NotificationService().notifyError("Failed to save chat history: $e");
     }
   }

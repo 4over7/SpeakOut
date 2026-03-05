@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../asr_provider.dart';
 import 'aliyun_token_service.dart';
+import 'package:speakout/config/app_log.dart';
 class AliyunProvider implements ASRProvider {
   WebSocketChannel? _channel;
   StreamController<String> _textController = StreamController<String>.broadcast();
@@ -220,7 +221,7 @@ class AliyunProvider implements ASRProvider {
          _textController.add(errMsg);
       }
     } catch (e) {
-      debugPrint("[AliyunProvider] Message parse error: $e");
+      AppLog.d("[AliyunProvider] Message parse error: $e");
     }
   }
 

@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import '../engine/core_engine.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
 import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// 管理应用程序生命周期与核心业务逻辑
 /// Central Hub for initialization and logic.
@@ -17,12 +17,25 @@ class AppService {
   
   bool _isPunctuationInitialized = false;
 
+  /// Apply verbose logging + log directory to AppLog and native C layer.
+  /// Call this after ConfigService.init() and whenever settings change.
+  void applyVerboseLogging() {
+    final enabled = ConfigService().verboseLogging;
+    AppLog.enabled = enabled;
+    engine.nativeInput?.setDebugLogging(enabled);
+    final dir = ConfigService().logDirectory;
+    if (dir.isNotEmpty) {
+      engine.nativeInput?.setLogDirectory(dir);
+    }
+  }
+
   /// 初始化应用核心服务
   Future<void> init() async {
     engine.updateStatus("正在配置服务...");
     await Future.delayed(const Duration(milliseconds: 50));
     // 1. Config
     await ConfigService().init();
+    applyVerboseLogging(); // Apply debug logging as early as possible
     
     // 1.5 Other Services
     await ChatService().init();
@@ -81,7 +94,7 @@ class AppService {
       
       // If no model, download default
       if (path == null) {
-        debugPrint("AppService: Downloading default model...");
+        AppLog.d("AppService: Downloading default model...");
         try {
           final defaultId = AppConstants.kDefaultModelId;
           // We can't easily show progress in UI here unless we expose stream.
@@ -90,7 +103,7 @@ class AppService {
           // Update Config
            await ConfigService().setActiveModelId(defaultId);
         } catch (e) {
-          debugPrint("AppService: Default download failed: $e");
+          AppLog.d("AppService: Default download failed: $e");
         }
       }
       
@@ -102,7 +115,7 @@ class AppService {
          await engine.initASR(path, modelType: type, modelName: name, hasPunctuation: hasPunct);
       }
     } catch (e) {
-       debugPrint("AppService: ASR Init Error: $e");
+       AppLog.d("AppService: ASR Init Error: $e");
     }
   }
 
@@ -118,7 +131,7 @@ class AppService {
       // 检查标点模型 - 不再自动下载，由 Onboarding 或 Settings 页面处理
       bool hasModel = await modelManager.isPunctuationModelDownloaded();
       if (!hasModel) {
-        debugPrint("Punctuation model not found. User can download from Settings.");
+        AppLog.d("Punctuation model not found. User can download from Settings.");
         return; // Skip init if not downloaded
       }
       
@@ -131,7 +144,7 @@ class AppService {
         _isPunctuationInitialized = true;
       }
     } catch (e) {
-      debugPrint("AppService: Punctuation init failed: $e. Attempting self-heal.");
+      AppLog.d("AppService: Punctuation init failed: $e. Attempting self-heal.");
       // If init failed, the model file is likely corrupted or incompatible.
       // Delete it so it re-downloads on next launch.
       await modelManager.deletePunctuationModel();

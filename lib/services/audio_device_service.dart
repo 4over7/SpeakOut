@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter/foundation.dart';
 import '../ffi/native_input_base.dart';
 import 'notification_service.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Represents an audio input device
 class AudioDevice {
@@ -73,7 +73,7 @@ class AudioDeviceService {
   
   /// Initialize the service and start listening for device changes
   void initialize() {
-    debugPrint('[AudioDeviceService] Initializing...');
+    AppLog.d('[AudioDeviceService] Initializing...');
     
     // Enumerate devices first
     refreshDevices();
@@ -81,7 +81,7 @@ class AudioDeviceService {
     // Start listening for device changes
     _startListening();
     
-    debugPrint('[AudioDeviceService] Initialized. Current device: $_currentDevice');
+    AppLog.d('[AudioDeviceService] Initialized. Current device: $_currentDevice');
   }
   
   void _startListening() {
@@ -94,7 +94,7 @@ class AudioDeviceService {
       _deviceChangeCallable!.nativeFunction,
     );
     
-    debugPrint('[AudioDeviceService] Device change listener started: $success');
+    AppLog.d('[AudioDeviceService] Device change listener started: $success');
   }
   
   /// Native callback when device changes
@@ -119,7 +119,7 @@ class AudioDeviceService {
   }
   
   void _handleDeviceChange(String deviceId, String deviceName, bool isBluetooth) {
-    debugPrint('[AudioDeviceService] Device changed: $deviceName (bluetooth=$isBluetooth)');
+    AppLog.d('[AudioDeviceService] Device changed: $deviceName (bluetooth=$isBluetooth)');
 
     // Invalidate cache — will be lazily rebuilt next time devices are accessed
     // (e.g. when user opens settings). Do NOT call refreshDevices() here:
@@ -140,10 +140,10 @@ class AudioDeviceService {
     final preferred = getPreferredDeviceUid();
     if (preferred.isNotEmpty) {
       if (_nativeInput.isDeviceAvailable(preferred)) {
-        debugPrint('[AudioDeviceService] Preferred device still available, no action needed');
+        AppLog.d('[AudioDeviceService] Preferred device still available, no action needed');
         return;
       }
-      debugPrint('[AudioDeviceService] Preferred device gone, falling back to built-in');
+      AppLog.d('[AudioDeviceService] Preferred device gone, falling back to built-in');
     }
 
     // Preferred device is gone (or none set) — fall back to built-in mic
@@ -153,7 +153,7 @@ class AudioDeviceService {
   }
   
   void _handleBluetoothMicDetected(String bluetoothDeviceName) {
-    debugPrint('[AudioDeviceService] Bluetooth mic detected, auto-switching to built-in...');
+    AppLog.d('[AudioDeviceService] Bluetooth mic detected, auto-switching to built-in...');
     
     final success = switchToBuiltinMic();
     
@@ -178,7 +178,7 @@ class AudioDeviceService {
       final List<dynamic> list = jsonDecode(jsonStr);
       _devices = list.map((e) => AudioDevice.fromJson(e)).toList();
     } catch (e) {
-      debugPrint('[AudioDeviceService] Failed to parse devices: $e');
+      AppLog.d('[AudioDeviceService] Failed to parse devices: $e');
       _devices = [];
     }
     
@@ -190,7 +190,7 @@ class AudioDeviceService {
         _currentDevice = AudioDevice.fromJson(json);
       }
     } catch (e) {
-      debugPrint('[AudioDeviceService] Failed to parse current device: $e');
+      AppLog.d('[AudioDeviceService] Failed to parse current device: $e');
     }
   }
   
@@ -240,7 +240,7 @@ class AudioDeviceService {
     final success = _nativeInput.switchToBuiltinMic();
     if (success) {
       refreshDevices();
-      debugPrint('[AudioDeviceService] Switched to built-in mic');
+      AppLog.d('[AudioDeviceService] Switched to built-in mic');
     }
     return success;
   }
@@ -255,7 +255,7 @@ class AudioDeviceService {
     );
     
     if (bluetoothDevice.id.isEmpty) {
-      debugPrint('[AudioDeviceService] No Bluetooth device found');
+      AppLog.d('[AudioDeviceService] No Bluetooth device found');
       return false;
     }
     
@@ -273,6 +273,6 @@ class AudioDeviceService {
     _nativeInput.stopDeviceChangeListener();
     _deviceChangeCallable?.close();
     _deviceChangeController.close();
-    debugPrint('[AudioDeviceService] Disposed');
+    AppLog.d('[AudioDeviceService] Disposed');
   }
 }

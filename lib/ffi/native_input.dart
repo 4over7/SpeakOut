@@ -1,7 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'native_input_ffi.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// macOS 平台的 NativeInput 实现
 ///
@@ -9,21 +9,21 @@ import 'native_input_ffi.dart';
 /// FFI 绑定逻辑全部复用 [NativeInputFFI] 基类。
 class NativeInput extends NativeInputFFI {
   NativeInput() {
-    debugPrint("[NativeInput] Initializing (macOS)...");
+    AppLog.d("[NativeInput] Initializing (macOS)...");
 
     final path = _resolveDylibPath();
 
     // Safety check
     if (!File(path).existsSync()) {
-      debugPrint("[NativeInput] CRITICAL: File Not Found at $path");
+      AppLog.d("[NativeInput] CRITICAL: File Not Found at $path");
     }
 
     try {
       final dylib = DynamicLibrary.open(path);
-      debugPrint("[NativeInput] DynamicLibrary.open($path) SUCCESS");
+      AppLog.d("[NativeInput] DynamicLibrary.open($path) SUCCESS");
       initWithLibrary(dylib);
     } catch (e) {
-      debugPrint("[NativeInput] DynamicLibrary.open FAILED: $e");
+      AppLog.d("[NativeInput] DynamicLibrary.open FAILED: $e");
       rethrow;
     }
   }
@@ -38,7 +38,7 @@ class NativeInput extends NativeInputFFI {
     var path = 'native_lib/libnative_input.dylib';
 
     final exeDir = File(Platform.resolvedExecutable).parent;
-    debugPrint("[NativeInput] ExeDir: ${exeDir.path}");
+    AppLog.d("[NativeInput] ExeDir: ${exeDir.path}");
 
     final bundleLibPath = '${exeDir.path}/native_lib/libnative_input.dylib';
     final appDir = exeDir.parent; // Contents/
@@ -48,16 +48,16 @@ class NativeInput extends NativeInputFFI {
     try {
       if (File(bundleLibPath).existsSync()) {
         path = bundleLibPath;
-        debugPrint("[NativeInput] Found in Bundle MacOS: $path");
+        AppLog.d("[NativeInput] Found in Bundle MacOS: $path");
       } else if (File(flutterAssetsPath).existsSync()) {
         path = flutterAssetsPath;
-        debugPrint("[NativeInput] Found in flutter_assets: $path");
+        AppLog.d("[NativeInput] Found in flutter_assets: $path");
       } else if (!File(path).existsSync()) {
         path = '${Directory.current.path}/native_lib/libnative_input.dylib';
-        debugPrint("[NativeInput] Fallback to CWD: $path");
+        AppLog.d("[NativeInput] Fallback to CWD: $path");
       }
     } catch (e) {
-      debugPrint("[NativeInput] Path Verify Error: $e");
+      AppLog.d("[NativeInput] Path Verify Error: $e");
     }
 
     return path;

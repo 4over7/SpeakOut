@@ -14,23 +14,40 @@
 #include <time.h>
 #include <unistd.h>
 
-// Debug Log Path
-// Debug Log Path
-// Get dynamic log path: ~/Downloads/speakout_native.log
+// Debug logging flag — disabled by default, enabled via set_debug_logging(1)
+static atomic_int debugLoggingEnabled = 0;
+
+void set_debug_logging(int enabled) {
+  atomic_store(&debugLoggingEnabled, enabled ? 1 : 0);
+}
+
+// Log file path — defaults to ~/Downloads/speakout_native.log
+// Override via set_log_directory()
+static char logFilePath[1024] = {0};
+
+void set_log_directory(const char *dir) {
+  if (dir == NULL || dir[0] == 0) return;
+  snprintf(logFilePath, sizeof(logFilePath), "%s/speakout_native.log", dir);
+}
+
 static char *get_log_path() {
-  static char path[512] = {0};
-  if (path[0] == 0) {
+  if (logFilePath[0] != 0) return logFilePath;
+  // Default: ~/Downloads/speakout_native.log
+  static char defaultPath[512] = {0};
+  if (defaultPath[0] == 0) {
     const char *home = getenv("HOME");
     if (!home) {
       struct passwd *pw = getpwuid(getuid());
       home = pw ? pw->pw_dir : "/tmp";
     }
-    snprintf(path, sizeof(path), "%s/Downloads/speakout_native.log", home);
+    snprintf(defaultPath, sizeof(defaultPath), "%s/Downloads/speakout_native.log", home);
   }
-  return path;
+  return defaultPath;
 }
 
 void log_to_file(const char *fmt, ...) {
+  if (!atomic_load(&debugLoggingEnabled)) return;
+
   va_list args;
   va_start(args, fmt);
   va_list args_copy;

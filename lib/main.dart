@@ -54,6 +54,7 @@ void main() {
       runApp(const SpeakOutApp()); // macOS (现有)
     }
   }, (error, stack) {
+    // Critical errors always print regardless of verbose mode
     debugPrint("CRITICAL ERROR: $error\n$stack");
   });
 }

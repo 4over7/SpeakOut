@@ -6,6 +6,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
 import 'linux_home.dart';
 import 'linux_onboarding.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Linux 平台入口 Widget
 ///
@@ -32,7 +33,7 @@ class _LinuxAppWrapperState extends State<LinuxAppWrapper> {
       await ConfigService().init();
       await _initWindow();
     } catch (e) {
-      debugPrint('[LinuxApp] Init error: $e');
+      AppLog.d('[LinuxApp] Init error: $e');
     }
     if (mounted) {
       setState(() {
@@ -60,7 +61,7 @@ class _LinuxAppWrapperState extends State<LinuxAppWrapper> {
     try {
       await _initSystemTray();
     } catch (e) {
-      debugPrint('[LinuxApp] System tray init failed: $e');
+      AppLog.d('[LinuxApp] System tray init failed: $e');
     }
   }
 

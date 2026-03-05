@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Offline (non-streaming) ASR Provider using sherpa-onnx OfflineRecognizer.
 ///
@@ -115,7 +116,7 @@ class OfflineSherpaProvider implements ASRProvider {
         sherpa.initBindings();
       }
     } catch (e) {
-      debugPrint("[OfflineSherpaProvider] Bindings init warning: $e");
+      AppLog.d("[OfflineSherpaProvider] Bindings init warning: $e");
     }
   }
 
@@ -171,7 +172,7 @@ class OfflineSherpaProvider implements ASRProvider {
 
       return text;
     } catch (e) {
-      debugPrint("[OfflineSherpaProvider] stop error: $e");
+      AppLog.d("[OfflineSherpaProvider] stop error: $e");
       _audioChunks.clear();
       return "";
     }

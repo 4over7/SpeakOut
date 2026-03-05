@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:speakout/config/app_log.dart';
 
 class AliyunTokenService {
   static const String _endpoint = "http://nls-meta.cn-shanghai.aliyuncs.com";
@@ -49,9 +49,9 @@ class AliyunTokenService {
           return json['Token']['Id'];
         }
       }
-      debugPrint("Aliyun Token Error: ${response.body}");
+      AppLog.d("Aliyun Token Error: ${response.body}");
     } catch (e) {
-      debugPrint("Aliyun Token Network Error: $e");
+      AppLog.d("Aliyun Token Network Error: $e");
     }
     return null;
   }

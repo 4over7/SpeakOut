@@ -6,6 +6,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
 import 'windows_home.dart';
 import 'windows_onboarding.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Windows 平台入口 Widget
 ///
@@ -32,7 +33,7 @@ class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
       await ConfigService().init();
       await _initWindow();
     } catch (e) {
-      debugPrint('[WindowsApp] Init error: $e');
+      AppLog.d('[WindowsApp] Init error: $e');
     }
     if (mounted) {
       setState(() {
@@ -60,7 +61,7 @@ class _WindowsAppWrapperState extends State<WindowsAppWrapper> {
     try {
       await _initSystemTray();
     } catch (e) {
-      debugPrint('[WindowsApp] System tray init failed: $e');
+      AppLog.d('[WindowsApp] System tray init failed: $e');
     }
   }
 

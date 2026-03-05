@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/config_service.dart';
+import '../services/app_service.dart';
 import '../config/app_constants.dart';
 import '../engine/model_manager.dart';
 import '../engine/core_engine.dart';
@@ -12,6 +14,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'theme.dart';
 import '../services/audio_device_service.dart';
+import 'package:speakout/config/app_log.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -233,7 +236,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } catch (e) {
       // Fallback or ignore
-      debugPrint("Pick Directory Failed: $e");
+      AppLog.d("Pick Directory Failed: $e");
     }
   }
 
@@ -1004,14 +1007,76 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         
         const SizedBox(height: 24),
+
+        // Developer / Debug
+        SettingsGroup(
+          title: '开发者',
+          children: [
+            SettingsTile(
+              label: '详细日志',
+              icon: CupertinoIcons.doc_text,
+              child: MacosSwitch(
+                value: ConfigService().verboseLogging,
+                onChanged: (v) async {
+                  await ConfigService().setVerboseLogging(v);
+                  AppService().applyVerboseLogging();
+                  setState(() {});
+                },
+              ),
+            ),
+            const SettingsDivider(),
+            SettingsTile(
+              label: '日志输出目录',
+              icon: CupertinoIcons.folder,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    ConfigService().logDirectory.isEmpty
+                        ? '~/Downloads（默认）'
+                        : ConfigService().logDirectory.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
+                    style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+                  ),
+                  const SizedBox(width: 8),
+                  MacosIconButton(
+                    icon: const MacosIcon(CupertinoIcons.folder_badge_plus, size: 16),
+                    backgroundColor: MacosColors.transparent,
+                    onPressed: () async {
+                      final dir = await FilePicker.platform.getDirectoryPath(
+                        dialogTitle: '选择日志输出目录',
+                      );
+                      if (dir != null) {
+                        await ConfigService().setLogDirectory(dir);
+                        AppService().applyVerboseLogging();
+                        setState(() {});
+                      }
+                    },
+                  ),
+                  if (ConfigService().logDirectory.isNotEmpty)
+                    MacosIconButton(
+                      icon: const MacosIcon(CupertinoIcons.xmark_circle, size: 16),
+                      backgroundColor: MacosColors.transparent,
+                      onPressed: () async {
+                        await ConfigService().setLogDirectory('');
+                        AppService().applyVerboseLogging();
+                        setState(() {});
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
       ],
     );
   }
-  
 
 
 
-  
+
+
   Widget _buildKeyCaptureTile(String label, IconData icon, {
     required bool isCapturing,
     required String keyName,

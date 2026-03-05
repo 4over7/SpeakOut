@@ -1,6 +1,9 @@
 /// 统一管理应用常数
 /// Single Source of Truth for constants.
 class AppConstants {
+  // Debug / Verbose Logging
+  // Set to true locally for testing; always false in committed code.
+  static const bool kVerboseLogging = false;
   // Config Keys
   static const String kKeyPttKeyCode = 'ptt_keycode';
   static const String kKeyPttKeyName = 'ptt_keyname';

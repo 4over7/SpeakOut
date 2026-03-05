@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
+import 'package:speakout/config/app_log.dart';
 
 class SherpaProvider implements ASRProvider {
   sherpa.OnlineRecognizer? _recognizer;
@@ -100,7 +101,7 @@ class SherpaProvider implements ASRProvider {
           sherpa.initBindings(); 
        }
     } catch (e) {
-      debugPrint("[SherpaProvider] Bindings init warning: $e");
+      AppLog.d("[SherpaProvider] Bindings init warning: $e");
     }
   }
 
@@ -128,7 +129,7 @@ class SherpaProvider implements ASRProvider {
       }
     } catch (e) {
       // Prevent FFI exceptions from crashing the app
-      debugPrint("[SherpaProvider] acceptWaveform error: $e");
+      AppLog.d("[SherpaProvider] acceptWaveform error: $e");
     }
   }
 
@@ -157,7 +158,7 @@ class SherpaProvider implements ASRProvider {
       
       return text;
     } catch (e) {
-      debugPrint("[SherpaProvider] stop error: $e");
+      AppLog.d("[SherpaProvider] stop error: $e");
       // Cleanup on error
       try { _stream?.free(); } catch (_) {}
       _stream = null;

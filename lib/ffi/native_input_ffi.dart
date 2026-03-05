@@ -1,7 +1,7 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
-import 'package:flutter/foundation.dart';
 import 'native_input_base.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// 通用 FFI 绑定基类
 ///
@@ -49,8 +49,11 @@ class NativeInputFFI implements NativeInputBase {
   late AnalyzeAudioQualityDart _analyzeAudioQuality;
   late IsLikelyTelephoneQualityDart _isLikelyTelephoneQuality;
 
+  late SetDebugLoggingDart _setDebugLogging;
+  late SetLogDirectoryDart _setLogDirectory;
+
   void _log(String msg) {
-    debugPrint("[NativeInputFFI] $msg");
+    AppLog.d("[NativeInputFFI] $msg");
   }
 
   /// 子类调用此方法完成初始化，传入已打开的 DynamicLibrary
@@ -72,6 +75,13 @@ class NativeInputFFI implements NativeInputBase {
 
       _checkPermissionSilent = _dylib
           .lookup<NativeFunction<CheckPermissionC>>('check_permission_silent')
+          .asFunction();
+
+      _setDebugLogging = _dylib
+          .lookup<NativeFunction<SetDebugLoggingC>>('set_debug_logging')
+          .asFunction();
+      _setLogDirectory = _dylib
+          .lookup<NativeFunction<SetLogDirectoryC>>('set_log_directory')
           .asFunction();
 
       _log("Core FFI bindings SUCCESS");
@@ -375,6 +385,18 @@ class NativeInputFFI implements NativeInputBase {
     final result = _isDeviceAvailable(ptr);
     calloc.free(ptr);
     return result == 1;
+  }
+
+  @override
+  void setDebugLogging(bool enabled) {
+    _setDebugLogging(enabled ? 1 : 0);
+  }
+
+  @override
+  void setLogDirectory(String dir) {
+    final ptr = dir.toNativeUtf8();
+    _setLogDirectory(ptr);
+    calloc.free(ptr);
   }
 
   // ============ SIGNAL QUALITY ANALYSIS ============
