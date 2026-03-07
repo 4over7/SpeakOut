@@ -46,7 +46,7 @@ class AliyunTokenService {
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         if (json['Token'] != null && json['Token']['Id'] != null) {
-          return json['Token']['Id'];
+          return json['Token']['Id']?.toString();
         }
       }
       AppLog.d("Aliyun Token Error: ${response.body}");
