@@ -1,5 +1,30 @@
 # SpeakOut Version History
 
+## [1.5.0] - 2026-03-07
+
+### 重构: AI 润色 — 词典从硬替换改为 LLM 上下文注入
+
+#### AI 润色（原 AI 纠错）
+- **重命名** — "AI 纠错" 更名为 "AI 润色"，正面表述
+- **独立 Tab** — AI 润色从通用设置提升为左侧导航栏独立 tab（含 LLM 配置 + 专业词汇）
+- **词典注入 LLM** — 专业术语不再直接替换文本，改为通过 `<vocab_hints>` 标签注入 LLM prompt，由 AI 结合语境智能判断是否替换
+- **离线回退** — AI 关闭时回退到精确字符串替换，保留基础纠错能力
+- **风险提示** — AI 润色页面顶部添加橙色警告横幅，提醒用户 AI 可能修改原意
+- **System Prompt 升级** — 默认 prompt 新增 vocab_hints 处理指令和 5 条润色规则
+
+#### 专业词汇
+- **TSV/CSV 导入导出** — 自定义词条支持文件批量导入（TSV/CSV/TXT）和导出
+- **Beta 标签** — 专业词汇开关标注 Beta
+
+#### 清理
+- **移除音近匹配** — 删除 lpinyin 依赖、拼音缓存、Levenshtein 算法、音近匹配 UI（阈值滑块等）
+- **移除 phonetic 配置** — ConfigService 中 vocabPhoneticEnabled / vocabPhoneticThreshold 已删除
+- **包体积优化** — 减少 ~2MB（去除 lpinyin）
+
+#### 测试
+- 143 测试全通过，新增 vocab hints 集成测试（验证 Cloud/Ollama 模式下 hints 注入）
+- Golden 测试更新为新版 prompt
+
 ## [1.4.0] - 2026-03-01
 
 ### 新功能: 跨平台架构 + CI/CD
