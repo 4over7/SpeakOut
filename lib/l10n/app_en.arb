@@ -207,5 +207,11 @@
   "vocabPhoneticEnabled": "Enable Phonetic Matching",
   "vocabPhoneticEnabledNote": "Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")",
   "vocabPhoneticThreshold": "Match Threshold",
-  "vocabPhoneticThresholdNote": "Lower = stricter (fewer false positives); Higher = broader coverage"
+  "vocabPhoneticThresholdNote": "Lower = stricter (fewer false positives); Higher = broader coverage",
+  "tabVocab": "Vocab",
+  "vocabImportTsv": "Import File",
+  "vocabImportTsvDesc": "TSV or CSV format, one entry per line: wrong<Tab>correct",
+  "vocabImportSuccess": "{count} entries imported",
+  "vocabImportFailed": "Import failed: {error}",
+  "vocabExportTsv": "Export File"
 }

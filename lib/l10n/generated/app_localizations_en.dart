@@ -549,4 +549,44 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get vocabEnabledNote =>
       'When enabled, vocab substitution runs before AI correction';
+
+  @override
+  String get vocabPhoneticMatching => 'Phonetic Matching';
+
+  @override
+  String get vocabPhoneticEnabled => 'Enable Phonetic Matching';
+
+  @override
+  String get vocabPhoneticEnabledNote =>
+      'Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")';
+
+  @override
+  String get vocabPhoneticThreshold => 'Match Threshold';
+
+  @override
+  String get vocabPhoneticThresholdNote =>
+      'Lower = stricter (fewer false positives); Higher = broader coverage';
+
+  @override
+  String get tabVocab => 'Vocab';
+
+  @override
+  String get vocabImportTsv => 'Import File';
+
+  @override
+  String get vocabImportTsvDesc =>
+      'TSV or CSV format, one entry per line: wrong<Tab>correct';
+
+  @override
+  String vocabImportSuccess(Object count) {
+    return '$count entries imported';
+  }
+
+  @override
+  String vocabImportFailed(Object error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String get vocabExportTsv => 'Export File';
 }

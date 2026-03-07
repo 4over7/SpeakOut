@@ -463,8 +463,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)), 
+                leading: MacosIcon(CupertinoIcons.textformat_abc_dottedunderline, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabVocab, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+              ),
+              SidebarItem(
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
               ),
             ],
           );
@@ -488,6 +492,7 @@ class _SettingsPageState extends State<SettingsPage> {
                        if (_selectedIndex == 0) return _buildGeneralView();
                        if (_selectedIndex == 1) return _buildModelsView();
                        if (_selectedIndex == 2) return _buildTriggerView();
+                       if (_selectedIndex == 3) return const VocabSettingsView();
                        return _buildAboutView(context, _version);
                     }),
                   ),
@@ -1008,28 +1013,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         
-        const SizedBox(height: 24),
-
-        // Vocab Enhancement Entry
-        SettingsGroup(
-          title: loc.vocabEnhancement,
-          children: [
-            SettingsTile(
-              label: loc.vocabEnhancement,
-              subtitle: loc.vocabEnhancementSubtitle,
-              icon: CupertinoIcons.textformat_abc_dottedunderline,
-              child: MacosIconButton(
-                icon: const MacosIcon(CupertinoIcons.chevron_right),
-                backgroundColor: MacosColors.transparent,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const VocabSettingsPage()),
-                ),
-              ),
-            ),
-          ],
-        ),
-
         const SizedBox(height: 24),
 
         // Developer / Debug

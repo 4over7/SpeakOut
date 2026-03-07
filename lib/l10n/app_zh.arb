@@ -178,5 +178,11 @@
   "vocabPhoneticEnabled": "启用音近匹配",
   "vocabPhoneticEnabledNote": "对 ASR 音近字错误做软匹配替换（如「科博斯」→「Kubernetes」）",
   "vocabPhoneticThreshold": "匹配阈值",
-  "vocabPhoneticThresholdNote": "越低越严格，误判越少；越高覆盖越广"
+  "vocabPhoneticThresholdNote": "越低越严格，误判越少；越高覆盖越广",
+  "tabVocab": "词汇增强",
+  "vocabImportTsv": "导入文件",
+  "vocabImportTsvDesc": "支持 TSV 或 CSV 格式，每行一条：错误形式<Tab>正确形式",
+  "vocabImportSuccess": "成功导入 {count} 条词条",
+  "vocabImportFailed": "导入失败：{error}",
+  "vocabExportTsv": "导出文件"
 }

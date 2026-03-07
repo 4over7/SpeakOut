@@ -1105,6 +1105,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When enabled, vocab substitution runs before AI correction'**
   String get vocabEnabledNote;
+
+  /// No description provided for @vocabPhoneticMatching.
+  ///
+  /// In en, this message translates to:
+  /// **'Phonetic Matching'**
+  String get vocabPhoneticMatching;
+
+  /// No description provided for @vocabPhoneticEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Phonetic Matching'**
+  String get vocabPhoneticEnabled;
+
+  /// No description provided for @vocabPhoneticEnabledNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")'**
+  String get vocabPhoneticEnabledNote;
+
+  /// No description provided for @vocabPhoneticThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Match Threshold'**
+  String get vocabPhoneticThreshold;
+
+  /// No description provided for @vocabPhoneticThresholdNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower = stricter (fewer false positives); Higher = broader coverage'**
+  String get vocabPhoneticThresholdNote;
+
+  /// No description provided for @tabVocab.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocab'**
+  String get tabVocab;
+
+  /// No description provided for @vocabImportTsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Import File'**
+  String get vocabImportTsv;
+
+  /// No description provided for @vocabImportTsvDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'TSV or CSV format, one entry per line: wrong<Tab>correct'**
+  String get vocabImportTsvDesc;
+
+  /// No description provided for @vocabImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} entries imported'**
+  String vocabImportSuccess(Object count);
+
+  /// No description provided for @vocabImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String vocabImportFailed(Object error);
+
+  /// No description provided for @vocabExportTsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export File'**
+  String get vocabExportTsv;
 }
 
 class _AppLocalizationsDelegate

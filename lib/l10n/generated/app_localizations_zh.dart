@@ -527,4 +527,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vocabEnabledNote => '开启后，ASR 结果将在 AI 纠错之前进行词汇替换';
+
+  @override
+  String get vocabPhoneticMatching => '音近匹配';
+
+  @override
+  String get vocabPhoneticEnabled => '启用音近匹配';
+
+  @override
+  String get vocabPhoneticEnabledNote =>
+      '对 ASR 音近字错误做软匹配替换（如「科博斯」→「Kubernetes」）';
+
+  @override
+  String get vocabPhoneticThreshold => '匹配阈值';
+
+  @override
+  String get vocabPhoneticThresholdNote => '越低越严格，误判越少；越高覆盖越广';
+
+  @override
+  String get tabVocab => '词汇增强';
+
+  @override
+  String get vocabImportTsv => '导入文件';
+
+  @override
+  String get vocabImportTsvDesc => '支持 TSV 或 CSV 格式，每行一条：错误形式<Tab>正确形式';
+
+  @override
+  String vocabImportSuccess(Object count) {
+    return '成功导入 $count 条词条';
+  }
+
+  @override
+  String vocabImportFailed(Object error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String get vocabExportTsv => '导出文件';
 }

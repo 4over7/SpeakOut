@@ -37,6 +37,7 @@ class SettingsTile extends StatelessWidget {
   final String? subtitle;
   final Widget child;
   final IconData? icon;
+  final Widget? trailing;
 
   const SettingsTile({
     super.key,
@@ -44,6 +45,7 @@ class SettingsTile extends StatelessWidget {
     this.subtitle,
     required this.child,
     this.icon,
+    this.trailing,
   });
 
   @override
@@ -60,7 +62,12 @@ class SettingsTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppTheme.body(context)),
+                Row(
+                  children: [
+                    Text(label, style: AppTheme.body(context)),
+                    if (trailing != null) trailing!,
+                  ],
+                ),
                 if (subtitle != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
