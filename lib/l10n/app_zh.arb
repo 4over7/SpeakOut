@@ -178,5 +178,6 @@
   "vocabImportTsvDesc": "支持 TSV 或 CSV 格式，每行一条：错误形式<Tab>正确形式",
   "vocabImportSuccess": "成功导入 {count} 条词条",
   "vocabImportFailed": "导入失败：{error}",
-  "vocabExportTsv": "导出文件"
+  "vocabExportTsv": "导出文件",
+  "aiPolishWarning": "AI 润色可能会修改原意或引入错误，建议在重要场景下对比确认原文。离线模式（AI 关闭）下输出原始识别结果，准确性由语音模型决定。"
 }

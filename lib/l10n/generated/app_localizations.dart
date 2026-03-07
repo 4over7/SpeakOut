@@ -1147,6 +1147,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export File'**
   String get vocabExportTsv;
+
+  /// No description provided for @aiPolishWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.'**
+  String get aiPolishWarning;
 }
 
 class _AppLocalizationsDelegate

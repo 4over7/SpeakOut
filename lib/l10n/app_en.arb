@@ -218,5 +218,6 @@
       "error": {}
     }
   },
-  "vocabExportTsv": "Export File"
+  "vocabExportTsv": "Export File",
+  "aiPolishWarning": "AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model."
 }

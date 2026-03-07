@@ -552,4 +552,8 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vocabExportTsv => '导出文件';
+
+  @override
+  String get aiPolishWarning =>
+      'AI 润色可能会修改原意或引入错误，建议在重要场景下对比确认原文。离线模式（AI 关闭）下输出原始识别结果，准确性由语音模型决定。';
 }

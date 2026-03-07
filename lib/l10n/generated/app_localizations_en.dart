@@ -576,4 +576,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vocabExportTsv => 'Export File';
+
+  @override
+  String get aiPolishWarning =>
+      'AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.';
 }

@@ -922,6 +922,38 @@ class _SettingsPageState extends State<SettingsPage> {
     final loc = AppLocalizations.of(context)!;
     return Column(
       children: [
+        // Warning banner
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.aiPolishWarning,
+                  style: AppTheme.caption(context).copyWith(
+                    color: MacosColors.systemOrangeColor,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
         // AI Polish main switch
         SettingsGroup(
           title: loc.tabAiPolish,
