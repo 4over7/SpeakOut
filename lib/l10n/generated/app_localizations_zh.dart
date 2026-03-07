@@ -502,7 +502,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vocabIndustryPresets => '行业预设词典';
 
   @override
-  String get vocabCustomVocab => '自定义词条';
+  String get vocabCustomVocab => '个人词库';
+
+  @override
+  String get vocabCustomEnabled => '启用个人词库';
 
   @override
   String get vocabAddEntry => '添加词条';

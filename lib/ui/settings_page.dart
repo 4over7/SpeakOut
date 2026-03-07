@@ -464,7 +464,21 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.sparkles, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabAiPolish, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+                label: Row(
+                  children: [
+                    Text(loc.tabAiPolish, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: MacosColors.systemOrangeColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.5)),
+                      ),
+                      child: const Text('Beta', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemOrangeColor)),
+                    ),
+                  ],
+                ),
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),

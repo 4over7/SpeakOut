@@ -189,21 +189,6 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
     } catch (_) {}
   }
 
-  Widget _buildBetaTag() {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: MacosColors.systemOrangeColor.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.5)),
-      ),
-      child: const Text(
-        'Beta',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: MacosColors.systemOrangeColor),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +203,6 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
             SettingsTile(
               label: loc.vocabEnabled,
               icon: CupertinoIcons.textformat_abc_dottedunderline,
-              trailing: _buildBetaTag(),
               child: MacosSwitch(
                 value: _vocabEnabled,
                 onChanged: (v) async {
@@ -267,7 +251,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
             title: loc.vocabCustomVocab,
             children: [
               SettingsTile(
-                label: loc.vocabEnabled,
+                label: loc.vocabCustomEnabled,
                 icon: CupertinoIcons.person_crop_square,
                 child: MacosSwitch(
                   value: _userEnabled,

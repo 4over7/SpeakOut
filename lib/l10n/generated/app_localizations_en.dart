@@ -524,7 +524,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vocabIndustryPresets => 'Industry Preset Dictionaries';
 
   @override
-  String get vocabCustomVocab => 'Custom Entries';
+  String get vocabCustomVocab => 'Personal Dictionary';
+
+  @override
+  String get vocabCustomEnabled => 'Enable Personal Dictionary';
 
   @override
   String get vocabAddEntry => 'Add Entry';

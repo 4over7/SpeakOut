@@ -1055,8 +1055,14 @@ abstract class AppLocalizations {
   /// No description provided for @vocabCustomVocab.
   ///
   /// In en, this message translates to:
-  /// **'Custom Entries'**
+  /// **'Personal Dictionary'**
   String get vocabCustomVocab;
+
+  /// No description provided for @vocabCustomEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Personal Dictionary'**
+  String get vocabCustomEnabled;
 
   /// No description provided for @vocabAddEntry.
   ///
