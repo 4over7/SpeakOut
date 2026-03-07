@@ -34,12 +34,13 @@ Capture thoughts without switching apps.
 - **Custom Save Directory** — Choose where notes are stored.
 - **Toggle Mode** — Same tap-to-toggle workflow available for note capture.
 
-### AI Smart Correction (Beta)
+### AI Polish (Beta)
 
 Optional LLM post-processing to remove filler words and polish text.
 
 - **Cloud API** — Any OpenAI-compatible endpoint.
 - **Ollama (Local)** — Run LLM locally for full privacy. Latency as low as 130ms.
+- **Professional Vocab** — Industry preset dictionaries (Tech/Medical/Legal/Finance/Education) + personal dictionary. Terminology injected as context hints to LLM for domain-aware recognition.
 
 ### Cloud ASR (Optional)
 
@@ -96,7 +97,7 @@ flutter pub get
 # Static analysis
 flutter analyze
 
-# Run tests
+# Run tests (549 tests)
 flutter test
 
 # Build
@@ -184,12 +185,13 @@ Copyright © 2026 Leon. All Rights Reserved.
 - **自定义保存目录** — 自由选择笔记存放位置。
 - **Toggle 模式** — 闪念笔记同样支持单击切换录音。
 
-### AI 智能纠错（Beta）
+### AI 润色（Beta）
 
 可选的 LLM 后处理，去除口水词、润色文本。
 
 - **云端 API** — 支持任何 OpenAI 兼容接口。
 - **Ollama 本地** — 本地运行 LLM，完全私密，延迟低至 130ms。
+- **专业词汇** — 行业预设词典（软件/医疗/法律/金融/教育）+ 个人词库。术语以上下文提示注入 LLM，实现领域感知识别。
 
 ### 云端识别（可选）
 
