@@ -1,5 +1,31 @@
 # SpeakOut Version History
 
+## [1.5.1] - 2026-03-07
+
+### 测试: 全模块黑盒测试覆盖
+
+#### 黑盒测试方法
+- **核心理念** — 生成测试用例时屏蔽实现代码，仅从需求文档推导，避免 "AI 写码 + AI 测试" 的共同盲区
+- **覆盖 10 个模块** — LLMService、VocabService、ConfigService、ChatService、NotificationService、DiaryService、CoreEngine、ModelManager、ASRResult、AliyunTokenService
+- **406 个黑盒测试用例**，加上原有 143 个，总计 **549 个测试全通过**
+
+#### 发现并修复的 Bug
+- **AliyunTokenService 段错误** — `generateToken` 返回 `Token.Id` 时未做类型安全检查，当阿里云返回非字符串类型（如 int）时导致 Dart VM segfault。修复：添加 `?.toString()`
+
+#### 测试覆盖详情
+| 模块 | 用例数 | 覆盖内容 |
+|------|--------|---------|
+| ConfigService | 115 | 全部配置项默认值、setter、组合状态、国际化、引导页、边界条件 |
+| LLMService | 45 | 4 种开关组合、Cloud/Ollama 双引擎、hints 注入、安全性、并发 |
+| CoreEngine utils | 43 | 文本去重、短语去重、标点检测、中英混合、emoji |
+| VocabService | 42 | 替换逻辑、hints 生成、用户词条 CRUD、持久化、边界 |
+| ModelManager | 39 | 模型元数据完整性、ID 唯一性、URL 格式、查询 |
+| ChatService | 39 | 5 种消息类型、持久化、自动裁剪、stream、损坏恢复 |
+| NotificationService | 30 | 通知类型、stream 广播、操作按钮、多订阅者、边界 |
+| AliyunTokenService | 21 | 成功/失败场景、网络异常、HTTP 错误码、响应格式、空凭证 |
+| ASRResult | 17 | 构造函数、工厂方法、默认值、可选字段 |
+| DiaryService | 15 | 并发追加、超长文本、特殊路径、空路径、边界输入 |
+
 ## [1.5.0] - 2026-03-07
 
 ### 重构: AI 润色 — 词典从硬替换改为 LLM 上下文注入
