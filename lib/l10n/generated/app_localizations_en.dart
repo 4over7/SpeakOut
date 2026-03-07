@@ -30,11 +30,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get systemDefault => 'System Default';
 
   @override
-  String get aiCorrection => 'AI Smart Correction (Beta)';
+  String get aiCorrection => 'AI Polish';
 
   @override
   String get aiCorrectionDesc =>
-      'Use LLM to remove filler words and polish text.';
+      'Use LLM to polish speech recognition results.';
 
   @override
   String get enabled => 'Enabled';
@@ -504,14 +504,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importing => 'Importing...';
 
   @override
-  String get vocabEnhancement => 'Vocab Enhancement';
+  String get tabAiPolish => 'AI Polish';
+
+  @override
+  String get aiPolishDesc =>
+      'Use LLM to polish speech results with professional vocabulary context.';
+
+  @override
+  String get vocabEnhancement => 'Professional Vocab';
 
   @override
   String get vocabEnhancementSubtitle =>
-      'Fix ASR homophones and technical term substitutions';
+      'Provide terminology hints to AI for better domain recognition';
 
   @override
-  String get vocabEnabled => 'Enable Vocab Enhancement';
+  String get vocabEnabled => 'Enable Professional Vocab';
 
   @override
   String get vocabIndustryPresets => 'Industry Preset Dictionaries';
@@ -548,27 +555,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vocabEnabledNote =>
-      'When enabled, vocab substitution runs before AI correction';
-
-  @override
-  String get vocabPhoneticMatching => 'Phonetic Matching';
-
-  @override
-  String get vocabPhoneticEnabled => 'Enable Phonetic Matching';
-
-  @override
-  String get vocabPhoneticEnabledNote =>
-      'Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")';
-
-  @override
-  String get vocabPhoneticThreshold => 'Match Threshold';
-
-  @override
-  String get vocabPhoneticThresholdNote =>
-      'Lower = stricter (fewer false positives); Higher = broader coverage';
-
-  @override
-  String get tabVocab => 'Vocab';
+      'When enabled, terminology is injected as context hints to AI Polish';
 
   @override
   String get vocabImportTsv => 'Import File';

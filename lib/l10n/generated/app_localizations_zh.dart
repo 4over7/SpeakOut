@@ -30,10 +30,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get systemDefault => '系统默认 (System Default)';
 
   @override
-  String get aiCorrection => 'AI 智能纠错 (Beta)';
+  String get aiCorrection => 'AI 润色';
 
   @override
-  String get aiCorrectionDesc => '使用大模型自动去除口水词、润色文本。';
+  String get aiCorrectionDesc => '使用大模型自动润色语音识别结果，修复同音字、去除口水词。';
 
   @override
   String get enabled => '已启用';
@@ -484,13 +484,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importing => '导入中...';
 
   @override
-  String get vocabEnhancement => '词汇增强';
+  String get tabAiPolish => 'AI 润色';
 
   @override
-  String get vocabEnhancementSubtitle => '修正 ASR 音近字错误，支持专业术语替换';
+  String get aiPolishDesc => '使用大模型自动润色语音识别结果，结合专业词典智能纠正。';
 
   @override
-  String get vocabEnabled => '启用词汇增强';
+  String get vocabEnhancement => '专业词汇';
+
+  @override
+  String get vocabEnhancementSubtitle => '为 AI 提供专业术语提示，提高领域词汇识别准确率';
+
+  @override
+  String get vocabEnabled => '启用专业词汇';
 
   @override
   String get vocabIndustryPresets => '行业预设词典';
@@ -526,26 +532,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vocabEducation => '教育';
 
   @override
-  String get vocabEnabledNote => '开启后，ASR 结果将在 AI 纠错之前进行词汇替换';
-
-  @override
-  String get vocabPhoneticMatching => '音近匹配';
-
-  @override
-  String get vocabPhoneticEnabled => '启用音近匹配';
-
-  @override
-  String get vocabPhoneticEnabledNote =>
-      '对 ASR 音近字错误做软匹配替换（如「科博斯」→「Kubernetes」）';
-
-  @override
-  String get vocabPhoneticThreshold => '匹配阈值';
-
-  @override
-  String get vocabPhoneticThresholdNote => '越低越严格，误判越少；越高覆盖越广';
-
-  @override
-  String get tabVocab => '词汇增强';
+  String get vocabEnabledNote => '开启后，专业术语将作为上下文提示注入 AI 润色';
 
   @override
   String get vocabImportTsv => '导入文件';

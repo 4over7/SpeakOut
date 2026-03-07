@@ -341,13 +341,6 @@ class ConfigService {
   String get vocabUserEntriesJson => _prefs?.getString('vocab_user_entries') ?? '[]';
   Future<void> setVocabUserEntriesJson(String json) async => await _prefs?.setString('vocab_user_entries', json);
 
-  // Phase 2 配置
-  bool get vocabPhoneticEnabled => _prefs?.getBool('vocab_phonetic_enabled') ?? false;
-  Future<void> setVocabPhoneticEnabled(bool v) async => await _prefs?.setBool('vocab_phonetic_enabled', v);
-
-  double get vocabPhoneticThreshold => _prefs?.getDouble('vocab_phonetic_threshold') ?? 1.5;
-  Future<void> setVocabPhoneticThreshold(double v) async => await _prefs?.setDouble('vocab_phonetic_threshold', v);
-
   // --- First Launch / Onboarding ---
   static const String _kOnboardingCompleted = 'onboarding_completed';
   

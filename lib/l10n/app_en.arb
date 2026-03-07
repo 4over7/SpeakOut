@@ -6,8 +6,8 @@
   "langSystem": "System Default",
   "audioInput": "Audio Input Device",
   "systemDefault": "System Default",
-  "aiCorrection": "AI Smart Correction (Beta)",
-  "aiCorrectionDesc": "Use LLM to remove filler words and polish text.",
+  "aiCorrection": "AI Polish",
+  "aiCorrectionDesc": "Use LLM to polish speech recognition results.",
   "enabled": "Enabled",
   "disabled": "Disabled",
   "apiConfig": "API Config (OpenAI Compatible)",
@@ -60,7 +60,6 @@
   "aboutSubTagline": "Secure. Fast. Offline.",
   "aboutPoweredBy": "Powered by",
   "aboutCopyright": "Copyright © 2026 Leon. All Rights Reserved.",
-  "tabAbout": "About",
   "diaryMode": "Flash Note",
   "diaryTrigger": "Note Hotkey",
   "diaryPath": "Save Directory",
@@ -188,9 +187,11 @@
   "manualDownload": "Manual Download",
   "importModelDesc": "Select a downloaded .tar.bz2 model file",
   "importing": "Importing...",
-  "vocabEnhancement": "Vocab Enhancement",
-  "vocabEnhancementSubtitle": "Fix ASR homophones and technical term substitutions",
-  "vocabEnabled": "Enable Vocab Enhancement",
+  "tabAiPolish": "AI Polish",
+  "aiPolishDesc": "Use LLM to polish speech results with professional vocabulary context.",
+  "vocabEnhancement": "Professional Vocab",
+  "vocabEnhancementSubtitle": "Provide terminology hints to AI for better domain recognition",
+  "vocabEnabled": "Enable Professional Vocab",
   "vocabIndustryPresets": "Industry Preset Dictionaries",
   "vocabCustomVocab": "Custom Entries",
   "vocabAddEntry": "Add Entry",
@@ -202,16 +203,20 @@
   "vocabLegal": "Legal",
   "vocabFinance": "Finance",
   "vocabEducation": "Education",
-  "vocabEnabledNote": "When enabled, vocab substitution runs before AI correction",
-  "vocabPhoneticMatching": "Phonetic Matching",
-  "vocabPhoneticEnabled": "Enable Phonetic Matching",
-  "vocabPhoneticEnabledNote": "Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")",
-  "vocabPhoneticThreshold": "Match Threshold",
-  "vocabPhoneticThresholdNote": "Lower = stricter (fewer false positives); Higher = broader coverage",
-  "tabVocab": "Vocab",
+  "vocabEnabledNote": "When enabled, terminology is injected as context hints to AI Polish",
   "vocabImportTsv": "Import File",
   "vocabImportTsvDesc": "TSV or CSV format, one entry per line: wrong<Tab>correct",
   "vocabImportSuccess": "{count} entries imported",
+  "@vocabImportSuccess": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "vocabImportFailed": "Import failed: {error}",
+  "@vocabImportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "vocabExportTsv": "Export File"
 }

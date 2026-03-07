@@ -463,8 +463,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.textformat_abc_dottedunderline, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabVocab, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.sparkles, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabAiPolish, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> {
                        if (_selectedIndex == 0) return _buildGeneralView();
                        if (_selectedIndex == 1) return _buildModelsView();
                        if (_selectedIndex == 2) return _buildTriggerView();
-                       if (_selectedIndex == 3) return const VocabSettingsView();
+                       if (_selectedIndex == 3) return _buildAiPolishView();
                        return _buildAboutView(context, _version);
                     }),
                   ),
@@ -847,172 +847,6 @@ class _SettingsPageState extends State<SettingsPage> {
         
 
 
-        const SizedBox(height: 32),
-        // 4. Config (AI Correction)
-        SettingsGroup(
-          title: loc.aiCorrection,
-          children: [
-             SettingsTile(
-               label: loc.enabled,
-               icon: CupertinoIcons.sparkles,
-               child: MacosSwitch(
-                 value: ConfigService().aiCorrectionEnabled,
-                 onChanged: (v) async { await ConfigService().setAiCorrectionEnabled(v); setState((){}); },
-               ),
-             ),
-             if (ConfigService().aiCorrectionEnabled) ...[
-               const SettingsDivider(),
-               // Provider selector
-               SettingsTile(
-                 label: loc.llmProvider,
-                 icon: CupertinoIcons.arrow_right_arrow_left,
-                 child: MacosPopupButton<String>(
-                   value: ConfigService().llmProviderType,
-                   items: [
-                     MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
-                     MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
-                   ],
-                   onChanged: (v) async {
-                     if (v != null) {
-                       await ConfigService().setLlmProviderType(v);
-                       setState(() {});
-                     }
-                   },
-                 ),
-               ),
-               const SettingsDivider(),
-               Padding(
-                 padding: const EdgeInsets.all(16),
-                 child: Column(
-                   crossAxisAlignment: CrossAxisAlignment.start,
-                   children: [
-
-                     // 2. Prompt Text
-                     Row(
-                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                       children: [
-                         Text(loc.systemPrompt, style: AppTheme.body(context)),
-                         GestureDetector(
-                           onTap: () async {
-                              await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
-                              _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
-                              setState((){});
-                           },
-                           child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
-                         )
-                       ],
-                     ),
-                     const SizedBox(height: 8),
-                     MacosTextField(
-                       maxLines: 5,
-                       placeholder: "Enter instructions for AI...",
-                       controller: _aiPromptController,
-                       decoration: BoxDecoration(
-                          color: AppTheme.getInputBackground(context),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.getBorder(context)),
-                       ),
-                       onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
-                     ),
-
-                     const SizedBox(height: 16),
-
-                     if (ConfigService().llmProviderType == 'cloud') ...[
-                       // Cloud API Config
-                       Row(
-                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                         children: [
-                            Text(loc.apiConfig, style: AppTheme.body(context)),
-                            GestureDetector(
-                              onTap: () async {
-                                final uri = Uri.parse("https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen");
-                                if (await canLaunchUrl(uri)) await launchUrl(uri);
-                              },
-                              child: Row(
-                                children: [
-                                  MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
-                                  const SizedBox(width: 4),
-                                  Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
-                                ],
-                              ),
-                            ),
-                         ],
-                       ),
-                       const SizedBox(height: 4),
-                       Text(
-                         "需要 OpenAI 兼容的 API（推荐阿里云百炼）",
-                         style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
-                       ),
-                       const SizedBox(height: 12),
-                       Container(
-                         padding: const EdgeInsets.all(12),
-                         decoration: BoxDecoration(
-                           color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                           borderRadius: BorderRadius.circular(8),
-                         ),
-                         child: Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                              _buildApiItem(
-                                context,
-                                "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride,
-                                (v) => ConfigService().setLlmApiKey(v), isSecret: true
-                              ),
-                              const SizedBox(height: 8),
-                              _buildApiItem(
-                                context,
-                                "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride,
-                                (v) => ConfigService().setLlmBaseUrl(v)
-                              ),
-                              const SizedBox(height: 8),
-                              _buildApiItem(
-                                context,
-                                "Model Name", CupertinoIcons.cube_box, ConfigService().llmModelOverride,
-                                (v) => ConfigService().setLlmModel(v), placeholder: "model-name"
-                              ),
-                           ],
-                         ),
-                       ),
-                     ] else ...[
-                       // Ollama Config
-                       Text(loc.ollamaUrl, style: AppTheme.body(context)),
-                       const SizedBox(height: 4),
-                       Text(
-                         "确保 Ollama 已启动（ollama serve）",
-                         style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
-                       ),
-                       const SizedBox(height: 12),
-                       Container(
-                         padding: const EdgeInsets.all(12),
-                         decoration: BoxDecoration(
-                           color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                           borderRadius: BorderRadius.circular(8),
-                         ),
-                         child: Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                              _buildApiItem(
-                                context,
-                                loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl,
-                                (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"
-                              ),
-                              const SizedBox(height: 8),
-                              _buildApiItem(
-                                context,
-                                loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel,
-                                (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"
-                              ),
-                           ],
-                         ),
-                       ),
-                     ],
-                    ],
-                 ),
-               ),
-             ]
-          ],
-        ),
-        
         const SizedBox(height: 24),
 
         // Developer / Debug
@@ -1083,6 +917,155 @@ class _SettingsPageState extends State<SettingsPage> {
 
 
 
+
+  Widget _buildAiPolishView() {
+    final loc = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        // AI Polish main switch
+        SettingsGroup(
+          title: loc.tabAiPolish,
+          children: [
+            SettingsTile(
+              label: loc.enabled,
+              icon: CupertinoIcons.sparkles,
+              child: MacosSwitch(
+                value: ConfigService().aiCorrectionEnabled,
+                onChanged: (v) async { await ConfigService().setAiCorrectionEnabled(v); setState((){}); },
+              ),
+            ),
+            if (ConfigService().aiCorrectionEnabled) ...[
+              const SettingsDivider(),
+              SettingsTile(
+                label: loc.llmProvider,
+                icon: CupertinoIcons.arrow_right_arrow_left,
+                child: MacosPopupButton<String>(
+                  value: ConfigService().llmProviderType,
+                  items: [
+                    MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+                    MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+                  ],
+                  onChanged: (v) async {
+                    if (v != null) {
+                      await ConfigService().setLlmProviderType(v);
+                      setState(() {});
+                    }
+                  },
+                ),
+              ),
+              const SettingsDivider(),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(loc.systemPrompt, style: AppTheme.body(context)),
+                        GestureDetector(
+                          onTap: () async {
+                            await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                            _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+                            setState((){});
+                          },
+                          child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    MacosTextField(
+                      maxLines: 5,
+                      placeholder: "Enter instructions for AI...",
+                      controller: _aiPromptController,
+                      decoration: BoxDecoration(
+                        color: AppTheme.getInputBackground(context),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.getBorder(context)),
+                      ),
+                      onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
+                    ),
+                    const SizedBox(height: 16),
+                    if (ConfigService().llmProviderType == 'cloud') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(loc.apiConfig, style: AppTheme.body(context)),
+                          GestureDetector(
+                            onTap: () async {
+                              final uri = Uri.parse("https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen");
+                              if (await canLaunchUrl(uri)) await launchUrl(uri);
+                            },
+                            child: Row(
+                              children: [
+                                MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
+                                const SizedBox(width: 4),
+                                Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "需要 OpenAI 兼容的 API（推荐阿里云百炼）",
+                        style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildApiItem(context, "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride, (v) => ConfigService().setLlmApiKey(v), isSecret: true),
+                            const SizedBox(height: 8),
+                            _buildApiItem(context, "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride, (v) => ConfigService().setLlmBaseUrl(v)),
+                            const SizedBox(height: 8),
+                            _buildApiItem(context, "Model Name", CupertinoIcons.cube_box, ConfigService().llmModelOverride, (v) => ConfigService().setLlmModel(v), placeholder: "model-name"),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Text(loc.ollamaUrl, style: AppTheme.body(context)),
+                      const SizedBox(height: 4),
+                      Text("确保 Ollama 已启动（ollama serve）", style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor)),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
+                            const SizedBox(height: 8),
+                            _buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // Vocab section (embedded)
+        const VocabSettingsView(),
+
+        const SizedBox(height: 24),
+      ],
+    );
+  }
 
   Widget _buildKeyCaptureTile(String label, IconData icon, {
     required bool isCapturing,

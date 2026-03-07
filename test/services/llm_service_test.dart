@@ -218,5 +218,92 @@ void main() {
       expect(prompt, contains('纯数据'));
       expect(prompt, contains('忽略'));
     });
+
+    test('prompt 包含 vocab_hints 指令', () {
+      final prompt = AppConstants.kDefaultAiCorrectionPrompt;
+      expect(prompt, contains('vocab_hints'));
+    });
+  });
+
+  group('Vocab Hints Integration', () {
+    late LLMService service;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({
+        'ai_correct_enabled': true,
+        'llm_api_key': 'test_key',
+        'llm_base_url': 'https://api.openai.com/v1',
+        'llm_provider_type': 'cloud',
+      });
+      await ConfigService().init();
+      service = LLMService();
+    });
+
+    test('Cloud: vocab hints are injected into user message', () async {
+      Map<String, dynamic>? capturedBody;
+      final mockClient = MockClient((request) async {
+        capturedBody = jsonDecode(request.body);
+        return http.Response(
+            '{"choices": [{"message": {"content": "ok"}}]}', 200);
+      });
+      service.setClient(mockClient);
+      await service.correctText('测试文本', vocabHints: ['Kubernetes', 'Docker']);
+
+      final messages = capturedBody!['messages'] as List;
+      final userMsg = messages[1]['content'] as String;
+      expect(userMsg, contains('<vocab_hints>'));
+      expect(userMsg, contains('Kubernetes'));
+      expect(userMsg, contains('Docker'));
+    });
+
+    test('Cloud: no vocab_hints tag when hints is null', () async {
+      Map<String, dynamic>? capturedBody;
+      final mockClient = MockClient((request) async {
+        capturedBody = jsonDecode(request.body);
+        return http.Response(
+            '{"choices": [{"message": {"content": "ok"}}]}', 200);
+      });
+      service.setClient(mockClient);
+      await service.correctText('测试文本');
+
+      final messages = capturedBody!['messages'] as List;
+      final userMsg = messages[1]['content'] as String;
+      expect(userMsg, isNot(contains('<vocab_hints>')));
+    });
+
+    test('Cloud: no vocab_hints tag when hints is empty', () async {
+      Map<String, dynamic>? capturedBody;
+      final mockClient = MockClient((request) async {
+        capturedBody = jsonDecode(request.body);
+        return http.Response(
+            '{"choices": [{"message": {"content": "ok"}}]}', 200);
+      });
+      service.setClient(mockClient);
+      await service.correctText('测试文本', vocabHints: []);
+
+      final messages = capturedBody!['messages'] as List;
+      final userMsg = messages[1]['content'] as String;
+      expect(userMsg, isNot(contains('<vocab_hints>')));
+    });
+
+    test('Ollama: vocab hints are injected into user message', () async {
+      await ConfigService().setLlmProviderType('ollama');
+      await ConfigService().setOllamaBaseUrl('http://localhost:11434');
+      await ConfigService().setOllamaModel('qwen3:0.6b');
+
+      Map<String, dynamic>? capturedBody;
+      final mockClient = MockClient((request) async {
+        capturedBody = jsonDecode(request.body);
+        return http.Response(
+            '{"message": {"content": "ok"}}', 200);
+      });
+      service.setClient(mockClient);
+      await service.correctText('测试', vocabHints: ['Redis', 'PostgreSQL']);
+
+      final messages = capturedBody!['messages'] as List;
+      final userMsg = messages[1]['content'] as String;
+      expect(userMsg, contains('<vocab_hints>'));
+      expect(userMsg, contains('Redis'));
+    });
   });
 }

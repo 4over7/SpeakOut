@@ -827,33 +827,26 @@ class CoreEngine {
         _log("[PERF] +${sw.elapsedMilliseconds}ms — dedup done");
       }
 
-      // Vocab Enhancement (Phase 1: exact replacement)
-      if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
-        finalText = VocabService().applyReplacements(finalText);
-        _log("[PERF] +${sw.elapsedMilliseconds}ms — vocab replacement done");
-      }
-
-      // Vocab Enhancement (Phase 2: phonetic soft matching)
-      if (finalText.isNotEmpty && ConfigService().vocabEnabled && ConfigService().vocabPhoneticEnabled) {
-        finalText = await VocabService().applyWithPhonetic(
-          finalText,
-          tokens: asrResult.tokens,
-          confidence: asrResult.tokenConfidence,
-        );
-        _log("[PERF] +${sw.elapsedMilliseconds}ms — vocab phonetic done");
-      }
-
-      // AI Correction
+      // AI Polish (with vocab hints injected into LLM prompt)
       if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {
-        _statusController.add("AI 优化中...");
-        _overlay.updateText("🤖 AI Optimizing...");
-        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI correction starting...");
+        _statusController.add("AI 润色中...");
+        _overlay.updateText("🤖 AI Polishing...");
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
         try {
-          finalText = await LLMService().correctText(finalText);
-          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI correction done");
+          List<String>? vocabHints;
+          if (ConfigService().vocabEnabled) {
+            vocabHints = VocabService().getVocabHints();
+            _log("[PERF] vocab hints: ${vocabHints.length} terms");
+          }
+          finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
+          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done");
         } catch (e) {
-          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI correction error: $e");
+          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");
         }
+      } else if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
+        // Offline fallback: direct replacement when AI is disabled
+        finalText = VocabService().applyReplacements(finalText);
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — vocab fallback replacement done");
       }
 
       // Fallback: Local Punctuation (Sherpa only, skip if model has built-in punctuation)

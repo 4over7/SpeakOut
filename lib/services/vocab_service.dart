@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
-import 'package:lpinyin/lpinyin.dart';
 import 'config_service.dart';
 
-/// 词汇表条目：错误形式 → 正确形式
+/// Vocab entry: wrong form -> correct form
 class VocabEntry {
   final String wrong;
   final String correct;
@@ -18,7 +17,7 @@ class VocabEntry {
   Map<String, dynamic> toJson() => {'wrong': wrong, 'correct': correct};
 }
 
-/// 行业词汇包
+/// Industry vocab pack
 class VocabPack {
   final String id;
   final String nameZh;
@@ -33,16 +32,15 @@ class VocabPack {
   });
 }
 
-/// 词汇增强服务（Phase 1：简单 replaceAll 替换表）
+/// Vocab service: manages industry packs and user custom entries.
 ///
-/// Phase 2 扩展点：applyWithPhonetic(text, tokens: List of String)
-/// Phase 3 扩展点：applyWithContext(text, industry: String)
+/// Primary mode: provide vocab hints to LLM for context-aware correction.
+/// Fallback mode: direct string replacement when AI is disabled.
 class VocabService {
   static final VocabService _instance = VocabService._internal();
   factory VocabService() => _instance;
   VocabService._internal();
 
-  // 行业包定义（id 资源路径 nameZh nameEn）
   static const _packDefs = [
     (id: 'tech', asset: 'assets/vocab/tech.json', nameZh: '软件/IT', nameEn: 'Software/IT'),
     (id: 'medical', asset: 'assets/vocab/medical.json', nameZh: '医疗', nameEn: 'Medical'),
@@ -54,33 +52,24 @@ class VocabService {
   final Map<String, VocabPack> _loadedPacks = {};
   bool _packsLoaded = false;
 
-  // Phase 2：拼音缓存（wrong 汉字 → 拼音字符串）
-  final Map<String, String> _pinyinCache = {};
-  bool _pinyinCacheReady = false;
-
-  /// 所有可用行业包（含元信息，不一定已加载词条）
   static List<({String id, String nameZh, String nameEn})> get availablePacks =>
       _packDefs.map((d) => (id: d.id, nameZh: d.nameZh, nameEn: d.nameEn)).toList();
 
-  /// 已加载的行业包
   List<VocabPack> get loadedPacks => _loadedPacks.values.toList();
 
-  /// 当前激活的所有词条（行业包 + 用户自定义）
+  /// All active entries (industry packs + user custom)
   List<VocabEntry> getActiveEntries() {
     final config = ConfigService();
     final entries = <VocabEntry>[];
 
-    // 行业包
     for (final def in _packDefs) {
-      final enabled = _isPackEnabled(def.id, config);
-      if (!enabled) continue;
+      if (!_isPackEnabled(def.id, config)) continue;
       final pack = _loadedPacks[def.id];
       if (pack != null) {
         entries.addAll(pack.entries.where((e) => e.wrong.isNotEmpty));
       }
     }
 
-    // 用户自定义词条
     if (config.vocabUserEnabled) {
       entries.addAll(userEntries.where((e) => e.wrong.isNotEmpty));
     }
@@ -88,7 +77,22 @@ class VocabService {
     return entries;
   }
 
-  /// 用户自定义词条（从 SharedPreferences 读取）
+  /// Get vocab hints for LLM prompt injection.
+  /// Returns unique correct-form terms, user entries prioritized.
+  List<String> getVocabHints({int maxItems = 200}) {
+    final entries = getActiveEntries();
+    final userSet = userEntries.map((e) => e.correct).toSet();
+    final allHints = entries.map((e) => e.correct).toSet().toList();
+
+    if (allHints.length <= maxItems) return allHints;
+
+    // Prioritize user entries, then truncate industry entries
+    final sorted = allHints.where(userSet.contains).toList()
+      ..addAll(allHints.where((h) => !userSet.contains(h)));
+    return sorted.take(maxItems).toList();
+  }
+
+  /// User custom entries (from SharedPreferences)
   List<VocabEntry> get userEntries {
     final json = ConfigService().vocabUserEntriesJson;
     try {
@@ -105,7 +109,6 @@ class VocabService {
     final current = userEntries;
     current.add(entry);
     await _saveUserEntries(current);
-    invalidatePinyinCache();
   }
 
   Future<void> deleteUserEntry(int index) async {
@@ -113,7 +116,6 @@ class VocabService {
     if (index < 0 || index >= current.length) return;
     current.removeAt(index);
     await _saveUserEntries(current);
-    invalidatePinyinCache();
   }
 
   Future<void> _saveUserEntries(List<VocabEntry> entries) async {
@@ -121,7 +123,7 @@ class VocabService {
     await ConfigService().setVocabUserEntriesJson(json);
   }
 
-  /// Phase 1：对 text 执行激活词条的精确替换
+  /// Fallback: direct string replacement (used when AI is disabled)
   String applyReplacements(String text) {
     if (text.isEmpty) return text;
     final entries = getActiveEntries();
@@ -135,118 +137,7 @@ class VocabService {
     return result;
   }
 
-  /// Phase 2：音近软匹配替换
-  ///
-  /// 先做 Phase 1 精确替换，再对文本做滑动窗口拼音距离匹配。
-  /// [tokens] — ASR 分词列表（当前仅用于未来置信度门控）
-  /// [confidence] — per-token 对数概率，仅离线 Transducer 模型有值
-  Future<String> applyWithPhonetic(
-    String text, {
-    List<String>? tokens,
-    List<double>? confidence,
-  }) async {
-    // Phase 1 已在 CoreEngine 执行，此处直接处理传入文本
-    if (text.isEmpty) return text;
-
-    await _ensurePinyinCache();
-    if (_pinyinCache.isEmpty) return text;
-
-    final threshold = ConfigService().vocabPhoneticThreshold;
-    final entries = getActiveEntries();
-    if (entries.isEmpty) return text;
-
-    String result = text;
-
-    // 对每个有 wrong 字段的词条，尝试在文本中找音近子串
-    for (final entry in entries) {
-      if (entry.wrong.isEmpty || entry.correct.isEmpty) continue;
-
-      final wrongPinyin = _pinyinCache[entry.wrong];
-      if (wrongPinyin == null) continue;
-
-      final wrongLen = entry.wrong.length;
-      if (wrongLen < 2 || wrongLen > 6) continue; // 只做 2~6 字窗口
-
-      // 在 result 中滑动相同长度窗口，寻找音近子串
-      int i = 0;
-      while (i <= result.length - wrongLen) {
-        final window = result.substring(i, i + wrongLen);
-        // 跳过已是正确词的位置
-        if (window == entry.correct) {
-          i++;
-          continue;
-        }
-        final windowPinyin = PinyinHelper.getPinyin(window, separator: ' ');
-        final dist = _phoneticDistance(wrongPinyin, windowPinyin);
-        if (dist <= threshold) {
-          result = result.substring(0, i) + entry.correct + result.substring(i + wrongLen);
-          i += entry.correct.length; // 跳过替换后的正确词
-        } else {
-          i++;
-        }
-      }
-    }
-
-    return result;
-  }
-
-  /// 使词条拼音缓存失效（词条变更或开关切换时调用）
-  void invalidatePinyinCache() {
-    _pinyinCache.clear();
-    _pinyinCacheReady = false;
-  }
-
-  Future<void> _ensurePinyinCache() async {
-    if (_pinyinCacheReady) return;
-    final entries = getActiveEntries();
-    for (final e in entries) {
-      if (e.wrong.isNotEmpty) {
-        _pinyinCache[e.wrong] = PinyinHelper.getPinyin(e.wrong, separator: ' ');
-      }
-    }
-    _pinyinCacheReady = true;
-  }
-
-  /// 方言标准化：将平翘舌、前后鼻音等视为等价
-  String _normalizeDialect(String pinyin) {
-    return pinyin
-        .replaceAll('zh', 'z')
-        .replaceAll('ch', 'c')
-        .replaceAll('sh', 's')
-        .replaceAll('l', 'n');
-  }
-
-  /// 音近距离：拼音归一化后的 Levenshtein 编辑距离（按音节空格分隔）
-  double _phoneticDistance(String pinyinA, String pinyinB) {
-    final a = _normalizeDialect(pinyinA);
-    final b = _normalizeDialect(pinyinB);
-    return _levenshtein(a, b).toDouble();
-  }
-
-  /// 标准 Levenshtein 编辑距离
-  int _levenshtein(String s, String t) {
-    if (s == t) return 0;
-    if (s.isEmpty) return t.length;
-    if (t.isEmpty) return s.length;
-
-    final dp = List.generate(s.length + 1, (i) => List.filled(t.length + 1, 0));
-    for (int i = 0; i <= s.length; i++) { dp[i][0] = i; }
-    for (int j = 0; j <= t.length; j++) { dp[0][j] = j; }
-
-    for (int i = 1; i <= s.length; i++) {
-      for (int j = 1; j <= t.length; j++) {
-        final cost = s[i - 1] == t[j - 1] ? 0 : 1;
-        dp[i][j] = [
-          dp[i - 1][j] + 1,
-          dp[i][j - 1] + 1,
-          dp[i - 1][j - 1] + cost,
-        ].reduce((a, b) => a < b ? a : b);
-      }
-    }
-    return dp[s.length][t.length];
-  }
-
-  /// 初始化：预加载所有启用的行业包（懒加载，首次调用时执行）
+  /// Load all industry packs (lazy, called once)
   Future<void> ensurePacksLoaded() async {
     if (_packsLoaded) return;
     _packsLoaded = true;
@@ -270,7 +161,7 @@ class VocabService {
         entries: entries,
       );
     } catch (_) {
-      // 资源不存在时忽略
+      // Asset not found — ignore
     }
   }
 

@@ -30,7 +30,7 @@ class LLMService {
     } catch (_) {}
   }
 
-  Future<String> correctText(String input) async {
+  Future<String> correctText(String input, {List<String>? vocabHints}) async {
     if (input.trim().isEmpty) return input;
     if (!ConfigService().aiCorrectionEnabled) {
       _log("RAW INPUT (AI OFF): $input");
@@ -39,12 +39,19 @@ class LLMService {
 
     final providerType = ConfigService().llmProviderType;
     if (providerType == 'ollama') {
-      return _correctTextOllama(input);
+      return _correctTextOllama(input, vocabHints: vocabHints);
     }
-    return _correctTextCloud(input);
+    return _correctTextCloud(input, vocabHints: vocabHints);
   }
 
-  Future<String> _correctTextCloud(String input) async {
+  String _buildUserMessage(String input, {List<String>? vocabHints}) {
+    final vocabSection = (vocabHints != null && vocabHints.isNotEmpty)
+        ? '\n\n<vocab_hints>\n${vocabHints.join(', ')}\n</vocab_hints>'
+        : '';
+    return '<speech_text>\n$input\n</speech_text>$vocabSection';
+  }
+
+  Future<String> _correctTextCloud(String input, {List<String>? vocabHints}) async {
     final apiKey = ConfigService().llmApiKey;
     final baseUrl = ConfigService().llmBaseUrl;
     final model = ConfigService().llmModel;
@@ -66,7 +73,7 @@ class LLMService {
         "model": model,
         "messages": [
           {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": "<speech_text>\n$input\n</speech_text>"}
+          {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
         ],
         "temperature": 0.3,
       };
@@ -98,7 +105,7 @@ class LLMService {
     return input;
   }
 
-  Future<String> _correctTextOllama(String input) async {
+  Future<String> _correctTextOllama(String input, {List<String>? vocabHints}) async {
     final baseUrl = ConfigService().ollamaBaseUrl;
     final model = ConfigService().ollamaModel;
     final systemPrompt = ConfigService().aiCorrectionPrompt;
@@ -114,7 +121,7 @@ class LLMService {
         "model": model,
         "messages": [
           {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": "<speech_text>\n$input\n</speech_text>"}
+          {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
         ],
         "stream": false,
         "think": false,

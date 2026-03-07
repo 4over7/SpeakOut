@@ -143,13 +143,13 @@ abstract class AppLocalizations {
   /// No description provided for @aiCorrection.
   ///
   /// In en, this message translates to:
-  /// **'AI Smart Correction (Beta)'**
+  /// **'AI Polish'**
   String get aiCorrection;
 
   /// No description provided for @aiCorrectionDesc.
   ///
   /// In en, this message translates to:
-  /// **'Use LLM to remove filler words and polish text.'**
+  /// **'Use LLM to polish speech recognition results.'**
   String get aiCorrectionDesc;
 
   /// No description provided for @enabled.
@@ -1016,22 +1016,34 @@ abstract class AppLocalizations {
   /// **'Importing...'**
   String get importing;
 
+  /// No description provided for @tabAiPolish.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish'**
+  String get tabAiPolish;
+
+  /// No description provided for @aiPolishDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use LLM to polish speech results with professional vocabulary context.'**
+  String get aiPolishDesc;
+
   /// No description provided for @vocabEnhancement.
   ///
   /// In en, this message translates to:
-  /// **'Vocab Enhancement'**
+  /// **'Professional Vocab'**
   String get vocabEnhancement;
 
   /// No description provided for @vocabEnhancementSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Fix ASR homophones and technical term substitutions'**
+  /// **'Provide terminology hints to AI for better domain recognition'**
   String get vocabEnhancementSubtitle;
 
   /// No description provided for @vocabEnabled.
   ///
   /// In en, this message translates to:
-  /// **'Enable Vocab Enhancement'**
+  /// **'Enable Professional Vocab'**
   String get vocabEnabled;
 
   /// No description provided for @vocabIndustryPresets.
@@ -1103,44 +1115,8 @@ abstract class AppLocalizations {
   /// No description provided for @vocabEnabledNote.
   ///
   /// In en, this message translates to:
-  /// **'When enabled, vocab substitution runs before AI correction'**
+  /// **'When enabled, terminology is injected as context hints to AI Polish'**
   String get vocabEnabledNote;
-
-  /// No description provided for @vocabPhoneticMatching.
-  ///
-  /// In en, this message translates to:
-  /// **'Phonetic Matching'**
-  String get vocabPhoneticMatching;
-
-  /// No description provided for @vocabPhoneticEnabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable Phonetic Matching'**
-  String get vocabPhoneticEnabled;
-
-  /// No description provided for @vocabPhoneticEnabledNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Soft-match ASR homophones (e.g. \"Kuberneces\" → \"Kubernetes\")'**
-  String get vocabPhoneticEnabledNote;
-
-  /// No description provided for @vocabPhoneticThreshold.
-  ///
-  /// In en, this message translates to:
-  /// **'Match Threshold'**
-  String get vocabPhoneticThreshold;
-
-  /// No description provided for @vocabPhoneticThresholdNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Lower = stricter (fewer false positives); Higher = broader coverage'**
-  String get vocabPhoneticThresholdNote;
-
-  /// No description provided for @tabVocab.
-  ///
-  /// In en, this message translates to:
-  /// **'Vocab'**
-  String get tabVocab;
 
   /// No description provided for @vocabImportTsv.
   ///

@@ -20,8 +20,6 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
   late Map<String, bool> _packEnabled;
   late bool _userEnabled;
   List<VocabEntry> _userEntries = [];
-  late bool _phoneticEnabled;
-  late double _phoneticThreshold;
 
   @override
   void initState() {
@@ -37,9 +35,6 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
       'education': config.vocabEducationEnabled,
     };
     _userEntries = List.from(VocabService().userEntries);
-    _phoneticEnabled = config.vocabPhoneticEnabled;
-    _phoneticThreshold = config.vocabPhoneticThreshold;
-
     VocabService().ensurePacksLoaded();
   }
 
@@ -127,7 +122,6 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
       int count = 0;
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
-        // Support both tab and comma as separator
         final parts = line.contains('\t') ? line.split('\t') : line.split(',');
         if (parts.length < 2) continue;
         final wrong = parts[0].trim();
@@ -192,9 +186,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
         buffer.writeln('${entry.wrong}\t${entry.correct}');
       }
       await File(result).writeAsString(buffer.toString());
-    } catch (_) {
-      // ignore export errors silently
-    }
+    } catch (_) {}
   }
 
   Widget _buildBetaTag() {
@@ -219,7 +211,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 总开关
+        // Main switch
         SettingsGroup(
           title: loc.vocabEnhancement,
           children: [
@@ -252,76 +244,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
         if (_vocabEnabled) ...[
           const SizedBox(height: 24),
 
-          // 音近匹配 Phase 2
-          SettingsGroup(
-            title: loc.vocabPhoneticMatching,
-            children: [
-              SettingsTile(
-                label: loc.vocabPhoneticEnabled,
-                icon: CupertinoIcons.waveform,
-                trailing: _buildBetaTag(),
-                child: MacosSwitch(
-                  value: _phoneticEnabled,
-                  onChanged: (v) async {
-                    await ConfigService().setVocabPhoneticEnabled(v);
-                    VocabService().invalidatePinyinCache();
-                    setState(() => _phoneticEnabled = v);
-                  },
-                ),
-              ),
-              if (_phoneticEnabled) ...[
-                Padding(
-                  padding: const EdgeInsets.only(left: 40, bottom: 4),
-                  child: Text(
-                    loc.vocabPhoneticEnabledNote,
-                    style: AppTheme.caption(context).copyWith(
-                      color: MacosColors.systemGrayColor,
-                    ),
-                  ),
-                ),
-                const SettingsDivider(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const MacosIcon(CupertinoIcons.slider_horizontal_3, size: 16),
-                          const SizedBox(width: 8),
-                          Text(loc.vocabPhoneticThreshold, style: AppTheme.body(context)),
-                          const Spacer(),
-                          Text(
-                            _phoneticThreshold.toStringAsFixed(1),
-                            style: AppTheme.caption(context),
-                          ),
-                        ],
-                      ),
-                      MacosSlider(
-                        value: _phoneticThreshold,
-                        min: 1.0,
-                        max: 3.0,
-                        onChanged: (v) async {
-                          await ConfigService().setVocabPhoneticThreshold(v);
-                          setState(() => _phoneticThreshold = v);
-                        },
-                      ),
-                      Text(
-                        loc.vocabPhoneticThresholdNote,
-                        style: AppTheme.caption(context).copyWith(
-                          color: MacosColors.systemGrayColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // 行业预设
+          // Industry presets
           SettingsGroup(
             title: loc.vocabIndustryPresets,
             children: [
@@ -339,7 +262,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
 
           const SizedBox(height: 24),
 
-          // 自定义词条
+          // Custom entries
           SettingsGroup(
             title: loc.vocabCustomVocab,
             children: [
@@ -355,116 +278,97 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                 ),
               ),
               if (_userEnabled) ...[
-              const SettingsDivider(),
-              if (_userEntries.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    '尚无自定义词条',
-                    style: AppTheme.caption(context).copyWith(
-                      color: MacosColors.systemGrayColor,
+                const SettingsDivider(),
+                if (_userEntries.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      '尚无自定义词条',
+                      style: AppTheme.caption(context).copyWith(
+                        color: MacosColors.systemGrayColor,
+                      ),
                     ),
-                  ),
-                )
-              else
-                ..._userEntries.asMap().entries.map((e) {
-                  final idx = e.key;
-                  final entry = e.value;
-                  return Column(
+                  )
+                else
+                  ..._userEntries.asMap().entries.map((e) {
+                    final idx = e.key;
+                    final entry = e.value;
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: entry.wrong.isNotEmpty
+                                    ? Text('${entry.wrong} → ${entry.correct}', style: AppTheme.body(context))
+                                    : Text(entry.correct, style: AppTheme.body(context)),
+                              ),
+                              MacosIconButton(
+                                icon: const MacosIcon(CupertinoIcons.trash, color: MacosColors.systemRedColor, size: 16),
+                                backgroundColor: MacosColors.transparent,
+                                onPressed: () => _deleteEntry(idx),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (idx < _userEntries.length - 1) const SettingsDivider(),
+                      ],
+                    );
+                  }),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                      PushButton(
+                        controlSize: ControlSize.regular,
+                        onPressed: _showAddEntryDialog,
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (entry.wrong.isNotEmpty)
-                                    Text(
-                                      '${entry.wrong} → ${entry.correct}',
-                                      style: AppTheme.body(context),
-                                    )
-                                  else
-                                    Text(
-                                      entry.correct,
-                                      style: AppTheme.body(context),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            MacosIconButton(
-                              icon: const MacosIcon(
-                                CupertinoIcons.trash,
-                                color: MacosColors.systemRedColor,
-                                size: 16,
-                              ),
-                              backgroundColor: MacosColors.transparent,
-                              onPressed: () => _deleteEntry(idx),
-                            ),
+                            const MacosIcon(CupertinoIcons.plus, size: 14),
+                            const SizedBox(width: 6),
+                            Text(loc.vocabAddEntry),
                           ],
                         ),
                       ),
-                      if (idx < _userEntries.length - 1) const SettingsDivider(),
-                    ],
-                  );
-                }),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    PushButton(
-                      controlSize: ControlSize.regular,
-                      onPressed: _showAddEntryDialog,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const MacosIcon(CupertinoIcons.plus, size: 14),
-                          const SizedBox(width: 6),
-                          Text(loc.vocabAddEntry),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    PushButton(
-                      controlSize: ControlSize.regular,
-                      secondary: true,
-                      onPressed: _importTsv,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const MacosIcon(CupertinoIcons.arrow_down_doc, size: 14),
-                          const SizedBox(width: 6),
-                          Text(loc.vocabImportTsv),
-                        ],
-                      ),
-                    ),
-                    if (_userEntries.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       PushButton(
                         controlSize: ControlSize.regular,
                         secondary: true,
-                        onPressed: _exportTsv,
+                        onPressed: _importTsv,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const MacosIcon(CupertinoIcons.arrow_up_doc, size: 14),
+                            const MacosIcon(CupertinoIcons.arrow_down_doc, size: 14),
                             const SizedBox(width: 6),
-                            Text(loc.vocabExportTsv),
+                            Text(loc.vocabImportTsv),
                           ],
                         ),
                       ),
+                      if (_userEntries.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        PushButton(
+                          controlSize: ControlSize.regular,
+                          secondary: true,
+                          onPressed: _exportTsv,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const MacosIcon(CupertinoIcons.arrow_up_doc, size: 14),
+                              const SizedBox(width: 6),
+                              Text(loc.vocabExportTsv),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              ], // end if (_userEnabled)
+              ],
             ],
           ),
         ],
-
-        const SizedBox(height: 24),
       ],
     );
   }
