@@ -968,9 +968,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
         const SizedBox(height: 16),
 
-        // AI Polish main switch
+        // LLM Rewrite switch
         SettingsGroup(
-          title: loc.tabAiPolish,
+          title: loc.llmRewrite,
           children: [
             SettingsTile(
               label: loc.enabled,
@@ -1103,7 +1103,44 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+
+        // 2x2 matrix explanation
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.15)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemGrayColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    loc.tabAiPolish,
+                    style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemGrayColor),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loc.aiPolishMatrix,
+                style: AppTheme.caption(context).copyWith(
+                  color: MacosColors.systemGrayColor,
+                  height: 1.6,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
 
         // Vocab section (embedded)
         const VocabSettingsView(),

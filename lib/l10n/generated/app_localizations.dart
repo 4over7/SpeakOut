@@ -1159,6 +1159,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.'**
   String get aiPolishWarning;
+
+  /// No description provided for @llmRewrite.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM Rewrite'**
+  String get llmRewrite;
+
+  /// No description provided for @aiPolishMatrix.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output'**
+  String get aiPolishMatrix;
 }
 
 class _AppLocalizationsDelegate

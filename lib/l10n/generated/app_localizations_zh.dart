@@ -559,4 +559,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get aiPolishWarning =>
       'AI 润色可能会修改原意或引入错误，建议在重要场景下对比确认原文。离线模式（AI 关闭）下输出原始识别结果，准确性由语音模型决定。';
+
+  @override
+  String get llmRewrite => 'LLM 智能改写';
+
+  @override
+  String get aiPolishMatrix =>
+      'LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出';
 }

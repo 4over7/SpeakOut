@@ -583,4 +583,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiPolishWarning =>
       'AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.';
+
+  @override
+  String get llmRewrite => 'LLM Rewrite';
+
+  @override
+  String get aiPolishMatrix =>
+      'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output';
 }
