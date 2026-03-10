@@ -15,6 +15,9 @@ class UpdateService {
   String? latestVersion;
   String? downloadUrl;
 
+  /// 重置检查状态，允许再次手动检查
+  void resetCheck() => _hasChecked = false;
+
   /// 启动时调用，fire-and-forget，不阻塞 UI
   Future<void> checkForUpdate() async {
     if (_hasChecked) return;

@@ -17,6 +17,7 @@ import 'widgets/settings_widgets.dart';
 import '../services/audio_device_service.dart';
 import 'package:speakout/config/app_log.dart';
 import 'vocab_settings_page.dart';
+import '../services/update_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -61,6 +62,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _toggleDiaryKeyName = "";
   bool _isCapturingToggleInputKey = false;
   bool _isCapturingToggleDiaryKey = false;
+  bool _isCheckingUpdate = false;
+  String? _updateResult;
   int _toggleMaxDuration = 0;
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
@@ -858,70 +861,6 @@ class _SettingsPageState extends State<SettingsPage> {
              _buildAudioInputSection(loc),
           ],
         ),
-        
-
-
-        const SizedBox(height: 24),
-
-        // Developer / Debug
-        SettingsGroup(
-          title: '开发者',
-          children: [
-            SettingsTile(
-              label: '详细日志',
-              icon: CupertinoIcons.doc_text,
-              child: MacosSwitch(
-                value: ConfigService().verboseLogging,
-                onChanged: (v) async {
-                  await ConfigService().setVerboseLogging(v);
-                  AppService().applyVerboseLogging();
-                  setState(() {});
-                },
-              ),
-            ),
-            const SettingsDivider(),
-            SettingsTile(
-              label: '日志输出目录',
-              icon: CupertinoIcons.folder,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    ConfigService().logDirectory.isEmpty
-                        ? '~/Downloads（默认）'
-                        : ConfigService().logDirectory.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
-                    style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
-                  ),
-                  const SizedBox(width: 8),
-                  MacosIconButton(
-                    icon: const MacosIcon(CupertinoIcons.folder_badge_plus, size: 16),
-                    backgroundColor: MacosColors.transparent,
-                    onPressed: () async {
-                      final dir = await FilePicker.platform.getDirectoryPath(
-                        dialogTitle: '选择日志输出目录',
-                      );
-                      if (dir != null) {
-                        await ConfigService().setLogDirectory(dir);
-                        AppService().applyVerboseLogging();
-                        setState(() {});
-                      }
-                    },
-                  ),
-                  if (ConfigService().logDirectory.isNotEmpty)
-                    MacosIconButton(
-                      icon: const MacosIcon(CupertinoIcons.xmark_circle, size: 16),
-                      backgroundColor: MacosColors.transparent,
-                      onPressed: () async {
-                        await ConfigService().setLogDirectory('');
-                        AppService().applyVerboseLogging();
-                        setState(() {});
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
 
         const SizedBox(height: 24),
       ],
@@ -1470,10 +1409,11 @@ class _SettingsPageState extends State<SettingsPage> {
   // --- View: About ---
   Widget _buildAboutView(BuildContext context, String version) {
     final loc = AppLocalizations.of(context)!;
-    return Center(
+    return SingleChildScrollView(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Logo and info section (centered)
+          const SizedBox(height: 32),
           Container(
             decoration: BoxDecoration(
               boxShadow: [
@@ -1488,45 +1428,97 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            "子曰 SpeakOut", 
+            "子曰 SpeakOut",
             style: AppTheme.display(context).copyWith(
-              fontSize: 28, 
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2
             )
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onDoubleTap: () {
-              Clipboard.setData(ClipboardData(text: version));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("已复制版本号: v$version"),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                  width: 220,
-                ),
-              );
-            },
-            child: Tooltip(
-              message: "双击复制版本号",
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
-                ),
-                child: Text(
-                  "v$version",
-                  style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.secondaryLabelColor),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onDoubleTap: () {
+                  Clipboard.setData(ClipboardData(text: version));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("已复制版本号: v$version"),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                      width: 220,
+                    ),
+                  );
+                },
+                child: Tooltip(
+                  message: "双击复制版本号",
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
+                    ),
+                    child: Text(
+                      "v$version",
+                      style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.secondaryLabelColor),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _isCheckingUpdate ? null : () async {
+                  setState(() { _isCheckingUpdate = true; _updateResult = null; });
+                  try {
+                    final info = await PackageInfo.fromPlatform();
+                    // Reset so it can check again
+                    UpdateService().resetCheck();
+                    await UpdateService().checkForUpdate();
+                    final latest = UpdateService().latestVersion;
+                    if (latest != null && UpdateService.isNewer(latest, info.version)) {
+                      setState(() => _updateResult = loc.updateAvailable(latest));
+                    } else {
+                      setState(() => _updateResult = loc.updateUpToDate);
+                    }
+                  } catch (_) {
+                    setState(() => _updateResult = loc.updateUpToDate);
+                  }
+                  setState(() => _isCheckingUpdate = false);
+                },
+                child: Tooltip(
+                  message: loc.updateAction,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
+                    ),
+                    child: _isCheckingUpdate
+                      ? const SizedBox(width: 14, height: 14, child: CupertinoActivityIndicator())
+                      : const MacosIcon(CupertinoIcons.arrow_clockwise, size: 14, color: MacosColors.secondaryLabelColor),
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (_updateResult != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _updateResult!,
+              style: AppTheme.caption(context).copyWith(
+                fontSize: 11,
+                color: _updateResult == loc.updateUpToDate
+                    ? MacosColors.systemGrayColor
+                    : MacosColors.systemOrangeColor,
+              ),
+            ),
+          ],
           const SizedBox(height: 32),
           Text(
-            loc.aboutTagline, 
+            loc.aboutTagline,
             style: AppTheme.body(context).copyWith(
               fontSize: 16,
               color: AppTheme.getAccent(context)
@@ -1562,9 +1554,75 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            loc.aboutCopyright, 
+            loc.aboutCopyright,
             style: AppTheme.caption(context).copyWith(color: MacosColors.quaternaryLabelColor)
           ),
+
+          const SizedBox(height: 48),
+
+          // Developer / Debug (hidden at bottom)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: SettingsGroup(
+              title: '开发者',
+              children: [
+                SettingsTile(
+                  label: '详细日志',
+                  icon: CupertinoIcons.doc_text,
+                  child: MacosSwitch(
+                    value: ConfigService().verboseLogging,
+                    onChanged: (v) async {
+                      await ConfigService().setVerboseLogging(v);
+                      AppService().applyVerboseLogging();
+                      setState(() {});
+                    },
+                  ),
+                ),
+                const SettingsDivider(),
+                SettingsTile(
+                  label: '日志输出目录',
+                  icon: CupertinoIcons.folder,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        ConfigService().logDirectory.isEmpty
+                            ? '~/Downloads（默认）'
+                            : ConfigService().logDirectory.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
+                        style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+                      ),
+                      const SizedBox(width: 8),
+                      MacosIconButton(
+                        icon: const MacosIcon(CupertinoIcons.folder_badge_plus, size: 16),
+                        backgroundColor: MacosColors.transparent,
+                        onPressed: () async {
+                          final dir = await FilePicker.platform.getDirectoryPath(
+                            dialogTitle: '选择日志输出目录',
+                          );
+                          if (dir != null) {
+                            await ConfigService().setLogDirectory(dir);
+                            AppService().applyVerboseLogging();
+                            setState(() {});
+                          }
+                        },
+                      ),
+                      if (ConfigService().logDirectory.isNotEmpty)
+                        MacosIconButton(
+                          icon: const MacosIcon(CupertinoIcons.xmark_circle, size: 16),
+                          backgroundColor: MacosColors.transparent,
+                          onPressed: () async {
+                            await ConfigService().setLogDirectory('');
+                            AppService().applyVerboseLogging();
+                            setState(() {});
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
         ],
       ),
     );
