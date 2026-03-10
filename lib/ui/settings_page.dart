@@ -82,7 +82,7 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _aiPromptController = TextEditingController(text: ConfigService().aiCorrectionPrompt);
     _loadVersion();
-    _tabController = MacosTabController(initialIndex: 0, length: 4);
+    _tabController = MacosTabController(initialIndex: 0, length: 5);
     _tabController.addListener(() {
       setState(() => _selectedIndex = _tabController.index);
     });
@@ -466,10 +466,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.sparkles, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+              ),
+              SidebarItem(
+                leading: MacosIcon(CupertinoIcons.sparkles, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
                 label: Row(
                   children: [
-                    Text(loc.tabAiPolish, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+                    Text(loc.tabAiPolish, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -484,8 +488,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : null)),
               ),
             ],
           );
@@ -509,7 +513,8 @@ class _SettingsPageState extends State<SettingsPage> {
                        if (_selectedIndex == 0) return _buildGeneralView();
                        if (_selectedIndex == 1) return _buildModelsView();
                        if (_selectedIndex == 2) return _buildTriggerView();
-                       if (_selectedIndex == 3) return _buildAiPolishView();
+                       if (_selectedIndex == 3) return _buildDiaryView();
+                       if (_selectedIndex == 4) return _buildAiPolishView();
                        return _buildAboutView(context, _version);
                     }),
                   ),
@@ -871,6 +876,74 @@ class _SettingsPageState extends State<SettingsPage> {
 
 
 
+  // --- View: Diary (闪念笔记) ---
+  Widget _buildDiaryView() {
+    final loc = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        SettingsGroup(
+          title: loc.diaryMode,
+          children: [
+            SettingsTile(
+              label: loc.enabled,
+              icon: CupertinoIcons.book,
+              child: MacosSwitch(
+                value: ConfigService().diaryEnabled,
+                onChanged: (v) async { await ConfigService().setDiaryEnabled(v); setState((){}); },
+              ),
+            ),
+            if (ConfigService().diaryEnabled) ...[
+              const SettingsDivider(),
+              _buildKeyCaptureTile(
+                loc.pttMode, CupertinoIcons.keyboard_chevron_compact_down,
+                isCapturing: _isCapturingDiaryKey,
+                keyName: _diaryKeyName,
+                onEdit: () => _startKeyCapture(isDiary: true),
+              ),
+              const SettingsDivider(),
+              _buildKeyCaptureTile(
+                loc.toggleModeTip, CupertinoIcons.book,
+                isCapturing: _isCapturingToggleDiaryKey,
+                keyName: _toggleDiaryKeyName,
+                onEdit: () => _startKeyCapture(isToggleDiary: true),
+                onClear: () async {
+                  await ConfigService().clearToggleDiaryKey();
+                  setState(() => _toggleDiaryKeyName = "");
+                },
+              ),
+              const SettingsDivider(),
+              SettingsTile(
+                label: loc.diaryPath,
+                icon: CupertinoIcons.folder,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 150),
+                      child: Text(
+                        ConfigService().diaryDirectory.split('/').last,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.caption(context),
+                        maxLines: 1,
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    MacosIconButton(
+                      icon: const MacosIcon(CupertinoIcons.folder_open),
+                      onPressed: _pickDiaryFolder,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
   Widget _buildAiPolishView() {
     final loc = AppLocalizations.of(context)!;
     return Column(
@@ -1160,69 +1233,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
         const SizedBox(height: 24),
 
-        // 2. Flash Note group
-        SettingsGroup(
-          title: loc.diaryMode,
-          children: [
-            SettingsTile(
-              label: loc.enabled,
-              icon: CupertinoIcons.book,
-              child: MacosSwitch(
-                value: ConfigService().diaryEnabled,
-                onChanged: (v) async { await ConfigService().setDiaryEnabled(v); setState((){}); },
-              ),
-            ),
-            if (ConfigService().diaryEnabled) ...[
-              const SettingsDivider(),
-              _buildKeyCaptureTile(
-                loc.pttMode, CupertinoIcons.keyboard_chevron_compact_down,
-                isCapturing: _isCapturingDiaryKey,
-                keyName: _diaryKeyName,
-                onEdit: () => _startKeyCapture(isDiary: true),
-              ),
-              const SettingsDivider(),
-              _buildKeyCaptureTile(
-                loc.toggleModeTip, CupertinoIcons.book,
-                isCapturing: _isCapturingToggleDiaryKey,
-                keyName: _toggleDiaryKeyName,
-                onEdit: () => _startKeyCapture(isToggleDiary: true),
-                onClear: () async {
-                  await ConfigService().clearToggleDiaryKey();
-                  setState(() => _toggleDiaryKeyName = "");
-                },
-              ),
-              const SettingsDivider(),
-              SettingsTile(
-                label: loc.diaryPath,
-                icon: CupertinoIcons.folder,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      constraints: const BoxConstraints(maxWidth: 150),
-                      child: Text(
-                        ConfigService().diaryDirectory.split('/').last,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTheme.caption(context),
-                        maxLines: 1,
-                        textAlign: TextAlign.end,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    MacosIconButton(
-                      icon: const MacosIcon(CupertinoIcons.folder_open),
-                      onPressed: _pickDiaryFolder,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // 3. Recording Protection group
+        // 2. Recording Protection group
         SettingsGroup(
           title: loc.recordingProtection,
           children: [
