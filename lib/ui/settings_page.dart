@@ -1515,10 +1515,11 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          if (_updateResult != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _updateResult!,
+          const SizedBox(height: 8),
+          Opacity(
+            opacity: _updateResult != null ? 1.0 : 0.0,
+            child: Text(
+              _updateResult ?? '',
               style: AppTheme.caption(context).copyWith(
                 fontSize: 11,
                 color: _updateResult == loc.updateUpToDate
@@ -1526,7 +1527,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     : MacosColors.systemOrangeColor,
               ),
             ),
-          ],
+          ),
           const SizedBox(height: 32),
           Text(
             loc.aboutTagline,
