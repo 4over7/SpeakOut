@@ -561,6 +561,17 @@ class AppLocalizationsZh extends AppLocalizations {
       'AI 润色可能会修改原意或引入错误，建议在重要场景下对比确认原文。离线模式（AI 关闭）下输出原始识别结果，准确性由语音模型决定。';
 
   @override
+  String updateAvailable(Object version) {
+    return '发现新版本 $version';
+  }
+
+  @override
+  String get updateAction => '查看更新';
+
+  @override
+  String get updateUpToDate => '已是最新版本';
+
+  @override
   String get llmRewrite => 'LLM 智能改写';
 
   @override

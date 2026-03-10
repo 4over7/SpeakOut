@@ -61,6 +61,12 @@ class AppConstants {
   static const bool kDefaultDeduplicationEnabled = true;
 
   
+  // Update Check
+  static const String kGitHubReleasesApi = 'https://api.github.com/repos/4over7/SpeakOut/releases/latest';
+  static const String kGitHubReleasesUrl = 'https://github.com/4over7/SpeakOut/releases/latest';
+  static const String kGatewayVersionUrl = 'https://speakout-gateway.4over7.workers.dev/version';
+  static const Duration kUpdateCheckTimeout = Duration(seconds: 5);
+
   // UI Layout
   static const double kStandardPadding = 16.0;
   static const double kSmallPadding = 8.0;

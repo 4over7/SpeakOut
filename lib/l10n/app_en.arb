@@ -221,6 +221,10 @@
   },
   "vocabExportTsv": "Export File",
   "aiPolishWarning": "AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.",
+  "updateAvailable": "New version {version} available",
+  "@updateAvailable": { "placeholders": { "version": {} } },
+  "updateAction": "View Update",
+  "updateUpToDate": "Up to date",
   "llmRewrite": "LLM Rewrite",
   "aiPolishMatrix": "LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output"
 }

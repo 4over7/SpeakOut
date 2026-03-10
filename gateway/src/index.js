@@ -15,6 +15,20 @@ app.use('*', async (c, next) => {
 // OPTIONS 预检请求直接返回 204
 app.options('*', (c) => c.body(null, 204));
 
+/**
+ * 0. 版本检查 (Version Check)
+ * 客户端启动时调用，GitHub API 降级备用。
+ * 每次发版时同步更新此处的 version 和 build。
+ */
+app.get('/version', (c) => {
+    return c.json({
+        version: '1.5.1',
+        build: 31,
+        download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
+        release_notes: '',
+    });
+});
+
 // --- Helper: 提取并验证 License Key ---
 function extractLicenseKey(c) {
     const authHeader = c.req.header('Authorization');

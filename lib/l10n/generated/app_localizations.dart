@@ -1160,6 +1160,24 @@ abstract class AppLocalizations {
   /// **'AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.'**
   String get aiPolishWarning;
 
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'New version {version} available'**
+  String updateAvailable(Object version);
+
+  /// No description provided for @updateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'View Update'**
+  String get updateAction;
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get updateUpToDate;
+
   /// No description provided for @llmRewrite.
   ///
   /// In en, this message translates to:

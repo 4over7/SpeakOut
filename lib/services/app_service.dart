@@ -1,6 +1,7 @@
 import '../engine/core_engine.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
+import 'update_service.dart';
 import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
@@ -85,6 +86,9 @@ class AppService {
         // Persistent Error - Do NOT Clear
         engine.updateStatus("❌ 监听启动失败 (请检查权限)");
     }
+
+    // 5. Check for updates (non-blocking)
+    UpdateService().checkForUpdate();
   }
   
   Future<void> _initASR() async {

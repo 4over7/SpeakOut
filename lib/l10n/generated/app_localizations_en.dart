@@ -585,6 +585,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.';
 
   @override
+  String updateAvailable(Object version) {
+    return 'New version $version available';
+  }
+
+  @override
+  String get updateAction => 'View Update';
+
+  @override
+  String get updateUpToDate => 'Up to date';
+
+  @override
   String get llmRewrite => 'LLM Rewrite';
 
   @override
