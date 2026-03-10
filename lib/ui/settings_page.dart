@@ -1515,20 +1515,23 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Opacity(
-            opacity: _updateResult != null ? 1.0 : 0.0,
-            child: Text(
-              _updateResult ?? '',
-              style: AppTheme.caption(context).copyWith(
-                fontSize: 11,
-                color: _updateResult == loc.updateUpToDate
-                    ? MacosColors.systemGrayColor
-                    : MacosColors.systemOrangeColor,
-              ),
-            ),
+          SizedBox(
+            height: 40,
+            child: _updateResult != null
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _updateResult!,
+                      style: AppTheme.caption(context).copyWith(
+                        fontSize: 11,
+                        color: _updateResult == loc.updateUpToDate
+                            ? MacosColors.systemGrayColor
+                            : MacosColors.systemOrangeColor,
+                      ),
+                    ),
+                  )
+                : null,
           ),
-          const SizedBox(height: 32),
           Text(
             loc.aboutTagline,
             style: AppTheme.body(context).copyWith(
