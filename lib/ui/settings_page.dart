@@ -50,7 +50,12 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _akSecretController = TextEditingController();
   final TextEditingController _appKeyController = TextEditingController();
   late final TextEditingController _aiPromptController;
-  
+  // LLM API config controllers (persistent to survive setState rebuilds)
+  final TextEditingController _llmApiKeyController = TextEditingController();
+  final TextEditingController _llmBaseUrlController = TextEditingController();
+  final TextEditingController _llmModelController = TextEditingController();
+  bool _llmControllersInitialized = false;
+
   // Hotkey State
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
   String _currentKeyName = AppConstants.kDefaultPttKeyName;
@@ -1356,12 +1361,27 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
+  void _syncLlmControllers() {
+    _llmApiKeyController.text = ConfigService().llmApiKeyOverride ?? '';
+    _llmBaseUrlController.text = ConfigService().llmBaseUrlOverride ?? '';
+    _llmModelController.text = ConfigService().llmModelOverride ?? '';
+  }
+
   Widget _buildCloudPresetSection(BuildContext context, AppLocalizations loc) {
     final currentPresetId = ConfigService().llmPresetId;
     final preset = AppConstants.kLlmPresets.firstWhere(
       (p) => p.id == currentPresetId,
       orElse: () => AppConstants.kLlmPresets.last, // custom
     );
+
+    // Initialize controllers once
+    if (!_llmControllersInitialized) {
+      _syncLlmControllers();
+      _llmApiKeyController.addListener(() => ConfigService().setLlmApiKey(_llmApiKeyController.text));
+      _llmBaseUrlController.addListener(() => ConfigService().setLlmBaseUrl(_llmBaseUrlController.text));
+      _llmModelController.addListener(() => ConfigService().setLlmModel(_llmModelController.text));
+      _llmControllersInitialized = true;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1414,7 +1434,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     await ConfigService().setLlmModel(selected.defaultModel);
                   }
                 }
-                setState(() {});
+                _syncLlmControllers();
+                setState(() { _llmTestResult = null; });
               },
             ),
           ],
@@ -1429,11 +1450,11 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildApiItem(context, "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride, (v) => ConfigService().setLlmApiKey(v), isSecret: true),
+              _buildApiItemWithController(context, "API Key", CupertinoIcons.lock, _llmApiKeyController, isSecret: true),
               const SizedBox(height: 8),
-              _buildApiItem(context, "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride, (v) => ConfigService().setLlmBaseUrl(v), placeholder: preset.baseUrl),
+              _buildApiItemWithController(context, "Base URL", CupertinoIcons.link, _llmBaseUrlController, placeholder: preset.baseUrl),
               const SizedBox(height: 8),
-              _buildApiItem(context, "Model", CupertinoIcons.cube_box, ConfigService().llmModelOverride, (v) => ConfigService().setLlmModel(v), placeholder: preset.modelHint),
+              _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: preset.modelHint),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -1502,6 +1523,29 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
            const SizedBox(height: 4),
+           MacosTextField(
+             placeholder: placeholder ?? label,
+             obscureText: isSecret,
+             maxLines: 1,
+             decoration: BoxDecoration(
+               color: AppTheme.getInputBackground(context),
+               borderRadius: BorderRadius.circular(6),
+               border: Border.all(color: AppTheme.getBorder(context)),
+             ),
+             prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
+             controller: TextEditingController(text: value),
+             onChanged: onChanged,
+           ),
+        ],
+      );
+  }
+
+  Widget _buildApiItemWithController(BuildContext context, String label, IconData icon, TextEditingController controller, {bool isSecret = false, String? placeholder}) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+           Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+           const SizedBox(height: 4),
            Row(
              children: [
                Expanded(
@@ -1515,8 +1559,7 @@ class _SettingsPageState extends State<SettingsPage> {
                      border: Border.all(color: AppTheme.getBorder(context)),
                    ),
                    prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
-                   controller: TextEditingController(text: value),
-                   onChanged: onChanged,
+                   controller: controller,
                  ),
                ),
                if (isSecret) ...[
