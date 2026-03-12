@@ -69,6 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // LLM Test
   bool _isTestingLlm = false;
   (bool, String)? _llmTestResult;
+  bool _showApiKey = false;
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
   StreamSubscription<int>? _keySubscription;
@@ -1501,18 +1502,34 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
            const SizedBox(height: 4),
-           MacosTextField(
-             placeholder: placeholder ?? label,
-             obscureText: isSecret,
-             maxLines: 1,
-             decoration: BoxDecoration(
-               color: AppTheme.getInputBackground(context),
-               borderRadius: BorderRadius.circular(6),
-               border: Border.all(color: AppTheme.getBorder(context)),
-             ),
-             prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
-             controller: TextEditingController(text: value),
-             onChanged: onChanged,
+           Row(
+             children: [
+               Expanded(
+                 child: MacosTextField(
+                   placeholder: placeholder ?? label,
+                   obscureText: isSecret && !_showApiKey,
+                   maxLines: 1,
+                   decoration: BoxDecoration(
+                     color: AppTheme.getInputBackground(context),
+                     borderRadius: BorderRadius.circular(6),
+                     border: Border.all(color: AppTheme.getBorder(context)),
+                   ),
+                   prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
+                   controller: TextEditingController(text: value),
+                   onChanged: onChanged,
+                 ),
+               ),
+               if (isSecret) ...[
+                 const SizedBox(width: 4),
+                 MacosIconButton(
+                   icon: MacosIcon(
+                     _showApiKey ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
+                     size: 16,
+                   ),
+                   onPressed: () => setState(() => _showApiKey = !_showApiKey),
+                 ),
+               ],
+             ],
            ),
         ],
       );
