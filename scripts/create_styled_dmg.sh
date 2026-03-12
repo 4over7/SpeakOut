@@ -2,6 +2,21 @@
 set -e
 
 APP_NAME="SpeakOut"
+
+# Auto-increment build number
+CURRENT_BUILD=$(grep 'version:' pubspec.yaml | sed 's/.*+//')
+NEW_BUILD=$((CURRENT_BUILD + 1))
+sed -i '' "s/+${CURRENT_BUILD}/+${NEW_BUILD}/" pubspec.yaml
+echo "📦 Build number: ${CURRENT_BUILD} → ${NEW_BUILD}"
+
+# Build
+echo "🔨 Building ${APP_NAME} (Release)..."
+flutter build macos --release
+if [ $? -ne 0 ]; then
+    echo "❌ Build failed!"
+    exit 1
+fi
+
 DMG_NAME="SpeakOut.dmg"
 DMG_TEMP="SpeakOut_temp.dmg"
 VOLUME_NAME="SpeakOut"

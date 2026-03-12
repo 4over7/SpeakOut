@@ -243,18 +243,22 @@ class LLMService {
     final apiKey = ConfigService().llmApiKey;
     final baseUrl = ConfigService().llmBaseUrl;
     final model = ConfigService().llmModel;
+    _log("TEST: apiKey=${apiKey.isEmpty ? 'EMPTY' : '***${apiKey.substring(apiKey.length > 4 ? apiKey.length - 4 : 0)}'}, baseUrl=$baseUrl, model=$model");
     if (apiKey.isEmpty) return (false, 'API Key 未设置');
     try {
+      _log("TEST: sending request to $baseUrl/chat/completions");
       final resp = await _effectiveClient.post(
         Uri.parse('$baseUrl/chat/completions'),
         headers: {"Content-Type": "application/json", "Authorization": "Bearer $apiKey"},
         body: jsonEncode({"model": model, "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 5}),
       ).timeout(const Duration(seconds: 10));
+      _log("TEST: response ${resp.statusCode}");
       if (resp.statusCode == 200) return (true, '连接成功 ($model)');
       final body = jsonDecode(resp.body);
       final errMsg = body['error']?['message'] ?? resp.body;
       return (false, '${resp.statusCode}: $errMsg');
     } catch (e) {
+      _log("TEST: exception $e");
       return (false, e.toString());
     }
   }
