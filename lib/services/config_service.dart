@@ -219,6 +219,10 @@ class ConfigService {
   String get llmProviderType => _prefs?.getString('llm_provider_type') ?? AppConstants.kDefaultLlmProviderType;
   Future<void> setLlmProviderType(String type) async => await _prefs?.setString('llm_provider_type', type);
 
+  // --- LLM Preset ---
+  String get llmPresetId => _prefs?.getString('llm_preset_id') ?? 'dashscope';
+  Future<void> setLlmPresetId(String id) async => await _prefs?.setString('llm_preset_id', id);
+
   // --- Ollama Config ---
   String get ollamaBaseUrl => _getStringWithDefault('ollama_base_url', AppConstants.kDefaultOllamaBaseUrl);
   String get ollamaModel => _getStringWithDefault('ollama_model', AppConstants.kDefaultOllamaModel);

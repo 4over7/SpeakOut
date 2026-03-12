@@ -1045,48 +1045,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(height: 16),
                     if (ConfigService().llmProviderType == 'cloud') ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(loc.apiConfig, style: AppTheme.body(context)),
-                          GestureDetector(
-                            onTap: () async {
-                              final uri = Uri.parse("https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen");
-                              if (await canLaunchUrl(uri)) await launchUrl(uri);
-                            },
-                            child: Row(
-                              children: [
-                                MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
-                                const SizedBox(width: 4),
-                                Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "需要 OpenAI 兼容的 API（推荐阿里云百炼）",
-                        style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildApiItem(context, "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride, (v) => ConfigService().setLlmApiKey(v), isSecret: true),
-                            const SizedBox(height: 8),
-                            _buildApiItem(context, "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride, (v) => ConfigService().setLlmBaseUrl(v)),
-                            const SizedBox(height: 8),
-                            _buildApiItem(context, "Model Name", CupertinoIcons.cube_box, ConfigService().llmModelOverride, (v) => ConfigService().setLlmModel(v), placeholder: "model-name"),
-                          ],
-                        ),
-                      ),
+                      _buildCloudPresetSection(context, loc),
                     ] else ...[
                       Text(loc.ollamaUrl, style: AppTheme.body(context)),
                       const SizedBox(height: 4),
@@ -1392,6 +1351,86 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
+  Widget _buildCloudPresetSection(BuildContext context, AppLocalizations loc) {
+    final currentPresetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == currentPresetId,
+      orElse: () => AppConstants.kLlmPresets.last, // custom
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(loc.apiConfig, style: AppTheme.body(context)),
+            if (preset.helpUrl.isNotEmpty)
+              GestureDetector(
+                onTap: () async {
+                  final uri = Uri.parse(preset.helpUrl);
+                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+                },
+                child: Row(
+                  children: [
+                    MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
+                    const SizedBox(width: 4),
+                    Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Preset selector
+        Row(
+          children: [
+            const MacosIcon(CupertinoIcons.building_2_fill, size: 16, color: MacosColors.systemGrayColor),
+            const SizedBox(width: 8),
+            Text("服务商", style: AppTheme.caption(context)),
+            const Spacer(),
+            MacosPopupButton<String>(
+              value: currentPresetId,
+              items: AppConstants.kLlmPresets.map((p) =>
+                MacosPopupMenuItem(value: p.id, child: Text(p.name)),
+              ).toList(),
+              onChanged: (v) async {
+                if (v == null) return;
+                await ConfigService().setLlmPresetId(v);
+                final selected = AppConstants.kLlmPresets.firstWhere((p) => p.id == v);
+                if (selected.baseUrl.isNotEmpty) {
+                  await ConfigService().setLlmBaseUrl(selected.baseUrl);
+                }
+                if (selected.defaultModel.isNotEmpty) {
+                  await ConfigService().setLlmModel(selected.defaultModel);
+                }
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildApiItem(context, "API Key", CupertinoIcons.lock, ConfigService().llmApiKeyOverride, (v) => ConfigService().setLlmApiKey(v), isSecret: true),
+              const SizedBox(height: 8),
+              _buildApiItem(context, "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride, (v) => ConfigService().setLlmBaseUrl(v), placeholder: preset.baseUrl),
+              const SizedBox(height: 8),
+              _buildApiItem(context, "Model", CupertinoIcons.cube_box, ConfigService().llmModelOverride, (v) => ConfigService().setLlmModel(v), placeholder: preset.modelHint),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildApiItem(BuildContext context, String label, IconData icon, String? value, Function(String) onChanged, {bool isSecret = false, String? placeholder}) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

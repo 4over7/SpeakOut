@@ -67,8 +67,94 @@ class AppConstants {
   static const String kGatewayVersionUrl = 'https://speakout-gateway.4over7.workers.dev/version';
   static const Duration kUpdateCheckTimeout = Duration(seconds: 5);
 
+  // LLM Provider Presets
+  static const List<LlmPreset> kLlmPresets = [
+    LlmPreset(
+      id: 'dashscope',
+      name: '阿里云百炼',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      defaultModel: 'qwen-turbo',
+      modelHint: '模型名，如 qwen-turbo, qwen-plus',
+      helpUrl: 'https://help.aliyun.com/zh/model-studio/getting-started/first-api-call-to-qwen',
+    ),
+    LlmPreset(
+      id: 'volcengine',
+      name: '火山方舟 (豆包)',
+      baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+      defaultModel: '',
+      modelHint: '接入点 ID，如 ep-20250xxx',
+      helpUrl: 'https://www.volcengine.com/docs/82379/1399008',
+    ),
+    LlmPreset(
+      id: 'deepseek',
+      name: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com/v1',
+      defaultModel: 'deepseek-chat',
+      modelHint: '模型名，如 deepseek-chat, deepseek-reasoner',
+      helpUrl: 'https://platform.deepseek.com/docs',
+    ),
+    LlmPreset(
+      id: 'zhipu',
+      name: '智谱 (GLM)',
+      baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+      defaultModel: 'glm-4-flash',
+      modelHint: '模型名，如 glm-4-flash, glm-4-plus',
+      helpUrl: 'https://open.bigmodel.cn/dev/howuse/introduction',
+    ),
+    LlmPreset(
+      id: 'moonshot',
+      name: '月之暗面 (Kimi)',
+      baseUrl: 'https://api.moonshot.cn/v1',
+      defaultModel: 'moonshot-v1-8k',
+      modelHint: '模型名，如 moonshot-v1-8k',
+      helpUrl: 'https://platform.moonshot.cn/docs',
+    ),
+    LlmPreset(
+      id: 'openai',
+      name: 'OpenAI',
+      baseUrl: 'https://api.openai.com/v1',
+      defaultModel: 'gpt-4o-mini',
+      modelHint: '模型名，如 gpt-4o-mini, gpt-4o',
+      helpUrl: 'https://platform.openai.com/docs/overview',
+    ),
+    LlmPreset(
+      id: 'gemini',
+      name: 'Google Gemini',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      defaultModel: 'gemini-2.0-flash',
+      modelHint: '模型名，如 gemini-2.0-flash',
+      helpUrl: 'https://ai.google.dev/gemini-api/docs/openai',
+    ),
+    LlmPreset(
+      id: 'custom',
+      name: '自定义 (Custom)',
+      baseUrl: '',
+      defaultModel: '',
+      modelHint: 'model-name',
+      helpUrl: '',
+    ),
+  ];
+
   // UI Layout
   static const double kStandardPadding = 16.0;
   static const double kSmallPadding = 8.0;
   static const double kCardRadius = 8.0;
+}
+
+class LlmPreset {
+  final String id;
+  final String name;
+  final String baseUrl;
+  final String defaultModel;
+  final String modelHint;
+  final String helpUrl;
+
+  const LlmPreset({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    required this.defaultModel,
+    required this.modelHint,
+    required this.helpUrl,
+  });
 }
