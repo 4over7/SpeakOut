@@ -134,6 +134,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _akSecretController.dispose();
     _appKeyController.dispose();
     _aiPromptController.dispose();
+    _llmApiKeyController.dispose();
+    _llmBaseUrlController.dispose();
+    _llmModelController.dispose();
     super.dispose();
   }
   
@@ -1462,12 +1465,20 @@ class _SettingsPageState extends State<SettingsPage> {
                     secondary: true,
                     onPressed: _isTestingLlm ? null : () async {
                       setState(() { _isTestingLlm = true; _llmTestResult = null; });
-                      // Flush controller values to ConfigService before testing
-                      await ConfigService().setLlmApiKey(_llmApiKeyController.text);
-                      await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
-                      await ConfigService().setLlmModel(_llmModelController.text);
-                      final (ok, msg) = await LLMService().testConnection();
-                      setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
+                      try {
+                        // Pass controller values directly to avoid Keychain blocking
+                        final (ok, msg) = await LLMService().testConnectionWith(
+                          apiKey: _llmApiKeyController.text,
+                          baseUrl: _llmBaseUrlController.text.isNotEmpty
+                              ? _llmBaseUrlController.text : preset.baseUrl,
+                          model: _llmModelController.text.isNotEmpty
+                              ? _llmModelController.text : preset.defaultModel,
+                          apiFormat: preset.apiFormat,
+                        );
+                        if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
+                      } catch (e) {
+                        if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (false, e.toString()); });
+                      }
                     },
                     child: _isTestingLlm
                       ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
@@ -1481,15 +1492,22 @@ class _SettingsPageState extends State<SettingsPage> {
                   PushButton(
                     controlSize: ControlSize.regular,
                     onPressed: () async {
-                      // Flush controller values before saving
-                      await ConfigService().setLlmApiKey(_llmApiKeyController.text);
-                      await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
-                      await ConfigService().setLlmModel(_llmModelController.text);
-                      await ConfigService().savePresetConfig(currentPresetId);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("已保存 ${preset.name} 配置"), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
-                        );
+                      try {
+                        await ConfigService().setLlmApiKey(_llmApiKeyController.text);
+                        await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
+                        await ConfigService().setLlmModel(_llmModelController.text);
+                        await ConfigService().savePresetConfig(currentPresetId);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("已保存 ${preset.name} 配置"), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("保存失败: $e"), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating),
+                          );
+                        }
                       }
                     },
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
