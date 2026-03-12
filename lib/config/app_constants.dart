@@ -134,6 +134,15 @@ class AppConstants {
       helpUrl: 'https://platform.minimax.io/docs/api-reference/text-openai-api',
     ),
     LlmPreset(
+      id: 'anthropic',
+      name: 'Anthropic (Claude)',
+      baseUrl: 'https://api.anthropic.com',
+      defaultModel: 'claude-sonnet-4-6',
+      modelHint: '模型名，如 claude-sonnet-4-6, claude-haiku-4-5-20251001',
+      helpUrl: 'https://docs.anthropic.com/en/docs/initial-setup',
+      apiFormat: LlmApiFormat.anthropic,
+    ),
+    LlmPreset(
       id: 'openai',
       name: 'OpenAI',
       baseUrl: 'https://api.openai.com/v1',
@@ -165,6 +174,8 @@ class AppConstants {
   static const double kCardRadius = 8.0;
 }
 
+enum LlmApiFormat { openai, anthropic }
+
 class LlmPreset {
   final String id;
   final String name;
@@ -172,6 +183,7 @@ class LlmPreset {
   final String defaultModel;
   final String modelHint;
   final String helpUrl;
+  final LlmApiFormat apiFormat;
 
   const LlmPreset({
     required this.id,
@@ -180,5 +192,6 @@ class LlmPreset {
     required this.defaultModel,
     required this.modelHint,
     required this.helpUrl,
+    this.apiFormat = LlmApiFormat.openai,
   });
 }

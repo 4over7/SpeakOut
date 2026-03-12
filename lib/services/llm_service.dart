@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'config_service.dart';
+import '../config/app_constants.dart';
 
 class LLMService {
   static final LLMService _instance = LLMService._internal();
@@ -40,6 +41,15 @@ class LLMService {
     final providerType = ConfigService().llmProviderType;
     if (providerType == 'ollama') {
       return _correctTextOllama(input, vocabHints: vocabHints);
+    }
+    // Check if current preset uses Anthropic format
+    final presetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == presetId,
+      orElse: () => AppConstants.kLlmPresets.last,
+    );
+    if (preset.apiFormat == LlmApiFormat.anthropic) {
+      return _correctTextAnthropic(input, vocabHints: vocabHints);
     }
     return _correctTextCloud(input, vocabHints: vocabHints);
   }
@@ -100,6 +110,64 @@ class LLMService {
       }
     } catch (e) {
       _log("LLM EXCEPTION: $e");
+    }
+
+    return input;
+  }
+
+  Future<String> _correctTextAnthropic(String input, {List<String>? vocabHints}) async {
+    final apiKey = ConfigService().llmApiKey;
+    final baseUrl = ConfigService().llmBaseUrl;
+    final model = ConfigService().llmModel;
+    final systemPrompt = ConfigService().aiCorrectionPrompt;
+
+    if (apiKey.isEmpty) {
+      _log("API Key MISSING. Returning input.");
+      return input;
+    }
+
+    _log("RAW INPUT: $input");
+    _log("Calling Anthropic: $baseUrl, model=$model, inputLen=${input.length}");
+
+    try {
+      final client = _effectiveClient;
+      final uri = Uri.parse('$baseUrl/v1/messages');
+
+      final body = {
+        "model": model,
+        "max_tokens": 1024,
+        "system": systemPrompt,
+        "messages": [
+          {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
+        ],
+        "temperature": 0.3,
+      };
+
+      final response = await client.post(
+        uri,
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(response.bodyBytes));
+        final content = (json['content'] as List?)
+            ?.firstWhere((b) => b['type'] == 'text', orElse: () => null)
+            ?['text']?.toString();
+        if (content != null && content.isNotEmpty) {
+          _log("Anthropic SUCCESS. Output differs: ${content.trim() != input}");
+          return content.trim();
+        }
+        _log("Anthropic returned empty content.");
+      } else {
+        _log("Anthropic ERROR: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      _log("Anthropic EXCEPTION: $e");
     }
 
     return input;
