@@ -1464,6 +1464,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     secondary: true,
                     onPressed: _isTestingLlm ? null : () async {
                       setState(() { _isTestingLlm = true; _llmTestResult = null; });
+                      // Flush controller values to ConfigService before testing
+                      await ConfigService().setLlmApiKey(_llmApiKeyController.text);
+                      await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
+                      await ConfigService().setLlmModel(_llmModelController.text);
                       final (ok, msg) = await LLMService().testConnection();
                       setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
                     },
@@ -1479,6 +1483,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   PushButton(
                     controlSize: ControlSize.regular,
                     onPressed: () async {
+                      // Flush controller values before saving
+                      await ConfigService().setLlmApiKey(_llmApiKeyController.text);
+                      await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
+                      await ConfigService().setLlmModel(_llmModelController.text);
                       await ConfigService().savePresetConfig(currentPresetId);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
