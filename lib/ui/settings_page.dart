@@ -1493,9 +1493,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     controlSize: ControlSize.regular,
                     onPressed: () async {
                       try {
-                        await ConfigService().setLlmApiKey(_llmApiKeyController.text);
-                        await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
-                        await ConfigService().setLlmModel(_llmModelController.text);
+                        await _flushLlmControllers();
                         await ConfigService().savePresetConfig(currentPresetId);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1564,6 +1562,13 @@ class _SettingsPageState extends State<SettingsPage> {
       );
   }
 
+  /// Flush all LLM controller values to ConfigService (Keychain + SharedPreferences)
+  Future<void> _flushLlmControllers() async {
+    await ConfigService().setLlmApiKey(_llmApiKeyController.text);
+    await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
+    await ConfigService().setLlmModel(_llmModelController.text);
+  }
+
   Widget _buildApiItemWithController(BuildContext context, String label, IconData icon, TextEditingController controller, {bool isSecret = false, String? placeholder}) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1573,17 +1578,22 @@ class _SettingsPageState extends State<SettingsPage> {
            Row(
              children: [
                Expanded(
-                 child: MacosTextField(
-                   placeholder: placeholder ?? label,
-                   obscureText: isSecret && !_showApiKey,
-                   maxLines: 1,
-                   decoration: BoxDecoration(
-                     color: AppTheme.getInputBackground(context),
-                     borderRadius: BorderRadius.circular(6),
-                     border: Border.all(color: AppTheme.getBorder(context)),
+                 child: Focus(
+                   onFocusChange: (hasFocus) {
+                     if (!hasFocus) _flushLlmControllers();
+                   },
+                   child: MacosTextField(
+                     placeholder: placeholder ?? label,
+                     obscureText: isSecret && !_showApiKey,
+                     maxLines: 1,
+                     decoration: BoxDecoration(
+                       color: AppTheme.getInputBackground(context),
+                       borderRadius: BorderRadius.circular(6),
+                       border: Border.all(color: AppTheme.getBorder(context)),
+                     ),
+                     prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
+                     controller: controller,
                    ),
-                   prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
-                   controller: controller,
                  ),
                ),
                if (isSecret) ...[
