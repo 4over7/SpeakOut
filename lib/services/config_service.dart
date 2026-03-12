@@ -223,6 +223,39 @@ class ConfigService {
   String get llmPresetId => _prefs?.getString('llm_preset_id') ?? 'dashscope';
   Future<void> setLlmPresetId(String id) async => await _prefs?.setString('llm_preset_id', id);
 
+  /// Save current LLM config (apiKey, baseUrl, model) under a preset ID
+  Future<void> savePresetConfig(String presetId) async {
+    final key = llmApiKey;
+    final url = _prefs?.getString('llm_base_url') ?? '';
+    final model = _prefs?.getString('llm_model') ?? '';
+    if (key.isNotEmpty) {
+      await _secureStorage.write(key: 'llm_preset_${presetId}_api_key', value: key);
+    }
+    if (url.isNotEmpty) await _prefs?.setString('llm_preset_${presetId}_base_url', url);
+    if (model.isNotEmpty) await _prefs?.setString('llm_preset_${presetId}_model', model);
+  }
+
+  /// Load saved config for a preset ID; returns true if config was found
+  Future<bool> loadPresetConfig(String presetId) async {
+    String? savedKey;
+    try {
+      savedKey = await _secureStorage.read(key: 'llm_preset_${presetId}_api_key');
+    } catch (_) {}
+    final savedUrl = _prefs?.getString('llm_preset_${presetId}_base_url');
+    final savedModel = _prefs?.getString('llm_preset_${presetId}_model');
+    if (savedKey == null && savedUrl == null && savedModel == null) return false;
+    if (savedKey != null && savedKey.isNotEmpty) await setLlmApiKey(savedKey);
+    if (savedUrl != null && savedUrl.isNotEmpty) await setLlmBaseUrl(savedUrl);
+    if (savedModel != null && savedModel.isNotEmpty) await setLlmModel(savedModel);
+    return true;
+  }
+
+  /// Check if a preset has saved config
+  bool hasPresetConfig(String presetId) {
+    return _prefs?.getString('llm_preset_${presetId}_base_url') != null ||
+           _prefs?.getString('llm_preset_${presetId}_model') != null;
+  }
+
   // --- Ollama Config ---
   String get ollamaBaseUrl => _getStringWithDefault('ollama_base_url', AppConstants.kDefaultOllamaBaseUrl);
   String get ollamaModel => _getStringWithDefault('ollama_model', AppConstants.kDefaultOllamaModel);

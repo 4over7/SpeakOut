@@ -222,6 +222,79 @@ class LLMService {
     return input;
   }
   
+  /// Test current LLM connection; returns (success, message)
+  Future<(bool, String)> testConnection() async {
+    final providerType = ConfigService().llmProviderType;
+    if (providerType == 'ollama') {
+      return _testOllama();
+    }
+    final presetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == presetId,
+      orElse: () => AppConstants.kLlmPresets.last,
+    );
+    if (preset.apiFormat == LlmApiFormat.anthropic) {
+      return _testAnthropic();
+    }
+    return _testOpenAI();
+  }
+
+  Future<(bool, String)> _testOpenAI() async {
+    final apiKey = ConfigService().llmApiKey;
+    final baseUrl = ConfigService().llmBaseUrl;
+    final model = ConfigService().llmModel;
+    if (apiKey.isEmpty) return (false, 'API Key 未设置');
+    try {
+      final resp = await _effectiveClient.post(
+        Uri.parse('$baseUrl/chat/completions'),
+        headers: {"Content-Type": "application/json", "Authorization": "Bearer $apiKey"},
+        body: jsonEncode({"model": model, "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 5}),
+      ).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200) return (true, '连接成功 ($model)');
+      final body = jsonDecode(resp.body);
+      final errMsg = body['error']?['message'] ?? resp.body;
+      return (false, '${resp.statusCode}: $errMsg');
+    } catch (e) {
+      return (false, e.toString());
+    }
+  }
+
+  Future<(bool, String)> _testAnthropic() async {
+    final apiKey = ConfigService().llmApiKey;
+    final baseUrl = ConfigService().llmBaseUrl;
+    final model = ConfigService().llmModel;
+    if (apiKey.isEmpty) return (false, 'API Key 未设置');
+    try {
+      final resp = await _effectiveClient.post(
+        Uri.parse('$baseUrl/v1/messages'),
+        headers: {"Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01"},
+        body: jsonEncode({"model": model, "max_tokens": 5, "messages": [{"role": "user", "content": "Hi"}]}),
+      ).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200) return (true, '连接成功 ($model)');
+      final body = jsonDecode(resp.body);
+      final errMsg = body['error']?['message'] ?? resp.body;
+      return (false, '${resp.statusCode}: $errMsg');
+    } catch (e) {
+      return (false, e.toString());
+    }
+  }
+
+  Future<(bool, String)> _testOllama() async {
+    final baseUrl = ConfigService().ollamaBaseUrl;
+    final model = ConfigService().ollamaModel;
+    try {
+      final resp = await _effectiveClient.post(
+        Uri.parse('$baseUrl/api/chat'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"model": model, "messages": [{"role": "user", "content": "Hi"}], "stream": false}),
+      ).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200) return (true, '连接成功 ($model)');
+      return (false, '${resp.statusCode}: ${resp.body}');
+    } catch (e) {
+      return (false, e.toString());
+    }
+  }
+
   // Imports for routing
   Future<Map<String, dynamic>?> routeIntent(String input, List<dynamic> tools) async {
     if (!ConfigService().aiCorrectionEnabled) return null;

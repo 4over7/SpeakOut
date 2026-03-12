@@ -18,6 +18,7 @@ import '../services/audio_device_service.dart';
 import 'package:speakout/config/app_log.dart';
 import 'vocab_settings_page.dart';
 import '../services/update_service.dart';
+import '../services/llm_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -65,6 +66,9 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _isCheckingUpdate = false;
   String? _updateResult;
   int _toggleMaxDuration = 0;
+  // LLM Test
+  bool _isTestingLlm = false;
+  (bool, String)? _llmTestResult;
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
   StreamSubscription<int>? _keySubscription;
@@ -1398,11 +1402,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (v == null) return;
                 await ConfigService().setLlmPresetId(v);
                 final selected = AppConstants.kLlmPresets.firstWhere((p) => p.id == v);
-                if (selected.baseUrl.isNotEmpty) {
-                  await ConfigService().setLlmBaseUrl(selected.baseUrl);
-                }
-                if (selected.defaultModel.isNotEmpty) {
-                  await ConfigService().setLlmModel(selected.defaultModel);
+                // Try loading saved config for this preset
+                final loaded = await ConfigService().loadPresetConfig(v);
+                if (!loaded) {
+                  // No saved config, use preset defaults
+                  if (selected.baseUrl.isNotEmpty) {
+                    await ConfigService().setLlmBaseUrl(selected.baseUrl);
+                  }
+                  if (selected.defaultModel.isNotEmpty) {
+                    await ConfigService().setLlmModel(selected.defaultModel);
+                  }
                 }
                 setState(() {});
               },
@@ -1424,6 +1433,61 @@ class _SettingsPageState extends State<SettingsPage> {
               _buildApiItem(context, "Base URL", CupertinoIcons.link, ConfigService().llmBaseUrlOverride, (v) => ConfigService().setLlmBaseUrl(v), placeholder: preset.baseUrl),
               const SizedBox(height: 8),
               _buildApiItem(context, "Model", CupertinoIcons.cube_box, ConfigService().llmModelOverride, (v) => ConfigService().setLlmModel(v), placeholder: preset.modelHint),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  PushButton(
+                    controlSize: ControlSize.regular,
+                    secondary: true,
+                    onPressed: _isTestingLlm ? null : () async {
+                      setState(() { _isTestingLlm = true; _llmTestResult = null; });
+                      final (ok, msg) = await LLMService().testConnection();
+                      setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
+                    },
+                    child: _isTestingLlm
+                      ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
+                      : const Row(mainAxisSize: MainAxisSize.min, children: [
+                          MacosIcon(CupertinoIcons.antenna_radiowaves_left_right, size: 14),
+                          SizedBox(width: 4),
+                          Text("测试连接"),
+                        ]),
+                  ),
+                  const SizedBox(width: 8),
+                  PushButton(
+                    controlSize: ControlSize.regular,
+                    onPressed: () async {
+                      await ConfigService().savePresetConfig(currentPresetId);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("已保存 ${preset.name} 配置"), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
+                        );
+                      }
+                    },
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      MacosIcon(CupertinoIcons.checkmark_circle, size: 14),
+                      SizedBox(width: 4),
+                      Text("保存配置"),
+                    ]),
+                  ),
+                ],
+              ),
+              if (_llmTestResult != null) ...[
+                const SizedBox(height: 8),
+                Row(children: [
+                  Icon(
+                    _llmTestResult!.$1 ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.xmark_circle_fill,
+                    size: 14,
+                    color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(
+                    _llmTestResult!.$2,
+                    style: TextStyle(fontSize: 12, color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor),
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
+                  )),
+                ]),
+              ],
             ],
           ),
         ),
