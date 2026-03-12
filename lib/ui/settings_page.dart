@@ -1564,9 +1564,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// Flush all LLM controller values to ConfigService (Keychain + SharedPreferences)
   Future<void> _flushLlmControllers() async {
-    await ConfigService().setLlmApiKey(_llmApiKeyController.text);
+    try {
+      await ConfigService().setLlmApiKey(_llmApiKeyController.text);
+    } catch (e) {
+      // Keychain write failed — log and continue
+      LLMService().log("FLUSH: setLlmApiKey failed: $e");
+    }
     await ConfigService().setLlmBaseUrl(_llmBaseUrlController.text);
     await ConfigService().setLlmModel(_llmModelController.text);
+    LLMService().log("FLUSH: done, keyLen=${_llmApiKeyController.text.length}");
   }
 
   Widget _buildApiItemWithController(BuildContext context, String label, IconData icon, TextEditingController controller, {bool isSecret = false, String? placeholder}) {

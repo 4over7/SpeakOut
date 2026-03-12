@@ -24,6 +24,7 @@ class LLMService {
     return _defaultClient!;
   }
 
+  void log(String msg) => _log(msg);
   void _log(String msg) {
     final line = "[${DateTime.now().toIso8601String()}] [LLM] $msg\n";
     try {
