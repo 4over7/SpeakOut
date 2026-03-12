@@ -1377,9 +1377,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // Initialize controllers once
     if (!_llmControllersInitialized) {
       _syncLlmControllers();
-      _llmApiKeyController.addListener(() => ConfigService().setLlmApiKey(_llmApiKeyController.text));
-      _llmBaseUrlController.addListener(() => ConfigService().setLlmBaseUrl(_llmBaseUrlController.text));
-      _llmModelController.addListener(() => ConfigService().setLlmModel(_llmModelController.text));
+      // No real-time listeners — values are flushed on test/save to avoid Keychain contention
       _llmControllersInitialized = true;
     }
 
@@ -1598,6 +1596,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 32),
           Container(
             decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha:0.2),
@@ -1606,7 +1605,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 )
               ],
             ),
-            child: Image.asset("assets/app_icon.png", width: 100, height: 100),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Image.asset("assets/app_icon.png", width: 100, height: 100),
+            ),
           ),
           const SizedBox(height: 24),
           Text(
@@ -1644,7 +1646,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     child: Text(
                       "v$version",
-                      style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.secondaryLabelColor),
+                      style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.labelColor.resolveFrom(context).withValues(alpha: 0.7)),
                     ),
                   ),
                 ),
