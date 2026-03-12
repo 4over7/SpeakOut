@@ -81,8 +81,8 @@ class AppConstants {
       id: 'volcengine',
       name: '火山方舟 (豆包)',
       baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-      defaultModel: 'doubao-1-5-pro-256k-250115',
-      modelHint: '模型名，如 doubao-1-5-pro-256k-250115',
+      defaultModel: 'doubao-seed-2-0-pro-260215',
+      modelHint: '模型名，如 doubao-seed-2-0-pro-260215',
       helpUrl: 'https://www.volcengine.com/docs/82379/1399008',
     ),
     LlmPreset(
