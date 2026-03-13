@@ -785,7 +785,15 @@ class _SettingsPageState extends State<SettingsPage> {
           label: loc.audioInput,
           icon: CupertinoIcons.mic,
           child: MacosPopupButton<String>(
-            value: _useSystemDefaultAudio ? 'system' : (_currentAudioDevice?.id ?? 'system'),
+            value: () {
+              if (_useSystemDefaultAudio) return 'system';
+              final savedId = ConfigService().audioInputDeviceId;
+              // If saved device not in current list, fall back to 'system'
+              if (savedId != null && _audioDevices.any((d) => d.id == savedId)) {
+                return savedId;
+              }
+              return 'system';
+            }(),
             items: [
               MacosPopupMenuItem(
                 value: 'system',
