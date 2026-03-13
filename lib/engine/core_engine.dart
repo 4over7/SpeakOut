@@ -852,22 +852,38 @@ class CoreEngine {
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
 
-          // Streaming: typewriter inject — each token injected with small delay
+          // Streaming: typewriter inject with batching
+          // CGEvent inject needs ~50ms between calls to avoid event duplication.
+          // We batch tokens and flush every 80ms for smooth typewriter effect.
           if (mode != RecordingMode.diary) {
             final streamBuffer = StringBuffer();
+            final batchBuffer = StringBuffer();
             bool firstChunk = true;
             bool streamOk = false;
+            var lastInjectTime = DateTime.now();
+            const batchInterval = Duration(milliseconds: 80);
+
             await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints)) {
               streamBuffer.write(chunk);
+              batchBuffer.write(chunk);
               if (firstChunk) {
                 _log("[PERF] +${sw.elapsedMilliseconds}ms — first token received");
                 _overlay.updateText("");
                 firstChunk = false;
                 streamOk = true;
               }
-              _nativeInput?.inject(chunk);
-              // Small delay between inject calls to let CGEvent queue drain
-              await Future.delayed(const Duration(milliseconds: 15));
+              // Flush batch if enough time has passed
+              final now = DateTime.now();
+              if (now.difference(lastInjectTime) >= batchInterval && batchBuffer.isNotEmpty) {
+                _nativeInput?.inject(batchBuffer.toString());
+                batchBuffer.clear();
+                lastInjectTime = now;
+                await Future.delayed(const Duration(milliseconds: 30));
+              }
+            }
+            // Flush remaining batch
+            if (batchBuffer.isNotEmpty) {
+              _nativeInput?.inject(batchBuffer.toString());
             }
             final polished = streamBuffer.toString().trim();
             if (polished.isNotEmpty) {
