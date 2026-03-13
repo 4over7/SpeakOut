@@ -627,35 +627,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               ),
                             ),
                             
-                            // 2. BRANDING: Fixed center title + version
+                            // 2. BRANDING: Fixed center title
                             Positioned(
                               top: cy + 40,
                               left: 0,
                               right: 0,
                               child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      "子曰",
-                                      style: AppTheme.display(context).copyWith(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 2.0,
-                                      ),
-                                    ),
-                                    if (_versionString.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          _versionString,
-                                          style: AppTheme.body(context).copyWith(
-                                            fontSize: 11,
-                                            color: MacosColors.secondaryLabelColor.resolveFrom(context),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                child: Text(
+                                  "子曰",
+                                  style: AppTheme.display(context).copyWith(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 2.0,
+                                  ),
                                 ),
                               ),
                             ),
@@ -744,6 +728,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
+                  // Version label — bottom left
+                  if (_versionString.isNotEmpty)
+                    Positioned(
+                      left: 16,
+                      bottom: 12,
+                      child: Text(
+                        _versionString,
+                        style: AppTheme.body(context).copyWith(
+                          fontSize: 11,
+                          color: MacosColors.tertiaryLabelColor.resolveFrom(context),
+                        ),
+                      ),
+                    ),
                   // === END FIXED LAYOUT ===
                 ],
                 ), // Stack
