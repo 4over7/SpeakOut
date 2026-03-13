@@ -644,12 +644,14 @@ float get_audio_level(void) {
     }
     float rms = sqrtf((float)(sumSq / windowSize));
 
-    // Map RMS to 0~1 with sensitivity tuning:
-    // Typical speech RMS ~0.01-0.1, whisper ~0.003-0.01
-    // Multiply by 8 so normal speech fills most of the range
-    float level = rms * 8.0f;
+    // Logarithmic mapping: dB scale makes quiet speech visible.
+    // RMS 0.003 (-50dB) → 0.0,  0.01 (-40dB) → 0.25,
+    // 0.03 (-30dB) → 0.5,  0.1 (-20dB) → 0.75,  0.3+ (-10dB) → 1.0
+    if (rms < 1e-6f) return 0.0f;
+    float db = 20.0f * log10f(rms);
+    float level = (db + 50.0f) / 40.0f;  // [-50dB, -10dB] → [0, 1]
+    if (level < 0.0f) level = 0.0f;
     if (level > 1.0f) level = 1.0f;
-
     return level;
 }
 
