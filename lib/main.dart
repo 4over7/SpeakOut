@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:system_tray/system_tray.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'services/config_service.dart';
 import 'ui/settings_page.dart';
 import 'services/app_service.dart';
@@ -175,7 +176,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _lastError = "";
   bool _isRecording = false;
   String _currentKeyName = ""; // Loaded from config in initState
-  String _recognizedText = ""; 
+  String _recognizedText = "";
+  String _versionString = "";
   
   AppNotification? _currentNotification;
   Timer? _notificationTimer;
@@ -197,8 +199,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     
     // Async Init after first frame to prevent White Screen
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+       final info = await PackageInfo.fromPlatform();
+       if (mounted) setState(() => _versionString = 'v${info.version}');
        await _initWindow();
-       await _appService.init(); 
+       await _appService.init();
     });
     
     // Listen to Engine status
@@ -623,19 +627,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               ),
                             ),
                             
-                            // 2. BRANDING: Fixed center title
+                            // 2. BRANDING: Fixed center title + version
                             Positioned(
                               top: cy + 40,
                               left: 0,
                               right: 0,
                               child: Center(
-                                child: Text(
-                                  "子曰",
-                                  style: AppTheme.display(context).copyWith(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 2.0,
-                                  ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      "子曰",
+                                      style: AppTheme.display(context).copyWith(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 2.0,
+                                      ),
+                                    ),
+                                    if (_versionString.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          _versionString,
+                                          style: AppTheme.body(context).copyWith(
+                                            fontSize: 11,
+                                            color: MacosColors.secondaryLabelColor.resolveFrom(context),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),

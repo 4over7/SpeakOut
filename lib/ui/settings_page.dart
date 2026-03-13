@@ -1046,7 +1046,7 @@ class _SettingsPageState extends State<SettingsPage> {
               const SettingsDivider(),
               SettingsTile(
                 label: '打字机效果（Alpha）',
-                subtitle: '流式输出时逐步注入文字到光标处。会临时占用剪贴板。',
+                subtitle: '加快文字输出速度，提升使用体验。流式逐步注入文字到光标处，会临时占用剪贴板。',
                 icon: CupertinoIcons.text_cursor,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
