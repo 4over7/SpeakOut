@@ -75,6 +75,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _isTestingLlm = false;
   (bool, String)? _llmTestResult;
   bool _showApiKey = false;
+  bool _llmConfigDirty = false; // True when LLM config has unsaved changes
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
   StreamSubscription<int>? _keySubscription;
@@ -94,7 +95,13 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadVersion();
     _tabController = MacosTabController(initialIndex: 0, length: 5);
     _tabController.addListener(() {
-      setState(() => _selectedIndex = _tabController.index);
+      final newIndex = _tabController.index;
+      // Warn if leaving AI Polish tab with unsaved changes
+      if (_selectedIndex == 4 && newIndex != 4 && _llmConfigDirty) {
+        _showUnsavedChangesDialog(newIndex);
+        return;
+      }
+      setState(() => _selectedIndex = newIndex);
     });
     
     _refresh();
@@ -521,16 +528,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 color: AppTheme.getBackground(context), // Force background
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: SingleChildScrollView(
-                    child: Builder(builder: (_) {
-                       if (_selectedIndex == 0) return _buildGeneralView();
-                       if (_selectedIndex == 1) return _buildModelsView();
-                       if (_selectedIndex == 2) return _buildTriggerView();
-                       if (_selectedIndex == 3) return _buildDiaryView();
-                       if (_selectedIndex == 4) return _buildAiPolishView();
-                       return _buildAboutView(context, _version);
-                    }),
-                  ),
+                  child: Builder(builder: (_) {
+                    // AI 润色页自己管理滚动（底部固定保存栏）
+                    if (_selectedIndex == 4) return _buildAiPolishView();
+                    return SingleChildScrollView(
+                      child: Builder(builder: (_) {
+                         if (_selectedIndex == 0) return _buildGeneralView();
+                         if (_selectedIndex == 1) return _buildModelsView();
+                         if (_selectedIndex == 2) return _buildTriggerView();
+                         if (_selectedIndex == 3) return _buildDiaryView();
+                         return _buildAboutView(context, _version);
+                      }),
+                    );
+                  }),
                 ),
               );
             },
@@ -959,8 +969,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildAiPolishView() {
     final loc = AppLocalizations.of(context)!;
+    final currentPresetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == currentPresetId,
+      orElse: () => AppConstants.kLlmPresets.last,
+    );
     return Column(
       children: [
+        Expanded(child: SingleChildScrollView(child: Column(
+          children: [
         // Warning banner
         Container(
           width: double.infinity,
@@ -1130,6 +1147,104 @@ class _SettingsPageState extends State<SettingsPage> {
         const VocabSettingsView(),
 
         const SizedBox(height: 24),
+          ],
+        ))),
+        // Fixed bottom save bar
+        if (ConfigService().aiCorrectionEnabled && ConfigService().llmProviderType == 'cloud')
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.getBackground(context),
+              border: Border(top: BorderSide(color: AppTheme.getBorder(context))),
+            ),
+            child: Row(
+              children: [
+                if (_llmConfigDirty)
+                  Row(children: [
+                    const MacosIcon(CupertinoIcons.circle_fill, size: 8, color: MacosColors.systemOrangeColor),
+                    const SizedBox(width: 6),
+                    Text("有未保存的修改", style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor, fontSize: 11)),
+                  ])
+                else
+                  Row(children: [
+                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14, color: MacosColors.systemGrayColor.resolveFrom(context)),
+                    const SizedBox(width: 6),
+                    Text(preset.name, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+                  ]),
+                const Spacer(),
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  secondary: true,
+                  onPressed: _isTestingLlm ? null : () async {
+                    setState(() { _isTestingLlm = true; _llmTestResult = null; });
+                    try {
+                      final (ok, msg) = await LLMService().testConnectionWith(
+                        apiKey: _llmApiKeyController.text,
+                        baseUrl: _llmBaseUrlController.text.isNotEmpty
+                            ? _llmBaseUrlController.text : preset.baseUrl,
+                        model: _llmModelController.text.isNotEmpty
+                            ? _llmModelController.text : preset.defaultModel,
+                        apiFormat: preset.apiFormat,
+                      );
+                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
+                    } catch (e) {
+                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (false, e.toString()); });
+                    }
+                  },
+                  child: _isTestingLlm
+                    ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
+                    : const Row(mainAxisSize: MainAxisSize.min, children: [
+                        MacosIcon(CupertinoIcons.antenna_radiowaves_left_right, size: 14),
+                        SizedBox(width: 4),
+                        Text("测试"),
+                      ]),
+                ),
+                const SizedBox(width: 8),
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  onPressed: _llmConfigDirty ? () async {
+                    try {
+                      await _flushLlmControllers();
+                      await ConfigService().savePresetConfig(currentPresetId);
+                      if (mounted) setState(() { _llmConfigDirty = false; });
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("保存失败: $e"), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating),
+                        );
+                      }
+                    }
+                  } : null,
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14),
+                    SizedBox(width: 4),
+                    Text("保存"),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        // Test result (below save bar)
+        if (_llmTestResult != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.getBackground(context),
+            ),
+            child: Row(children: [
+              Icon(
+                _llmTestResult!.$1 ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.xmark_circle_fill,
+                size: 14,
+                color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor,
+              ),
+              const SizedBox(width: 6),
+              Expanded(child: Text(
+                _llmTestResult!.$2,
+                style: TextStyle(fontSize: 12, color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor),
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+              )),
+            ]),
+          ),
       ],
     );
   }
@@ -1364,6 +1479,39 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
+  void _showUnsavedChangesDialog(int targetIndex) {
+    showMacosAlertDialog(
+      context: context,
+      builder: (_) => MacosAlertDialog(
+        appIcon: const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 48, color: MacosColors.systemOrangeColor),
+        title: const Text("有未保存的修改"),
+        message: const Text("AI 润色配置尚未保存，是否保存后再切换？"),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () async {
+            Navigator.of(context).pop();
+            await _flushLlmControllers();
+            await ConfigService().savePresetConfig(ConfigService().llmPresetId);
+            setState(() { _llmConfigDirty = false; _selectedIndex = targetIndex; });
+            _tabController.index = targetIndex;
+          },
+          child: const Text("保存"),
+        ),
+        secondaryButton: PushButton(
+          controlSize: ControlSize.large,
+          secondary: true,
+          onPressed: () {
+            Navigator.of(context).pop();
+            _syncLlmControllers(); // Revert to saved values
+            setState(() { _llmConfigDirty = false; _selectedIndex = targetIndex; });
+            _tabController.index = targetIndex;
+          },
+          child: const Text("放弃"),
+        ),
+      ),
+    );
+  }
+
   void _syncLlmControllers() {
     _llmApiKeyController.text = ConfigService().llmApiKeyOverride ?? '';
     _llmBaseUrlController.text = ConfigService().llmBaseUrlOverride ?? '';
@@ -1436,7 +1584,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   }
                 }
                 _syncLlmControllers();
-                setState(() { _llmTestResult = null; });
+                setState(() { _llmTestResult = null; _llmConfigDirty = false; });
               },
             ),
           ],
@@ -1456,82 +1604,6 @@ class _SettingsPageState extends State<SettingsPage> {
               _buildApiItemWithController(context, "Base URL", CupertinoIcons.link, _llmBaseUrlController, placeholder: preset.baseUrl),
               const SizedBox(height: 8),
               _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: preset.modelHint),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  PushButton(
-                    controlSize: ControlSize.regular,
-                    secondary: true,
-                    onPressed: _isTestingLlm ? null : () async {
-                      setState(() { _isTestingLlm = true; _llmTestResult = null; });
-                      try {
-                        // Pass controller values directly to avoid Keychain blocking
-                        final (ok, msg) = await LLMService().testConnectionWith(
-                          apiKey: _llmApiKeyController.text,
-                          baseUrl: _llmBaseUrlController.text.isNotEmpty
-                              ? _llmBaseUrlController.text : preset.baseUrl,
-                          model: _llmModelController.text.isNotEmpty
-                              ? _llmModelController.text : preset.defaultModel,
-                          apiFormat: preset.apiFormat,
-                        );
-                        if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
-                      } catch (e) {
-                        if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (false, e.toString()); });
-                      }
-                    },
-                    child: _isTestingLlm
-                      ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
-                      : const Row(mainAxisSize: MainAxisSize.min, children: [
-                          MacosIcon(CupertinoIcons.antenna_radiowaves_left_right, size: 14),
-                          SizedBox(width: 4),
-                          Text("测试连接"),
-                        ]),
-                  ),
-                  const SizedBox(width: 8),
-                  PushButton(
-                    controlSize: ControlSize.regular,
-                    onPressed: () async {
-                      try {
-                        await _flushLlmControllers();
-                        await ConfigService().savePresetConfig(currentPresetId);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("已保存 ${preset.name} 配置"), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("保存失败: $e"), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating),
-                          );
-                        }
-                      }
-                    },
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      MacosIcon(CupertinoIcons.checkmark_circle, size: 14),
-                      SizedBox(width: 4),
-                      Text("保存配置"),
-                    ]),
-                  ),
-                ],
-              ),
-              if (_llmTestResult != null) ...[
-                const SizedBox(height: 8),
-                Row(children: [
-                  Icon(
-                    _llmTestResult!.$1 ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.xmark_circle_fill,
-                    size: 14,
-                    color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(
-                    _llmTestResult!.$2,
-                    style: TextStyle(fontSize: 12, color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor),
-                    maxLines: 2, overflow: TextOverflow.ellipsis,
-                  )),
-                ]),
-              ],
             ],
           ),
         ),
@@ -1584,22 +1656,20 @@ class _SettingsPageState extends State<SettingsPage> {
            Row(
              children: [
                Expanded(
-                 child: Focus(
-                   onFocusChange: (hasFocus) {
-                     if (!hasFocus) _flushLlmControllers();
-                   },
-                   child: MacosTextField(
-                     placeholder: placeholder ?? label,
-                     obscureText: isSecret && !_showApiKey,
-                     maxLines: 1,
-                     decoration: BoxDecoration(
-                       color: AppTheme.getInputBackground(context),
-                       borderRadius: BorderRadius.circular(6),
-                       border: Border.all(color: AppTheme.getBorder(context)),
-                     ),
-                     prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
-                     controller: controller,
+                 child: MacosTextField(
+                   placeholder: placeholder ?? label,
+                   obscureText: isSecret && !_showApiKey,
+                   maxLines: 1,
+                   decoration: BoxDecoration(
+                     color: AppTheme.getInputBackground(context),
+                     borderRadius: BorderRadius.circular(6),
+                     border: Border.all(color: AppTheme.getBorder(context)),
                    ),
+                   prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
+                   controller: controller,
+                   onChanged: (_) {
+                     if (!_llmConfigDirty) setState(() => _llmConfigDirty = true);
+                   },
                  ),
                ),
                if (isSecret) ...[
