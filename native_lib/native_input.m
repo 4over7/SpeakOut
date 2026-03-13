@@ -644,15 +644,14 @@ float get_audio_level(void) {
     }
     float rms = sqrtf((float)(sumSq / windowSize));
 
-    // Aggressive mapping: quiet speech should already feel "active".
-    // Only need to distinguish silence vs any-speech vs loud-ish.
+    // Aggressive mapping: any speech → quickly ramp to full.
+    // 15dB window: whisper already near half, normal speech maxed.
     // RMS 0.002 (-54dB) → 0.0 (noise floor)
-    // RMS 0.005 (-46dB) → ~0.5 (whisper → already half)
-    // RMS 0.02+ (-34dB) → 1.0 (normal speech → fully maxed out)
+    // RMS 0.005 (-46dB) → ~0.5
+    // RMS 0.01+ (-40dB) → 1.0 (quiet speech already maxed)
     if (rms < 0.002f) return 0.0f;  // noise floor cutoff
-    if (rms < 1e-6f) return 0.0f;
     float db = 20.0f * log10f(rms);
-    float level = (db + 54.0f) / 20.0f;  // [-54dB, -34dB] → [0, 1]
+    float level = (db + 54.0f) / 14.0f;  // [-54dB, -40dB] → [0, 1]
     if (level < 0.0f) level = 0.0f;
     if (level > 1.0f) level = 1.0f;
     return level;

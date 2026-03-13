@@ -190,9 +190,9 @@ class AppDelegate: FlutterAppDelegate {
     waveTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
       guard let self = self, self.isShowingRecording else { return }
 
-      let maxHeight: CGFloat = 24
+      let maxHeight: CGFloat = 36
       let minHeight: CGFloat = 4
-      let waveY: CGFloat = (panelHeight - 24) / 2
+      let waveY: CGFloat = (panelHeight - maxHeight) / 2
 
       // Get real-time audio level (0.0 ~ 1.0)
       let level = CGFloat(self.getAudioLevelFunc?() ?? 0)
