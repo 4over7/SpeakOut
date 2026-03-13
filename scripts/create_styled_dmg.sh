@@ -102,7 +102,9 @@ echo "Finalizing..."
 hdiutil convert "${DMG_TEMP_PATH}" -format UDZO -o "${DMG_FINAL_PATH}"
 rm -f "${DMG_TEMP_PATH}"
 
-# 6. Mount final DMG and open Finder window
+# 6. Unmount any previously mounted SpeakOut DMG, then mount new one
+echo "Unmounting old DMG if present..."
+hdiutil detach "/Volumes/${VOLUME_NAME}" -force >/dev/null 2>&1 || true
 echo "Mounting DMG..."
 hdiutil attach "${DMG_FINAL_PATH}" -noautoopen
 open "/Volumes/${VOLUME_NAME}"
