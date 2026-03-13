@@ -69,6 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _isCapturingToggleInputKey = false;
   bool _isCapturingToggleDiaryKey = false;
   bool _isCheckingUpdate = false;
+  bool _versionCopied = false;
   String? _updateResult;
   int _toggleMaxDuration = 0;
   // LLM Test
@@ -1749,27 +1750,44 @@ class _SettingsPageState extends State<SettingsPage> {
               GestureDetector(
                 onDoubleTap: () {
                   Clipboard.setData(ClipboardData(text: version));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("已复制版本号: v$version"),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                      width: 220,
-                    ),
-                  );
+                  setState(() => _versionCopied = true);
+                  Future.delayed(const Duration(seconds: 2), () {
+                    if (mounted) setState(() => _versionCopied = false);
+                  });
                 },
                 child: Tooltip(
                   message: "双击复制版本号",
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                      color: _versionCopied
+                          ? MacosColors.systemGreenColor.withValues(alpha: 0.15)
+                          : MacosColors.systemGrayColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
+                      border: Border.all(
+                        color: _versionCopied
+                            ? MacosColors.systemGreenColor.withValues(alpha: 0.4)
+                            : MacosColors.systemGrayColor.withValues(alpha: 0.2),
+                      ),
                     ),
-                    child: Text(
-                      "v$version",
-                      style: AppTheme.mono(context).copyWith(fontSize: 12, color: MacosColors.labelColor.resolveFrom(context).withValues(alpha: 0.7)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_versionCopied) ...[
+                          const MacosIcon(CupertinoIcons.checkmark, size: 12, color: MacosColors.systemGreenColor),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          _versionCopied ? "已复制" : "v$version",
+                          style: AppTheme.mono(context).copyWith(
+                            fontSize: 12,
+                            color: _versionCopied
+                                ? MacosColors.systemGreenColor
+                                : MacosColors.labelColor.resolveFrom(context).withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
