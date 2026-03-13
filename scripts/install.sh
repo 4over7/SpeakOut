@@ -59,7 +59,7 @@ fi
 ENTITLEMENTS="macos/Runner/Release.entitlements"
 echo "Signing with: $SIGN_IDENTITY"
 codesign -f -s "$SIGN_IDENTITY" "$NATIVE_LIB_DEST/libnative_input.dylib"
-codesign -f --deep -s "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "$SOURCE_APP"
+codesign -f -s "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "$SOURCE_APP"
 
 echo "Installing ${APP_NAME} to ${DEST_DIR}..."
 
