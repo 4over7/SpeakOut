@@ -709,6 +709,8 @@ class CoreEngine {
         if (_silencePollCount >= 10) {
           timer.cancel();
           _log("Silence detected for 2s — mic may be unavailable");
+          // Show on both overlay and main UI (non-blocking, auto-dismiss)
+          _overlay.updateText('未检测到声音，请检查麦克风');
           NotificationService().notify('未检测到声音，请检查麦克风是否可用');
         }
       });
