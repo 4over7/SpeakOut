@@ -851,7 +851,7 @@ class CoreEngine {
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
 
-          // Streaming: inject tokens as they arrive (typewriter effect)
+          // Use streaming to reduce wait time (collect full result, inject once)
           if (mode != RecordingMode.diary) {
             final streamBuffer = StringBuffer();
             bool firstChunk = true;
@@ -859,14 +859,12 @@ class CoreEngine {
               streamBuffer.write(chunk);
               if (firstChunk) {
                 _log("[PERF] +${sw.elapsedMilliseconds}ms — first token received");
-                _overlay.updateText(""); // Clear overlay
                 firstChunk = false;
               }
-              _nativeInput?.inject(chunk);
             }
-            final streamResult = streamBuffer.toString().trim();
-            if (streamResult.isNotEmpty) {
-              finalText = streamResult;
+            final polished = streamBuffer.toString().trim();
+            if (polished.isNotEmpty) {
+              finalText = polished;
             }
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done, len=${finalText.length}");
           } else {
@@ -910,13 +908,8 @@ class CoreEngine {
             }
           });
           ChatService().addUserMessage(finalText);
-        } else if (!ConfigService().aiCorrectionEnabled) {
-          // Only inject here if AI polish didn't already stream-inject
-          _nativeInput?.inject(finalText);
-          ChatService().addDictation(finalText);
-          _statusController.add("Ready");
         } else {
-          // AI polish already injected via streaming
+          _nativeInput?.inject(finalText);
           ChatService().addDictation(finalText);
           _statusController.add("Ready");
         }
