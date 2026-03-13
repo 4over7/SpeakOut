@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:math';
-import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
@@ -285,11 +283,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
   }
   
-  // Waveform Animation State (FFT spectrum-driven)
+  // Waveform Animation State (random animation × audio level)
   final List<double> _waveHeights = List.generate(7, (_) => 0.0);
   Timer? _waveTimer;
-  // Pre-allocated native buffer for spectrum polling
-  ffi.Pointer<ffi.Float>? _spectrumBuffer;
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -319,7 +315,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _waveTimer?.cancel();
-    if (_spectrumBuffer != null) pkg_ffi.calloc.free(_spectrumBuffer!);
     _notificationTimer?.cancel();
     _statusSub?.cancel();
     _notifSub?.cancel();
@@ -329,31 +324,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.dispose();
   }
   
-  static const double _spectrumThreshold = 0.02; // below this = silence
+  final _random = Random();
 
   void _startWaveAnimation() {
     _waveTimer?.cancel();
-    _spectrumBuffer ??= pkg_ffi.calloc<ffi.Float>(7);
     _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (mounted && _isRecording) {
-        _appService.engine.nativeInput?.getAudioSpectrum(_spectrumBuffer!, 7);
+        // Get real-time audio level (0.0 ~ 1.0)
+        final level = _appService.engine.nativeInput?.getAudioLevel() ?? 0.0;
         setState(() {
-          // Check if total energy is above threshold
-          double totalEnergy = 0;
-          for (int i = 0; i < 7; i++) {
-            totalEnergy += _spectrumBuffer![i];
-          }
-          if (totalEnergy < _spectrumThreshold) {
-            // Silence: smoothly decay to near-zero
-            for (int i = 0; i < 7; i++) {
-              _waveHeights[i] = _waveHeights[i] * 0.6;
-            }
-          } else {
-            // Active: smooth toward FFT values (lerp for fluid animation)
-            for (int i = 0; i < 7; i++) {
-              final target = _spectrumBuffer![i].clamp(0.0, 1.0);
-              _waveHeights[i] = _waveHeights[i] * 0.3 + target * 0.7;
-            }
+          for (int i = 0; i < _waveHeights.length; i++) {
+            // Random base shape (0.0 ~ 1.0), scaled by audio level
+            // minScale: even in silence, tiny idle movement
+            final minScale = 0.08;
+            final scale = minScale + (1.0 - minScale) * level;
+            _waveHeights[i] = _random.nextDouble() * scale;
           }
         });
       }

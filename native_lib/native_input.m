@@ -622,90 +622,43 @@ static int16_t ringBuffer[RING_BUFFER_SAMPLES];
 static _Atomic uint64_t ringWritePos = 0; // monotonically increasing write cursor
 static _Atomic uint64_t ringReadPos = 0;  // monotonically increasing read cursor
 
-// ---- FFT Spectrum Analysis for Waveform Visualization ----
-// 128-point FFT → 64 bins → grouped into 7 frequency bands
-#define SPECTRUM_FFT_SIZE 128
-#define SPECTRUM_FFT_LOG2N 7  // log2(128)
-static float spectrumBands[7] = {0};  // 7 frequency band energies (0.0 ~ 1.0)
-static FFTSetup spectrumFFTSetup = NULL;
+// ---- Real-time Audio Level for Waveform Visualization ----
+// RMS of latest samples → single 0.0~1.0 value for UI to scale random animation.
 
-// Compute 7-band spectrum from the latest audio samples in the ring buffer.
-// Called from get_audio_spectrum() on Dart's polling thread — NOT in the audio callback.
-static void compute_spectrum(void) {
+// Exported: returns current RMS audio level (0.0 = silence, 1.0 = loud).
+// Dart/Swift polls this every ~80ms.
+float get_audio_level(void) {
+    if (!atomic_load(&isRecording)) return 0.0f;
+
     uint64_t wp = atomic_load_explicit(&ringWritePos, memory_order_acquire);
-    if (wp < SPECTRUM_FFT_SIZE) { memset(spectrumBands, 0, sizeof(spectrumBands)); return; }
+    // Use ~10ms of samples (160 @ 16kHz) for responsive level
+    const int windowSize = 160;
+    if (wp < (uint64_t)windowSize) return 0.0f;
 
-    // One-time FFT setup
-    if (!spectrumFFTSetup) spectrumFFTSetup = vDSP_create_fftsetup(SPECTRUM_FFT_LOG2N, kFFTRadix2);
-
-    // Copy latest SPECTRUM_FFT_SIZE samples from ring buffer
-    float input[SPECTRUM_FFT_SIZE];
-    uint64_t startPos = wp - SPECTRUM_FFT_SIZE;
-    for (int i = 0; i < SPECTRUM_FFT_SIZE; i++) {
-        input[i] = (float)ringBuffer[(startPos + i) % RING_BUFFER_SAMPLES] / 32768.0f;
+    // Compute RMS
+    double sumSq = 0;
+    uint64_t startPos = wp - windowSize;
+    for (int i = 0; i < windowSize; i++) {
+        float s = (float)ringBuffer[(startPos + i) % RING_BUFFER_SAMPLES] / 32768.0f;
+        sumSq += s * s;
     }
+    float rms = sqrtf((float)(sumSq / windowSize));
 
-    // Apply Hann window to reduce spectral leakage
-    float window[SPECTRUM_FFT_SIZE];
-    vDSP_hann_window(window, SPECTRUM_FFT_SIZE, vDSP_HANN_NORM);
-    vDSP_vmul(input, 1, window, 1, input, 1, SPECTRUM_FFT_SIZE);
+    // Map RMS to 0~1 with sensitivity tuning:
+    // Typical speech RMS ~0.01-0.1, whisper ~0.003-0.01
+    // Multiply by 8 so normal speech fills most of the range
+    float level = rms * 8.0f;
+    if (level > 1.0f) level = 1.0f;
 
-    // Split-complex format for vDSP FFT
-    float realp[SPECTRUM_FFT_SIZE / 2], imagp[SPECTRUM_FFT_SIZE / 2];
-    DSPSplitComplex splitComplex = { .realp = realp, .imagp = imagp };
-    vDSP_ctoz((DSPComplex *)input, 2, &splitComplex, 1, SPECTRUM_FFT_SIZE / 2);
-    vDSP_fft_zrip(spectrumFFTSetup, &splitComplex, 1, SPECTRUM_FFT_LOG2N, kFFTDirection_Forward);
-
-    // Compute magnitude for each bin (64 bins for 128-point FFT)
-    float magnitudes[SPECTRUM_FFT_SIZE / 2];
-    vDSP_zvmags(&splitComplex, 1, magnitudes, 1, SPECTRUM_FFT_SIZE / 2);
-
-    // Group 64 bins into 7 bands (16kHz sample rate → each bin = 125Hz)
-    // Band 0: bins 1-2    (125-375Hz)   — low voice fundamental
-    // Band 1: bins 3-4    (375-625Hz)   — upper fundamental
-    // Band 2: bins 5-7    (625-1000Hz)  — low harmonics
-    // Band 3: bins 8-12   (1000-1625Hz) — mid harmonics
-    // Band 4: bins 13-19  (1625-2500Hz) — presence
-    // Band 5: bins 20-31  (2500-4000Hz) — sibilance
-    // Band 6: bins 32-63  (4000-8000Hz) — high freq / noise
-    static const int bandStart[] = { 1,  3,  5,  8, 13, 20, 32};
-    static const int bandEnd[]   = { 2,  4,  7, 12, 19, 31, 63};
-
-    // Per-band gain compensation: boost higher frequencies that are naturally weaker
-    // in human voice. This makes all 7 bars visually active during speech.
-    static const float bandGain[] = { 1.0f, 1.5f, 2.5f, 4.0f, 6.0f, 10.0f, 16.0f };
-
-    float bandEnergy[7];
-    for (int b = 0; b < 7; b++) {
-        float sum = 0;
-        for (int i = bandStart[b]; i <= bandEnd[b] && i < SPECTRUM_FFT_SIZE / 2; i++) {
-            sum += magnitudes[i];
-        }
-        // Average energy per bin, then apply gain compensation
-        bandEnergy[b] = (sum / (bandEnd[b] - bandStart[b] + 1)) * bandGain[b];
-    }
-
-    // Convert to dB scale for better visual dynamic range, then normalize
-    // dB = 10 * log10(energy), clamped to [-60dB, 0dB] → mapped to [0, 1]
-    static const float DB_FLOOR = -60.0f;
-    for (int b = 0; b < 7; b++) {
-        float db = (bandEnergy[b] > 1e-10f) ? 10.0f * log10f(bandEnergy[b]) : DB_FLOOR;
-        if (db < DB_FLOOR) db = DB_FLOOR;
-        if (db > 0) db = 0;
-        spectrumBands[b] = (db - DB_FLOOR) / (-DB_FLOOR);  // 0.0 ~ 1.0
-    }
+    return level;
 }
 
-// Exported: Dart polls this every ~80ms to get 7-band spectrum
+// Legacy stub — kept for ABI compatibility if old code still links it.
 void get_audio_spectrum(float *outBands, int count) {
     if (!outBands || count <= 0) return;
-    if (!atomic_load(&isRecording)) {
-        memset(outBands, 0, sizeof(float) * (count < 7 ? count : 7));
-        return;
-    }
-    compute_spectrum();
+    float level = get_audio_level();
     int n = count < 7 ? count : 7;
-    memcpy(outBands, spectrumBands, sizeof(float) * n);
+    for (int i = 0; i < n; i++) outBands[i] = level;
 }
 
 // AudioQueue Input Callback — runs on CoreAudio's AQClient thread.

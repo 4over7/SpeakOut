@@ -501,4 +501,24 @@ class NativeInputFFI implements NativeInputBase {
     }
     _getAudioSpectrum(outBands, count);
   }
+
+  // --- Audio Level ---
+  late GetAudioLevelDart _getAudioLevel;
+  bool _audioLevelBound = false;
+
+  @override
+  double getAudioLevel() {
+    if (!_audioLevelBound) {
+      try {
+        _getAudioLevel = _dylib
+            .lookup<NativeFunction<GetAudioLevelC>>('get_audio_level')
+            .asFunction();
+        _audioLevelBound = true;
+      } catch (e) {
+        _log("AudioLevel FFI binding FAILED: $e");
+        return 0.0;
+      }
+    }
+    return _getAudioLevel();
+  }
 }

@@ -102,6 +102,10 @@ typedef SetLogDirectoryDart = void Function(Pointer<Utf8> dir);
 typedef GetAudioSpectrumC = Void Function(Pointer<Float> outBands, Int32 count);
 typedef GetAudioSpectrumDart = void Function(Pointer<Float> outBands, int count);
 
+// Audio level (RMS) for waveform visualization
+typedef GetAudioLevelC = Float Function();
+typedef GetAudioLevelDart = double Function();
+
 // Clipboard streaming injection
 typedef InjectClipboardBeginC = Void Function();
 typedef InjectClipboardBeginDart = void Function();
@@ -155,4 +159,7 @@ abstract class NativeInputBase {
 
   // Audio spectrum (7-band FFT for waveform visualization)
   void getAudioSpectrum(Pointer<Float> outBands, int count);
+
+  // Audio level (RMS 0.0~1.0 for waveform amplitude)
+  double getAudioLevel();
 }

@@ -13,25 +13,23 @@ class AppDelegate: FlutterAppDelegate {
   // Mint Green accent color (#2ECC71)
   let accentColor = NSColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 1.0)
 
-  // FFT spectrum function pointer from native dylib
-  typealias GetAudioSpectrumFunc = @convention(c) (UnsafeMutablePointer<Float>, Int32) -> Void
-  var getAudioSpectrum: GetAudioSpectrumFunc?
-  var spectrumBuffer = [Float](repeating: 0, count: 7)
+  // Native audio level function pointer from dylib
+  typealias GetAudioLevelFunc = @convention(c) () -> Float
+  var getAudioLevelFunc: GetAudioLevelFunc?
 
-  private func loadSpectrumFunction() {
-    if getAudioSpectrum != nil { return }
-    let bundle = Bundle.main
-    let dylibPath = bundle.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib"
+  private func loadAudioLevelFunction() {
+    if getAudioLevelFunc != nil { return }
+    let dylibPath = Bundle.main.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib"
     guard let handle = dlopen(dylibPath, RTLD_NOW) else {
       NSLog("[Overlay] Failed to load dylib: %@", String(cString: dlerror()))
       return
     }
-    guard let sym = dlsym(handle, "get_audio_spectrum") else {
-      NSLog("[Overlay] get_audio_spectrum symbol not found")
+    guard let sym = dlsym(handle, "get_audio_level") else {
+      NSLog("[Overlay] get_audio_level symbol not found")
       return
     }
-    getAudioSpectrum = unsafeBitCast(sym, to: GetAudioSpectrumFunc.self)
-    NSLog("[Overlay] FFT spectrum function loaded")
+    getAudioLevelFunc = unsafeBitCast(sym, to: GetAudioLevelFunc.self)
+    NSLog("[Overlay] Audio level function loaded")
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
@@ -184,7 +182,7 @@ class AppDelegate: FlutterAppDelegate {
 
   private func startWaveAnimation() {
     isShowingRecording = true
-    loadSpectrumFunction()
+    loadAudioLevelFunction()
 
     guard let panel = recordingOverlayWindow else { return }
     let panelHeight = panel.frame.height
@@ -196,19 +194,15 @@ class AppDelegate: FlutterAppDelegate {
       let minHeight: CGFloat = 4
       let waveY: CGFloat = (panelHeight - 24) / 2
 
-      // Get FFT spectrum data from native lib
-      if let spectrumFunc = self.getAudioSpectrum {
-        self.spectrumBuffer.withUnsafeMutableBufferPointer { ptr in
-          spectrumFunc(ptr.baseAddress!, 7)
-        }
-      }
+      // Get real-time audio level (0.0 ~ 1.0)
+      let level = CGFloat(self.getAudioLevelFunc?() ?? 0)
+      let minScale: CGFloat = 0.08
+      let scale = minScale + (1.0 - minScale) * min(max(level, 0), 1)
 
-      // Animate each bar based on spectrum
-      for (i, barView) in self.waveformViews.enumerated() {
-        let spectrum = i < self.spectrumBuffer.count ? CGFloat(self.spectrumBuffer[i]) : 0
-        let clampedSpectrum = min(max(spectrum, 0), 1)
-        let barHeight = minHeight + (maxHeight - minHeight) * clampedSpectrum
-        let yOffset = waveY + (maxHeight - barHeight) / 2
+      // Random animation scaled by audio level
+      for barView in self.waveformViews {
+        let randomHeight = minHeight + (maxHeight - minHeight) * CGFloat.random(in: 0...1) * scale
+        let yOffset = waveY + (maxHeight - randomHeight) / 2
 
         NSAnimationContext.runAnimationGroup { context in
           context.duration = 0.08
@@ -216,7 +210,7 @@ class AppDelegate: FlutterAppDelegate {
             x: barView.frame.origin.x,
             y: yOffset,
             width: barView.frame.width,
-            height: barHeight
+            height: randomHeight
           )
         }
       }
