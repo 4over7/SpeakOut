@@ -814,17 +814,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               )),
             ],
-            onChanged: (value) {
+            onChanged: (value) async {
               if (value == null) return;
               final service = _engine.audioDeviceService;
               if (service == null) return;
               if (value == 'system') {
                 service.clearPreferredDevice();
-                ConfigService().setAudioInputDeviceId(null);
+                await ConfigService().setAudioInputDeviceId(null);
               } else {
                 service.setInputDevice(value);
                 final device = _audioDevices.firstWhere((d) => d.id == value, orElse: () => _audioDevices.first);
-                ConfigService().setAudioInputDeviceId(value, name: device.name);
+                await ConfigService().setAudioInputDeviceId(value, name: device.name);
               }
               _loadAudioDevices();
             },
