@@ -98,6 +98,10 @@ typedef SetDebugLoggingDart = void Function(int enabled);
 typedef SetLogDirectoryC = Void Function(Pointer<Utf8> dir);
 typedef SetLogDirectoryDart = void Function(Pointer<Utf8> dir);
 
+// Audio spectrum for waveform visualization
+typedef GetAudioSpectrumC = Void Function(Pointer<Float> outBands, Int32 count);
+typedef GetAudioSpectrumDart = void Function(Pointer<Float> outBands, int count);
+
 // Clipboard streaming injection
 typedef InjectClipboardBeginC = Void Function();
 typedef InjectClipboardBeginDart = void Function();
@@ -148,4 +152,7 @@ abstract class NativeInputBase {
   void injectClipboardBegin();
   void injectClipboardChunk(String text);
   void injectClipboardEnd();
+
+  // Audio spectrum (7-band FFT for waveform visualization)
+  void getAudioSpectrum(Pointer<Float> outBands, int count);
 }

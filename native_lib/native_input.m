@@ -13,6 +13,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <Accelerate/Accelerate.h>
 
 // Debug logging flag — disabled by default, enabled via set_debug_logging(1)
 static atomic_int debugLoggingEnabled = 0;
@@ -620,6 +621,84 @@ static AudioStreamBasicDescription audioFormat;
 static int16_t ringBuffer[RING_BUFFER_SAMPLES];
 static _Atomic uint64_t ringWritePos = 0; // monotonically increasing write cursor
 static _Atomic uint64_t ringReadPos = 0;  // monotonically increasing read cursor
+
+// ---- FFT Spectrum Analysis for Waveform Visualization ----
+// 128-point FFT → 64 bins → grouped into 7 frequency bands
+#define SPECTRUM_FFT_SIZE 128
+#define SPECTRUM_FFT_LOG2N 7  // log2(128)
+static float spectrumBands[7] = {0};  // 7 frequency band energies (0.0 ~ 1.0)
+static FFTSetup spectrumFFTSetup = NULL;
+
+// Compute 7-band spectrum from the latest audio samples in the ring buffer.
+// Called from get_audio_spectrum() on Dart's polling thread — NOT in the audio callback.
+static void compute_spectrum(void) {
+    uint64_t wp = atomic_load_explicit(&ringWritePos, memory_order_acquire);
+    if (wp < SPECTRUM_FFT_SIZE) { memset(spectrumBands, 0, sizeof(spectrumBands)); return; }
+
+    // One-time FFT setup
+    if (!spectrumFFTSetup) spectrumFFTSetup = vDSP_create_fftsetup(SPECTRUM_FFT_LOG2N, kFFTRadix2);
+
+    // Copy latest SPECTRUM_FFT_SIZE samples from ring buffer
+    float input[SPECTRUM_FFT_SIZE];
+    uint64_t startPos = wp - SPECTRUM_FFT_SIZE;
+    for (int i = 0; i < SPECTRUM_FFT_SIZE; i++) {
+        input[i] = (float)ringBuffer[(startPos + i) % RING_BUFFER_SAMPLES] / 32768.0f;
+    }
+
+    // Apply Hann window to reduce spectral leakage
+    float window[SPECTRUM_FFT_SIZE];
+    vDSP_hann_window(window, SPECTRUM_FFT_SIZE, vDSP_HANN_NORM);
+    vDSP_vmul(input, 1, window, 1, input, 1, SPECTRUM_FFT_SIZE);
+
+    // Split-complex format for vDSP FFT
+    float realp[SPECTRUM_FFT_SIZE / 2], imagp[SPECTRUM_FFT_SIZE / 2];
+    DSPSplitComplex splitComplex = { .realp = realp, .imagp = imagp };
+    vDSP_ctoz((DSPComplex *)input, 2, &splitComplex, 1, SPECTRUM_FFT_SIZE / 2);
+    vDSP_fft_zrip(spectrumFFTSetup, &splitComplex, 1, SPECTRUM_FFT_LOG2N, kFFTDirection_Forward);
+
+    // Compute magnitude for each bin (64 bins for 128-point FFT)
+    float magnitudes[SPECTRUM_FFT_SIZE / 2];
+    vDSP_zvmags(&splitComplex, 1, magnitudes, 1, SPECTRUM_FFT_SIZE / 2);
+
+    // Group 64 bins into 7 bands (16kHz sample rate → each bin = 125Hz)
+    // Band 0: bins 1-2    (125-375Hz)   — low voice fundamental
+    // Band 1: bins 3-4    (375-625Hz)   — upper fundamental
+    // Band 2: bins 5-7    (625-1000Hz)  — low harmonics
+    // Band 3: bins 8-12   (1000-1625Hz) — mid harmonics
+    // Band 4: bins 13-19  (1625-2500Hz) — presence
+    // Band 5: bins 20-31  (2500-4000Hz) — sibilance
+    // Band 6: bins 32-63  (4000-8000Hz) — high freq / noise
+    static const int bandStart[] = { 1,  3,  5,  8, 13, 20, 32};
+    static const int bandEnd[]   = { 2,  4,  7, 12, 19, 31, 63};
+
+    float maxEnergy = 0.0001f;  // avoid div-by-zero
+    float bandEnergy[7];
+    for (int b = 0; b < 7; b++) {
+        float sum = 0;
+        for (int i = bandStart[b]; i <= bandEnd[b] && i < SPECTRUM_FFT_SIZE / 2; i++) {
+            sum += magnitudes[i];
+        }
+        bandEnergy[b] = sum / (bandEnd[b] - bandStart[b] + 1);
+        if (bandEnergy[b] > maxEnergy) maxEnergy = bandEnergy[b];
+    }
+
+    // Normalize to 0.0 ~ 1.0 range relative to peak band
+    for (int b = 0; b < 7; b++) {
+        spectrumBands[b] = bandEnergy[b] / maxEnergy;
+    }
+}
+
+// Exported: Dart polls this every ~80ms to get 7-band spectrum
+void get_audio_spectrum(float *outBands, int count) {
+    if (!outBands || count <= 0) return;
+    if (!atomic_load(&isRecording)) {
+        memset(outBands, 0, sizeof(float) * (count < 7 ? count : 7));
+        return;
+    }
+    compute_spectrum();
+    int n = count < 7 ? count : 7;
+    memcpy(outBands, spectrumBands, sizeof(float) * n);
+}
 
 // AudioQueue Input Callback — runs on CoreAudio's AQClient thread.
 // IMPORTANT: This function NEVER calls Dart. It only writes to the ring buffer.
@@ -1285,15 +1364,13 @@ void set_preferred_device_uid(const char *uid) {
 // SIGNAL QUALITY ANALYSIS (Phase 3)
 // ============================================================================
 
-#import <Accelerate/Accelerate.h>
-
-// FFT setup for 512-sample analysis window
-static FFTSetup fftSetup = NULL;
+// FFT setup for 512-sample quality analysis window
+static FFTSetup qualityFFTSetup = NULL;
 static int log2n = 9; // 2^9 = 512
 
 static void ensureFFTSetup() {
-  if (fftSetup == NULL) {
-    fftSetup = vDSP_create_fftsetup(log2n, FFT_RADIX2);
+  if (qualityFFTSetup == NULL) {
+    qualityFFTSetup = vDSP_create_fftsetup(log2n, FFT_RADIX2);
     log_to_file("AudioQuality: FFT setup created (N=512)");
   }
 }
@@ -1340,7 +1417,7 @@ const char *analyze_audio_quality(const int16_t *samples, int sampleCount,
   vDSP_ctoz((DSPComplex *)windowedSamples, 2, &splitComplex, 1, N / 2);
 
   // Perform FFT
-  vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFT_FORWARD);
+  vDSP_fft_zrip(qualityFFTSetup, &splitComplex, 1, log2n, FFT_FORWARD);
 
   // Calculate magnitude squared for each bin
   float *magnitudes = (float *)malloc((N / 2) * sizeof(float));

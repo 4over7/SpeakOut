@@ -481,4 +481,24 @@ class NativeInputFFI implements NativeInputBase {
     if (!_clipboardBound) return;
     _injectClipboardEnd();
   }
+
+  // --- Audio Spectrum ---
+  late GetAudioSpectrumDart _getAudioSpectrum;
+  bool _spectrumBound = false;
+
+  @override
+  void getAudioSpectrum(Pointer<Float> outBands, int count) {
+    if (!_spectrumBound) {
+      try {
+        _getAudioSpectrum = _dylib
+            .lookup<NativeFunction<GetAudioSpectrumC>>('get_audio_spectrum')
+            .asFunction();
+        _spectrumBound = true;
+      } catch (e) {
+        _log("Spectrum FFI binding FAILED: $e");
+        return;
+      }
+    }
+    _getAudioSpectrum(outBands, count);
+  }
 }

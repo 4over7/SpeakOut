@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:math';
+import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
@@ -283,9 +285,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
   }
   
-  // Waveform Animation State
-  final List<double> _waveHeights = List.generate(7, (_) => 0.3);
+  // Waveform Animation State (FFT spectrum-driven)
+  final List<double> _waveHeights = List.generate(7, (_) => 0.0);
   Timer? _waveTimer;
+  // Pre-allocated native buffer for spectrum polling
+  ffi.Pointer<ffi.Float>? _spectrumBuffer;
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -315,6 +319,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _waveTimer?.cancel();
+    if (_spectrumBuffer != null) pkg_ffi.calloc.free(_spectrumBuffer!);
     _notificationTimer?.cancel();
     _statusSub?.cancel();
     _notifSub?.cancel();
@@ -324,16 +329,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.dispose();
   }
   
-  final _random = Random();
-  
+  static const double _spectrumThreshold = 0.02; // below this = silence
+
   void _startWaveAnimation() {
     _waveTimer?.cancel();
+    _spectrumBuffer ??= pkg_ffi.calloc<ffi.Float>(7);
     _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (mounted && _isRecording) {
+        _appService.engine.nativeInput?.getAudioSpectrum(_spectrumBuffer!, 7);
         setState(() {
-          for (int i = 0; i < _waveHeights.length; i++) {
-            // Match native: random height between 4-24px (normalized to 0.17-1.0)
-            _waveHeights[i] = 0.17 + _random.nextDouble() * 0.83;
+          // Check if total energy is above threshold
+          double totalEnergy = 0;
+          for (int i = 0; i < 7; i++) {
+            totalEnergy += _spectrumBuffer![i];
+          }
+          if (totalEnergy < _spectrumThreshold) {
+            // Silence: smoothly decay to near-zero
+            for (int i = 0; i < 7; i++) {
+              _waveHeights[i] = _waveHeights[i] * 0.6;
+            }
+          } else {
+            // Active: smooth toward FFT values (lerp for fluid animation)
+            for (int i = 0; i < 7; i++) {
+              final target = _spectrumBuffer![i].clamp(0.0, 1.0);
+              _waveHeights[i] = _waveHeights[i] * 0.3 + target * 0.7;
+            }
           }
         });
       }
