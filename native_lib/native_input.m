@@ -625,6 +625,9 @@ static _Atomic uint64_t ringReadPos = 0;  // monotonically increasing read curso
 // ---- Real-time Audio Level for Waveform Visualization ----
 // RMS of latest samples → single 0.0~1.0 value for UI to scale random animation.
 
+// Smoothed level with fast attack / slow decay (VU meter style)
+static float smoothedLevel = 0.0f;
+
 // Exported: returns current RMS audio level (0.0 = silence, 1.0 = loud).
 // Dart/Swift polls this every ~80ms.
 float get_audio_level(void) {
@@ -654,7 +657,15 @@ float get_audio_level(void) {
     float level = (db + 54.0f) / 14.0f;  // [-54dB, -40dB] → [0, 1]
     if (level < 0.0f) level = 0.0f;
     if (level > 1.0f) level = 1.0f;
-    return level;
+
+    // Asymmetric smoothing: instant attack, ~250ms decay
+    // At 80ms poll interval, decay factor 0.7 → half-life ~180ms
+    if (level >= smoothedLevel) {
+        smoothedLevel = level;           // instant rise
+    } else {
+        smoothedLevel = smoothedLevel * 0.7f + level * 0.3f;  // slow fall
+    }
+    return smoothedLevel;
 }
 
 // Legacy stub — kept for ABI compatibility if old code still links it.
