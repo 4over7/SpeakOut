@@ -671,20 +671,28 @@ static void compute_spectrum(void) {
     static const int bandStart[] = { 1,  3,  5,  8, 13, 20, 32};
     static const int bandEnd[]   = { 2,  4,  7, 12, 19, 31, 63};
 
-    float maxEnergy = 0.0001f;  // avoid div-by-zero
+    // Per-band gain compensation: boost higher frequencies that are naturally weaker
+    // in human voice. This makes all 7 bars visually active during speech.
+    static const float bandGain[] = { 1.0f, 1.5f, 2.5f, 4.0f, 6.0f, 10.0f, 16.0f };
+
     float bandEnergy[7];
     for (int b = 0; b < 7; b++) {
         float sum = 0;
         for (int i = bandStart[b]; i <= bandEnd[b] && i < SPECTRUM_FFT_SIZE / 2; i++) {
             sum += magnitudes[i];
         }
-        bandEnergy[b] = sum / (bandEnd[b] - bandStart[b] + 1);
-        if (bandEnergy[b] > maxEnergy) maxEnergy = bandEnergy[b];
+        // Average energy per bin, then apply gain compensation
+        bandEnergy[b] = (sum / (bandEnd[b] - bandStart[b] + 1)) * bandGain[b];
     }
 
-    // Normalize to 0.0 ~ 1.0 range relative to peak band
+    // Convert to dB scale for better visual dynamic range, then normalize
+    // dB = 10 * log10(energy), clamped to [-60dB, 0dB] → mapped to [0, 1]
+    static const float DB_FLOOR = -60.0f;
     for (int b = 0; b < 7; b++) {
-        spectrumBands[b] = bandEnergy[b] / maxEnergy;
+        float db = (bandEnergy[b] > 1e-10f) ? 10.0f * log10f(bandEnergy[b]) : DB_FLOOR;
+        if (db < DB_FLOOR) db = DB_FLOOR;
+        if (db > 0) db = 0;
+        spectrumBands[b] = (db - DB_FLOOR) / (-DB_FLOOR);  // 0.0 ~ 1.0
     }
 }
 

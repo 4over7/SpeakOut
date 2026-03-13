@@ -13,6 +13,27 @@ class AppDelegate: FlutterAppDelegate {
   // Mint Green accent color (#2ECC71)
   let accentColor = NSColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 1.0)
 
+  // FFT spectrum function pointer from native dylib
+  typealias GetAudioSpectrumFunc = @convention(c) (UnsafeMutablePointer<Float>, Int32) -> Void
+  var getAudioSpectrum: GetAudioSpectrumFunc?
+  var spectrumBuffer = [Float](repeating: 0, count: 7)
+
+  private func loadSpectrumFunction() {
+    if getAudioSpectrum != nil { return }
+    let bundle = Bundle.main
+    let dylibPath = bundle.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib"
+    guard let handle = dlopen(dylibPath, RTLD_NOW) else {
+      NSLog("[Overlay] Failed to load dylib: %@", String(cString: dlerror()))
+      return
+    }
+    guard let sym = dlsym(handle, "get_audio_spectrum") else {
+      NSLog("[Overlay] get_audio_spectrum symbol not found")
+      return
+    }
+    getAudioSpectrum = unsafeBitCast(sym, to: GetAudioSpectrumFunc.self)
+    NSLog("[Overlay] FFT spectrum function loaded")
+  }
+
   override func applicationDidFinishLaunching(_ notification: Notification) {
     // Setup MethodChannel for recording overlay control
     if let controller = mainFlutterWindow?.contentViewController as? FlutterViewController {
@@ -163,25 +184,31 @@ class AppDelegate: FlutterAppDelegate {
 
   private func startWaveAnimation() {
     isShowingRecording = true
+    loadSpectrumFunction()
 
     guard let panel = recordingOverlayWindow else { return }
     let panelHeight = panel.frame.height
 
     waveTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-      // Debug log every 1 second (approx 12 frames) to avoid flooding
-      // if Int.random(in: 0...12) == 0 { NSLog("[Overlay] Animation Frame") }
-
       guard let self = self, self.isShowingRecording else { return }
 
       let maxHeight: CGFloat = 24
       let minHeight: CGFloat = 4
       let waveY: CGFloat = (panelHeight - 24) / 2
 
-      // Animate each bar
-      for barView in self.waveformViews {
-        let randomHeight = CGFloat.random(in: minHeight...maxHeight)
-        // Center the bar vertically in the wave area
-        let yOffset = waveY + (24 - randomHeight) / 2
+      // Get FFT spectrum data from native lib
+      if let spectrumFunc = self.getAudioSpectrum {
+        self.spectrumBuffer.withUnsafeMutableBufferPointer { ptr in
+          spectrumFunc(ptr.baseAddress!, 7)
+        }
+      }
+
+      // Animate each bar based on spectrum
+      for (i, barView) in self.waveformViews.enumerated() {
+        let spectrum = i < self.spectrumBuffer.count ? CGFloat(self.spectrumBuffer[i]) : 0
+        let clampedSpectrum = min(max(spectrum, 0), 1)
+        let barHeight = minHeight + (maxHeight - minHeight) * clampedSpectrum
+        let yOffset = waveY + (maxHeight - barHeight) / 2
 
         NSAnimationContext.runAnimationGroup { context in
           context.duration = 0.08
@@ -189,7 +216,7 @@ class AppDelegate: FlutterAppDelegate {
             x: barView.frame.origin.x,
             y: yOffset,
             width: barView.frame.width,
-            height: randomHeight
+            height: barHeight
           )
         }
       }
