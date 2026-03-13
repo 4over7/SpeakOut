@@ -10,6 +10,7 @@ import '../config/app_constants.dart';
 import '../services/config_service.dart';
 import '../services/llm_service.dart';
 import '../services/vocab_service.dart';
+import '../services/notification_service.dart';
 import 'asr_provider.dart';
 import 'asr_result.dart';
 import 'providers/sherpa_provider.dart';
@@ -61,6 +62,8 @@ class CoreEngine {
   bool _activeModelHasPunctuation = false;
   
   Timer? _watchdogTimer; // Safety mechanism
+  Timer? _silenceCheckTimer;
+  int _silencePollCount = 0;
 
   // Recording state machine (replaces _isRecording, _isStopping, _audioStarted, _isDiaryMode)
   RecordingState _recordingState = RecordingState.idle;
@@ -690,6 +693,26 @@ class CoreEngine {
       // 6. START POLLING
       _startAudioPolling();
 
+      // 7. SILENCE DETECTION — warn if mic captures nothing for 2s
+      _silenceCheckTimer?.cancel();
+      _silencePollCount = 0;
+      _silenceCheckTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+        if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
+        final level = _nativeInput.getAudioLevel();
+        if (level < 0.01) {
+          _silencePollCount++;
+        } else {
+          _silencePollCount = 0;
+          timer.cancel(); // got audio, no need to keep checking
+        }
+        // 2 seconds of silence (10 × 200ms)
+        if (_silencePollCount >= 10) {
+          timer.cancel();
+          _log("Silence detected for 2s — mic may be unavailable");
+          NotificationService().notify('未检测到声音，请检查麦克风是否可用');
+        }
+      });
+
       // Transition: starting → recording
       _recordingState = RecordingState.recording;
       _log("Recording started (mode=${mode.name}).");
@@ -770,6 +793,7 @@ class CoreEngine {
      _toggleMaxTimer = null;
      _stopAudioPolling();
      _watchdogTimer?.cancel();
+     _silenceCheckTimer?.cancel();
      _recordingController.add(false);
      _overlay.hide();
   }
