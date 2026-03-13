@@ -260,7 +260,19 @@ class CoreEngine {
     // 2.5 Initialize Audio Device Service (Bluetooth detection)
     _audioDeviceService?.initialize();
     _log("Audio device service initialized. Auto-manage: ${_audioDeviceService?.autoManageEnabled}");
-    
+
+    // Restore user's preferred device from config
+    final savedDeviceId = ConfigService().audioInputDeviceId;
+    if (savedDeviceId != null && savedDeviceId.isNotEmpty) {
+      _log("Restoring preferred audio device: $savedDeviceId");
+      if (_audioDeviceService != null && _nativeInput!.isDeviceAvailable(savedDeviceId)) {
+        _audioDeviceService!.setInputDevice(savedDeviceId);
+        _audioDeviceService!.setPreferredDeviceUid(savedDeviceId);
+      } else {
+        _log("Saved device not available, using system default");
+      }
+    }
+
     // Check for Bluetooth mic at startup
     if (_audioDeviceService?.isCurrentInputBluetooth == true) {
       _log("Warning: Bluetooth mic detected at startup. Switching to built-in...");

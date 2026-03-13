@@ -226,6 +226,19 @@ class AudioDeviceService {
   /// Stream of device change events
   Stream<AudioDeviceEvent> get deviceChanges => _deviceChangeController.stream;
   
+  /// Whether the user chose "System Default" (no preferred device)
+  bool get isUsingSystemDefault {
+    final preferred = getPreferredDeviceUid();
+    return preferred.isEmpty || preferred == 'system';
+  }
+
+  /// Clear preferred device — follow system default
+  void clearPreferredDevice() {
+    _nativeInput.setPreferredDeviceUid('');
+    refreshDevices();
+    AppLog.d('[AudioDeviceService] Cleared preferred device, following system default');
+  }
+
   /// Set input device by UID
   bool setInputDevice(String deviceId) {
     final success = _nativeInput.setInputDevice(deviceId);

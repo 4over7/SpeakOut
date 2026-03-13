@@ -111,6 +111,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadAudioDevices();
   }
   
+  bool _useSystemDefaultAudio = true;
+
   void _loadAudioDevices() {
     final service = _engine.audioDeviceService;
     if (service == null) return;
@@ -119,6 +121,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _audioDevices = service.devices;
       _currentAudioDevice = service.currentDevice;
       _autoManageAudio = service.autoManageEnabled;
+      _useSystemDefaultAudio = service.isUsingSystemDefault;
     });
   }
   
@@ -781,7 +784,7 @@ class _SettingsPageState extends State<SettingsPage> {
           label: loc.audioInput,
           icon: CupertinoIcons.mic,
           child: MacosPopupButton<String>(
-            value: _currentAudioDevice?.id ?? 'system',
+            value: _useSystemDefaultAudio ? 'system' : (_currentAudioDevice?.id ?? 'system'),
             items: [
               MacosPopupMenuItem(
                 value: 'system',
@@ -803,14 +806,30 @@ class _SettingsPageState extends State<SettingsPage> {
               )),
             ],
             onChanged: (value) {
-              if (value == null || value == 'system') return;
+              if (value == null) return;
               final service = _engine.audioDeviceService;
               if (service == null) return;
-              service.setInputDevice(value);
+              if (value == 'system') {
+                service.clearPreferredDevice();
+                ConfigService().setAudioInputDeviceId(null);
+              } else {
+                service.setInputDevice(value);
+                final device = _audioDevices.firstWhere((d) => d.id == value, orElse: () => _audioDevices.first);
+                ConfigService().setAudioInputDeviceId(value, name: device.name);
+              }
               _loadAudioDevices();
             },
           ),
         ),
+        // Show current device info when using system default
+        if (_useSystemDefaultAudio && _currentAudioDevice != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 40, top: 4),
+            child: Text(
+              '当前系统设备: ${_currentAudioDevice!.name}',
+              style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+            ),
+          ),
         // Show Bluetooth warning if current device is Bluetooth
         if (isBluetooth)
           Padding(
