@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -53,6 +54,116 @@ class LLMService {
       return _correctTextAnthropic(input, vocabHints: vocabHints);
     }
     return _correctTextCloud(input, vocabHints: vocabHints);
+  }
+
+  /// Streaming version: yields incremental text chunks as they arrive from LLM.
+  /// Falls back to non-streaming for Anthropic/Ollama.
+  Stream<String> correctTextStream(String input, {List<String>? vocabHints}) async* {
+    if (input.trim().isEmpty) {
+      yield input;
+      return;
+    }
+    if (!ConfigService().aiCorrectionEnabled) {
+      _log("RAW INPUT (AI OFF): $input");
+      yield input;
+      return;
+    }
+
+    final providerType = ConfigService().llmProviderType;
+    if (providerType == 'ollama') {
+      yield await _correctTextOllama(input, vocabHints: vocabHints);
+      return;
+    }
+    final presetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == presetId,
+      orElse: () => AppConstants.kLlmPresets.last,
+    );
+    if (preset.apiFormat == LlmApiFormat.anthropic) {
+      yield await _correctTextAnthropic(input, vocabHints: vocabHints);
+      return;
+    }
+    yield* _correctTextCloudStream(input, vocabHints: vocabHints);
+  }
+
+  /// SSE streaming for OpenAI-compatible APIs
+  Stream<String> _correctTextCloudStream(String input, {List<String>? vocabHints}) async* {
+    final apiKey = ConfigService().llmApiKey;
+    final baseUrl = ConfigService().llmBaseUrl;
+    final model = ConfigService().llmModel;
+    final systemPrompt = ConfigService().aiCorrectionPrompt;
+
+    if (apiKey.isEmpty) {
+      _log("API Key MISSING. Returning input.");
+      yield input;
+      return;
+    }
+
+    _log("RAW INPUT: $input");
+    _log("Calling Cloud LLM (stream): $baseUrl, model=$model, inputLen=${input.length}");
+
+    try {
+      final client = _effectiveClient;
+      final uri = Uri.parse('$baseUrl/chat/completions');
+
+      final body = {
+        "model": model,
+        "messages": [
+          {"role": "system", "content": systemPrompt},
+          {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
+        ],
+        "temperature": 0.3,
+        "stream": true,
+      };
+
+      final request = http.Request('POST', uri)
+        ..headers.addAll({
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $apiKey",
+        })
+        ..body = jsonEncode(body);
+
+      final streamedResponse = await client.send(request).timeout(const Duration(seconds: 30));
+
+      if (streamedResponse.statusCode != 200) {
+        final respBody = await streamedResponse.stream.bytesToString();
+        _log("LLM STREAM ERROR: ${streamedResponse.statusCode} - $respBody");
+        yield input;
+        return;
+      }
+
+      final fullBuffer = StringBuffer();
+      String lineBuffer = '';
+
+      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+        lineBuffer += chunk;
+        final lines = lineBuffer.split('\n');
+        // Keep the last (possibly incomplete) line in buffer
+        lineBuffer = lines.removeLast();
+
+        for (final line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty || !trimmed.startsWith('data: ')) continue;
+          final data = trimmed.substring(6);
+          if (data == '[DONE]') continue;
+
+          try {
+            final json = jsonDecode(data);
+            final delta = json['choices']?[0]?['delta']?['content']?.toString();
+            if (delta != null && delta.isNotEmpty) {
+              fullBuffer.write(delta);
+              yield delta; // Yield incremental chunk
+            }
+          } catch (_) {}
+        }
+      }
+
+      final result = fullBuffer.toString().trim();
+      _log("LLM STREAM SUCCESS. Output differs: ${result != input}, totalLen=${result.length}");
+    } catch (e) {
+      _log("LLM STREAM EXCEPTION: $e");
+      yield input;
+    }
   }
 
   String _buildUserMessage(String input, {List<String>? vocabHints}) {

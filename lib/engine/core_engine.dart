@@ -850,8 +850,30 @@ class CoreEngine {
             vocabHints = VocabService().getVocabHints();
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
-          finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
-          _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done");
+
+          // Streaming: inject tokens as they arrive (typewriter effect)
+          if (mode != RecordingMode.diary) {
+            final streamBuffer = StringBuffer();
+            bool firstChunk = true;
+            await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints)) {
+              streamBuffer.write(chunk);
+              if (firstChunk) {
+                _log("[PERF] +${sw.elapsedMilliseconds}ms — first token received");
+                _overlay.updateText(""); // Clear overlay
+                firstChunk = false;
+              }
+              _nativeInput?.inject(chunk);
+            }
+            final streamResult = streamBuffer.toString().trim();
+            if (streamResult.isNotEmpty) {
+              finalText = streamResult;
+            }
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done, len=${finalText.length}");
+          } else {
+            // Diary mode: non-streaming (need complete text for file save)
+            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done");
+          }
         } catch (e) {
           _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");
         }
@@ -888,8 +910,13 @@ class CoreEngine {
             }
           });
           ChatService().addUserMessage(finalText);
-        } else {
+        } else if (!ConfigService().aiCorrectionEnabled) {
+          // Only inject here if AI polish didn't already stream-inject
           _nativeInput?.inject(finalText);
+          ChatService().addDictation(finalText);
+          _statusController.add("Ready");
+        } else {
+          // AI polish already injected via streaming
           ChatService().addDictation(finalText);
           _statusController.add("Ready");
         }
