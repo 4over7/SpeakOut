@@ -840,6 +840,7 @@ class CoreEngine {
       }
 
       // AI Polish (with vocab hints injected into LLM prompt)
+      bool streamInjected = false;
       if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {
         _statusController.add("AI 润色中...");
         _overlay.updateText("🤖 AI Polishing...");
@@ -851,22 +852,33 @@ class CoreEngine {
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
 
-          // Use streaming to reduce wait time (collect full result, inject once)
+          // Streaming: typewriter inject — each token injected with small delay
           if (mode != RecordingMode.diary) {
             final streamBuffer = StringBuffer();
             bool firstChunk = true;
+            bool streamOk = false;
             await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints)) {
               streamBuffer.write(chunk);
               if (firstChunk) {
                 _log("[PERF] +${sw.elapsedMilliseconds}ms — first token received");
+                _overlay.updateText("");
                 firstChunk = false;
+                streamOk = true;
               }
+              _nativeInput?.inject(chunk);
+              // Small delay between inject calls to let CGEvent queue drain
+              await Future.delayed(const Duration(milliseconds: 15));
             }
             final polished = streamBuffer.toString().trim();
             if (polished.isNotEmpty) {
               finalText = polished;
             }
-            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done, len=${finalText.length}");
+            streamInjected = streamOk;
+            if (streamOk) {
+              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
+            } else {
+              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream fallback, len=${finalText.length}");
+            }
           } else {
             // Diary mode: non-streaming (need complete text for file save)
             finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
@@ -909,7 +921,9 @@ class CoreEngine {
           });
           ChatService().addUserMessage(finalText);
         } else {
-          _nativeInput?.inject(finalText);
+          if (!streamInjected) {
+            _nativeInput?.inject(finalText);
+          }
           ChatService().addDictation(finalText);
           _statusController.add("Ready");
         }
