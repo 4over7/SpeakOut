@@ -658,12 +658,12 @@ float get_audio_level(void) {
     if (level < 0.0f) level = 0.0f;
     if (level > 1.0f) level = 1.0f;
 
-    // Asymmetric smoothing: instant attack, ~250ms decay
-    // At 80ms poll interval, decay factor 0.7 → half-life ~180ms
+    // Asymmetric smoothing: instant attack, ~500ms decay
+    // At 80ms poll interval, decay factor 0.88 → half-life ~460ms
     if (level >= smoothedLevel) {
         smoothedLevel = level;           // instant rise
     } else {
-        smoothedLevel = smoothedLevel * 0.7f + level * 0.3f;  // slow fall
+        smoothedLevel = smoothedLevel * 0.88f + level * 0.12f;  // slow fall
     }
     return smoothedLevel;
 }
