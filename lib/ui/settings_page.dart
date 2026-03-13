@@ -1045,6 +1045,30 @@ class _SettingsPageState extends State<SettingsPage> {
             if (ConfigService().aiCorrectionEnabled) ...[
               const SettingsDivider(),
               SettingsTile(
+                label: '打字机效果（Alpha）',
+                subtitle: '流式输出时逐步注入文字到光标处。会临时占用剪贴板。',
+                icon: CupertinoIcons.text_cursor,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
+                      ),
+                      child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
+                    ),
+                    const SizedBox(width: 8),
+                    MacosSwitch(
+                      value: ConfigService().typewriterEnabled,
+                      onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState((){}); },
+                    ),
+                  ],
+                ),
+              ),
+              const SettingsDivider(),
+              SettingsTile(
                 label: loc.llmProvider,
                 icon: CupertinoIcons.arrow_right_arrow_left,
                 child: MacosPopupButton<String>(

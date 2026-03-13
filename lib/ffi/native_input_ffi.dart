@@ -432,4 +432,53 @@ class NativeInputFFI implements NativeInputBase {
     if (!_qualityBound) return false;
     return _isLikelyTelephoneQuality() == 1;
   }
+
+  // ============ CLIPBOARD STREAMING INJECTION ============
+
+  bool _clipboardBound = false;
+  late InjectClipboardBeginDart _injectClipboardBegin;
+  late InjectClipboardChunkDart _injectClipboardChunk;
+  late InjectClipboardEndDart _injectClipboardEnd;
+
+  void _bindClipboardFunctions() {
+    if (_clipboardBound) return;
+    try {
+      _injectClipboardBegin = _dylib
+          .lookup<NativeFunction<InjectClipboardBeginC>>('inject_clipboard_begin')
+          .asFunction();
+      _injectClipboardChunk = _dylib
+          .lookup<NativeFunction<InjectClipboardChunkC>>('inject_clipboard_chunk')
+          .asFunction();
+      _injectClipboardEnd = _dylib
+          .lookup<NativeFunction<InjectClipboardEndC>>('inject_clipboard_end')
+          .asFunction();
+      _clipboardBound = true;
+      _log("Clipboard streaming FFI bindings SUCCESS");
+    } catch (e) {
+      _log("Clipboard streaming FFI bindings FAILED: $e");
+    }
+  }
+
+  @override
+  void injectClipboardBegin() {
+    _bindClipboardFunctions();
+    if (!_clipboardBound) return;
+    _injectClipboardBegin();
+  }
+
+  @override
+  void injectClipboardChunk(String text) {
+    _bindClipboardFunctions();
+    if (!_clipboardBound) return;
+    final ptr = text.toNativeUtf8();
+    _injectClipboardChunk(ptr);
+    calloc.free(ptr);
+  }
+
+  @override
+  void injectClipboardEnd() {
+    _bindClipboardFunctions();
+    if (!_clipboardBound) return;
+    _injectClipboardEnd();
+  }
 }

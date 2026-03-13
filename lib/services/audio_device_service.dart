@@ -4,6 +4,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import '../ffi/native_input_base.dart';
+import 'config_service.dart';
 import 'notification_service.dart';
 import 'package:speakout/config/app_log.dart';
 
@@ -135,35 +136,40 @@ class AudioDeviceService {
       isBluetooth: isBluetooth,
     ));
 
-    // Check only the device we actually care about: is our preferred device
-    // still available? Uses O(1) UID lookup — no device enumeration, no blocking.
-    final preferred = getPreferredDeviceUid();
-    if (preferred.isNotEmpty) {
-      if (_nativeInput.isDeviceAvailable(preferred)) {
+    // Check if our preferred device is still available
+    final savedId = ConfigService().audioInputDeviceId;
+    if (savedId != null && savedId.isNotEmpty) {
+      if (_nativeInput.isDeviceAvailable(savedId)) {
         AppLog.d('[AudioDeviceService] Preferred device still available, no action needed');
         return;
       }
-      AppLog.d('[AudioDeviceService] Preferred device gone, falling back to built-in');
+      // Preferred device gone — clear config and C layer
+      AppLog.d('[AudioDeviceService] Preferred device gone, clearing preference → system default');
+      ConfigService().setAudioInputDeviceId(null);
+      clearPreferredDevice();
+
+      if (showSwitchNotifications) {
+        NotificationService().notify('音频设备已断开，已切换到系统默认');
+      }
+      return;
     }
 
-    // Preferred device is gone (or none set) — fall back to built-in mic
-    if (autoManageEnabled) {
-      _handleBluetoothMicDetected(deviceName);
+    // No preferred device — auto-manage Bluetooth if enabled
+    if (autoManageEnabled && isBluetooth) {
+      _handleBluetoothDetected(deviceName);
     }
   }
-  
-  void _handleBluetoothMicDetected(String bluetoothDeviceName) {
-    AppLog.d('[AudioDeviceService] Bluetooth mic detected, auto-switching to built-in...');
-    
-    final success = switchToBuiltinMic();
-    
-    if (success && showSwitchNotifications) {
+
+  void _handleBluetoothDetected(String bluetoothDeviceName) {
+    AppLog.d('[AudioDeviceService] Bluetooth mic detected as system default, suggesting built-in...');
+
+    if (showSwitchNotifications) {
       NotificationService().notifyWithAction(
-        message: '已自动切换到高质量麦克风，转写更准确',
-        actionLabel: '仍用耳机麦',
+        message: '检测到蓝牙麦克风，建议使用内置麦克风以获得更好的转写效果',
+        actionLabel: '切换到内置麦克风',
         onAction: () {
-          switchToBluetoothMic();
-          NotificationService().notify('已切换回耳机麦克风');
+          switchToBuiltinMic();
+          NotificationService().notify('已切换到内置麦克风');
         },
         type: NotificationType.audioDeviceSwitch,
         duration: const Duration(seconds: 6),
@@ -227,9 +233,10 @@ class AudioDeviceService {
   Stream<AudioDeviceEvent> get deviceChanges => _deviceChangeController.stream;
   
   /// Whether the user chose "System Default" (no preferred device)
+  /// Uses ConfigService as single source of truth, not C layer.
   bool get isUsingSystemDefault {
-    final preferred = getPreferredDeviceUid();
-    return preferred.isEmpty || preferred == 'system';
+    final savedId = ConfigService().audioInputDeviceId;
+    return savedId == null || savedId.isEmpty;
   }
 
   /// Clear preferred device — follow system default

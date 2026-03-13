@@ -98,6 +98,14 @@ typedef SetDebugLoggingDart = void Function(int enabled);
 typedef SetLogDirectoryC = Void Function(Pointer<Utf8> dir);
 typedef SetLogDirectoryDart = void Function(Pointer<Utf8> dir);
 
+// Clipboard streaming injection
+typedef InjectClipboardBeginC = Void Function();
+typedef InjectClipboardBeginDart = void Function();
+typedef InjectClipboardChunkC = Void Function(Pointer<Utf8> text);
+typedef InjectClipboardChunkDart = void Function(Pointer<Utf8> text);
+typedef InjectClipboardEndC = Void Function();
+typedef InjectClipboardEndDart = void Function();
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
@@ -135,4 +143,9 @@ abstract class NativeInputBase {
   // Signal Quality Analysis
   String analyzeAudioQuality(Pointer<Int16> samples, int sampleCount, int sampleRate);
   bool isLikelyTelephoneQuality();
+
+  // Clipboard streaming injection (for typewriter effect)
+  void injectClipboardBegin();
+  void injectClipboardChunk(String text);
+  void injectClipboardEnd();
 }

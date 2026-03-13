@@ -70,6 +70,7 @@ class CoreEngine {
   // Keep Offline Punctuation & Debugging related fields
   sherpa.OfflinePunctuation? _punctuation;
   bool _punctuationEnabled = false;
+  bool _typewriterInjected = false;
 
   // Configuration
   int pttKeyCode = 58; 
@@ -266,17 +267,21 @@ class CoreEngine {
     if (savedDeviceId != null && savedDeviceId.isNotEmpty) {
       _log("Restoring preferred audio device: $savedDeviceId");
       if (_audioDeviceService != null && _nativeInput!.isDeviceAvailable(savedDeviceId)) {
-        _audioDeviceService!.setInputDevice(savedDeviceId);
-        _audioDeviceService!.setPreferredDeviceUid(savedDeviceId);
+        // Only set preferredDeviceUID in C layer — AudioQueue will use it at recording time
+        _nativeInput!.setPreferredDeviceUid(savedDeviceId);
+        _log("Preferred device set: $savedDeviceId");
       } else {
-        _log("Saved device not available, using system default");
+        _log("Saved device '$savedDeviceId' not available, clearing preference → system default");
+        await ConfigService().setAudioInputDeviceId(null);
+        _audioDeviceService?.clearPreferredDevice();
       }
     }
 
-    // Check for Bluetooth mic at startup
-    if (_audioDeviceService?.isCurrentInputBluetooth == true) {
-      _log("Warning: Bluetooth mic detected at startup. Switching to built-in...");
-      _audioDeviceService?.switchToBuiltinMic();
+    // Bluetooth auto-manage: only when user hasn't manually selected a device
+    if (savedDeviceId == null && _audioDeviceService?.isCurrentInputBluetooth == true) {
+      _log("Warning: Bluetooth mic detected as system default (no user preference). Notifying user.");
+      // Don't force-switch — just log. The auto-manage handler in AudioDeviceService
+      // will show a notification if a BT device becomes default during usage.
     }
 
     // 2. Init Native Listener
@@ -840,8 +845,10 @@ class CoreEngine {
       }
 
       // AI Polish (with vocab hints injected into LLM prompt)
-      bool streamInjected = false;
-      if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled) {
+      // Skip LLM for trivial input: pure punctuation, whitespace, or ≤2 chars
+      final _trimmedForCheck = finalText.replaceAll(RegExp(r'[\s\p{P}]', unicode: true), '');
+      final _shouldCallLlm = finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && _trimmedForCheck.length > 2;
+      if (_shouldCallLlm) {
         _statusController.add("AI 润色中...");
         _overlay.updateText("🤖 AI Polishing...");
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
@@ -852,49 +859,55 @@ class CoreEngine {
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
 
-          // Streaming: typewriter inject with batching
-          // CGEvent inject needs ~50ms between calls to avoid event duplication.
-          // We batch tokens and flush every 80ms for smooth typewriter effect.
-          if (mode != RecordingMode.diary) {
+          if (mode != RecordingMode.diary && ConfigService().typewriterEnabled) {
+            // Typewriter mode (alpha): streaming LLM + clipboard injection
             final streamBuffer = StringBuffer();
             final batchBuffer = StringBuffer();
             bool firstChunk = true;
-            bool streamOk = false;
+            bool streamInjected = false;
             var lastInjectTime = DateTime.now();
-            const batchInterval = Duration(milliseconds: 80);
+            const batchInterval = Duration(milliseconds: 120);
+
+            _nativeInput?.injectClipboardBegin();
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — typewriter mode: clipboard begin");
 
             await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints)) {
               streamBuffer.write(chunk);
               batchBuffer.write(chunk);
               if (firstChunk) {
                 _log("[PERF] +${sw.elapsedMilliseconds}ms — first token received");
-                _overlay.updateText("");
                 firstChunk = false;
-                streamOk = true;
               }
-              // Flush batch if enough time has passed
+
+              // Flush batch via clipboard paste
               final now = DateTime.now();
               if (now.difference(lastInjectTime) >= batchInterval && batchBuffer.isNotEmpty) {
-                _nativeInput?.inject(batchBuffer.toString());
+                _nativeInput?.injectClipboardChunk(batchBuffer.toString());
                 batchBuffer.clear();
                 lastInjectTime = now;
-                await Future.delayed(const Duration(milliseconds: 30));
+                streamInjected = true;
               }
             }
+
             // Flush remaining batch
             if (batchBuffer.isNotEmpty) {
-              _nativeInput?.inject(batchBuffer.toString());
+              _nativeInput?.injectClipboardChunk(batchBuffer.toString());
+              streamInjected = true;
             }
+            _nativeInput?.injectClipboardEnd();
+
             final polished = streamBuffer.toString().trim();
             if (polished.isNotEmpty) {
               finalText = polished;
             }
-            streamInjected = streamOk;
-            if (streamOk) {
-              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
-            } else {
-              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream fallback, len=${finalText.length}");
+            if (streamInjected) {
+              _typewriterInjected = true;
             }
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
+          } else if (mode != RecordingMode.diary) {
+            // Normal mode: non-streaming LLM, inject once at end
+            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done, len=${finalText.length}");
           } else {
             // Diary mode: non-streaming (need complete text for file save)
             finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
@@ -903,6 +916,8 @@ class CoreEngine {
         } catch (e) {
           _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");
         }
+      } else if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && _trimmedForCheck.length <= 2) {
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: '${finalText}')");
       } else if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
         // Offline fallback: direct replacement when AI is disabled
         finalText = VocabService().applyReplacements(finalText);
@@ -937,9 +952,10 @@ class CoreEngine {
           });
           ChatService().addUserMessage(finalText);
         } else {
-          if (!streamInjected) {
+          if (!_typewriterInjected) {
             _nativeInput?.inject(finalText);
           }
+          _typewriterInjected = false;
           ChatService().addDictation(finalText);
           _statusController.add("Ready");
         }

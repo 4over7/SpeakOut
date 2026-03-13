@@ -330,6 +330,8 @@ static bool is_terminal_app(void) {
 }
 
 // Inject via CGEvent keyboard events (works for most GUI apps)
+// Uses kCGEventSourceStatePrivate to avoid conflicts with real HID events,
+// and creates fresh CGEvent objects per chunk to prevent async post races.
 static void inject_via_keyboard(const char *text) {
   CFStringRef cfStr =
       CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8);
@@ -343,17 +345,8 @@ static void inject_via_keyboard(const char *text) {
   }
 
   CGEventSourceRef source =
-      CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+      CGEventSourceCreate(kCGEventSourceStatePrivate);
   if (!source) {
-    CFRelease(cfStr);
-    return;
-  }
-  CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 0, true);
-  CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 0, false);
-  if (!keyDown || !keyUp) {
-    if (keyDown) CFRelease(keyDown);
-    if (keyUp) CFRelease(keyUp);
-    CFRelease(source);
     CFRelease(cfStr);
     return;
   }
@@ -377,16 +370,32 @@ static void inject_via_keyboard(const char *text) {
     }
 
     CFStringGetCharacters(cfStr, CFRangeMake(i, chunkLen), buffer);
+
+    // Create fresh events per chunk — reusing events causes races with async CGEventPost
+    CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 0, true);
+    CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 0, false);
+    if (!keyDown || !keyUp) {
+      if (keyDown) CFRelease(keyDown);
+      if (keyUp) CFRelease(keyUp);
+      break;
+    }
+
     CGEventKeyboardSetUnicodeString(keyDown, chunkLen, buffer);
     CGEventKeyboardSetUnicodeString(keyUp, chunkLen, buffer);
     CGEventPost(kCGHIDEventTap, keyDown);
     CGEventPost(kCGHIDEventTap, keyUp);
 
+    CFRelease(keyDown);
+    CFRelease(keyUp);
+
+    // Small delay between chunks to let the event queue drain
+    if (i + chunkLen < totalLen) {
+      usleep(3000); // 3ms
+    }
+
     i += chunkLen;
   }
 
-  CFRelease(keyDown);
-  CFRelease(keyUp);
   CFRelease(source);
   CFRelease(cfStr);
 }
@@ -448,6 +457,86 @@ static void inject_via_clipboard(const char *text) {
           if (savedItems != nil && savedItems.count > 0) {
             [pasteboard writeObjects:savedItems];
           }
+        });
+  }
+}
+
+// --- Streaming clipboard injection (for typewriter effect) ---
+// Saves clipboard once at begin, pastes each chunk, restores at end.
+static NSArray *_savedClipboardItems = nil;
+
+void inject_clipboard_begin(void) {
+  @autoreleasepool {
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    NSArray *oldContents = [pasteboard pasteboardItems];
+    if (oldContents.count > 0) {
+      NSMutableArray *items = [NSMutableArray array];
+      for (NSPasteboardItem *item in oldContents) {
+        NSPasteboardItem *copy = [[NSPasteboardItem alloc] init];
+        for (NSString *type in [item types]) {
+          NSData *data = [item dataForType:type];
+          if (data) {
+            [copy setData:data forType:type];
+          }
+        }
+        [items addObject:copy];
+      }
+      _savedClipboardItems = items;
+    } else {
+      _savedClipboardItems = nil;
+    }
+    log_to_file("Clipboard streaming: begin (saved %lu items)",
+                (unsigned long)(_savedClipboardItems ? _savedClipboardItems.count : 0));
+  }
+}
+
+void inject_clipboard_chunk(const char *text) {
+  if (text == NULL || text[0] == '\0')
+    return;
+
+  @autoreleasepool {
+    NSString *newText = [NSString stringWithUTF8String:text];
+    if (newText == nil || newText.length == 0)
+      return;
+
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard clearContents];
+    [pasteboard setString:newText forType:NSPasteboardTypeString];
+    usleep(10000); // 10ms for pasteboard propagation
+
+    CGEventSourceRef source =
+        CGEventSourceCreate(kCGEventSourceStatePrivate);
+    if (source) {
+      CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 9, true);
+      CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 9, false);
+      if (keyDown && keyUp) {
+        CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
+        CGEventSetFlags(keyUp, kCGEventFlagMaskCommand);
+        CGEventPost(kCGHIDEventTap, keyDown);
+        CGEventPost(kCGHIDEventTap, keyUp);
+      }
+      if (keyDown) CFRelease(keyDown);
+      if (keyUp) CFRelease(keyUp);
+      CFRelease(source);
+    }
+    usleep(30000); // 30ms for paste to complete before next chunk
+  }
+}
+
+void inject_clipboard_end(void) {
+  @autoreleasepool {
+    // Restore clipboard after a short delay
+    NSArray *saved = _savedClipboardItems;
+    _savedClipboardItems = nil;
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+          [pasteboard clearContents];
+          if (saved != nil && saved.count > 0) {
+            [pasteboard writeObjects:saved];
+          }
+          log_to_file("Clipboard streaming: end (restored)");
         });
   }
 }
@@ -520,6 +609,8 @@ int check_key_pressed(int keyCode) {
 #define RING_BUFFER_SAMPLES 480000
 
 // Audio Recording State
+static char preferredDeviceUID[256] = {0};
+static char builtInDeviceUID[256] = {0};
 static AudioQueueRef audioQueue = NULL;
 static AudioQueueBufferRef audioBuffers[NUM_BUFFERS];
 static atomic_bool isRecording = false;
@@ -635,6 +726,26 @@ int start_audio_recording() {
     return -2;
   }
 
+  // Set preferred input device if specified (non-empty and not "system")
+  if (preferredDeviceUID[0] != 0 &&
+      strcmp(preferredDeviceUID, "system") != 0) {
+    CFStringRef uid = CFStringCreateWithCString(NULL, preferredDeviceUID,
+                                                 kCFStringEncodingUTF8);
+    if (uid) {
+      OSStatus devStatus = AudioQueueSetProperty(
+          audioQueue, kAudioQueueProperty_CurrentDevice, &uid, sizeof(uid));
+      if (devStatus != noErr) {
+        log_to_file("Audio: Failed to set preferred device '%s', status=%d — falling back to system default",
+                     preferredDeviceUID, (int)devStatus);
+        // Clear preferred device so we don't keep failing
+        preferredDeviceUID[0] = 0;
+      } else {
+        log_to_file("Audio: Using preferred device '%s'", preferredDeviceUID);
+      }
+      CFRelease(uid);
+    }
+  }
+
   // Calculate buffer size for 100ms of audio
   UInt32 bufferByteSize =
       (UInt32)(audioFormat.mSampleRate * BUFFER_DURATION_MS / 1000.0 *
@@ -723,9 +834,7 @@ typedef void (*DartDeviceChangeCallback)(const char *deviceId,
                                          int isBluetooth);
 static DartDeviceChangeCallback deviceChangeCallback = NULL;
 
-// Stored preferred device UID
-static char preferredDeviceUID[256] = {0};
-static char builtInDeviceUID[256] = {0};
+// (moved to top of audio section for forward reference)
 
 // Get string property from audio device
 static NSString *getDeviceStringProperty(AudioObjectID deviceID,
@@ -1010,23 +1119,12 @@ int set_input_device(const char *deviceUID) {
     return 0;
   }
 
-  // Set as default input device
-  AudioObjectPropertyAddress setAddr = {
-      kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal,
-      kAudioObjectPropertyElementMain};
-
-  status =
-      AudioObjectSetPropertyData(kAudioObjectSystemObject, &setAddr, 0, NULL,
-                                 sizeof(AudioObjectID), &targetDevice);
-
-  if (status == noErr) {
-    log_to_file("AudioDevice: Set input device to: %s", deviceUID);
-    strncpy(preferredDeviceUID, deviceUID, sizeof(preferredDeviceUID) - 1);
-    return 1;
-  } else {
-    log_to_file("AudioDevice: Failed to set device, status=%d", (int)status);
-    return 0;
-  }
+  // Only set preferredDeviceUID — don't change macOS system default.
+  // The actual device switch happens in start_audio_recording() via
+  // kAudioQueueProperty_CurrentDevice, which only affects SpeakOut.
+  log_to_file("AudioDevice: Set preferred device to: %s", deviceUID);
+  strncpy(preferredDeviceUID, deviceUID, sizeof(preferredDeviceUID) - 1);
+  return 1;
 }
 
 // Check if a device with the given UID is currently available.
@@ -1170,17 +1268,9 @@ void stop_device_change_listener() {
   log_to_file("AudioDevice: Device change listener stopped");
 }
 
-// Get preferred high-quality device UID (user's choice or built-in)
+// Get preferred device UID. Returns empty string if using system default.
 const char *get_preferred_device_uid() {
-  if (preferredDeviceUID[0] != 0) {
-    return preferredDeviceUID;
-  }
-  if (builtInDeviceUID[0] != 0) {
-    return builtInDeviceUID;
-  }
-  // Trigger enumeration
-  get_audio_input_devices();
-  return builtInDeviceUID;
+  return preferredDeviceUID; // empty string = system default
 }
 
 // Set preferred high-quality device UID

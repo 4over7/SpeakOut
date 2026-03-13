@@ -319,6 +319,10 @@ class ConfigService {
   String get vocabUserEntriesJson => _prefs?.getString('vocab_user_entries') ?? '[]';
   Future<void> setVocabUserEntriesJson(String json) async => await _prefs?.setString('vocab_user_entries', json);
 
+  // --- Typewriter Effect (Alpha) ---
+  bool get typewriterEnabled => _prefs?.getBool('typewriter_enabled') ?? false;
+  Future<void> setTypewriterEnabled(bool v) async => await _prefs?.setBool('typewriter_enabled', v);
+
   // --- First Launch / Onboarding ---
   static const String _kOnboardingCompleted = 'onboarding_completed';
   
