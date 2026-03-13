@@ -56,9 +56,10 @@ fi
 
 # Code sign: inner components first, then the app bundle
 # This ensures TCC (permission database) recognizes the same identity across reinstalls
+ENTITLEMENTS="macos/Runner/Release.entitlements"
 echo "Signing with: $SIGN_IDENTITY"
 codesign -f -s "$SIGN_IDENTITY" "$NATIVE_LIB_DEST/libnative_input.dylib"
-codesign -f --deep -s "$SIGN_IDENTITY" "$SOURCE_APP"
+codesign -f --deep -s "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "$SOURCE_APP"
 
 echo "Installing ${APP_NAME} to ${DEST_DIR}..."
 

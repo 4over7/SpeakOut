@@ -44,14 +44,15 @@ cp "native_lib/libnative_input.dylib" "${STAGING_DIR}/${APP_NAME}.app/Contents/M
 ln -s /Applications "${STAGING_DIR}/Applications"
 
 # 2.5. Code Sign
+ENTITLEMENTS="macos/Runner/Release.entitlements"
 if security find-identity -v -p codesigning | grep -q "$SIGN_IDENTITY"; then
     echo "Signing with: $SIGN_IDENTITY"
     codesign -f -s "$SIGN_IDENTITY" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/libnative_input.dylib"
-    codesign -f --deep -s "$SIGN_IDENTITY" "${STAGING_DIR}/${APP_NAME}.app"
+    codesign -f --deep -s "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "${STAGING_DIR}/${APP_NAME}.app"
 else
     echo "⚠️  Signing identity not found, using ad-hoc signing"
     codesign -f -s "-" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/libnative_input.dylib"
-    codesign -f --deep -s "-" "${STAGING_DIR}/${APP_NAME}.app"
+    codesign -f --deep -s "-" --entitlements "$ENTITLEMENTS" "${STAGING_DIR}/${APP_NAME}.app"
 fi
 
 # 3. Create Temp DMG
