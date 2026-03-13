@@ -102,4 +102,9 @@ echo "Finalizing..."
 hdiutil convert "${DMG_TEMP_PATH}" -format UDZO -o "${DMG_FINAL_PATH}"
 rm -f "${DMG_TEMP_PATH}"
 
+# 6. Mount final DMG and open Finder window
+echo "Mounting DMG..."
+hdiutil attach "${DMG_FINAL_PATH}" -noautoopen
+open "/Volumes/${VOLUME_NAME}"
+
 echo "Done: ${DMG_FINAL_PATH}"
