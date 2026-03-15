@@ -521,4 +521,24 @@ class NativeInputFFI implements NativeInputBase {
     }
     return _getAudioLevel();
   }
+
+  // --- Terminal Detection ---
+  late CheckIsTerminalAppDart _checkIsTerminalApp;
+  bool _terminalCheckBound = false;
+
+  @override
+  bool isTerminalApp() {
+    if (!_terminalCheckBound) {
+      try {
+        _checkIsTerminalApp = _dylib
+            .lookup<NativeFunction<CheckIsTerminalAppC>>('check_is_terminal_app')
+            .asFunction();
+        _terminalCheckBound = true;
+      } catch (e) {
+        _log("TerminalCheck FFI binding FAILED: $e");
+        return false;
+      }
+    }
+    return _checkIsTerminalApp() == 1;
+  }
 }

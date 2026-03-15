@@ -330,6 +330,11 @@ static bool is_terminal_app(void) {
   }
 }
 
+// Exported: let Dart check if frontmost app is a terminal
+int check_is_terminal_app(void) {
+  return is_terminal_app() ? 1 : 0;
+}
+
 // Inject via CGEvent keyboard events (works for most GUI apps)
 // Uses kCGEventSourceStatePrivate to avoid conflicts with real HID events,
 // and creates fresh CGEvent objects per chunk to prevent async post races.

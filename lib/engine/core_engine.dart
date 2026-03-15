@@ -885,7 +885,10 @@ class CoreEngine {
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
 
-          if (mode != RecordingMode.diary && ConfigService().typewriterEnabled) {
+          final useTypewriter = mode != RecordingMode.diary
+              && ConfigService().typewriterEnabled
+              && !(_nativeInput?.isTerminalApp() ?? false);
+          if (useTypewriter) {
             // Typewriter mode (alpha): streaming LLM + clipboard injection
             final streamBuffer = StringBuffer();
             final batchBuffer = StringBuffer();

@@ -106,6 +106,10 @@ typedef GetAudioSpectrumDart = void Function(Pointer<Float> outBands, int count)
 typedef GetAudioLevelC = Float Function();
 typedef GetAudioLevelDart = double Function();
 
+// Terminal detection
+typedef CheckIsTerminalAppC = Int32 Function();
+typedef CheckIsTerminalAppDart = int Function();
+
 // Clipboard streaming injection
 typedef InjectClipboardBeginC = Void Function();
 typedef InjectClipboardBeginDart = void Function();
@@ -162,4 +166,7 @@ abstract class NativeInputBase {
 
   // Audio level (RMS 0.0~1.0 for waveform amplitude)
   double getAudioLevel();
+
+  // Check if frontmost app is a terminal emulator
+  bool isTerminalApp();
 }
