@@ -27,9 +27,12 @@ PWD=$(pwd)
 DMG_TEMP_PATH="${PWD}/${DMG_TEMP}"
 DMG_FINAL_PATH="${PWD}/${DMG_NAME}"
 
-# 1. Cleanup
+# 1. Cleanup — close Finder windows and eject ALL mounted SpeakOut volumes
 echo "Cleaning up..."
-hdiutil detach "/Volumes/${VOLUME_NAME}" -force >/dev/null 2>&1 || true
+osascript -e 'tell application "Finder" to close (every window whose name contains "SpeakOut")' 2>/dev/null || true
+for vol in /Volumes/SpeakOut*; do
+  [ -d "$vol" ] && hdiutil detach "$vol" -force >/dev/null 2>&1 || true
+done
 rm -f "${DMG_TEMP_PATH}" "${DMG_FINAL_PATH}"
 rm -rf "${STAGING_DIR}"
 mkdir -p "${STAGING_DIR}"
@@ -102,9 +105,12 @@ echo "Finalizing..."
 hdiutil convert "${DMG_TEMP_PATH}" -format UDZO -o "${DMG_FINAL_PATH}"
 rm -f "${DMG_TEMP_PATH}"
 
-# 6. Unmount any previously mounted SpeakOut DMG, then mount new one
-echo "Unmounting old DMG if present..."
-hdiutil detach "/Volumes/${VOLUME_NAME}" -force >/dev/null 2>&1 || true
+# 6. Close old Finder windows, eject all SpeakOut volumes, then mount new DMG
+echo "Ejecting old DMG..."
+osascript -e 'tell application "Finder" to close (every window whose name contains "SpeakOut")' 2>/dev/null || true
+for vol in /Volumes/SpeakOut*; do
+  [ -d "$vol" ] && hdiutil detach "$vol" -force >/dev/null 2>&1 || true
+done
 echo "Mounting DMG..."
 hdiutil attach "${DMG_FINAL_PATH}" -noautoopen
 open "/Volumes/${VOLUME_NAME}"
