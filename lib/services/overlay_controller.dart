@@ -41,6 +41,16 @@ class OverlayController {
     _invoke('updateStatus', {"text": display});
   }
 
+  void showSilenceHint() {
+    if (!_hasNativeOverlay) return;
+    _invoke('showSilenceHint');
+  }
+
+  void hideSilenceHint() {
+    if (!_hasNativeOverlay) return;
+    _invoke('hideSilenceHint');
+  }
+
   /// Show text on overlay, then clear after [delay].
   void showThenClear(String text, Duration delay) {
     if (!_hasNativeOverlay) return;

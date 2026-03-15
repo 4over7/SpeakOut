@@ -64,6 +64,7 @@ class CoreEngine {
   Timer? _watchdogTimer; // Safety mechanism
   Timer? _silenceCheckTimer;
   int _silencePollCount = 0;
+  DateTime? _lastSilenceNotify;
 
   // Recording state machine (replaces _isRecording, _isStopping, _audioStarted, _isDiaryMode)
   RecordingState _recordingState = RecordingState.idle;
@@ -693,25 +694,32 @@ class CoreEngine {
       // 6. START POLLING
       _startAudioPolling();
 
-      // 7. SILENCE DETECTION — warn if mic captures nothing for 2s
+      // 7. SILENCE DETECTION — soft reminder if mic captures nothing for 2s
       _silenceCheckTimer?.cancel();
       _silencePollCount = 0;
+      _lastSilenceNotify = null;
       _silenceCheckTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
         if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
         final level = _nativeInput.getAudioLevel();
         if (level < 0.01) {
           _silencePollCount++;
         } else {
+          if (_silencePollCount >= 10) {
+            // Was silent, now got audio — hide hint
+            _overlay.hideSilenceHint();
+          }
           _silencePollCount = 0;
-          timer.cancel(); // got audio, no need to keep checking
         }
-        // 2 seconds of silence (10 × 200ms)
+        // 2 seconds continuous silence (10 × 200ms), with 10s cooldown
         if (_silencePollCount >= 10) {
-          timer.cancel();
-          _log("Silence detected for 2s — mic may be unavailable");
-          // Show on both overlay and main UI (non-blocking, auto-dismiss)
-          _overlay.updateText('未检测到声音，请检查麦克风');
-          NotificationService().notify('未检测到声音，请检查麦克风是否可用');
+          final now = DateTime.now();
+          if (_lastSilenceNotify == null ||
+              now.difference(_lastSilenceNotify!).inSeconds >= 10) {
+            _lastSilenceNotify = now;
+            _log("Silence detected for 2s — mic may be unavailable");
+            _overlay.showSilenceHint();
+            NotificationService().notify('未检测到声音，请检查麦克风是否可用');
+          }
         }
       });
 

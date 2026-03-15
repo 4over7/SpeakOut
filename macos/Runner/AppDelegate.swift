@@ -7,6 +7,7 @@ class AppDelegate: FlutterAppDelegate {
   var waveformViews: [NSView] = []
   var waveTimer: Timer?
   var statusLabel: NSTextField?
+  var silenceHintWindow: NSPanel?
   var isShowingRecording = false
   var currentOverlayMode: String = "streaming" // "streaming" or "offline"
 
@@ -58,6 +59,12 @@ class AppDelegate: FlutterAppDelegate {
           result(nil)
         case "hideRecording":
           self?.hideRecordingOverlay()
+          result(nil)
+        case "showSilenceHint":
+          self?.showSilenceHint()
+          result(nil)
+        case "hideSilenceHint":
+          self?.hideSilenceHint()
           result(nil)
         case "pickDirectory":
           self?.pickDirectory(result: result)
@@ -217,12 +224,60 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
+  private func showSilenceHint() {
+    guard let overlay = recordingOverlayWindow else { return }
+    if silenceHintWindow != nil { return } // already showing
+
+    let hintText = "🎤 未检测到声音"
+    let hintWidth: CGFloat = 140
+    let hintHeight: CGFloat = 22
+    let overlayFrame = overlay.frame
+    let hintX = overlayFrame.origin.x + (overlayFrame.width - hintWidth) / 2
+    let hintY = overlayFrame.origin.y - hintHeight - 4
+
+    let panel = NSPanel(
+      contentRect: NSRect(x: hintX, y: hintY, width: hintWidth, height: hintHeight),
+      styleMask: [.borderless, .nonactivatingPanel],
+      backing: .buffered, defer: false
+    )
+    panel.level = .floating
+    panel.backgroundColor = .clear
+    panel.isOpaque = false
+    panel.hasShadow = false
+    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+    let bg = NSView(frame: NSRect(x: 0, y: 0, width: hintWidth, height: hintHeight))
+    bg.wantsLayer = true
+    bg.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
+    bg.layer?.cornerRadius = hintHeight / 2
+
+    let label = NSTextField(frame: NSRect(x: 8, y: 1, width: hintWidth - 16, height: hintHeight - 2))
+    label.stringValue = hintText
+    label.alignment = .center
+    label.isEditable = false
+    label.isBordered = false
+    label.drawsBackground = false
+    label.textColor = NSColor.white.withAlphaComponent(0.7)
+    label.font = NSFont.systemFont(ofSize: 10, weight: .regular)
+    bg.addSubview(label)
+
+    panel.contentView = bg
+    panel.orderFront(nil)
+    silenceHintWindow = panel
+  }
+
+  private func hideSilenceHint() {
+    silenceHintWindow?.orderOut(nil)
+    silenceHintWindow = nil
+  }
+
   private func hideRecordingOverlay() {
     NSLog("[Overlay] hideRecordingOverlay called")
     isShowingRecording = false
     waveTimer?.invalidate()
     waveTimer = nil
     recordingOverlayWindow?.orderOut(nil)
+    hideSilenceHint()
   }
 
   private func pickFile(result: @escaping FlutterResult) {

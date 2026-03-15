@@ -169,26 +169,45 @@ class _SettingsPageState extends State<SettingsPage> {
   }
   
   Future<void> _saveHotkeyConfig(int keyCode, String keyName) async {
+    final config = ConfigService();
+    final isInputGroup = _isCapturingKey || _isCapturingToggleInputKey;
+    final isDiaryGroup = _isCapturingDiaryKey || _isCapturingToggleDiaryKey;
+
+    // Cross-group conflict check: input keys vs diary keys (skip disabled keys = 0)
+    if (isInputGroup) {
+      final diaryKeys = [config.diaryKeyCode, config.toggleDiaryKeyCode].where((k) => k != 0);
+      if (diaryKeys.contains(keyCode)) {
+        _showHotkeyConflict(keyName, true);
+        return;
+      }
+    } else if (isDiaryGroup) {
+      final inputKeys = [config.pttKeyCode, config.toggleInputKeyCode].where((k) => k != 0);
+      if (inputKeys.contains(keyCode)) {
+        _showHotkeyConflict(keyName, false);
+        return;
+      }
+    }
+
     if (_isCapturingToggleInputKey) {
-       await ConfigService().setToggleInputKey(keyCode, keyName);
+       await config.setToggleInputKey(keyCode, keyName);
        setState(() {
          _toggleInputKeyName = keyName;
          _isCapturingToggleInputKey = false;
        });
     } else if (_isCapturingToggleDiaryKey) {
-       await ConfigService().setToggleDiaryKey(keyCode, keyName);
+       await config.setToggleDiaryKey(keyCode, keyName);
        setState(() {
          _toggleDiaryKeyName = keyName;
          _isCapturingToggleDiaryKey = false;
        });
     } else if (_isCapturingDiaryKey) {
-       await ConfigService().setDiaryKey(keyCode, keyName);
+       await config.setDiaryKey(keyCode, keyName);
        setState(() {
          _diaryKeyName = keyName;
          _isCapturingDiaryKey = false;
        });
     } else {
-       await ConfigService().setPttKey(keyCode, keyName);
+       await config.setPttKey(keyCode, keyName);
        _engine.pttKeyCode = keyCode;
        setState(() {
          _currentKeyCode = keyCode;
@@ -196,6 +215,25 @@ class _SettingsPageState extends State<SettingsPage> {
          _isCapturingKey = false;
        });
     }
+  }
+
+  void _showHotkeyConflict(String keyName, bool conflictsWithDiary) {
+    final loc = AppLocalizations.of(context)!;
+    final target = conflictsWithDiary ? loc.diaryMode : loc.tabTrigger;
+    _stopKeyCapture();
+    showMacosAlertDialog(
+      context: context,
+      builder: (_) => MacosAlertDialog(
+        appIcon: const Icon(CupertinoIcons.exclamationmark_triangle, size: 48, color: Colors.orange),
+        title: Text('$keyName 已被 $target 使用', style: const TextStyle(fontWeight: FontWeight.bold)),
+        message: const Text('文本注入和闪念笔记不能使用相同的热键，请选择其他按键。'),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          child: const Text('好的'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
   }
   
   // --- Key Capture Logic ---
