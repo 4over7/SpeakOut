@@ -504,6 +504,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importing => 'Importing...';
 
   @override
+  String get tabWorkMode => 'Work Mode';
+
+  @override
+  String get workModeOffline => 'Offline Mode';
+
+  @override
+  String get workModeOfflineDesc =>
+      'Local Sherpa recognition, fully offline and private';
+
+  @override
+  String get workModeOfflineIcon => 'Privacy-first, zero network dependency';
+
+  @override
+  String get workModeSmart => 'Smart Mode';
+
+  @override
+  String get workModeSmartDesc =>
+      'Local recognition + AI polish. Fixes homophones, removes filler words';
+
+  @override
+  String get workModeCloud => 'Cloud Recognition';
+
+  @override
+  String get workModeCloudDesc =>
+      'Aliyun high-accuracy recognition, requires internet';
+
+  @override
+  String get workModeAdvanced => 'Advanced Settings';
+
+  @override
   String get tabAiPolish => 'AI Polish';
 
   @override

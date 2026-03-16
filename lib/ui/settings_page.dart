@@ -42,10 +42,6 @@ class _SettingsPageState extends State<SettingsPage> {
   String? _activatingId; // Only one model can be activating at a time
   String? _activeModelId;
   
-  // Cloud State
-  String _asrEngineType = 'sherpa';
-
-
   final TextEditingController _akIdController = TextEditingController();
   final TextEditingController _akSecretController = TextEditingController();
   final TextEditingController _appKeyController = TextEditingController();
@@ -77,6 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
   (bool, String)? _llmTestResult;
   bool _showApiKey = false;
   bool _llmConfigDirty = false; // True when LLM config has unsaved changes
+  bool _workModeAdvancedExpanded = false;
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
   StreamSubscription<int>? _keySubscription;
@@ -97,8 +94,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _tabController = MacosTabController(initialIndex: 0, length: 5);
     _tabController.addListener(() {
       final newIndex = _tabController.index;
-      // Warn if leaving AI Polish tab with unsaved changes
-      if (_selectedIndex == 4 && newIndex != 4 && _llmConfigDirty) {
+      // Warn if leaving Work Mode tab with unsaved LLM changes
+      if (_selectedIndex == 1 && newIndex != 1 && _llmConfigDirty) {
         _showUnsavedChangesDialog(newIndex);
         return;
       }
@@ -129,7 +126,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadAliyunConfig() async {
     final s = ConfigService();
     setState(() {
-      _asrEngineType = s.asrEngineType;
       _akIdController.text = s.aliyunAccessKeyId;
       _akSecretController.text = s.aliyunAccessKeySecret;
       _appKeyController.text = s.aliyunAppKey;
@@ -521,7 +517,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 1 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabModels, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : null)),
+                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 2 ? AppTheme.accentColor : MacosColors.systemGrayColor),
@@ -532,26 +528,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.sparkles, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Row(
-                  children: [
-                    Text(loc.tabAiPolish, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: MacosColors.systemOrangeColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.5)),
-                      ),
-                      child: const Text('Beta', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemOrangeColor)),
-                    ),
-                  ],
-                ),
-              ),
-              SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
               ),
             ],
           );
@@ -571,12 +549,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Builder(builder: (_) {
-                    // AI 润色页自己管理滚动（底部固定保存栏）
-                    if (_selectedIndex == 4) return _buildAiPolishView();
+                    // Work Mode page manages its own scroll (fixed bottom save bar)
+                    if (_selectedIndex == 1) return _buildWorkModeView();
                     return SingleChildScrollView(
                       child: Builder(builder: (_) {
                          if (_selectedIndex == 0) return _buildGeneralView();
-                         if (_selectedIndex == 1) return _buildModelsView();
                          if (_selectedIndex == 2) return _buildTriggerView();
                          if (_selectedIndex == 3) return _buildDiaryView();
                          return _buildAboutView(context, _version);
@@ -592,178 +569,614 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
   
-  // --- View: Models ---
-  Widget _buildModelsView() {
+  // --- View: Work Mode (merged Models + AI Polish) ---
+  Widget _buildWorkModeView() {
     final loc = AppLocalizations.of(context)!;
+    final currentMode = ConfigService().workMode;
+    final currentPresetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == currentPresetId,
+      orElse: () => AppConstants.kLlmPresets.last,
+    );
+
     return Column(
       children: [
-        SettingsGroup(
-          title: loc.engineType,
+        Expanded(child: SingleChildScrollView(child: Column(
           children: [
-             SettingsTile(
-               label: loc.engineLocal,
-               child: MacosRadioButton(
-                 groupValue: _asrEngineType,
-                 value: 'sherpa',
-                 onChanged: (v) async { if(v!=null) { await ConfigService().setAsrEngineType(v); setState(()=>_asrEngineType=v); } },
-               ),
-             ),
-             const SettingsDivider(),
-             SettingsTile(
-               label: loc.engineCloud,
-               child: MacosRadioButton(
-                 groupValue: _asrEngineType,
-                 value: 'aliyun',
-                 onChanged: (v) async { if(v!=null) { await ConfigService().setAsrEngineType(v); setState(()=>_asrEngineType=v); } },
-               ),
-             ),
+            // Mode selector
+            SettingsGroup(
+              title: loc.tabWorkMode,
+              children: [
+                _buildModeRadio(
+                  value: 'offline',
+                  groupValue: currentMode,
+                  icon: CupertinoIcons.lock_shield,
+                  label: loc.workModeOffline,
+                  description: loc.workModeOfflineDesc,
+                ),
+                const SettingsDivider(),
+                _buildModeRadio(
+                  value: 'smart',
+                  groupValue: currentMode,
+                  icon: CupertinoIcons.sparkles,
+                  label: loc.workModeSmart,
+                  description: loc.workModeSmartDesc,
+                  badge: loc.recommended,
+                ),
+                const SettingsDivider(),
+                _buildModeRadio(
+                  value: 'cloud',
+                  groupValue: currentMode,
+                  icon: CupertinoIcons.cloud,
+                  label: loc.workModeCloud,
+                  description: loc.workModeCloudDesc,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Mode-specific config
+            if (currentMode == 'smart') ...[
+              // Warning banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        loc.aiPolishWarning,
+                        style: AppTheme.caption(context).copyWith(
+                          color: MacosColors.systemOrangeColor,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildSmartModeConfig(loc),
+            ],
+
+            if (currentMode == 'cloud') ...[
+              _buildCloudModeConfig(loc),
+            ],
+
+            if (currentMode == 'offline') ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemGreenColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MacosColors.systemGreenColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        loc.workModeOfflineIcon,
+                        style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            // Advanced settings (collapsible)
+            _buildWorkModeAdvanced(loc, currentMode),
+
+            const SizedBox(height: 24),
           ],
+        ))),
+
+        // Fixed bottom save bar (smart mode + cloud LLM only)
+        if (currentMode == 'smart' && ConfigService().llmProviderType == 'cloud')
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.getBackground(context),
+              border: Border(top: BorderSide(color: AppTheme.getBorder(context))),
+            ),
+            child: Row(
+              children: [
+                if (_llmConfigDirty)
+                  Row(children: [
+                    const MacosIcon(CupertinoIcons.circle_fill, size: 8, color: MacosColors.systemOrangeColor),
+                    const SizedBox(width: 6),
+                    Text("有未保存的修改", style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor, fontSize: 11)),
+                  ])
+                else
+                  Row(children: [
+                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14, color: MacosColors.systemGrayColor.resolveFrom(context)),
+                    const SizedBox(width: 6),
+                    Text(preset.name, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+                  ]),
+                const Spacer(),
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  secondary: true,
+                  onPressed: _isTestingLlm ? null : () async {
+                    setState(() { _isTestingLlm = true; _llmTestResult = null; });
+                    try {
+                      final (ok, msg) = await LLMService().testConnectionWith(
+                        apiKey: _llmApiKeyController.text,
+                        baseUrl: _llmBaseUrlController.text.isNotEmpty
+                            ? _llmBaseUrlController.text : preset.baseUrl,
+                        model: _llmModelController.text.isNotEmpty
+                            ? _llmModelController.text : preset.defaultModel,
+                        apiFormat: preset.apiFormat,
+                      );
+                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
+                    } catch (e) {
+                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (false, e.toString()); });
+                    }
+                  },
+                  child: _isTestingLlm
+                    ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
+                    : const Row(mainAxisSize: MainAxisSize.min, children: [
+                        MacosIcon(CupertinoIcons.antenna_radiowaves_left_right, size: 14),
+                        SizedBox(width: 4),
+                        Text("测试"),
+                      ]),
+                ),
+                const SizedBox(width: 8),
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  onPressed: _llmConfigDirty ? () async {
+                    try {
+                      await _flushLlmControllers();
+                      await ConfigService().savePresetConfig(currentPresetId);
+                      if (mounted) setState(() { _llmConfigDirty = false; });
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("保存失败: $e"), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating),
+                        );
+                      }
+                    }
+                  } : null,
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14),
+                    SizedBox(width: 4),
+                    Text("保存"),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        // Test result (below save bar)
+        if (_llmTestResult != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.getBackground(context),
+            ),
+            child: Row(children: [
+              Icon(
+                _llmTestResult!.$1 ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.xmark_circle_fill,
+                size: 14,
+                color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor,
+              ),
+              const SizedBox(width: 6),
+              Expanded(child: Text(
+                _llmTestResult!.$2,
+                style: TextStyle(fontSize: 12, color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor),
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+              )),
+            ]),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildModeRadio({
+    required String value,
+    required String groupValue,
+    required IconData icon,
+    required String label,
+    required String description,
+    String? badge,
+  }) {
+    return SettingsTile(
+      label: label,
+      subtitle: description,
+      icon: icon,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (badge != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.5)),
+              ),
+              child: Text(badge, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
+            ),
+            const SizedBox(width: 8),
+          ],
+          MacosRadioButton<String>(
+            groupValue: groupValue,
+            value: value,
+            onChanged: (v) => _switchWorkMode(v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _switchWorkMode(String? mode) async {
+    if (mode == null) return;
+    final oldMode = ConfigService().workMode;
+    await ConfigService().setWorkMode(mode);
+
+    // Re-init ASR when switching between sherpa <-> aliyun
+    if (mode == 'cloud' && oldMode != 'cloud') {
+      await _engine.initASR('', modelType: 'aliyun');
+    } else if (mode != 'cloud' && oldMode == 'cloud') {
+      final path = await _modelManager.getActiveModelPath();
+      final model = _modelManager.getModelById(_activeModelId ?? '');
+      if (path != null && model != null) {
+        await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+      }
+    }
+    setState(() {});
+  }
+
+  Widget _buildSmartModeConfig(AppLocalizations loc) {
+    return SettingsGroup(
+      title: loc.aiCorrection,
+      children: [
+        SettingsTile(
+          label: '打字机效果（Alpha）',
+          subtitle: '流式逐步注入文字到光标处，会临时占用剪贴板。',
+          icon: CupertinoIcons.text_cursor,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
+                ),
+                child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
+              ),
+              const SizedBox(width: 8),
+              MacosSwitch(
+                value: ConfigService().typewriterEnabled,
+                onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState((){}); },
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 24),
-        
-        if (_asrEngineType == 'aliyun') 
-           SettingsGroup(
-             title: loc.aliyunConfig,
-             children: [
-                Padding(
+        const SettingsDivider(),
+        SettingsTile(
+          label: loc.llmProvider,
+          icon: CupertinoIcons.arrow_right_arrow_left,
+          child: MacosPopupButton<String>(
+            value: ConfigService().llmProviderType,
+            items: [
+              MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+              MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+            ],
+            onChanged: (v) async {
+              if (v != null) {
+                await ConfigService().setLlmProviderType(v);
+                setState(() {});
+              }
+            },
+          ),
+        ),
+        const SettingsDivider(),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(loc.systemPrompt, style: AppTheme.body(context)),
+                  GestureDetector(
+                    onTap: () async {
+                      await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                      _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+                      setState((){});
+                    },
+                    child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                  )
+                ],
+              ),
+              const SizedBox(height: 8),
+              MacosTextField(
+                maxLines: 5,
+                placeholder: "Enter instructions for AI...",
+                controller: _aiPromptController,
+                decoration: BoxDecoration(
+                  color: AppTheme.getInputBackground(context),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.getBorder(context)),
+                ),
+                onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
+              ),
+              const SizedBox(height: 16),
+              if (ConfigService().llmProviderType == 'cloud') ...[
+                _buildCloudPresetSection(context, loc),
+              ] else ...[
+                Text(loc.ollamaUrl, style: AppTheme.body(context)),
+                const SizedBox(height: 4),
+                Text("确保 Ollama 已启动（ollama serve）", style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor)),
+                const SizedBox(height: 12),
+                Container(
                   padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
+                      _buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
                       const SizedBox(height: 8),
-                      MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
-                      const SizedBox(height: 8),
-                      MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
-                      const SizedBox(height: 12),
-                      PushButton(
-                        controlSize: ControlSize.regular,
-                        onPressed: () async {
-                           await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
-                           if (mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(
-                               const SnackBar(content: Text("Saved Cloud Config!"), duration: Duration(seconds: 2)),
-                             );
-                           }
-                        }, 
-                        child: Text(loc.saveApply)
+                      _buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCloudModeConfig(AppLocalizations loc) {
+    return SettingsGroup(
+      title: loc.aliyunConfig,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+          child: Text(loc.aliyunConfigDesc, style: AppTheme.caption(context)),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
+              const SizedBox(height: 8),
+              MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
+              const SizedBox(height: 8),
+              MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
+              const SizedBox(height: 12),
+              PushButton(
+                controlSize: ControlSize.regular,
+                onPressed: () async {
+                   await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
+                   if (mounted) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(content: Text("Saved Cloud Config!"), duration: Duration(seconds: 2)),
+                     );
+                   }
+                },
+                child: Text(loc.saveApply)
+              ),
+            ],
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildWorkModeAdvanced(AppLocalizations loc, String currentMode) {
+    return Column(
+      children: [
+        // Collapsible header
+        GestureDetector(
+          onTap: () => setState(() => _workModeAdvancedExpanded = !_workModeAdvancedExpanded),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              children: [
+                MacosIcon(
+                  _workModeAdvancedExpanded ? CupertinoIcons.chevron_down : CupertinoIcons.chevron_right,
+                  size: 14,
+                  color: MacosColors.systemGrayColor,
+                ),
+                const SizedBox(width: 8),
+                Text(loc.workModeAdvanced, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ),
+
+        if (_workModeAdvancedExpanded) ...[
+          const SizedBox(height: 16),
+
+          // Voice model management (offline/smart modes)
+          if (currentMode != 'cloud') ...[
+            // Punctuation model
+            Builder(builder: (_) {
+              final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+              final modelHasPunct = activeModel?.hasPunctuation ?? false;
+              final punctLabel = modelHasPunct
+                  ? loc.punctuationModel
+                  : "${loc.punctuationModel} (${loc.required})";
+              final punctDesc = modelHasPunct
+                  ? loc.builtInPunctuation
+                  : loc.punctuationModelDesc;
+              return SettingsGroup(
+                title: punctLabel,
+                children: [
+                   Padding(
+                     padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                     child: Text(punctDesc, style: AppTheme.caption(context)),
+                   ),
+                   if (!modelHasPunct)
+                     SettingsTile(
+                       label: loc.punctuationModel,
+                       child: _buildActionBtn(
+                         context,
+                         isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
+                         isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
+                         progress: _downloadProgressMap[ModelManager.punctuationModelId],
+                         statusText: _downloadStatusMap[ModelManager.punctuationModelId],
+                         isActive: true,
+                         onDownload: _downloadPunctuation,
+                         onDelete: _deletePunctuation,
+                         onActivate: () {},
+                       ),
+                     ),
+                ],
+              );
+            }),
+
+            const SizedBox(height: 24),
+
+            // Streaming models
+            SettingsGroup(
+              title: loc.streamingModels,
+              children: [
+                 Padding(
+                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                   child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
+                 ),
+                 ...ModelManager.availableModels.map((m) {
+                    return Column(
+                      children: [
+                        SettingsTile(
+                          label: _localizedModelName(m, loc),
+                          subtitle: _localizedModelDesc(m, loc),
+                          child: _buildActionBtn(
+                           context,
+                            isDownloaded: _downloadedStatus[m.id] ?? false,
+                            isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                            progress: _downloadProgressMap[m.id],
+                            statusText: _downloadStatusMap[m.id],
+                            isActive: _activeModelId == m.id,
+                            isOffline: false,
+                            onDownload: () => _download(m),
+                            onDelete: () => _delete(m),
+                            onActivate: () => _activate(m),
+                            modelUrl: m.url,
+                            onImport: () => _importModel(m),
+                          ),
+                        ),
+                        if (m != ModelManager.availableModels.last) const SettingsDivider(),
+                      ],
+                    );
+                 }),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // Offline models
+            SettingsGroup(
+              title: loc.offlineModels,
+              children: [
+                 Padding(
+                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                   child: Text(loc.offlineModelsDesc, style: AppTheme.caption(context)),
+                 ),
+                 ...ModelManager.offlineModels.map((m) {
+                    return Column(
+                      children: [
+                        SettingsTile(
+                          label: _localizedModelName(m, loc),
+                          subtitle: _localizedModelDesc(m, loc),
+                          child: _buildActionBtn(
+                           context,
+                            isDownloaded: _downloadedStatus[m.id] ?? false,
+                            isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                            progress: _downloadProgressMap[m.id],
+                            statusText: _downloadStatusMap[m.id],
+                            isActive: _activeModelId == m.id,
+                            isOffline: true,
+                            onDownload: () => _download(m),
+                            onDelete: () => _delete(m),
+                            onActivate: () => _activate(m),
+                            modelUrl: m.url,
+                            onImport: () => _importModel(m),
+                          ),
+                        ),
+                        if (m != ModelManager.offlineModels.last) const SettingsDivider(),
+                      ],
+                    );
+                 }),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+          ],
+
+          // Vocab section (offline/smart modes)
+          if (currentMode != 'cloud') ...[
+            const VocabSettingsView(),
+            const SizedBox(height: 16),
+          ],
+
+          // 2x2 matrix explanation
+          if (currentMode == 'smart' || currentMode == 'offline')
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemGrayColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        loc.tabAiPolish,
+                        style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemGrayColor),
                       ),
                     ],
                   ),
-                )
-             ],
-           )
-        else ...[
-           // 标点模型（根据当前模型决定是否必需）
-           Builder(builder: (_) {
-             final activeModel = _modelManager.getModelById(_activeModelId ?? '');
-             final modelHasPunct = activeModel?.hasPunctuation ?? false;
-             final punctLabel = modelHasPunct
-                 ? loc.punctuationModel
-                 : "${loc.punctuationModel} (${loc.required})";
-             final punctDesc = modelHasPunct
-                 ? loc.builtInPunctuation
-                 : loc.punctuationModelDesc;
-             return SettingsGroup(
-               title: punctLabel,
-               children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                    child: Text(punctDesc, style: AppTheme.caption(context)),
-                  ),
-                  if (!modelHasPunct)
-                    SettingsTile(
-                      label: loc.punctuationModel,
-                      child: _buildActionBtn(
-                        context,
-                        isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
-                        isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
-                        progress: _downloadProgressMap[ModelManager.punctuationModelId],
-                        statusText: _downloadStatusMap[ModelManager.punctuationModelId],
-                        isActive: true,
-                        onDownload: _downloadPunctuation,
-                        onDelete: _deletePunctuation,
-                        onActivate: () {},
-                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    loc.aiPolishMatrix,
+                    style: AppTheme.caption(context).copyWith(
+                      color: MacosColors.systemGrayColor,
+                      height: 1.6,
+                      fontSize: 11,
                     ),
-               ],
-             );
-           }),
-           
-           const SizedBox(height: 24),
-           
-           // 流式模型（实时显示）
-           SettingsGroup(
-             title: loc.streamingModels,
-             children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                  child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
-                ),
-                ...ModelManager.availableModels.map((m) {
-                   return Column(
-                     children: [
-                       SettingsTile(
-                         label: _localizedModelName(m, loc),
-                         subtitle: _localizedModelDesc(m, loc),
-                         child: _buildActionBtn(
-                          context,
-                           isDownloaded: _downloadedStatus[m.id] ?? false,
-                           isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                           progress: _downloadProgressMap[m.id],
-                           statusText: _downloadStatusMap[m.id],
-                           isActive: _activeModelId == m.id,
-                           isOffline: false,
-                           onDownload: () => _download(m),
-                           onDelete: () => _delete(m),
-                           onActivate: () => _activate(m),
-                           modelUrl: m.url,
-                           onImport: () => _importModel(m),
-                         ),
-                       ),
-                       if (m != ModelManager.availableModels.last) const SettingsDivider(),
-                     ],
-                   );
-                }),
-             ],
-           ),
-
-           const SizedBox(height: 24),
-
-           // 离线模型（高精度）
-           SettingsGroup(
-             title: loc.offlineModels,
-             children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                  child: Text(loc.offlineModelsDesc, style: AppTheme.caption(context)),
-                ),
-                ...ModelManager.offlineModels.map((m) {
-                   return Column(
-                     children: [
-                       SettingsTile(
-                         label: _localizedModelName(m, loc),
-                         subtitle: _localizedModelDesc(m, loc),
-                         child: _buildActionBtn(
-                          context,
-                           isDownloaded: _downloadedStatus[m.id] ?? false,
-                           isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                           progress: _downloadProgressMap[m.id],
-                           statusText: _downloadStatusMap[m.id],
-                           isActive: _activeModelId == m.id,
-                           isOffline: true,
-                           onDownload: () => _download(m),
-                           onDelete: () => _delete(m),
-                           onActivate: () => _activate(m),
-                           modelUrl: m.url,
-                           onImport: () => _importModel(m),
-                         ),
-                       ),
-                       if (m != ModelManager.offlineModels.last) const SettingsDivider(),
-                     ],
-                   );
-                }),
-             ],
-           ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ],
     );
@@ -1033,311 +1446,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildAiPolishView() {
-    final loc = AppLocalizations.of(context)!;
-    final currentPresetId = ConfigService().llmPresetId;
-    final preset = AppConstants.kLlmPresets.firstWhere(
-      (p) => p.id == currentPresetId,
-      orElse: () => AppConstants.kLlmPresets.last,
-    );
-    return Column(
-      children: [
-        Expanded(child: SingleChildScrollView(child: Column(
-          children: [
-        // Warning banner
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 2),
-                child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  loc.aiPolishWarning,
-                  style: AppTheme.caption(context).copyWith(
-                    color: MacosColors.systemOrangeColor,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // LLM Rewrite switch
-        SettingsGroup(
-          title: loc.llmRewrite,
-          children: [
-            SettingsTile(
-              label: loc.enabled,
-              icon: CupertinoIcons.sparkles,
-              child: MacosSwitch(
-                value: ConfigService().aiCorrectionEnabled,
-                onChanged: (v) async { await ConfigService().setAiCorrectionEnabled(v); setState((){}); },
-              ),
-            ),
-            if (ConfigService().aiCorrectionEnabled) ...[
-              const SettingsDivider(),
-              SettingsTile(
-                label: '打字机效果（Alpha）',
-                subtitle: '加快文字输出速度，提升使用体验。流式逐步注入文字到光标处，会临时占用剪贴板。',
-                icon: CupertinoIcons.text_cursor,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
-                      ),
-                      child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
-                    ),
-                    const SizedBox(width: 8),
-                    MacosSwitch(
-                      value: ConfigService().typewriterEnabled,
-                      onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState((){}); },
-                    ),
-                  ],
-                ),
-              ),
-              const SettingsDivider(),
-              SettingsTile(
-                label: loc.llmProvider,
-                icon: CupertinoIcons.arrow_right_arrow_left,
-                child: MacosPopupButton<String>(
-                  value: ConfigService().llmProviderType,
-                  items: [
-                    MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
-                    MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
-                  ],
-                  onChanged: (v) async {
-                    if (v != null) {
-                      await ConfigService().setLlmProviderType(v);
-                      setState(() {});
-                    }
-                  },
-                ),
-              ),
-              const SettingsDivider(),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(loc.systemPrompt, style: AppTheme.body(context)),
-                        GestureDetector(
-                          onTap: () async {
-                            await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
-                            _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
-                            setState((){});
-                          },
-                          child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    MacosTextField(
-                      maxLines: 5,
-                      placeholder: "Enter instructions for AI...",
-                      controller: _aiPromptController,
-                      decoration: BoxDecoration(
-                        color: AppTheme.getInputBackground(context),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppTheme.getBorder(context)),
-                      ),
-                      onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
-                    ),
-                    const SizedBox(height: 16),
-                    if (ConfigService().llmProviderType == 'cloud') ...[
-                      _buildCloudPresetSection(context, loc),
-                    ] else ...[
-                      Text(loc.ollamaUrl, style: AppTheme.body(context)),
-                      const SizedBox(height: 4),
-                      Text("确保 Ollama 已启动（ollama serve）", style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor)),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
-                            const SizedBox(height: 8),
-                            _buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-
-        const SizedBox(height: 16),
-
-        // 2x2 matrix explanation
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.15)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemGrayColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    loc.tabAiPolish,
-                    style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemGrayColor),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                loc.aiPolishMatrix,
-                style: AppTheme.caption(context).copyWith(
-                  color: MacosColors.systemGrayColor,
-                  height: 1.6,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Vocab section (embedded)
-        const VocabSettingsView(),
-
-        const SizedBox(height: 24),
-          ],
-        ))),
-        // Fixed bottom save bar
-        if (ConfigService().aiCorrectionEnabled && ConfigService().llmProviderType == 'cloud')
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.getBackground(context),
-              border: Border(top: BorderSide(color: AppTheme.getBorder(context))),
-            ),
-            child: Row(
-              children: [
-                if (_llmConfigDirty)
-                  Row(children: [
-                    const MacosIcon(CupertinoIcons.circle_fill, size: 8, color: MacosColors.systemOrangeColor),
-                    const SizedBox(width: 6),
-                    Text("有未保存的修改", style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor, fontSize: 11)),
-                  ])
-                else
-                  Row(children: [
-                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14, color: MacosColors.systemGrayColor.resolveFrom(context)),
-                    const SizedBox(width: 6),
-                    Text(preset.name, style: AppTheme.caption(context).copyWith(fontSize: 11)),
-                  ]),
-                const Spacer(),
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  secondary: true,
-                  onPressed: _isTestingLlm ? null : () async {
-                    setState(() { _isTestingLlm = true; _llmTestResult = null; });
-                    try {
-                      final (ok, msg) = await LLMService().testConnectionWith(
-                        apiKey: _llmApiKeyController.text,
-                        baseUrl: _llmBaseUrlController.text.isNotEmpty
-                            ? _llmBaseUrlController.text : preset.baseUrl,
-                        model: _llmModelController.text.isNotEmpty
-                            ? _llmModelController.text : preset.defaultModel,
-                        apiFormat: preset.apiFormat,
-                      );
-                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
-                    } catch (e) {
-                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (false, e.toString()); });
-                    }
-                  },
-                  child: _isTestingLlm
-                    ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
-                    : const Row(mainAxisSize: MainAxisSize.min, children: [
-                        MacosIcon(CupertinoIcons.antenna_radiowaves_left_right, size: 14),
-                        SizedBox(width: 4),
-                        Text("测试"),
-                      ]),
-                ),
-                const SizedBox(width: 8),
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  onPressed: _llmConfigDirty ? () async {
-                    try {
-                      await _flushLlmControllers();
-                      await ConfigService().savePresetConfig(currentPresetId);
-                      if (mounted) setState(() { _llmConfigDirty = false; });
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("保存失败: $e"), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating),
-                        );
-                      }
-                    }
-                  } : null,
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14),
-                    SizedBox(width: 4),
-                    Text("保存"),
-                  ]),
-                ),
-              ],
-            ),
-          ),
-        // Test result (below save bar)
-        if (_llmTestResult != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.getBackground(context),
-            ),
-            child: Row(children: [
-              Icon(
-                _llmTestResult!.$1 ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.xmark_circle_fill,
-                size: 14,
-                color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor,
-              ),
-              const SizedBox(width: 6),
-              Expanded(child: Text(
-                _llmTestResult!.$2,
-                style: TextStyle(fontSize: 12, color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor),
-                maxLines: 2, overflow: TextOverflow.ellipsis,
-              )),
-            ]),
-          ),
-      ],
-    );
-  }
+  // _buildAiPolishView removed — merged into _buildWorkModeView()
 
   Widget _buildKeyCaptureTile(String label, IconData icon, {
     required bool isCapturing,

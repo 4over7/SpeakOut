@@ -484,6 +484,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importing => '导入中...';
 
   @override
+  String get tabWorkMode => '工作模式';
+
+  @override
+  String get workModeOffline => '纯离线模式';
+
+  @override
+  String get workModeOfflineDesc => 'Sherpa 本地识别，完全离线，保护隐私';
+
+  @override
+  String get workModeOfflineIcon => '隐私优先，零网络依赖';
+
+  @override
+  String get workModeSmart => '智能模式';
+
+  @override
+  String get workModeSmartDesc => '本地识别 + AI 纠错润色，修复同音字、去除口水词';
+
+  @override
+  String get workModeCloud => '云端识别模式';
+
+  @override
+  String get workModeCloudDesc => '阿里云高精度识别，需联网';
+
+  @override
+  String get workModeAdvanced => '高级设置';
+
+  @override
   String get tabAiPolish => 'AI 润色';
 
   @override

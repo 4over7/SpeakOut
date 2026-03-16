@@ -36,6 +36,7 @@ class AppService {
     await Future.delayed(const Duration(milliseconds: 50));
     // 1. Config
     await ConfigService().init();
+    await ConfigService().migrateToWorkMode();
     applyVerboseLogging(); // Apply debug logging as early as possible
     
     // 1.5 Other Services

@@ -1016,6 +1016,60 @@ abstract class AppLocalizations {
   /// **'Importing...'**
   String get importing;
 
+  /// No description provided for @tabWorkMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Work Mode'**
+  String get tabWorkMode;
+
+  /// No description provided for @workModeOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Mode'**
+  String get workModeOffline;
+
+  /// No description provided for @workModeOfflineDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Sherpa recognition, fully offline and private'**
+  String get workModeOfflineDesc;
+
+  /// No description provided for @workModeOfflineIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy-first, zero network dependency'**
+  String get workModeOfflineIcon;
+
+  /// No description provided for @workModeSmart.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Mode'**
+  String get workModeSmart;
+
+  /// No description provided for @workModeSmartDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Local recognition + AI polish. Fixes homophones, removes filler words'**
+  String get workModeSmartDesc;
+
+  /// No description provided for @workModeCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Recognition'**
+  String get workModeCloud;
+
+  /// No description provided for @workModeCloudDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Aliyun high-accuracy recognition, requires internet'**
+  String get workModeCloudDesc;
+
+  /// No description provided for @workModeAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get workModeAdvanced;
+
   /// No description provided for @tabAiPolish.
   ///
   /// In en, this message translates to:

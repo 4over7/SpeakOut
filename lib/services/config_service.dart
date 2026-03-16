@@ -163,9 +163,41 @@ class ConfigService {
     }
   }
   
+  // --- Work Mode ---
+  // 'offline' | 'smart' | 'cloud'
+  String get workMode => _prefs?.getString('work_mode') ?? _inferWorkMode();
+
+  Future<void> setWorkMode(String mode) async {
+    await _prefs?.setString('work_mode', mode);
+    switch (mode) {
+      case 'offline':
+        await setAsrEngineType('sherpa');
+        await setAiCorrectionEnabled(false);
+      case 'smart':
+        await setAsrEngineType('sherpa');
+        await setAiCorrectionEnabled(true);
+      case 'cloud':
+        await setAsrEngineType('aliyun');
+        await setAiCorrectionEnabled(false);
+    }
+  }
+
+  /// Backward compat: infer workMode from legacy config
+  String _inferWorkMode() {
+    if (asrEngineType == 'aliyun') return 'cloud';
+    if (aiCorrectionEnabled) return 'smart';
+    return 'offline';
+  }
+
+  /// One-time migration: persist inferred workMode
+  Future<void> migrateToWorkMode() async {
+    if (_prefs?.containsKey('work_mode') ?? false) return;
+    await _prefs?.setString('work_mode', _inferWorkMode());
+  }
+
   // --- Engine Type ---
   String get asrEngineType => _prefs?.getString('asr_engine_type') ?? 'sherpa';
-  
+
   Future<void> setAsrEngineType(String type) async {
     await _prefs?.setString('asr_engine_type', type);
   }
