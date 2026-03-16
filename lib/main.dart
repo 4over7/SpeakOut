@@ -11,6 +11,8 @@ import 'services/config_service.dart';
 import 'ui/settings_page.dart';
 import 'services/app_service.dart';
 import 'services/notification_service.dart';
+import 'services/update_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
@@ -757,17 +759,49 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                       ),
                     ),
                   ),
-                  // Version label — bottom left
+                  // Version label + persistent update banner — bottom left
                   if (_versionString.isNotEmpty)
                     Positioned(
                       left: 16,
                       bottom: 12,
-                      child: Text(
-                        _versionString,
-                        style: AppTheme.body(context).copyWith(
-                          fontSize: 11,
-                          color: MacosColors.tertiaryLabelColor.resolveFrom(context),
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _versionString,
+                            style: AppTheme.body(context).copyWith(
+                              fontSize: 11,
+                              color: MacosColors.tertiaryLabelColor.resolveFrom(context),
+                            ),
+                          ),
+                          if (UpdateService().hasUpdate && UpdateService().latestVersion != null) ...[
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: () {
+                                final url = UpdateService().downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+                                launchUrl(Uri.parse(url));
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: MacosColors.systemOrangeColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(CupertinoIcons.arrow_down_circle_fill, size: 12, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${UpdateService().latestVersion} 可用',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   // === END FIXED LAYOUT ===

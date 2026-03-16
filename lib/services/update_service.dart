@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../config/app_constants.dart';
 import '../config/app_log.dart';
-import 'notification_service.dart';
 
 class UpdateService {
   static final UpdateService _instance = UpdateService._internal();
@@ -14,6 +12,7 @@ class UpdateService {
   bool _hasChecked = false;
   String? latestVersion;
   String? downloadUrl;
+  bool hasUpdate = false;
 
   /// 重置检查状态，允许再次手动检查
   void resetCheck() => _hasChecked = false;
@@ -42,17 +41,8 @@ class UpdateService {
       downloadUrl = remote.url;
 
       if (isNewer(remote.version, localVersion)) {
+        hasUpdate = true;
         AppLog.d('UpdateService: new version available: ${remote.version} (local: $localVersion)');
-        NotificationService().notifyWithAction(
-          message: '发现新版本 ${remote.version}',
-          actionLabel: '查看更新',
-          onAction: () async {
-            final uri = Uri.parse(remote!.url);
-            if (await canLaunchUrl(uri)) await launchUrl(uri);
-          },
-          type: NotificationType.info,
-          duration: const Duration(seconds: 10),
-        );
       } else {
         AppLog.d('UpdateService: up to date ($localVersion)');
       }
