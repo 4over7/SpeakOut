@@ -195,6 +195,7 @@
   "workModeSmartDesc": "Local recognition + AI polish. Fixes homophones, removes filler words",
   "workModeCloud": "Cloud Recognition",
   "workModeCloudDesc": "Aliyun high-accuracy recognition, requires internet",
+  "workModeSmartConfig": "Smart Polish Config",
   "workModeAdvanced": "Advanced Settings",
   "tabAiPolish": "AI Polish",
   "aiPolishDesc": "Use LLM to polish speech results with professional vocabulary context.",

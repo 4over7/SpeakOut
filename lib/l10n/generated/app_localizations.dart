@@ -1064,6 +1064,12 @@ abstract class AppLocalizations {
   /// **'Aliyun high-accuracy recognition, requires internet'**
   String get workModeCloudDesc;
 
+  /// No description provided for @workModeSmartConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Polish Config'**
+  String get workModeSmartConfig;
+
   /// No description provided for @workModeAdvanced.
   ///
   /// In en, this message translates to:

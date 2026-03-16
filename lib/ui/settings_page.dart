@@ -505,6 +505,9 @@ class _SettingsPageState extends State<SettingsPage> {
           color: AppTheme.getSidebarBackground(context), // Match mockup #2C2C2E
         ),
         builder: (context, scrollController) {
+          final unselectedColor = MacosTheme.brightnessOf(context) == Brightness.dark
+              ? MacosColors.systemGrayColor
+              : const Color(0xFF6E6E73); // Visible gray for light sidebar
           return SidebarItems(
             currentIndex: _selectedIndex,
             onChanged: (i) => setState(() => _selectedIndex = i),
@@ -512,24 +515,24 @@ class _SettingsPageState extends State<SettingsPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             items: [
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.settings, color: _selectedIndex == 0 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabGeneral, style: TextStyle(color: _selectedIndex == 0 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.settings, color: _selectedIndex == 0 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabGeneral, style: TextStyle(color: _selectedIndex == 0 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 1 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 2 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : MacosColors.systemGrayColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : null)),
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
               ),
             ],
           );
@@ -788,6 +791,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  /// Mode color: offline=green, smart=blue, cloud=orange
+  Color _modeColor(String mode) {
+    switch (mode) {
+      case 'offline': return MacosColors.systemGreenColor;
+      case 'smart': return MacosColors.systemBlueColor;
+      case 'cloud': return MacosColors.systemOrangeColor;
+      default: return MacosColors.systemGrayColor;
+    }
+  }
+
   Widget _buildModeRadio({
     required String value,
     required String groupValue,
@@ -796,31 +809,54 @@ class _SettingsPageState extends State<SettingsPage> {
     required String description,
     String? badge,
   }) {
-    return SettingsTile(
-      label: label,
-      subtitle: description,
-      icon: icon,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (badge != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: AppTheme.accentColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.5)),
+    final isSelected = value == groupValue;
+    final color = _modeColor(value);
+
+    return GestureDetector(
+      onTap: () => _switchWorkMode(value),
+      child: Container(
+        decoration: isSelected ? BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          border: Border(left: BorderSide(color: color, width: 3)),
+        ) : null,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            MacosIcon(icon, size: 20, color: isSelected ? color : MacosColors.systemGrayColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppTheme.body(context).copyWith(
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected ? color : null,
+                  )),
+                  const SizedBox(height: 2),
+                  Text(description, style: AppTheme.caption(context).copyWith(
+                    color: MacosColors.secondaryLabelColor.resolveFrom(context),
+                  )),
+                ],
               ),
-              child: Text(badge, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
             ),
-            const SizedBox(width: 8),
+            if (badge != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.white)),
+              ),
+              const SizedBox(width: 8),
+            ],
+            MacosRadioButton<String>(
+              groupValue: groupValue,
+              value: value,
+              onChanged: (v) => _switchWorkMode(v),
+            ),
           ],
-          MacosRadioButton<String>(
-            groupValue: groupValue,
-            value: value,
-            onChanged: (v) => _switchWorkMode(v),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -845,7 +881,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildSmartModeConfig(AppLocalizations loc) {
     return SettingsGroup(
-      title: loc.aiCorrection,
+      title: loc.workModeSmartConfig,
       children: [
         SettingsTile(
           label: '打字机效果（Alpha）',

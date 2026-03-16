@@ -316,7 +316,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    return true
+    return false  // Hide to tray instead of quitting
   }
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {

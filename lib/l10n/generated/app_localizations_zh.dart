@@ -508,6 +508,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workModeCloudDesc => '阿里云高精度识别，需联网';
 
   @override
+  String get workModeSmartConfig => '智能润色配置';
+
+  @override
   String get workModeAdvanced => '高级设置';
 
   @override

@@ -167,7 +167,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver, WindowListener {
   final AppService _appService = AppService();
   final SystemTray _systemTray = SystemTray();
   
@@ -194,6 +194,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     // Register lifecycle observer for permission refresh
     WidgetsBinding.instance.addObserver(this);
+    windowManager.addListener(this);
     // Load hotkey name from config
     _currentKeyName = ConfigService().pttKeyName;
     
@@ -314,6 +315,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    windowManager.removeListener(this);
     _waveTimer?.cancel();
     _notificationTimer?.cancel();
     _statusSub?.cancel();
@@ -324,6 +326,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.dispose();
   }
   
+  @override
+  void onWindowClose() async {
+    // Hide to tray instead of quitting
+    await windowManager.hide();
+  }
+
   final _random = Random();
 
   void _startWaveAnimation() {
@@ -378,10 +386,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _initSystemTray() async {
     String path = Platform.isWindows ? 'assets/app_icon.ico' : 'assets/tray_icon.png';
-    // We assume assets exist or use default blank. 
-    
-    final AppWindow appWindow = AppWindow();
-    
     await _systemTray.initSystemTray(
       title: "", // No title as requested
       iconPath: path,
@@ -390,18 +394,37 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     
     final Menu menu = Menu();
     await menu.buildFrom([
-      MenuItemLabel(label: 'Show', onClicked: (menuItem) => appWindow.show()),
-      MenuItemLabel(label: 'Hide', onClicked: (menuItem) => appWindow.hide()),
-      MenuItemLabel(label: 'Exit', onClicked: (menuItem) => appWindow.close()),
+      MenuItemLabel(label: 'Show', onClicked: (menuItem) async {
+        await windowManager.show();
+        await windowManager.focus();
+      }),
+      MenuItemLabel(label: 'Hide', onClicked: (menuItem) async {
+        await windowManager.hide();
+      }),
+      MenuSeparator(),
+      MenuItemLabel(label: 'Quit', onClicked: (menuItem) async {
+        await windowManager.setPreventClose(false);
+        await windowManager.close();
+      }),
     ]);
     
     await _systemTray.setContextMenu(menu);
     
-    _systemTray.registerSystemTrayEventHandler((eventName) {
+    _systemTray.registerSystemTrayEventHandler((eventName) async {
       if (eventName == kSystemTrayEventClick) {
-        Platform.isWindows ? appWindow.show() : _systemTray.popUpContextMenu();
+        if (Platform.isWindows) {
+          await windowManager.show();
+          await windowManager.focus();
+        } else {
+          _systemTray.popUpContextMenu();
+        }
       } else if (eventName == kSystemTrayEventRightClick) {
-        Platform.isWindows ? _systemTray.popUpContextMenu() : appWindow.show();
+        if (Platform.isWindows) {
+          _systemTray.popUpContextMenu();
+        } else {
+          await windowManager.show();
+          await windowManager.focus();
+        }
       }
     });
   }
@@ -419,6 +442,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       await windowManager.waitUntilReadyToShow(windowOptions, () async {
         await windowManager.setSize(const Size(800, 600));
         await windowManager.center();
+        await windowManager.setPreventClose(true); // Intercept close → hide to tray
         await windowManager.show();
         await windowManager.focus();
       });
