@@ -60,47 +60,56 @@ class ConfigService {
   // --- Hotkey ---
 
   int get pttKeyCode => _prefs?.getInt(AppConstants.kKeyPttKeyCode) ?? AppConstants.kDefaultPttKeyCode;
-  
+  int get pttModifiers => _prefs?.getInt('ptt_modifiers') ?? 0;
+
   String get pttKeyName => _prefs?.getString(AppConstants.kKeyPttKeyName) ?? AppConstants.kDefaultPttKeyName;
 
-  Future<void> setPttKey(int code, String name) async {
+  Future<void> setPttKey(int code, String name, {int modifiers = 0}) async {
     await _prefs?.setInt(AppConstants.kKeyPttKeyCode, code);
     await _prefs?.setString(AppConstants.kKeyPttKeyName, name);
+    await _prefs?.setInt('ptt_modifiers', modifiers);
   }
 
   // --- Diary (Flash Note) ---
   bool get diaryEnabled => _prefs?.getBool('diary_enabled') ?? false;
   int get diaryKeyCode => _prefs?.getInt('diary_key_code') ?? 61; // Default Right Option
+  int get diaryModifiers => _prefs?.getInt('diary_modifiers') ?? 0;
   String get diaryKeyName => _prefs?.getString('diary_key_name') ?? "Right Option";
   String get diaryDirectory => _prefs?.getString('diary_directory') ?? _defaultDocPath;
 
   Future<void> setDiaryEnabled(bool enabled) async => await _prefs?.setBool('diary_enabled', enabled);
-  Future<void> setDiaryKey(int code, String name) async {
+  Future<void> setDiaryKey(int code, String name, {int modifiers = 0}) async {
     await _prefs?.setInt('diary_key_code', code);
     await _prefs?.setString('diary_key_name', name);
+    await _prefs?.setInt('diary_modifiers', modifiers);
   }
   Future<void> setDiaryDirectory(String path) async => await _prefs?.setString('diary_directory', path);
 
   // --- Toggle Input (Text Injection) ---
   bool get toggleInputEnabled => toggleInputKeyCode != 0;
   int get toggleInputKeyCode => _prefs?.getInt('toggle_input_key_code') ?? AppConstants.kDefaultToggleInputKeyCode;
+  int get toggleInputModifiers => _prefs?.getInt('toggle_input_modifiers') ?? 0;
   String get toggleInputKeyName => _prefs?.getString('toggle_input_key_name') ?? AppConstants.kDefaultToggleInputKeyName;
-  Future<void> setToggleInputKey(int code, String name) async {
+  Future<void> setToggleInputKey(int code, String name, {int modifiers = 0}) async {
     await _prefs?.setInt('toggle_input_key_code', code);
     await _prefs?.setString('toggle_input_key_name', name);
+    await _prefs?.setInt('toggle_input_modifiers', modifiers);
   }
   Future<void> clearToggleInputKey() async {
     await _prefs?.remove('toggle_input_key_code');
     await _prefs?.remove('toggle_input_key_name');
+    await _prefs?.remove('toggle_input_modifiers');
   }
 
   // --- Toggle Diary (Flash Note) ---
   bool get toggleDiaryEnabled => toggleDiaryKeyCode != 0;
   int get toggleDiaryKeyCode => _prefs?.getInt('toggle_diary_key_code') ?? AppConstants.kDefaultToggleDiaryKeyCode;
+  int get toggleDiaryModifiers => _prefs?.getInt('toggle_diary_modifiers') ?? 0;
   String get toggleDiaryKeyName => _prefs?.getString('toggle_diary_key_name') ?? AppConstants.kDefaultToggleDiaryKeyName;
-  Future<void> setToggleDiaryKey(int code, String name) async {
+  Future<void> setToggleDiaryKey(int code, String name, {int modifiers = 0}) async {
     await _prefs?.setInt('toggle_diary_key_code', code);
     await _prefs?.setString('toggle_diary_key_name', name);
+    await _prefs?.setInt('toggle_diary_modifiers', modifiers);
   }
   Future<void> clearToggleDiaryKey() async {
     await _prefs?.remove('toggle_diary_key_code');

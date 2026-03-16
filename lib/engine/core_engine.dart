@@ -92,8 +92,8 @@ class CoreEngine {
   final _recordingController = StreamController<bool>.broadcast();
   Stream<bool> get recordingStream => _recordingController.stream;
   
-  final _rawKeyController = StreamController<int>.broadcast();
-  Stream<int> get rawKeyEventStream => _rawKeyController.stream;
+  final _rawKeyController = StreamController<(int keyCode, int modifierFlags)>.broadcast();
+  Stream<(int keyCode, int modifierFlags)> get rawKeyEventStream => _rawKeyController.stream;
 
   final _resultController = StreamController<String>.broadcast();
   Stream<String> get resultStream => _resultController.stream;
@@ -270,9 +270,9 @@ class CoreEngine {
     final savedDeviceId = ConfigService().audioInputDeviceId;
     if (savedDeviceId != null && savedDeviceId.isNotEmpty) {
       _log("Restoring preferred audio device: $savedDeviceId");
-      if (_audioDeviceService != null && _nativeInput!.isDeviceAvailable(savedDeviceId)) {
+      if (_audioDeviceService != null && _nativeInput != null && _nativeInput.isDeviceAvailable(savedDeviceId)) {
         // Only set preferredDeviceUID in C layer — AudioQueue will use it at recording time
-        _nativeInput!.setPreferredDeviceUid(savedDeviceId);
+        _nativeInput.setPreferredDeviceUid(savedDeviceId);
         _log("Preferred device set: $savedDeviceId");
       } else {
         _log("Saved device '$savedDeviceId' not available, clearing preference → system default");
@@ -465,8 +465,41 @@ class CoreEngine {
 
 
   // Key Handling
-  static void _onKeyStatic(int keyCode, bool isDown) {
-    CoreEngine()._handleKey(keyCode, isDown);
+  static void _onKeyStatic(int keyCode, bool isDown, int modifierFlags) {
+    CoreEngine()._handleKey(keyCode, isDown, modifierFlags);
+  }
+
+  // Modifier flag constants (device-specific, from IOLLEvent.h)
+  static const int kModLAlt = 0x0020;
+  static const int kModRAlt = 0x0040;
+  static const int kModLShift = 0x0002;
+  static const int kModRShift = 0x0004;
+  static const int kModLCmd = 0x0008;
+  static const int kModRCmd = 0x0010;
+  static const int kModLCtrl = 0x0001;
+  static const int kModRCtrl = 0x2000;
+
+  /// Mask for the trigger key itself (should be stripped before comparing required modifiers)
+  static int _ownModifierMask(int keyCode) {
+    switch (keyCode) {
+      case 58: return kModLAlt;
+      case 61: return kModRAlt;
+      case 56: return kModLShift;
+      case 60: return kModRShift;
+      case 55: return kModLCmd;
+      case 54: return kModRCmd;
+      case 59: return kModLCtrl;
+      case 62: return kModRCtrl;
+      default: return 0;
+    }
+  }
+
+  /// Check if the current modifier flags satisfy the required combo modifiers.
+  /// Strips the trigger key's own modifier bit before comparison.
+  bool _modifiersMatch(int keyCode, int currentFlags, int requiredFlags) {
+    if (requiredFlags == 0) return true; // No combo required
+    final stripped = currentFlags & ~_ownModifierMask(keyCode);
+    return (stripped & requiredFlags) == requiredFlags;
   }
 
   // Toggle mode state
@@ -479,23 +512,27 @@ class CoreEngine {
   bool _diaryKeyHeld = false;
   bool _deferredStop = false;
 
-  void _handleKey(int keyCode, bool isDown) {
+  void _handleKey(int keyCode, bool isDown, int modifierFlags) {
     // macOS 26+: Globe/Fn key sends keyCode 179 (kCGEventKeyDown) in addition
     // to legacy keyCode 63 (kCGEventFlagsChanged). Normalize so users who
     // configured Fn (63) still get matched when Globe (179) arrives.
     if (keyCode == 179) keyCode = 63;
 
-    _log("[KeyEvent] code=$keyCode, isDown=$isDown, pttKey=$pttKeyCode, state=$_recordingState, toggle=$_isToggleMode");
-    if (isDown) _rawKeyController.add(keyCode);
+    _log("[KeyEvent] code=$keyCode, isDown=$isDown, mods=0x${modifierFlags.toRadixString(16)}, pttKey=$pttKeyCode, state=$_recordingState, toggle=$_isToggleMode");
+    if (isDown) _rawKeyController.add((keyCode, modifierFlags));
 
     final config = ConfigService();
     final toggleInputCode = config.toggleInputKeyCode;
     final toggleDiaryCode = config.toggleDiaryKeyCode;
 
+    // Helper: check keyCode + modifier combo match
+    bool matchKey(int code, int requiredMods) =>
+        keyCode == code && _modifiersMatch(keyCode, modifierFlags, requiredMods);
+
     // 1. Toggle stop: if toggle recording is active and the same toggle key is pressed again
     if (isDown && _isToggleMode && _recordingState == RecordingState.recording) {
-      if ((_recordingMode == RecordingMode.ptt && toggleInputCode == keyCode) ||
-          (_recordingMode == RecordingMode.diary && toggleDiaryCode == keyCode)) {
+      if ((_recordingMode == RecordingMode.ptt && keyCode == toggleInputCode) ||
+          (_recordingMode == RecordingMode.diary && keyCode == toggleDiaryCode)) {
         _log("[Toggle] Second tap → stopRecording");
         stopRecording();
         return;
@@ -516,11 +553,11 @@ class CoreEngine {
     }
 
     // 3. Independent toggle keys (not shared with PTT/diary)
-    if (isDown && toggleInputCode != 0 && keyCode == toggleInputCode) {
+    if (isDown && toggleInputCode != 0 && matchKey(toggleInputCode, config.toggleInputModifiers)) {
       _handleToggleKey(RecordingMode.ptt);
       return;
     }
-    if (isDown && toggleDiaryCode != 0 && keyCode == toggleDiaryCode) {
+    if (isDown && toggleDiaryCode != 0 && matchKey(toggleDiaryCode, config.toggleDiaryModifiers)) {
       _handleToggleKey(RecordingMode.diary);
       return;
     }
@@ -530,9 +567,12 @@ class CoreEngine {
     // to prevent the keyUp from a toggle-start tap from stopping recording.
     if (_isToggleMode && !isDown) return;
 
-    if (keyCode == pttKeyCode) {
+    final bool pttMatch = matchKey(pttKeyCode, config.pttModifiers);
+    final bool diaryMatch = config.diaryEnabled && matchKey(config.diaryKeyCode, config.diaryModifiers);
+
+    if (pttMatch) {
       _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
-    } else if (config.diaryEnabled && keyCode == config.diaryKeyCode) {
+    } else if (diaryMatch) {
       _handleModeKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
     }
   }

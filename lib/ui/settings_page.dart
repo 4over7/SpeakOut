@@ -76,7 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _workModeAdvancedExpanded = false;
   
   final FocusNode _keyCaptureFocusNode = FocusNode();
-  StreamSubscription<int>? _keySubscription;
+  StreamSubscription<(int, int)>? _keySubscription;
 
   // UI State
   String _version = "";
@@ -164,50 +164,75 @@ class _SettingsPageState extends State<SettingsPage> {
     _engine.pttKeyCode = _currentKeyCode;
   }
   
-  Future<void> _saveHotkeyConfig(int keyCode, String keyName) async {
+  /// Build a display name for a key + modifier combo
+  String _comboKeyName(int keyCode, int modifiers) {
+    final parts = <String>[];
+    if (modifiers & 0x0008 != 0) parts.add('L.Cmd');
+    if (modifiers & 0x0010 != 0) parts.add('R.Cmd');
+    if (modifiers & 0x0001 != 0) parts.add('L.Ctrl');
+    if (modifiers & 0x2000 != 0) parts.add('R.Ctrl');
+    if (modifiers & 0x0020 != 0) parts.add('L.Opt');
+    if (modifiers & 0x0040 != 0) parts.add('R.Opt');
+    if (modifiers & 0x0002 != 0) parts.add('L.Shift');
+    if (modifiers & 0x0004 != 0) parts.add('R.Shift');
+    parts.add(_mapKeyCodeToString(keyCode));
+    return parts.join(' + ');
+  }
+
+  /// Strip the trigger key's own modifier from flags
+  int _stripOwnModifier(int keyCode, int flags) {
+    const ownMasks = {58: 0x0020, 61: 0x0040, 56: 0x0002, 60: 0x0004, 55: 0x0008, 54: 0x0010, 59: 0x0001, 62: 0x2000};
+    return flags & ~(ownMasks[keyCode] ?? 0);
+  }
+
+  Future<void> _saveHotkeyConfig(int keyCode, String keyName, {int modifierFlags = 0}) async {
     final config = ConfigService();
     final isInputGroup = _isCapturingKey || _isCapturingToggleInputKey;
     final isDiaryGroup = _isCapturingDiaryKey || _isCapturingToggleDiaryKey;
+
+    // Strip the trigger key's own modifier bit (e.g., Right Option press includes its own flag)
+    final requiredMods = _stripOwnModifier(keyCode, modifierFlags);
+    final displayName = requiredMods != 0 ? _comboKeyName(keyCode, requiredMods) : keyName;
 
     // Cross-group conflict check: input keys vs diary keys (skip disabled keys = 0)
     if (isInputGroup) {
       final diaryKeys = [config.diaryKeyCode, config.toggleDiaryKeyCode].where((k) => k != 0);
       if (diaryKeys.contains(keyCode)) {
-        _showHotkeyConflict(keyName, true);
+        _showHotkeyConflict(displayName, true);
         return;
       }
     } else if (isDiaryGroup) {
       final inputKeys = [config.pttKeyCode, config.toggleInputKeyCode].where((k) => k != 0);
       if (inputKeys.contains(keyCode)) {
-        _showHotkeyConflict(keyName, false);
+        _showHotkeyConflict(displayName, false);
         return;
       }
     }
 
     if (_isCapturingToggleInputKey) {
-       await config.setToggleInputKey(keyCode, keyName);
+       await config.setToggleInputKey(keyCode, displayName, modifiers: requiredMods);
        setState(() {
-         _toggleInputKeyName = keyName;
+         _toggleInputKeyName = displayName;
          _isCapturingToggleInputKey = false;
        });
     } else if (_isCapturingToggleDiaryKey) {
-       await config.setToggleDiaryKey(keyCode, keyName);
+       await config.setToggleDiaryKey(keyCode, displayName, modifiers: requiredMods);
        setState(() {
-         _toggleDiaryKeyName = keyName;
+         _toggleDiaryKeyName = displayName;
          _isCapturingToggleDiaryKey = false;
        });
     } else if (_isCapturingDiaryKey) {
-       await config.setDiaryKey(keyCode, keyName);
+       await config.setDiaryKey(keyCode, displayName, modifiers: requiredMods);
        setState(() {
-         _diaryKeyName = keyName;
+         _diaryKeyName = displayName;
          _isCapturingDiaryKey = false;
        });
     } else {
-       await config.setPttKey(keyCode, keyName);
+       await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
        _engine.pttKeyCode = keyCode;
        setState(() {
          _currentKeyCode = keyCode;
-         _currentKeyName = keyName;
+         _currentKeyName = displayName;
          _isCapturingKey = false;
        });
     }
@@ -246,9 +271,10 @@ class _SettingsPageState extends State<SettingsPage> {
        }
     });
 
-    _keySubscription = _engine.rawKeyEventStream.listen((keyCode) {
+    _keySubscription = _engine.rawKeyEventStream.listen((event) {
+       final (keyCode, modifierFlags) = event;
        final keyName = _mapKeyCodeToString(keyCode);
-       _saveHotkeyConfig(keyCode, keyName);
+       _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
        _stopKeyCapture();
     });
     // Timeout

@@ -14,8 +14,8 @@ typedef InjectTextDart = void Function(Pointer<Utf8> text);
 typedef CheckPermissionC = Bool Function();
 typedef CheckPermissionDart = bool Function();
 
-// Callback type: void callback(int keyCode, bool isDown)
-typedef KeyCallbackC = Void Function(Int32 keyCode, Bool isDown);
+// Callback type: void callback(int keyCode, bool isDown, uint modifierFlags)
+typedef KeyCallbackC = Void Function(Int32 keyCode, Bool isDown, Uint32 modifierFlags);
 
 typedef CheckKeyPressedC = Int32 Function(Int32 keyCode);
 typedef CheckKeyPressedDart = int Function(int keyCode);

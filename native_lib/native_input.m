@@ -73,8 +73,18 @@ void log_to_file(const char *fmt, ...) {
   va_end(args);
 }
 
-// Callback function type defined in Dart
-typedef void (*DartKeyCallback)(int keyCode, bool isDown);
+// Callback function type defined in Dart (v2: added modifierFlags for combo key support)
+typedef void (*DartKeyCallback)(int keyCode, bool isDown, unsigned int modifierFlags);
+
+// Device-specific modifier masks (from IOKit/hidsystem/IOLLEvent.h)
+#define NX_DEVICELCTLKEYMASK    0x00000001
+#define NX_DEVICELSHIFTKEYMASK  0x00000002
+#define NX_DEVICERSHIFTKEYMASK  0x00000004
+#define NX_DEVICELCMDKEYMASK    0x00000008
+#define NX_DEVICERCMDKEYMASK    0x00000010
+#define NX_DEVICELALTKEYMASK    0x00000020
+#define NX_DEVICERALTKEYMASK    0x00000040
+#define NX_DEVICERCTLKEYMASK    0x00002000
 
 // Forward declaration
 bool check_permission();
@@ -143,8 +153,10 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
                   type == kCGEventKeyDown ? "DOWN" : "UP");
     }
 
+    CGEventFlags flags = CGEventGetFlags(event);
+    unsigned int devFlags = (unsigned int)(flags & 0xFFFF); // device-dependent bits
     uint64_t t0 = mach_absolute_time();
-    dartCallback(mappedKeyCode, type == kCGEventKeyDown);
+    dartCallback(mappedKeyCode, type == kCGEventKeyDown, devFlags);
     uint64_t t1 = mach_absolute_time();
 
     // Convert to milliseconds
@@ -157,22 +169,32 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     CGEventFlags flags = CGEventGetFlags(event);
     bool isDown = false;
 
-    // Check specific keys based on standard macOS keycodes
+    // Use device-specific masks to correctly distinguish left/right modifiers
+    unsigned int devFlags = (unsigned int)(flags & 0xFFFF);
+
     // Option (Alt): 58 (Left), 61 (Right)
-    if (keyCode == 58 || keyCode == 61) {
-      isDown = (flags & kCGEventFlagMaskAlternate) != 0;
+    if (keyCode == 58) {
+      isDown = (devFlags & NX_DEVICELALTKEYMASK) != 0;
+    } else if (keyCode == 61) {
+      isDown = (devFlags & NX_DEVICERALTKEYMASK) != 0;
     }
     // Shift: 56 (Left), 60 (Right)
-    else if (keyCode == 56 || keyCode == 60) {
-      isDown = (flags & kCGEventFlagMaskShift) != 0;
+    else if (keyCode == 56) {
+      isDown = (devFlags & NX_DEVICELSHIFTKEYMASK) != 0;
+    } else if (keyCode == 60) {
+      isDown = (devFlags & NX_DEVICERSHIFTKEYMASK) != 0;
     }
     // Control: 59 (Left), 62 (Right)
-    else if (keyCode == 59 || keyCode == 62) {
-      isDown = (flags & kCGEventFlagMaskControl) != 0;
+    else if (keyCode == 59) {
+      isDown = (devFlags & NX_DEVICELCTLKEYMASK) != 0;
+    } else if (keyCode == 62) {
+      isDown = (devFlags & NX_DEVICERCTLKEYMASK) != 0;
     }
     // Command: 55 (Left), 54 (Right)
-    else if (keyCode == 55 || keyCode == 54) {
-      isDown = (flags & kCGEventFlagMaskCommand) != 0;
+    else if (keyCode == 55) {
+      isDown = (devFlags & NX_DEVICELCMDKEYMASK) != 0;
+    } else if (keyCode == 54) {
+      isDown = (devFlags & NX_DEVICERCMDKEYMASK) != 0;
     }
     // CapsLock: 57
     else if (keyCode == 57) {
@@ -213,11 +235,11 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
                   (unsigned long long)flags, fnFlagSet, isDown);
     }
 
-    if (keyCode == 58) {
-      log_to_file("FlagsChanged: Key 58. IsDown: %d", isDown);
+    if (keyCode == 58 || keyCode == 61) {
+      log_to_file("FlagsChanged: Key %d. IsDown: %d. devFlags: 0x%04x", keyCode, isDown, devFlags);
     }
 
-    dartCallback((int)keyCode, isDown);
+    dartCallback((int)keyCode, isDown, devFlags);
   }
 
   return event;
