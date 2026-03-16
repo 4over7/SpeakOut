@@ -2050,15 +2050,35 @@ class _SettingsPageState extends State<SettingsPage> {
             child: _updateResult != null
                 ? Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      _updateResult!,
-                      style: AppTheme.caption(context).copyWith(
-                        fontSize: 11,
-                        color: _updateResult == loc.updateUpToDate
-                            ? MacosColors.systemGrayColor
-                            : MacosColors.systemOrangeColor,
-                      ),
-                    ),
+                    child: _updateResult == loc.updateUpToDate
+                      ? Text(
+                          _updateResult!,
+                          style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _updateResult!,
+                              style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemOrangeColor),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                final url = UpdateService().downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+                                launchUrl(Uri.parse(url));
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(loc.updateAction, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+                              ),
+                            ),
+                          ],
+                        ),
                   )
                 : null,
           ),
