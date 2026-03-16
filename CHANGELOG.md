@@ -1,5 +1,18 @@
 # SpeakOut Version History
 
+## [1.5.9] - 2026-03-16
+
+### 修复: Left/Right 修饰键误触发 + 组合键热键支持
+
+#### Bug 修复
+- **Left/Right 修饰键区分** — 用 device-specific modifier masks 替代共用 flag，修复按住 Left Option 时按 Right Option 导致录音无法停止的问题
+- **日志增强** — FlagsChanged 事件同时记录 Left/Right Option 的 keyCode 和 devFlags
+
+#### 组合键热键
+- **组合键触发** — 支持如 "L.Cmd + Right Option" 等组合键作为热键，减少误触发
+- **自动识别** — 设置热键时自动捕获当前按住的修饰键，显示组合名称
+- **全链路支持** — 原生层传递 modifier flags → FFI → CoreEngine 匹配 → ConfigService 存储
+
 ## [1.5.8] - 2026-03-16
 
 ### 改进: 更新提示优化
