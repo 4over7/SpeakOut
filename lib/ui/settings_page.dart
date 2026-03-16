@@ -498,11 +498,12 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     return MacosWindow(
-      backgroundColor: AppTheme.getBackground(context), // Match mockup #1C1C1E
+      backgroundColor: AppTheme.getBackground(context),
+      disableWallpaperTinting: true, // Disable vibrancy so sidebar uses our explicit colors
       sidebar: Sidebar(
         minWidth: 200,
         decoration: BoxDecoration(
-          color: AppTheme.getSidebarBackground(context), // Match mockup #2C2C2E
+          color: AppTheme.getSidebarBackground(context),
         ),
         builder: (context, scrollController) {
           final unselectedColor = MacosTheme.brightnessOf(context) == Brightness.dark
