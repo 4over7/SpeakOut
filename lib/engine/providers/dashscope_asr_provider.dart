@@ -21,6 +21,7 @@ class DashScopeASRProvider implements ASRProvider {
 
   bool _isReady = false;
   bool _isHandshakeComplete = false;
+  bool _isTaskFinished = false;
 
   // Audio buffering during handshake
   static const int _maxPendingBuffers = 200;
@@ -55,6 +56,7 @@ class DashScopeASRProvider implements ASRProvider {
   Future<void> start() async {
     _pendingBuffer.clear();
     _isHandshakeComplete = false;
+    _isTaskFinished = false;
     _committedText = '';
     _currentSentence = '';
     _lastError = null;
@@ -139,6 +141,7 @@ class DashScopeASRProvider implements ASRProvider {
           _textController.add(_committedText + _currentSentence);
 
         case 'task-finished':
+          _isTaskFinished = true;
           _log('task-finished');
           _textController.add(_committedText + _currentSentence);
 
@@ -151,6 +154,7 @@ class DashScopeASRProvider implements ASRProvider {
           final display = errorCode.isNotEmpty ? '$errorCode: $errorMsg' : errorMsg;
           _log('task-failed: $display (full header: $header)');
           _lastError = display;
+          _isTaskFinished = true; // 失败也视为完成，解除 stop() 等待
           // 不向文本流发送错误，避免错误文字被当成识别结果注入
       }
     } catch (e) {
@@ -217,8 +221,14 @@ class DashScopeASRProvider implements ASRProvider {
     _channel!.sink.add(jsonEncode(finishTask));
     _log('finish-task sent');
 
-    // Wait for final results
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Wait for task-finished / task-failed event (max 4s)
+    await Future.any([
+      Future.doWhile(() async {
+        await Future.delayed(const Duration(milliseconds: 100));
+        return !_isTaskFinished;
+      }),
+      Future.delayed(const Duration(seconds: 4)),
+    ]);
 
     // Close connection (DashScope doesn't support connection reuse across tasks)
     await _channel?.sink.close();

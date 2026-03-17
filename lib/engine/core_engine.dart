@@ -944,7 +944,7 @@ class CoreEngine {
     if (_asrProvider != null) {
       ASRResult asrResult = ASRResult.textOnly("");
       try {
-        asrResult = await _asrProvider!.stop().timeout(const Duration(seconds: 2), onTimeout: () {
+        asrResult = await _asrProvider!.stop().timeout(const Duration(seconds: 6), onTimeout: () {
           _log("ASR Provider Stop Timeout!");
           return ASRResult.textOnly("");
         });
