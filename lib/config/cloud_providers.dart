@@ -22,8 +22,8 @@ class CloudProviders {
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
       asrModels: [
-        CloudASRModel(id: 'paraformer-v2', name: 'Paraformer V2', isStreaming: true, priceHint: '0.86 元/h'),
         CloudASRModel(id: 'paraformer-realtime-v2', name: 'Paraformer 实时 V2', isStreaming: true, priceHint: '0.86 元/h'),
+        CloudASRModel(id: 'paraformer-realtime-v1', name: 'Paraformer 实时 V1', isStreaming: true, priceHint: '0.57 元/h'),
       ],
       llmModels: [
         CloudLLMModel(id: 'qwen-turbo', name: 'Qwen Turbo', description: '快速，性价比高', priceHint: '0.003 元/千 token'),
