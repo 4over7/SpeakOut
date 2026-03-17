@@ -10,13 +10,20 @@ class ASRResult {
   /// Per-token 对数概率；仅 transducerOffline 模型有值，其余为 null
   final List<double>? tokenConfidence;
 
+  /// ASR 服务返回的错误信息（如云端鉴权失败）；非空时 text 为空
+  final String? error;
+
   const ASRResult({
     required this.text,
     this.tokens = const [],
     this.timestamps = const [],
     this.tokenConfidence,
+    this.error,
   });
 
   /// 便捷工厂：从纯文本创建（用于 Aliyun 等无 token 信息的情况）
   factory ASRResult.textOnly(String text) => ASRResult(text: text);
+
+  /// 便捷工厂：创建错误结果
+  factory ASRResult.withError(String error) => ASRResult(text: '', error: error);
 }

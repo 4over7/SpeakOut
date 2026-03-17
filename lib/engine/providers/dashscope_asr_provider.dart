@@ -29,6 +29,7 @@ class DashScopeASRProvider implements ASRProvider {
   // Text accumulation
   String _committedText = '';
   String _currentSentence = '';
+  String? _lastError;
 
   @override
   Stream<String> get textStream => _textController.stream;
@@ -56,6 +57,7 @@ class DashScopeASRProvider implements ASRProvider {
     _isHandshakeComplete = false;
     _committedText = '';
     _currentSentence = '';
+    _lastError = null;
     _taskId = const Uuid().v4().replaceAll('-', '');
 
     // Connect WebSocket with auth headers
@@ -141,9 +143,15 @@ class DashScopeASRProvider implements ASRProvider {
           _textController.add(_committedText + _currentSentence);
 
         case 'task-failed':
-          final message = header['message'] as String? ?? 'Unknown error';
-          _log('task-failed: $message');
-          _textController.add('Error: $message');
+          // DashScope 错误字段: error_code + error_message (非 message)
+          final errorCode = header['error_code'] as String? ?? '';
+          final errorMsg = header['error_message'] as String?
+              ?? header['message'] as String?
+              ?? 'Unknown error';
+          final display = errorCode.isNotEmpty ? '$errorCode: $errorMsg' : errorMsg;
+          _log('task-failed: $display (full header: $header)');
+          _lastError = display;
+          // 不向文本流发送错误，避免错误文字被当成识别结果注入
       }
     } catch (e) {
       _log('Message parse error: $e');
@@ -216,6 +224,9 @@ class DashScopeASRProvider implements ASRProvider {
     await _channel?.sink.close();
     _channel = null;
 
+    if (_lastError != null && _committedText.isEmpty && _currentSentence.isEmpty) {
+      return ASRResult.withError(_lastError!);
+    }
     return ASRResult.textOnly(_committedText + _currentSentence);
   }
 

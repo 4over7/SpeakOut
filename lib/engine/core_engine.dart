@@ -953,6 +953,15 @@ class CoreEngine {
       }
       _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned: '${asrResult.text.length > 30 ? '${asrResult.text.substring(0, 30)}...' : asrResult.text}'");
 
+      // 云端 ASR 错误（鉴权失败、配额超限等）
+      if (asrResult.error != null) {
+        _log("ASR Error: ${asrResult.error}");
+        _statusController.add("❌ ${asrResult.error}");
+        _overlay.showThenClear("❌ ${asrResult.error}", const Duration(seconds: 4));
+        _cleanupRecordingState();
+        return;
+      }
+
       String finalText = asrResult.text;
 
       // Post-processing: De-duplicate (仅流式 ASR 需要，离线和云端不会产生滑动窗口重复)
