@@ -54,7 +54,8 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _llmApiKeyController = TextEditingController();
   final TextEditingController _llmBaseUrlController = TextEditingController();
   final TextEditingController _llmModelController = TextEditingController();
-
+  // 自定义模型输入框（选"自定义..."时显示）
+  final TextEditingController _llmCustomModelController = TextEditingController();
 
   // Hotkey State
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
@@ -75,7 +76,6 @@ class _SettingsPageState extends State<SettingsPage> {
   // LLM Test
   bool _isTestingLlm = false;
   (bool, String)? _llmTestResult;
-  bool _showApiKey = false;
   bool _llmConfigDirty = false; // True when LLM config has unsaved changes
   bool _workModeAdvancedExpanded = false;
   
@@ -148,6 +148,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _llmApiKeyController.dispose();
     _llmBaseUrlController.dispose();
     _llmModelController.dispose();
+    _llmCustomModelController.dispose();
     super.dispose();
   }
   
@@ -1087,33 +1088,126 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         const SizedBox(height: 12),
-        // Model input
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // Model selector
+        _buildLlmModelSelector(selectedAccount, selectedProvider),
+      ],
+    );
+  }
+
+  static const String _kCustomModelSentinel = '__custom__';
+
+  /// 模型选择器：预设下拉 + 自定义文本框
+  Widget _buildLlmModelSelector(CloudAccount? account, CloudProvider? provider) {
+    final presets = provider?.llmModels ?? [];
+    final currentModel = ConfigService().llmModelOverride ?? provider?.llmDefaultModel ?? '';
+
+    // 判断是否是自定义（不在预设列表中）
+    final isCustom = presets.isNotEmpty &&
+        currentModel.isNotEmpty &&
+        !presets.any((m) => m.id == currentModel);
+
+    // 下拉当前值
+    String dropdownValue;
+    if (presets.isEmpty) {
+      dropdownValue = _kCustomModelSentinel;
+    } else if (isCustom) {
+      dropdownValue = _kCustomModelSentinel;
+      _llmCustomModelController.text = currentModel;
+    } else {
+      dropdownValue = presets.any((m) => m.id == currentModel)
+          ? currentModel
+          : presets.first.id;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // API Key 来源提示
+          Row(
             children: [
-              // Show which account's API Key is being used
-              Row(
-                children: [
-                  const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 14, color: AppTheme.accentColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    'API Key: ${selectedAccount?.displayName ?? selectedProvider?.name ?? ""}',
-                    style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11),
-                  ),
-                ],
+              const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 14, color: AppTheme.accentColor),
+              const SizedBox(width: 6),
+              Text(
+                'API Key: ${account?.displayName ?? provider?.name ?? ""}',
+                style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11),
               ),
-              const SizedBox(height: 8),
-              _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: selectedProvider?.llmModelHint ?? ''),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          // 模型行
+          Row(
+            children: [
+              const MacosIcon(CupertinoIcons.cube_box, size: 14, color: MacosColors.systemGrayColor),
+              const SizedBox(width: 6),
+              Text('模型', style: AppTheme.caption(context)),
+              const Spacer(),
+              if (presets.isNotEmpty)
+                MacosPopupButton<String>(
+                  value: dropdownValue,
+                  items: [
+                    ...presets.map((m) => MacosPopupMenuItem(
+                      value: m.id,
+                      child: Row(
+                        children: [
+                          Text(m.name),
+                          if (m.description != null) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              m.description!,
+                              style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor),
+                            ),
+                          ],
+                        ],
+                      ),
+                    )),
+                    const MacosPopupMenuItem(
+                      value: _kCustomModelSentinel,
+                      child: Text('自定义...'),
+                    ),
+                  ],
+                  onChanged: (v) async {
+                    if (v == null) return;
+                    if (v != _kCustomModelSentinel) {
+                      _llmCustomModelController.clear();
+                      await ConfigService().setLlmModel(v);
+                      _llmModelController.text = v;
+                    }
+                    setState(() {});
+                  },
+                ),
+            ],
+          ),
+          // 自定义输入框（仅在选了"自定义..."时显示）
+          if (dropdownValue == _kCustomModelSentinel) ...[
+            const SizedBox(height: 8),
+            MacosTextField(
+              controller: _llmCustomModelController,
+              placeholder: provider?.llmModelHint ?? '模型名称',
+              onChanged: (v) async {
+                _llmModelController.text = v;
+                await ConfigService().setLlmModel(v);
+              },
+            ),
+          ],
+          // 价格提示（预设模式下显示）
+          if (dropdownValue != _kCustomModelSentinel && presets.isNotEmpty) ...[
+            Builder(builder: (_) {
+              final hint = presets.firstWhere((m) => m.id == dropdownValue, orElse: () => presets.first).priceHint;
+              if (hint == null) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(hint, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+              );
+            }),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1988,48 +2082,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await ConfigService().setLlmModel(_llmModelController.text);
     LLMService().log("FLUSH: done, keyLen=${_llmApiKeyController.text.length}");
   }
-
-  Widget _buildApiItemWithController(BuildContext context, String label, IconData icon, TextEditingController controller, {bool isSecret = false, String? placeholder}) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-           Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-           const SizedBox(height: 4),
-           Row(
-             children: [
-               Expanded(
-                 child: MacosTextField(
-                   placeholder: placeholder ?? label,
-                   obscureText: isSecret && !_showApiKey,
-                   maxLines: 1,
-                   decoration: BoxDecoration(
-                     color: AppTheme.getInputBackground(context),
-                     borderRadius: BorderRadius.circular(6),
-                     border: Border.all(color: AppTheme.getBorder(context)),
-                   ),
-                   prefix: Padding(padding: const EdgeInsets.only(left: 8), child: MacosIcon(icon, size: 14)),
-                   controller: controller,
-                   onChanged: (_) {
-                     if (!_llmConfigDirty) setState(() => _llmConfigDirty = true);
-                   },
-                 ),
-               ),
-               if (isSecret) ...[
-                 const SizedBox(width: 4),
-                 MacosIconButton(
-                   icon: MacosIcon(
-                     _showApiKey ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
-                     size: 16,
-                   ),
-                   onPressed: () => setState(() => _showApiKey = !_showApiKey),
-                 ),
-               ],
-             ],
-           ),
-        ],
-      );
-  }
-
 
 
   // --- View: About ---

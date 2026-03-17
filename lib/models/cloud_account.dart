@@ -31,6 +31,21 @@ class CredentialField {
   bool appliesTo(CloudCapability cap) => scope.isEmpty || scope.contains(cap);
 }
 
+/// 服务商支持的 LLM 模型
+class CloudLLMModel {
+  final String id;
+  final String name;
+  final String? description;
+  final String? priceHint;
+
+  const CloudLLMModel({
+    required this.id,
+    required this.name,
+    this.description,
+    this.priceHint,
+  });
+}
+
 /// 服务商支持的 ASR 模型
 class CloudASRModel {
   final String id;
@@ -55,6 +70,7 @@ class CloudProvider {
   final List<CredentialField> credentialFields;
   final Set<CloudCapability> capabilities;
   final List<CloudASRModel> asrModels;
+  final List<CloudLLMModel> llmModels;
   final String? llmBaseUrl;
   final String? llmDefaultModel;
   final String? llmModelHint;
@@ -67,6 +83,7 @@ class CloudProvider {
     required this.credentialFields,
     required this.capabilities,
     this.asrModels = const [],
+    this.llmModels = const [],
     this.llmBaseUrl,
     this.llmDefaultModel,
     this.llmModelHint,
