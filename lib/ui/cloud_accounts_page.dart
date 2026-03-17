@@ -334,27 +334,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                           color: MacosColors.systemGrayColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: provider.credentialFields.map((field) {
-                            final ctrl = credControllers[field.key] ??= TextEditingController();
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(field.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                                  const SizedBox(height: 4),
-                                  MacosTextField(
-                                    placeholder: field.placeholder ?? field.label,
-                                    obscureText: field.isSecret,
-                                    controller: ctrl,
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                        child: _buildCredentialFieldsGrouped(provider, credControllers),
                       ),
                       // 帮助链接
                       if (provider.helpUrl.isNotEmpty) ...[
@@ -452,5 +432,74 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
         );
       },
     );
+  }
+
+  /// Build credential fields grouped by scope (通用 / ASR / LLM)
+  Widget _buildCredentialFieldsGrouped(CloudProvider provider, Map<String, TextEditingController> controllers) {
+    final universal = provider.credentialFields.where((f) => f.scope.isEmpty).toList();
+    final asrOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.asrStreaming) || f.scope.contains(CloudCapability.asrBatch)).toList();
+    final llmOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.llm)).toList();
+
+    // If all fields are universal (no scope), show flat list
+    final hasGroups = asrOnly.isNotEmpty || llmOnly.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (universal.isNotEmpty) ...[
+          if (hasGroups)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text('通用凭证', style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600)),
+            ),
+          ..._buildFieldList(universal, controllers),
+        ],
+        if (asrOnly.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              MacosIcon(CupertinoIcons.waveform, size: 12, color: MacosColors.systemBlueColor),
+              const SizedBox(width: 4),
+              Text('语音识别 (ASR)', style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemBlueColor)),
+            ]),
+          ),
+          ..._buildFieldList(asrOnly, controllers),
+        ],
+        if (llmOnly.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              MacosIcon(CupertinoIcons.sparkles, size: 12, color: MacosColors.systemOrangeColor),
+              const SizedBox(width: 4),
+              Text('大语言模型 (LLM)', style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemOrangeColor)),
+            ]),
+          ),
+          ..._buildFieldList(llmOnly, controllers),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildFieldList(List<CredentialField> fields, Map<String, TextEditingController> controllers) {
+    return fields.map((field) {
+      final ctrl = controllers[field.key] ??= TextEditingController();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(field.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            MacosTextField(
+              placeholder: field.placeholder ?? field.label,
+              obscureText: field.isSecret,
+              controller: ctrl,
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 }
