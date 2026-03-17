@@ -16,6 +16,9 @@ import 'asr_result.dart';
 import 'providers/sherpa_provider.dart';
 import 'providers/offline_sherpa_provider.dart';
 import 'providers/aliyun_provider.dart';
+import 'providers/asr_provider_factory.dart';
+import '../config/cloud_providers.dart';
+import '../services/cloud_account_service.dart';
 import '../services/diary_service.dart';
 import '../services/chat_service.dart';
 import '../services/audio_device_service.dart';
@@ -351,6 +354,45 @@ class CoreEngine {
     // Check if this is an offline model type
     final isOfflineModel = modelType == 'sense_voice' || modelType == 'offline_paraformer' || modelType == 'whisper' || modelType == 'fire_red_asr';
 
+    // Cloud Account path: use unified account system
+    final accountId = ConfigService().selectedAsrAccountId;
+    final asrModelId = ConfigService().selectedAsrModelId;
+    if (type == 'aliyun' && accountId != null && asrModelId != null) {
+      final account = CloudAccountService().getAccountById(accountId);
+      final cloudProvider = account != null ? CloudProviders.getById(account.providerId) : null;
+      if (account != null && cloudProvider != null) {
+        final asrModel = cloudProvider.asrModels.where((m) => m.id == asrModelId).firstOrNull;
+        if (asrModel != null) {
+          provider = ASRProviderFactory.create(account.providerId);
+          config = ASRProviderFactory.buildConfig(account, asrModel);
+          _isOfflineASR = !asrModel.isStreaming;
+          _log("Initializing ${cloudProvider.name} ASR (model=${asrModel.name})...");
+          _statusController.add("☁️ 连接 ${cloudProvider.name}...");
+          // Skip legacy path
+          try {
+            await provider.initialize(config);
+            _asrProvider = provider;
+            _asrSubscription = provider.textStream.listen((text) {
+              if (!_partialTextController.isClosed) _partialTextController.add(text);
+              if (_recordingState == RecordingState.recording && text.isNotEmpty) {
+                _overlay.updateText(text);
+              }
+            });
+            _activeModelHasPunctuation = true; // Cloud ASR has built-in punctuation
+            _overlay.isOfflineMode = _isOfflineASR;
+            _statusController.add("✅ ${cloudProvider.name} 就绪");
+            _log("ASR Provider initialized: ${provider.type}");
+          } catch (e) {
+            _log("Cloud ASR Init Failed: $e");
+            _statusController.add("❌ ${cloudProvider.name} 连接失败: $e");
+            _asrProvider = null;
+          }
+          return;
+        }
+      }
+    }
+
+    // Legacy Aliyun NLS path
     if (type == 'aliyun') {
       provider = AliyunProvider();
       config = {
@@ -358,7 +400,7 @@ class CoreEngine {
         'accessKeySecret': ConfigService().aliyunAccessKeySecret,
         'appKey': ConfigService().aliyunAppKey,
       };
-      _log("Initializing Aliyun Provider...");
+      _log("Initializing Aliyun Provider (legacy)...");
       _statusController.add("☁️ 连接阿里云 (Connecting)...");
     } else if (isOfflineModel) {
       // Offline Sherpa (non-streaming, batch recognition)
