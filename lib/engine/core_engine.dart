@@ -357,38 +357,39 @@ class CoreEngine {
     // Cloud Account path: use unified account system
     final accountId = ConfigService().selectedAsrAccountId;
     final asrModelId = ConfigService().selectedAsrModelId;
-    if (type == 'aliyun' && accountId != null && asrModelId != null) {
+    if (type == 'aliyun' && accountId != null) {
       final account = CloudAccountService().getAccountById(accountId);
       final cloudProvider = account != null ? CloudProviders.getById(account.providerId) : null;
-      if (account != null && cloudProvider != null) {
-        final asrModel = cloudProvider.asrModels.where((m) => m.id == asrModelId).firstOrNull;
-        if (asrModel != null) {
-          provider = ASRProviderFactory.create(account.providerId);
-          config = ASRProviderFactory.buildConfig(account, asrModel);
-          _isOfflineASR = !asrModel.isStreaming;
-          _log("Initializing ${cloudProvider.name} ASR (model=${asrModel.name})...");
-          _statusController.add("☁️ 连接 ${cloudProvider.name}...");
-          // Skip legacy path
-          try {
-            await provider.initialize(config);
-            _asrProvider = provider;
-            _asrSubscription = provider.textStream.listen((text) {
-              if (!_partialTextController.isClosed) _partialTextController.add(text);
-              if (_recordingState == RecordingState.recording && text.isNotEmpty) {
-                _overlay.updateText(text);
-              }
-            });
-            _activeModelHasPunctuation = true; // Cloud ASR has built-in punctuation
-            _overlay.isOfflineMode = _isOfflineASR;
-            _statusController.add("✅ ${cloudProvider.name} 就绪");
-            _log("ASR Provider initialized: ${provider.type}");
-          } catch (e) {
-            _log("Cloud ASR Init Failed: $e");
-            _statusController.add("❌ ${cloudProvider.name} 连接失败: $e");
-            _asrProvider = null;
-          }
-          return;
+      if (account != null && cloudProvider != null && cloudProvider.asrModels.isNotEmpty) {
+        // effectiveModel: 优先用已选模型，否则回退到第一个可用模型
+        final asrModel = (asrModelId != null
+            ? cloudProvider.asrModels.where((m) => m.id == asrModelId).firstOrNull
+            : null) ?? cloudProvider.asrModels.first;
+        provider = ASRProviderFactory.create(account.providerId);
+        config = ASRProviderFactory.buildConfig(account, asrModel);
+        _isOfflineASR = !asrModel.isStreaming;
+        _log("Initializing ${cloudProvider.name} ASR (model=${asrModel.name})...");
+        _statusController.add("☁️ 连接 ${cloudProvider.name}...");
+        // Skip legacy path
+        try {
+          await provider.initialize(config);
+          _asrProvider = provider;
+          _asrSubscription = provider.textStream.listen((text) {
+            if (!_partialTextController.isClosed) _partialTextController.add(text);
+            if (_recordingState == RecordingState.recording && text.isNotEmpty) {
+              _overlay.updateText(text);
+            }
+          });
+          _activeModelHasPunctuation = true; // Cloud ASR has built-in punctuation
+          _overlay.isOfflineMode = _isOfflineASR;
+          _statusController.add("✅ ${cloudProvider.name} 就绪");
+          _log("ASR Provider initialized: ${provider.type}");
+        } catch (e) {
+          _log("Cloud ASR Init Failed: $e");
+          _statusController.add("❌ ${cloudProvider.name} 连接失败: $e");
+          _asrProvider = null;
         }
+        return;
       }
     }
 
