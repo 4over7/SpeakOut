@@ -757,13 +757,23 @@ class _SettingsPageState extends State<SettingsPage> {
                   onPressed: _isTestingLlm ? null : () async {
                     setState(() { _isTestingLlm = true; _llmTestResult = null; });
                     try {
+                      // 从账户凭证中读取（与 LLMService._resolveLlmConfig 逻辑一致）
+                      final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+                      final savedId = ConfigService().selectedLlmAccountId ?? '';
+                      final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : (llmAccounts.isNotEmpty ? llmAccounts.first.id : '');
+                      final testAccount = effectiveId.isNotEmpty ? CloudAccountService().getAccountById(effectiveId) : null;
+                      final testProvider = testAccount != null ? CloudProviders.getById(testAccount.providerId) : null;
+                      final testApiKey = testAccount?.credentials['api_key'] ?? _llmApiKeyController.text;
+                      final testBaseUrl = testProvider?.llmBaseUrl ?? _llmBaseUrlController.text;
+                      final savedModel = ConfigService().llmModelOverride;
+                      final testModel = (savedModel != null && savedModel.isNotEmpty)
+                          ? savedModel
+                          : (testProvider?.llmDefaultModel ?? _llmModelController.text);
                       final (ok, msg) = await LLMService().testConnectionWith(
-                        apiKey: _llmApiKeyController.text,
-                        baseUrl: _llmBaseUrlController.text.isNotEmpty
-                            ? _llmBaseUrlController.text : (provider?.llmBaseUrl ?? ''),
-                        model: _llmModelController.text.isNotEmpty
-                            ? _llmModelController.text : (provider?.llmDefaultModel ?? ''),
-                        apiFormat: provider?.llmApiFormat ?? LlmApiFormat.openai,
+                        apiKey: testApiKey,
+                        baseUrl: testBaseUrl,
+                        model: testModel,
+                        apiFormat: testProvider?.llmApiFormat ?? LlmApiFormat.openai,
                       );
                       if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
                     } catch (e) {
@@ -1083,9 +1093,13 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: (v) async {
                 if (v == null) return;
                 await ConfigService().setSelectedLlmAccountId(v);
-                // Also sync the preset ID for backward compat
                 final account = CloudAccountService().getAccountById(v);
-                if (account != null) await ConfigService().setLlmPresetId(account.providerId);
+                if (account != null) {
+                  await ConfigService().setLlmPresetId(account.providerId);
+                  // 切换服务商时重置模型为该服务商默认，避免旧模型名污染
+                  final p = CloudProviders.getById(account.providerId);
+                  if (p?.llmDefaultModel != null) await ConfigService().setLlmModel(p!.llmDefaultModel!);
+                }
                 setState(() => _llmModelCustom = false); // 切换服务商时重置到预设下拉
               },
             ),
@@ -1280,6 +1294,14 @@ class _SettingsPageState extends State<SettingsPage> {
         ? selectedAsrId!
         : uniqueAsrAccounts.first.id;
 
+    final selectedAsrAccount = uniqueAsrAccounts.firstWhere((a) => a.id == effectiveAsrId);
+    final selectedAsrProvider = CloudProviders.getById(selectedAsrAccount.providerId);
+    final asrModels = selectedAsrProvider?.asrModels ?? [];
+    final selectedAsrModelId = ConfigService().selectedAsrModelId;
+    final effectiveAsrModelId = asrModels.any((m) => m.id == selectedAsrModelId)
+        ? selectedAsrModelId!
+        : (asrModels.isNotEmpty ? asrModels.first.id : '');
+
     return SettingsGroup(
       title: loc.cloudAccountSelectAsr,
       children: [
@@ -1297,11 +1319,43 @@ class _SettingsPageState extends State<SettingsPage> {
             }).toList(),
             onChanged: (v) async {
               if (v == null) return;
-              await ConfigService().setSelectedAsrAccount(v);
+              // 切换账户时自动选取新服务商的默认 ASR 模型
+              final acc = uniqueAsrAccounts.firstWhere((a) => a.id == v);
+              final prov = CloudProviders.getById(acc.providerId);
+              final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
+              await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
+              await _engine.initASR('', modelType: 'aliyun');
               setState(() {});
             },
           ),
         ),
+        // ASR 模型选择（有多个模型时显示）
+        if (asrModels.length > 1) ...[
+          const SettingsDivider(),
+          SettingsTile(
+            label: '识别模型',
+            icon: CupertinoIcons.waveform,
+            child: MacosPopupButton<String>(
+              value: effectiveAsrModelId,
+              items: asrModels.map((m) => MacosPopupMenuItem(
+                value: m.id,
+                child: Row(children: [
+                  Text(m.name),
+                  if (m.priceHint != null) ...[
+                    const SizedBox(width: 6),
+                    Text(m.priceHint!, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor)),
+                  ],
+                ]),
+              )).toList(),
+              onChanged: (v) async {
+                if (v == null) return;
+                await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
+                await _engine.initASR('', modelType: 'aliyun');
+                setState(() {});
+              },
+            ),
+          ),
+        ],
         // 前往云服务账户添加服务商
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

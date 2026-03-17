@@ -47,7 +47,11 @@ class LLMService {
         if (provider != null && provider.hasLLM) {
           final apiKey = account.credentials['api_key'] ?? '';
           final baseUrl = provider.llmBaseUrl ?? '';
-          final model = provider.llmDefaultModel ?? '';
+          // 优先用用户选择的模型，否则回退到服务商默认
+          final savedModel = ConfigService().llmModelOverride;
+          final model = (savedModel != null && savedModel.isNotEmpty)
+              ? savedModel
+              : (provider.llmDefaultModel ?? '');
           final isAnthropic = provider.llmApiFormat == LlmApiFormat.anthropic;
           _log("Resolved LLM from CloudAccount: provider=${account.providerId}, keyLen=${apiKey.length}");
           return (apiKey: apiKey, baseUrl: baseUrl, model: model, isAnthropic: isAnthropic);
