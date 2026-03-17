@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -80,7 +81,9 @@ class _SettingsPageState extends State<SettingsPage> {
   (bool, String)? _llmTestResult;
   bool _llmConfigDirty = false; // True when LLM config has unsaved changes
   bool _workModeAdvancedExpanded = false;
-  
+  // 笔记目录写入权限验证结果（null = 未验证 / '' = 验证通过 / 非空 = 错误信息）
+  String? _diaryDirError;
+
   final FocusNode _keyCaptureFocusNode = FocusNode();
   StreamSubscription<(int, int)>? _keySubscription;
 
@@ -328,11 +331,30 @@ class _SettingsPageState extends State<SettingsPage> {
       final String? outputDir = await const MethodChannel('com.SpeakOut/overlay').invokeMethod('pickDirectory');
       if (outputDir != null) {
         await ConfigService().setDiaryDirectory(outputDir);
+        await _validateDiaryDirectory();
         setState((){});
       }
     } catch (e) {
-      // Fallback or ignore
       AppLog.d("Pick Directory Failed: $e");
+    }
+  }
+
+  /// 测试笔记目录是否可写，更新 [_diaryDirError]。
+  Future<void> _validateDiaryDirectory() async {
+    final dirPath = ConfigService().diaryDirectory;
+    if (dirPath.isEmpty) {
+      setState(() => _diaryDirError = '未设置保存目录');
+      return;
+    }
+    try {
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) await dir.create(recursive: true);
+      final testFile = File('${dir.path}/.speakout_write_test');
+      await testFile.writeAsString('test');
+      await testFile.delete();
+      setState(() => _diaryDirError = '');
+    } catch (e) {
+      setState(() => _diaryDirError = '无法写入目录，请重新选择（macOS 需重新授权）');
     }
   }
 
@@ -1779,10 +1801,58 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: CupertinoIcons.book,
               child: MacosSwitch(
                 value: ConfigService().diaryEnabled,
-                onChanged: (v) async { await ConfigService().setDiaryEnabled(v); setState((){}); },
+                onChanged: (v) async {
+                  await ConfigService().setDiaryEnabled(v);
+                  if (v) await _validateDiaryDirectory();
+                  setState((){});
+                },
               ),
             ),
             if (ConfigService().diaryEnabled) ...[
+              // 目录权限警告横幅
+              if (_diaryDirError == null || _diaryDirError!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: (_diaryDirError == null
+                          ? MacosColors.systemOrangeColor
+                          : MacosColors.systemRedColor).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: (_diaryDirError == null
+                            ? MacosColors.systemOrangeColor
+                            : MacosColors.systemRedColor).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        MacosIcon(
+                          CupertinoIcons.exclamationmark_triangle_fill,
+                          size: 14,
+                          color: _diaryDirError == null
+                              ? MacosColors.systemOrangeColor
+                              : MacosColors.systemRedColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _diaryDirError == null
+                                ? '请点击右侧文件夹图标选择保存目录，以授权访问'
+                                : _diaryDirError!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _diaryDirError == null
+                                  ? MacosColors.systemOrangeColor
+                                  : MacosColors.systemRedColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               const SettingsDivider(),
               _buildKeyCaptureTile(
                 loc.pttMode, CupertinoIcons.keyboard_chevron_compact_down,
@@ -2370,7 +2440,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       Text(
                         ConfigService().logDirectory.isEmpty
-                            ? '~/Downloads（默认）'
+                            ? '未设置（仅输出到控制台）'
                             : ConfigService().logDirectory.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
                         style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
                       ),
