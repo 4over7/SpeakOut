@@ -193,16 +193,37 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             ),
           ),
           // 操作按钮
-          Row(
+          Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              MacosIconButton(
-                icon: const MacosIcon(CupertinoIcons.pencil, size: 16),
-                onPressed: () => _showAddEditDialog(context, AppLocalizations.of(context)!, existingAccount: account),
+              MacosSwitch(
+                value: account.isEnabled,
+                onChanged: (v) async {
+                  final updated = CloudAccount(
+                    id: account.id,
+                    providerId: account.providerId,
+                    displayName: account.displayName,
+                    credentials: account.credentials,
+                    isEnabled: v,
+                    createdAt: account.createdAt,
+                  );
+                  await CloudAccountService().updateAccount(updated);
+                  _refreshAccounts();
+                },
               ),
-              MacosIconButton(
-                icon: const MacosIcon(CupertinoIcons.trash, size: 16, color: MacosColors.systemRedColor),
-                onPressed: () => _confirmDelete(context, account, AppLocalizations.of(context)!),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MacosIconButton(
+                    icon: const MacosIcon(CupertinoIcons.pencil, size: 16),
+                    onPressed: () => _showAddEditDialog(context, AppLocalizations.of(context)!, existingAccount: account),
+                  ),
+                  MacosIconButton(
+                    icon: const MacosIcon(CupertinoIcons.trash, size: 16, color: MacosColors.systemRedColor),
+                    onPressed: () => _confirmDelete(context, account, AppLocalizations.of(context)!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -244,7 +265,6 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     // 选中的服务商 ID
     String selectedProviderId = existingAccount?.providerId ?? CloudProviders.all.first.id;
     String displayName = existingAccount?.displayName ?? '';
-    bool isEnabled = existingAccount?.isEnabled ?? true;
     final credControllers = <String, TextEditingController>{};
 
     // 初始化凭证控制器
@@ -361,19 +381,6 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                             ),
                           ],
                         ],
-                        const SizedBox(height: 16),
-
-                        // 启用开关
-                        Row(
-                          children: [
-                            Text('${loc.cloudAccountEnabled}:', style: AppTheme.body(builderContext)),
-                            const SizedBox(width: 12),
-                            MacosSwitch(
-                              value: isEnabled,
-                              onChanged: (v) => setDialogState(() => isEnabled = v),
-                            ),
-                          ],
-                        ),
                       ],
                     ))),
                     const SizedBox(height: 16),
@@ -406,7 +413,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                                 providerId: existingAccount.providerId,
                                 displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
                                 credentials: creds,
-                                isEnabled: isEnabled,
+                                isEnabled: existingAccount.isEnabled,
                                 createdAt: existingAccount.createdAt,
                               );
                               await CloudAccountService().updateAccount(updated);
@@ -416,7 +423,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                                 providerId: selectedProviderId,
                                 displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
                                 credentials: creds,
-                                isEnabled: isEnabled,
+                                isEnabled: true,
                               );
                               await CloudAccountService().addAccount(account);
                             }
