@@ -99,7 +99,7 @@ class CloudProviders {
       ],
       capabilities: {CloudCapability.asrBatch, CloudCapability.llm},
       asrModels: [
-        CloudASRModel(id: 'whisper-large-v3-turbo', name: 'Whisper V3 Turbo', isStreaming: false, description: '比 V3 更快', priceHint: '0.81 元/h'),
+        CloudASRModel(id: 'whisper-large-v3-turbo', name: 'Whisper V3 Turbo', isStreaming: false, description: '更快更便宜', priceHint: '0.29 元/h'),
         CloudASRModel(id: 'whisper-large-v3', name: 'Whisper Large V3', isStreaming: false, priceHint: '0.81 元/h'),
       ],
       llmModels: [
