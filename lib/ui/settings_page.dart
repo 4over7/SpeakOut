@@ -1031,8 +1031,10 @@ class _SettingsPageState extends State<SettingsPage> {
   /// Cloud LLM account selector — replaces old preset-based API Key input
   Widget _buildCloudLlmAccountSelector(AppLocalizations loc) {
     final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
-    final selectedId = ConfigService().selectedLlmAccountId ?? '';
-    final selectedAccount = selectedId.isNotEmpty ? CloudAccountService().getAccountById(selectedId) : null;
+    final savedId = ConfigService().selectedLlmAccountId ?? '';
+    // effectiveId: 已保存的 ID 若不在账户列表中则回退到第一个账户，保证 account/provider 与下拉显示一致
+    final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : (llmAccounts.isNotEmpty ? llmAccounts.first.id : '');
+    final selectedAccount = effectiveId.isNotEmpty ? CloudAccountService().getAccountById(effectiveId) : null;
     final selectedProvider = selectedAccount != null ? CloudProviders.getById(selectedAccount.providerId) : null;
 
     if (llmAccounts.isEmpty) {
@@ -1070,7 +1072,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Text(loc.cloudAccountSelectLlm, style: AppTheme.caption(context)),
             const Spacer(),
             MacosPopupButton<String>(
-              value: llmAccounts.any((a) => a.id == selectedId) ? selectedId : llmAccounts.first.id,
+              value: effectiveId,
               items: llmAccounts.map((a) {
                 final p = CloudProviders.getById(a.providerId);
                 return MacosPopupMenuItem(
@@ -1132,7 +1134,7 @@ class _SettingsPageState extends State<SettingsPage> {
               const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 14, color: AppTheme.accentColor),
               const SizedBox(width: 6),
               Text(
-                'API Key: ${account?.displayName ?? provider?.name ?? ""}',
+                account?.displayName ?? provider?.name ?? '',
                 style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11),
               ),
             ],
@@ -1234,7 +1236,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: GestureDetector(
-              onTap: () => setState(() => _selectedIndex = 1),
+              onTap: () => setState(() => _selectedIndex = 4), // 云服务账户 tab
               child: Row(
                 children: [
                   MacosIcon(CupertinoIcons.arrow_right_circle, size: 14, color: AppTheme.accentColor),
@@ -1274,6 +1276,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     // 有 ASR 账户: 显示下拉选择
+    final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
+        ? selectedAsrId!
+        : uniqueAsrAccounts.first.id;
+
     return SettingsGroup(
       title: loc.cloudAccountSelectAsr,
       children: [
@@ -1281,29 +1287,26 @@ class _SettingsPageState extends State<SettingsPage> {
           label: loc.cloudAccountSelectAsr,
           icon: CupertinoIcons.cloud,
           child: MacosPopupButton<String>(
-            value: selectedAsrId ?? '',
-            items: [
-              const MacosPopupMenuItem(value: '', child: Text('--')),
-              ...uniqueAsrAccounts.map((a) {
-                final provider = CloudProviders.getById(a.providerId);
-                return MacosPopupMenuItem(
-                  value: a.id,
-                  child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
-                );
-              }),
-            ],
+            value: effectiveAsrId,
+            items: uniqueAsrAccounts.map((a) {
+              final provider = CloudProviders.getById(a.providerId);
+              return MacosPopupMenuItem(
+                value: a.id,
+                child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
+              );
+            }).toList(),
             onChanged: (v) async {
               if (v == null) return;
-              await ConfigService().setSelectedAsrAccount(v.isEmpty ? null : v);
+              await ConfigService().setSelectedAsrAccount(v);
               setState(() {});
             },
           ),
         ),
-        // 也保留旧版凭证输入区（折叠）
+        // 前往云服务账户添加服务商
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: GestureDetector(
-            onTap: () => setState(() => _selectedIndex = 1),
+            onTap: () => setState(() => _selectedIndex = 4), // 云服务账户 tab
             child: Row(
               children: [
                 MacosIcon(CupertinoIcons.plus_circle, size: 14, color: AppTheme.accentColor),

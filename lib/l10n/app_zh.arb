@@ -164,7 +164,7 @@
   "workModeSmart": "智能模式",
   "workModeSmartDesc": "本地识别 + AI 纠错润色，修复同音字、去除口水词",
   "workModeCloud": "云端识别模式",
-  "workModeCloudDesc": "阿里云高精度识别，需联网",
+  "workModeCloudDesc": "云端高精度识别，需联网",
   "workModeSmartConfig": "智能润色配置",
   "workModeAdvanced": "高级设置",
   "tabAiPolish": "AI 润色",

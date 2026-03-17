@@ -528,7 +528,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workModeCloudDesc =>
-      'Aliyun high-accuracy recognition, requires internet';
+      'Cloud high-accuracy recognition, requires internet';
 
   @override
   String get workModeSmartConfig => 'Smart Polish Config';
