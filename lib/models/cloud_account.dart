@@ -7,18 +7,28 @@ import '../config/app_constants.dart' show LlmApiFormat;
 enum CloudCapability { asrStreaming, asrBatch, llm }
 
 /// 描述一个服务商需要的凭证字段
+///
+/// [scope] 标记此凭证用于哪些能力:
+///   - 空集 {} = 通用（ASR + LLM 都用，如 DashScope 的 api_key）
+///   - {CloudCapability.llm} = 仅 LLM（如火山方舟 api_key）
+///   - {CloudCapability.asrStreaming} = 仅 ASR（如火山 ASR token）
 class CredentialField {
   final String key;
   final String label;
   final bool isSecret;
   final String? placeholder;
+  final Set<CloudCapability> scope;
 
   const CredentialField({
     required this.key,
     required this.label,
     this.isSecret = false,
     this.placeholder,
+    this.scope = const {},  // empty = universal (used by all capabilities)
   });
+
+  /// 此凭证是否用于指定能力（scope 为空表示通用，匹配任何能力）
+  bool appliesTo(CloudCapability cap) => scope.isEmpty || scope.contains(cap);
 }
 
 /// 服务商支持的 ASR 模型

@@ -31,8 +31,11 @@ class CloudProviders {
       id: 'volcengine',
       name: '火山引擎 (豆包)',
       credentialFields: [
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
-        CredentialField(key: 'app_id', label: 'App ID', placeholder: '应用 ID'),
+        CredentialField(key: 'api_key', label: '方舟 API Key', isSecret: true, scope: {CloudCapability.llm}),
+        CredentialField(key: 'endpoint_id', label: '推理接入点 ID', placeholder: 'ep-xxx', scope: {CloudCapability.llm}),
+        CredentialField(key: 'asr_app_id', label: 'ASR App ID', scope: {CloudCapability.asrStreaming}),
+        CredentialField(key: 'asr_token', label: 'ASR Access Token', isSecret: true, scope: {CloudCapability.asrStreaming}),
+        CredentialField(key: 'asr_cluster', label: 'ASR Cluster', placeholder: 'volcengine_streaming_common', scope: {CloudCapability.asrStreaming}),
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
       asrModels: [
@@ -40,7 +43,7 @@ class CloudProviders {
       ],
       llmBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
       llmDefaultModel: 'doubao-seed-2-0-mini-260215',
-      llmModelHint: '如 doubao-seed-2-0-mini-260215',
+      llmModelHint: '推理接入点 ID，如 ep-xxx',
       helpUrl: 'https://www.volcengine.com/docs/82379/1399008',
     ),
 
@@ -100,8 +103,9 @@ class CloudProviders {
       name: '讯飞',
       credentialFields: [
         CredentialField(key: 'app_id', label: 'App ID'),
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
-        CredentialField(key: 'api_secret', label: 'API Secret', isSecret: true),
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true, scope: {CloudCapability.asrStreaming}),
+        CredentialField(key: 'api_secret', label: 'API Secret', isSecret: true, scope: {CloudCapability.asrStreaming}),
+        CredentialField(key: 'api_password', label: 'API Password (星火)', isSecret: true, scope: {CloudCapability.llm}, placeholder: 'Bearer Token for HTTP API'),
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
       asrModels: [
@@ -170,7 +174,7 @@ class CloudProviders {
 
     CloudProvider(
       id: 'moonshot',
-      name: 'Kimi (Moonshot)',
+      name: 'Kimi 国内',
       credentialFields: [
         CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
       ],
@@ -182,8 +186,21 @@ class CloudProviders {
     ),
 
     CloudProvider(
+      id: 'moonshot_global',
+      name: 'Kimi 海外',
+      credentialFields: [
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
+      ],
+      capabilities: {CloudCapability.llm},
+      llmBaseUrl: 'https://api.moonshot.ai/v1',
+      llmDefaultModel: 'kimi-k2.5',
+      llmModelHint: '如 kimi-k2.5, kimi-k2-0711',
+      helpUrl: 'https://platform.moonshot.ai/',
+    ),
+
+    CloudProvider(
       id: 'minimax',
-      name: 'MiniMax',
+      name: 'MiniMax 国内',
       credentialFields: [
         CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
       ],
@@ -192,6 +209,19 @@ class CloudProviders {
       llmDefaultModel: 'MiniMax-M2.5',
       llmModelHint: '如 MiniMax-M2.5, MiniMax-M1',
       helpUrl: 'https://platform.minimaxi.com/document/introduction',
+    ),
+
+    CloudProvider(
+      id: 'minimax_global',
+      name: 'MiniMax 海外',
+      credentialFields: [
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
+      ],
+      capabilities: {CloudCapability.llm},
+      llmBaseUrl: 'https://api.minimax.io/v1',
+      llmDefaultModel: 'MiniMax-M2.5',
+      llmModelHint: '如 MiniMax-M2.5, MiniMax-M1',
+      helpUrl: 'https://platform.minimax.io/docs/api-reference/text-openai-api',
     ),
 
     // ── Legacy ──

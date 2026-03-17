@@ -19,7 +19,9 @@ class ASRProviderFactory {
         return OpenAIASRProvider();
       case 'aliyun_nls':
         return AliyunProvider();
-      // TODO: volcengine, tencent, xfyun
+      // volcengine: TODO — implement VolcEngineASRProvider
+      // tencent: TODO — implement TencentASRProvider
+      // xfyun: TODO — implement XfyunASRProvider
       default:
         throw Exception('Unsupported ASR provider: $providerId');
     }
