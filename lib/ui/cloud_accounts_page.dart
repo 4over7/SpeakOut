@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../services/cloud_account_service.dart';
+import '../services/llm_service.dart';
 import '../config/cloud_providers.dart';
 import '../models/cloud_account.dart';
 import 'theme.dart';
@@ -266,6 +267,8 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     String selectedProviderId = existingAccount?.providerId ?? CloudProviders.all.first.id;
     String displayName = existingAccount?.displayName ?? '';
     final credControllers = <String, TextEditingController>{};
+    String? testResult;
+    bool testLoading = false;
 
     // 初始化凭证控制器
     void initCredControllers(String providerId) {
@@ -393,10 +396,62 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     ))),
                     const SizedBox(height: 16),
 
+                    // 测试结果
+                    if (testResult != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            MacosIcon(
+                              testResult!.startsWith('✅') ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.xmark_circle_fill,
+                              size: 14,
+                              color: testResult!.startsWith('✅') ? MacosColors.systemGreenColor : MacosColors.systemRedColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                testResult!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: testResult!.startsWith('✅') ? MacosColors.systemGreenColor : MacosColors.systemRedColor,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // 固定底部按钮
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        if (provider != null && provider.hasLLM) ...[
+                          PushButton(
+                            controlSize: ControlSize.regular,
+                            secondary: true,
+                            onPressed: testLoading ? null : () async {
+                              final apiKey = credControllers['api_key']?.text ?? '';
+                              final baseUrl = provider.llmBaseUrl ?? '';
+                              final model = provider.llmDefaultModel ?? '';
+                              setDialogState(() { testLoading = true; testResult = null; });
+                              final (ok, msg) = await LLMService().testConnectionWith(
+                                apiKey: apiKey,
+                                baseUrl: baseUrl,
+                                model: model,
+                                apiFormat: provider.llmApiFormat,
+                              );
+                              setDialogState(() {
+                                testLoading = false;
+                                testResult = ok ? '✅ $msg' : '❌ $msg';
+                              });
+                            },
+                            child: testLoading
+                              ? const SizedBox(width: 16, height: 16, child: ProgressCircle(value: null))
+                              : const Text('测试连接'),
+                          ),
+                          const Spacer(),
+                        ],
                         PushButton(
                           controlSize: ControlSize.regular,
                           secondary: true,
