@@ -2,9 +2,9 @@
 // CloudProvider: 静态服务商定义（能力、凭证字段、ASR 模型等）
 // CloudAccount: 用户的具体账户实例（凭证值、启用状态等）
 
-enum CloudCapability { asrStreaming, asrBatch, llm }
+import '../config/app_constants.dart' show LlmApiFormat;
 
-enum LlmApiFormat { openai, anthropic }
+enum CloudCapability { asrStreaming, asrBatch, llm }
 
 /// 描述一个服务商需要的凭证字段
 class CredentialField {

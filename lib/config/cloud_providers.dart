@@ -1,4 +1,5 @@
 import '../models/cloud_account.dart';
+import 'app_constants.dart' show LlmApiFormat;
 
 /// 云服务商静态注册表
 ///

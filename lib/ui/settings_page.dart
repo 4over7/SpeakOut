@@ -99,7 +99,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _tabController.addListener(() {
       final newIndex = _tabController.index;
       // Warn if leaving Work Mode tab with unsaved LLM changes
-      if (_selectedIndex == 2 && newIndex != 2 && _llmConfigDirty) {
+      if (_selectedIndex == 1 && newIndex != 1 && _llmConfigDirty) {
         _showUnsavedChangesDialog(newIndex);
         return;
       }
@@ -550,20 +550,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabGeneral, style: TextStyle(color: _selectedIndex == 0 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.cloud, color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabCloudAccounts, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.cloud, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabCloudAccounts, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
                 leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
@@ -588,14 +588,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   padding: const EdgeInsets.all(20),
                   child: Builder(builder: (_) {
                     // Work Mode page manages its own scroll (fixed bottom save bar)
-                    if (_selectedIndex == 2) return _buildWorkModeView();
+                    if (_selectedIndex == 1) return _buildWorkModeView();
                     // Cloud Accounts page has its own scroll
-                    if (_selectedIndex == 1) return const CloudAccountsPage();
+                    if (_selectedIndex == 4) return const CloudAccountsPage();
                     return SingleChildScrollView(
                       child: Builder(builder: (_) {
                          if (_selectedIndex == 0) return _buildGeneralView();
-                         if (_selectedIndex == 3) return _buildTriggerView();
-                         if (_selectedIndex == 4) return _buildDiaryView();
+                         if (_selectedIndex == 2) return _buildTriggerView();
+                         if (_selectedIndex == 3) return _buildDiaryView();
                          return _buildAboutView(context, _version);
                       }),
                     );
@@ -614,10 +614,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final loc = AppLocalizations.of(context)!;
     final currentMode = ConfigService().workMode;
     final currentPresetId = ConfigService().llmPresetId;
-    final preset = AppConstants.kLlmPresets.firstWhere(
-      (p) => p.id == currentPresetId,
-      orElse: () => AppConstants.kLlmPresets.last,
-    );
+    final provider = CloudProviders.getById(currentPresetId);
 
     return Column(
       children: [
@@ -748,7 +745,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   Row(children: [
                     MacosIcon(CupertinoIcons.checkmark_circle, size: 14, color: MacosColors.systemGrayColor.resolveFrom(context)),
                     const SizedBox(width: 6),
-                    Text(preset.name, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+                    Text(provider?.name ?? currentPresetId, style: AppTheme.caption(context).copyWith(fontSize: 11)),
                   ]),
                 const Spacer(),
                 PushButton(
@@ -760,10 +757,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       final (ok, msg) = await LLMService().testConnectionWith(
                         apiKey: _llmApiKeyController.text,
                         baseUrl: _llmBaseUrlController.text.isNotEmpty
-                            ? _llmBaseUrlController.text : preset.baseUrl,
+                            ? _llmBaseUrlController.text : (provider?.llmBaseUrl ?? ''),
                         model: _llmModelController.text.isNotEmpty
-                            ? _llmModelController.text : preset.defaultModel,
-                        apiFormat: preset.apiFormat,
+                            ? _llmModelController.text : (provider?.llmDefaultModel ?? ''),
+                        apiFormat: provider?.llmApiFormat ?? LlmApiFormat.openai,
                       );
                       if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
                     } catch (e) {
@@ -1922,16 +1919,14 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildCloudPresetSection(BuildContext context, AppLocalizations loc) {
+    // Use CloudProviders as single source of truth for LLM providers
+    final llmProviders = CloudProviders.all.where((p) => p.hasLLM).toList();
     final currentPresetId = ConfigService().llmPresetId;
-    final preset = AppConstants.kLlmPresets.firstWhere(
-      (p) => p.id == currentPresetId,
-      orElse: () => AppConstants.kLlmPresets.last, // custom
-    );
+    final provider = CloudProviders.getById(currentPresetId);
 
     // Initialize controllers once
     if (!_llmControllersInitialized) {
       _syncLlmControllers();
-      // No real-time listeners — values are flushed on test/save to avoid Keychain contention
       _llmControllersInitialized = true;
     }
 
@@ -1942,10 +1937,10 @@ class _SettingsPageState extends State<SettingsPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(loc.apiConfig, style: AppTheme.body(context)),
-            if (preset.helpUrl.isNotEmpty)
+            if (provider != null && provider.helpUrl.isNotEmpty)
               GestureDetector(
                 onTap: () async {
-                  final uri = Uri.parse(preset.helpUrl);
+                  final uri = Uri.parse(provider.helpUrl);
                   if (await canLaunchUrl(uri)) await launchUrl(uri);
                 },
                 child: Row(
@@ -1959,7 +1954,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         const SizedBox(height: 12),
-        // Preset selector
+        // Provider selector (from CloudProviders)
         Row(
           children: [
             const MacosIcon(CupertinoIcons.building_2_fill, size: 16, color: MacosColors.systemGrayColor),
@@ -1967,23 +1962,22 @@ class _SettingsPageState extends State<SettingsPage> {
             Text("服务商", style: AppTheme.caption(context)),
             const Spacer(),
             MacosPopupButton<String>(
-              value: currentPresetId,
-              items: AppConstants.kLlmPresets.map((p) =>
+              value: llmProviders.any((p) => p.id == currentPresetId) ? currentPresetId : llmProviders.first.id,
+              items: llmProviders.map((p) =>
                 MacosPopupMenuItem(value: p.id, child: Text(p.name)),
               ).toList(),
               onChanged: (v) async {
                 if (v == null) return;
                 await ConfigService().setLlmPresetId(v);
-                final selected = AppConstants.kLlmPresets.firstWhere((p) => p.id == v);
+                final selected = CloudProviders.getById(v);
                 // Try loading saved config for this preset
                 final loaded = await ConfigService().loadPresetConfig(v);
-                if (!loaded) {
-                  // No saved config, use preset defaults
-                  if (selected.baseUrl.isNotEmpty) {
-                    await ConfigService().setLlmBaseUrl(selected.baseUrl);
+                if (!loaded && selected != null) {
+                  if (selected.llmBaseUrl != null && selected.llmBaseUrl!.isNotEmpty) {
+                    await ConfigService().setLlmBaseUrl(selected.llmBaseUrl!);
                   }
-                  if (selected.defaultModel.isNotEmpty) {
-                    await ConfigService().setLlmModel(selected.defaultModel);
+                  if (selected.llmDefaultModel != null && selected.llmDefaultModel!.isNotEmpty) {
+                    await ConfigService().setLlmModel(selected.llmDefaultModel!);
                   }
                 }
                 _syncLlmControllers();
@@ -2004,9 +1998,9 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _buildApiItemWithController(context, "API Key", CupertinoIcons.lock, _llmApiKeyController, isSecret: true),
               const SizedBox(height: 8),
-              _buildApiItemWithController(context, "Base URL", CupertinoIcons.link, _llmBaseUrlController, placeholder: preset.baseUrl),
+              _buildApiItemWithController(context, "Base URL", CupertinoIcons.link, _llmBaseUrlController, placeholder: provider?.llmBaseUrl ?? ''),
               const SizedBox(height: 8),
-              _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: preset.modelHint),
+              _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: provider?.llmModelHint ?? ''),
             ],
           ),
         ),

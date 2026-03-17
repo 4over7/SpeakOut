@@ -6,7 +6,6 @@ import 'config_service.dart';
 import 'cloud_account_service.dart';
 import '../config/app_constants.dart';
 import '../config/cloud_providers.dart';
-import '../models/cloud_account.dart' as cloud;
 
 class LLMService {
   static final LLMService _instance = LLMService._internal();
@@ -49,7 +48,7 @@ class LLMService {
           final apiKey = account.credentials['api_key'] ?? '';
           final baseUrl = provider.llmBaseUrl ?? '';
           final model = provider.llmDefaultModel ?? '';
-          final isAnthropic = provider.llmApiFormat == cloud.LlmApiFormat.anthropic;
+          final isAnthropic = provider.llmApiFormat == LlmApiFormat.anthropic;
           _log("Resolved LLM from CloudAccount: provider=${account.providerId}, keyLen=${apiKey.length}");
           return (apiKey: apiKey, baseUrl: baseUrl, model: model, isAnthropic: isAnthropic);
         }
