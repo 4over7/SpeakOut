@@ -56,6 +56,8 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _llmModelController = TextEditingController();
   // 自定义模型输入框（选"自定义..."时显示）
   final TextEditingController _llmCustomModelController = TextEditingController();
+  // 是否处于自定义模型模式（仅用户主动选"自定义..."时才为 true）
+  bool _llmModelCustom = false;
 
   // Hotkey State
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
@@ -1082,7 +1084,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 // Also sync the preset ID for backward compat
                 final account = CloudAccountService().getAccountById(v);
                 if (account != null) await ConfigService().setLlmPresetId(account.providerId);
-                setState(() {});
+                setState(() => _llmModelCustom = false); // 切换服务商时重置到预设下拉
               },
             ),
           ],
@@ -1101,18 +1103,14 @@ class _SettingsPageState extends State<SettingsPage> {
     final presets = provider?.llmModels ?? [];
     final currentModel = ConfigService().llmModelOverride ?? provider?.llmDefaultModel ?? '';
 
-    // 判断是否是自定义（不在预设列表中）
-    final isCustom = presets.isNotEmpty &&
-        currentModel.isNotEmpty &&
-        !presets.any((m) => m.id == currentModel);
+    // _llmModelCustom 只在用户主动选"自定义..."时才为 true。
+    // 旧版本残留的不匹配模型名不触发自定义模式，直接显示下拉并默认第一项。
+    final showCustom = _llmModelCustom || presets.isEmpty;
 
     // 下拉当前值
     String dropdownValue;
-    if (presets.isEmpty) {
+    if (showCustom) {
       dropdownValue = _kCustomModelSentinel;
-    } else if (isCustom) {
-      dropdownValue = _kCustomModelSentinel;
-      _llmCustomModelController.text = currentModel;
     } else {
       dropdownValue = presets.any((m) => m.id == currentModel)
           ? currentModel
@@ -1173,12 +1171,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   ],
                   onChanged: (v) async {
                     if (v == null) return;
-                    if (v != _kCustomModelSentinel) {
+                    if (v == _kCustomModelSentinel) {
+                      // 用户主动选"自定义..."
+                      setState(() => _llmModelCustom = true);
+                    } else {
                       _llmCustomModelController.clear();
                       await ConfigService().setLlmModel(v);
                       _llmModelController.text = v;
+                      setState(() => _llmModelCustom = false);
                     }
-                    setState(() {});
                   },
                 ),
             ],
