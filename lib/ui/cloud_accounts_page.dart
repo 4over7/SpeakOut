@@ -270,11 +270,10 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           builder: (builderContext, setDialogState) {
             final provider = CloudProviders.getById(selectedProviderId);
             return MacosSheet(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 100, vertical: 60),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 100, vertical: 40),
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 标题
@@ -282,98 +281,104 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                       isEdit ? loc.cloudAccountEdit : loc.cloudAccountAdd,
                       style: AppTheme.heading(builderContext),
                     ),
-                    const SizedBox(height: 20),
-
-                    // 服务商选择（仅新建时可选）
-                    Row(
-                      children: [
-                        Text('${loc.cloudAccountProvider}:', style: AppTheme.body(builderContext)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: MacosPopupButton<String>(
-                            value: selectedProviderId,
-                            items: CloudProviders.all.map((p) =>
-                              MacosPopupMenuItem(value: p.id, child: Text(p.name)),
-                            ).toList(),
-                            onChanged: isEdit ? null : (v) {
-                              if (v == null) return;
-                              setDialogState(() {
-                                selectedProviderId = v;
-                                final p = CloudProviders.getById(v);
-                                displayName = p?.name ?? v;
-                                initCredControllers(v);
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 显示名称
-                    Row(
-                      children: [
-                        Text('${loc.cloudAccountName}:', style: AppTheme.body(builderContext)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: MacosTextField(
-                            placeholder: provider?.name ?? '',
-                            controller: TextEditingController(text: displayName),
-                            onChanged: (v) => displayName = v,
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 16),
 
-                    // 凭证字段
-                    if (provider != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: MacosColors.systemGrayColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: _buildCredentialFieldsGrouped(provider, credControllers),
-                      ),
-                      // 帮助链接
-                      if (provider.helpUrl.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () async {
-                            final uri = Uri.parse(provider.helpUrl);
-                            if (await canLaunchUrl(uri)) await launchUrl(uri);
-                          },
-                          child: Row(
-                            children: [
-                              MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                provider.helpUrl,
-                                style: TextStyle(fontSize: 11, color: AppTheme.accentColor),
-                                overflow: TextOverflow.ellipsis,
+                    // 可滚动内容区
+                    Expanded(child: SingleChildScrollView(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 服务商选择（仅新建时可选）
+                        Row(
+                          children: [
+                            Text('${loc.cloudAccountProvider}:', style: AppTheme.body(builderContext)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: MacosPopupButton<String>(
+                                value: selectedProviderId,
+                                items: CloudProviders.all.map((p) =>
+                                  MacosPopupMenuItem(value: p.id, child: Text(p.name)),
+                                ).toList(),
+                                onChanged: isEdit ? null : (v) {
+                                  if (v == null) return;
+                                  setDialogState(() {
+                                    selectedProviderId = v;
+                                    final p = CloudProviders.getById(v);
+                                    displayName = p?.name ?? v;
+                                    initCredControllers(v);
+                                  });
+                                },
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // 显示名称
+                        Row(
+                          children: [
+                            Text('${loc.cloudAccountName}:', style: AppTheme.body(builderContext)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: MacosTextField(
+                                placeholder: provider?.name ?? '',
+                                controller: TextEditingController(text: displayName),
+                                onChanged: (v) => displayName = v,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 凭证字段
+                        if (provider != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: MacosColors.systemGrayColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: _buildCredentialFieldsGrouped(provider, credControllers),
                           ),
+                          // 帮助链接
+                          if (provider.helpUrl.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () async {
+                                final uri = Uri.parse(provider.helpUrl);
+                                if (await canLaunchUrl(uri)) await launchUrl(uri);
+                              },
+                              child: Row(
+                                children: [
+                                  MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    provider.helpUrl,
+                                    style: TextStyle(fontSize: 11, color: AppTheme.accentColor),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                        const SizedBox(height: 16),
+
+                        // 启用开关
+                        Row(
+                          children: [
+                            Text('${loc.cloudAccountEnabled}:', style: AppTheme.body(builderContext)),
+                            const SizedBox(width: 12),
+                            MacosSwitch(
+                              value: isEnabled,
+                              onChanged: (v) => setDialogState(() => isEnabled = v),
+                            ),
+                          ],
                         ),
                       ],
-                    ],
+                    ))),
                     const SizedBox(height: 16),
 
-                    // 启用开关
-                    Row(
-                      children: [
-                        Text('${loc.cloudAccountEnabled}:', style: AppTheme.body(builderContext)),
-                        const SizedBox(width: 12),
-                        MacosSwitch(
-                          value: isEnabled,
-                          onChanged: (v) => setDialogState(() => isEnabled = v),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 按钮
+                    // 固定底部按钮
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [

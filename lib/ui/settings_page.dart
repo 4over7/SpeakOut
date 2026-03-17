@@ -54,7 +54,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _llmApiKeyController = TextEditingController();
   final TextEditingController _llmBaseUrlController = TextEditingController();
   final TextEditingController _llmModelController = TextEditingController();
-  bool _llmControllersInitialized = false;
+
 
   // Hotkey State
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
@@ -959,47 +959,12 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         const SettingsDivider(),
-        // 账户中心 LLM 选择（如果有 LLM 能力的账户）
-        if (ConfigService().llmProviderType == 'cloud') ...[
-          Builder(builder: (_) {
-            final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
-            if (llmAccounts.isEmpty) return const SizedBox.shrink();
-            final selectedId = ConfigService().selectedLlmAccountId ?? '';
-            return Column(
-              children: [
-                SettingsTile(
-                  label: loc.cloudAccountSelectLlm,
-                  subtitle: selectedId.isNotEmpty ? null : null,
-                  icon: CupertinoIcons.sparkles,
-                  child: MacosPopupButton<String>(
-                    value: selectedId,
-                    items: [
-                      const MacosPopupMenuItem(value: '', child: Text('Preset (手动配置)')),
-                      ...llmAccounts.map((a) {
-                        final provider = CloudProviders.getById(a.providerId);
-                        return MacosPopupMenuItem(
-                          value: a.id,
-                          child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
-                        );
-                      }),
-                    ],
-                    onChanged: (v) async {
-                      if (v == null) return;
-                      await ConfigService().setSelectedLlmAccountId(v.isEmpty ? null : v);
-                      setState(() {});
-                    },
-                  ),
-                ),
-                const SettingsDivider(),
-              ],
-            );
-          }),
-        ],
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // System Prompt
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1027,36 +992,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
               ),
               const SizedBox(height: 16),
-              // 如果选了账户中心的 LLM，隐藏手动配置区
-              if (ConfigService().llmProviderType == 'cloud' && (ConfigService().selectedLlmAccountId?.isNotEmpty ?? false)) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 16, color: AppTheme.accentColor),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Builder(builder: (_) {
-                          final account = CloudAccountService().getAccountById(ConfigService().selectedLlmAccountId!);
-                          final provider = account != null ? CloudProviders.getById(account.providerId) : null;
-                          final name = account?.displayName ?? provider?.name ?? '';
-                          return Text(
-                            'API Key 来自账户中心: $name',
-                            style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ] else if (ConfigService().llmProviderType == 'cloud') ...[
-                _buildCloudPresetSection(context, loc),
+
+              // LLM 配置
+              if (ConfigService().llmProviderType == 'cloud') ...[
+                _buildCloudLlmAccountSelector(loc),
               ] else ...[
+                // Ollama
                 Text(loc.ollamaUrl, style: AppTheme.body(context)),
                 const SizedBox(height: 4),
                 Text("确保 Ollama 已启动（ollama serve）", style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor)),
@@ -1077,6 +1018,98 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Cloud LLM account selector — replaces old preset-based API Key input
+  Widget _buildCloudLlmAccountSelector(AppLocalizations loc) {
+    final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+    final selectedId = ConfigService().selectedLlmAccountId ?? '';
+    final selectedAccount = selectedId.isNotEmpty ? CloudAccountService().getAccountById(selectedId) : null;
+    final selectedProvider = selectedAccount != null ? CloudProviders.getById(selectedAccount.providerId) : null;
+
+    if (llmAccounts.isEmpty) {
+      // No accounts configured — show hint
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
+            const SizedBox(width: 8),
+            Expanded(child: Text(loc.cloudAccountNone, style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor))),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _selectedIndex = 4), // Navigate to Cloud Accounts tab
+              child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, decoration: TextDecoration.underline)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Account selector
+        Row(
+          children: [
+            const MacosIcon(CupertinoIcons.building_2_fill, size: 16, color: MacosColors.systemGrayColor),
+            const SizedBox(width: 8),
+            Text(loc.cloudAccountSelectLlm, style: AppTheme.caption(context)),
+            const Spacer(),
+            MacosPopupButton<String>(
+              value: llmAccounts.any((a) => a.id == selectedId) ? selectedId : llmAccounts.first.id,
+              items: llmAccounts.map((a) {
+                final p = CloudProviders.getById(a.providerId);
+                return MacosPopupMenuItem(
+                  value: a.id,
+                  child: Text(a.displayName.isNotEmpty ? a.displayName : (p?.name ?? a.providerId)),
+                );
+              }).toList(),
+              onChanged: (v) async {
+                if (v == null) return;
+                await ConfigService().setSelectedLlmAccountId(v);
+                // Also sync the preset ID for backward compat
+                final account = CloudAccountService().getAccountById(v);
+                if (account != null) await ConfigService().setLlmPresetId(account.providerId);
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Model input
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Show which account's API Key is being used
+              Row(
+                children: [
+                  const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 14, color: AppTheme.accentColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'API Key: ${selectedAccount?.displayName ?? selectedProvider?.name ?? ""}',
+                    style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: selectedProvider?.llmModelHint ?? ''),
             ],
           ),
         ),
@@ -1918,95 +1951,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _llmModelController.text = ConfigService().llmModelOverride ?? '';
   }
 
-  Widget _buildCloudPresetSection(BuildContext context, AppLocalizations loc) {
-    // Use CloudProviders as single source of truth for LLM providers
-    final llmProviders = CloudProviders.all.where((p) => p.hasLLM).toList();
-    final currentPresetId = ConfigService().llmPresetId;
-    final provider = CloudProviders.getById(currentPresetId);
-
-    // Initialize controllers once
-    if (!_llmControllersInitialized) {
-      _syncLlmControllers();
-      _llmControllersInitialized = true;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(loc.apiConfig, style: AppTheme.body(context)),
-            if (provider != null && provider.helpUrl.isNotEmpty)
-              GestureDetector(
-                onTap: () async {
-                  final uri = Uri.parse(provider.helpUrl);
-                  if (await canLaunchUrl(uri)) await launchUrl(uri);
-                },
-                child: Row(
-                  children: [
-                    MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
-                    const SizedBox(width: 4),
-                    Text("获取帮助", style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Provider selector (from CloudProviders)
-        Row(
-          children: [
-            const MacosIcon(CupertinoIcons.building_2_fill, size: 16, color: MacosColors.systemGrayColor),
-            const SizedBox(width: 8),
-            Text("服务商", style: AppTheme.caption(context)),
-            const Spacer(),
-            MacosPopupButton<String>(
-              value: llmProviders.any((p) => p.id == currentPresetId) ? currentPresetId : llmProviders.first.id,
-              items: llmProviders.map((p) =>
-                MacosPopupMenuItem(value: p.id, child: Text(p.name)),
-              ).toList(),
-              onChanged: (v) async {
-                if (v == null) return;
-                await ConfigService().setLlmPresetId(v);
-                final selected = CloudProviders.getById(v);
-                // Try loading saved config for this preset
-                final loaded = await ConfigService().loadPresetConfig(v);
-                if (!loaded && selected != null) {
-                  if (selected.llmBaseUrl != null && selected.llmBaseUrl!.isNotEmpty) {
-                    await ConfigService().setLlmBaseUrl(selected.llmBaseUrl!);
-                  }
-                  if (selected.llmDefaultModel != null && selected.llmDefaultModel!.isNotEmpty) {
-                    await ConfigService().setLlmModel(selected.llmDefaultModel!);
-                  }
-                }
-                _syncLlmControllers();
-                setState(() { _llmTestResult = null; _llmConfigDirty = false; });
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildApiItemWithController(context, "API Key", CupertinoIcons.lock, _llmApiKeyController, isSecret: true),
-              const SizedBox(height: 8),
-              _buildApiItemWithController(context, "Base URL", CupertinoIcons.link, _llmBaseUrlController, placeholder: provider?.llmBaseUrl ?? ''),
-              const SizedBox(height: 8),
-              _buildApiItemWithController(context, "Model", CupertinoIcons.cube_box, _llmModelController, placeholder: provider?.llmModelHint ?? ''),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // _buildCloudPresetSection removed — replaced by _buildCloudLlmAccountSelector
 
   Widget _buildApiItem(BuildContext context, String label, IconData icon, String? value, Function(String) onChanged, {bool isSecret = false, String? placeholder}) {
       return Column(
