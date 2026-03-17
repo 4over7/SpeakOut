@@ -8,7 +8,11 @@ import 'app_constants.dart' show LlmApiFormat;
 /// 每个服务商需要什么凭证、能提供什么能力。
 class CloudProviders {
   static const List<CloudProvider> all = [
-    // ── 第一梯队：推荐 ──
+
+    // ══════════════════════════════════════════════════
+    // 一、流式 ASR + LLM（全功能，推荐优先）
+    // 说话即出字，延迟最低，适合语音输入主力场景
+    // ══════════════════════════════════════════════════
 
     CloudProvider(
       id: 'dashscope',
@@ -59,70 +63,6 @@ class CloudProviders {
     ),
 
     CloudProvider(
-      id: 'openai',
-      name: 'OpenAI',
-      credentialFields: [
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true, placeholder: 'sk-...'),
-      ],
-      capabilities: {CloudCapability.asrBatch, CloudCapability.llm},
-      asrModels: [
-        CloudASRModel(id: 'whisper-1', name: 'Whisper', isStreaming: false, priceHint: '2.63 元/h'),
-        CloudASRModel(id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', isStreaming: false, priceHint: '2.63 元/h'),
-        CloudASRModel(id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', isStreaming: false, priceHint: '1.31 元/h'),
-      ],
-      llmModels: [
-        CloudLLMModel(id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '推荐，性价比高', priceHint: '0.011 元/千 token'),
-        CloudLLMModel(id: 'gpt-4o', name: 'GPT-4o', priceHint: '0.18 元/千 token'),
-        CloudLLMModel(id: 'gpt-4.1', name: 'GPT-4.1', priceHint: '0.14 元/千 token'),
-        CloudLLMModel(id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', priceHint: '0.03 元/千 token'),
-        CloudLLMModel(id: 'o4-mini', name: 'o4-mini', description: '推理模型'),
-      ],
-      llmBaseUrl: 'https://api.openai.com/v1',
-      llmDefaultModel: 'gpt-4o-mini',
-      llmModelHint: '如 gpt-4o-mini, gpt-4o',
-      helpUrl: 'https://platform.openai.com/docs/overview',
-    ),
-
-    CloudProvider(
-      id: 'groq',
-      name: 'Groq',
-      credentialFields: [
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true, placeholder: 'gsk_...'),
-      ],
-      capabilities: {CloudCapability.asrBatch, CloudCapability.llm},
-      asrModels: [
-        CloudASRModel(id: 'whisper-large-v3-turbo', name: 'Whisper V3 Turbo', isStreaming: false, description: '299x 实时速度', priceHint: '0.29 元/h'),
-        CloudASRModel(id: 'whisper-large-v3', name: 'Whisper Large V3', isStreaming: false, priceHint: '0.81 元/h'),
-      ],
-      llmModels: [
-        CloudLLMModel(id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', description: '推荐，极快', priceHint: '免费额度'),
-        CloudLLMModel(id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', description: '最快', priceHint: '免费额度'),
-        CloudLLMModel(id: 'gemma2-9b-it', name: 'Gemma2 9B', priceHint: '免费额度'),
-        CloudLLMModel(id: 'moonshotai/kimi-k2-instruct', name: 'Kimi K2 (via Groq)', description: 'MoE 旗舰'),
-      ],
-      llmBaseUrl: 'https://api.groq.com/openai/v1',
-      llmDefaultModel: 'llama-3.3-70b-versatile',
-      llmModelHint: '如 llama-3.3-70b-versatile',
-      helpUrl: 'https://console.groq.com/docs/quickstart',
-    ),
-
-    // ── 第二梯队：特定场景 ──
-
-    CloudProvider(
-      id: 'tencent',
-      name: '腾讯云',
-      credentialFields: [
-        CredentialField(key: 'secret_id', label: 'SecretId'),
-        CredentialField(key: 'secret_key', label: 'SecretKey', isSecret: true),
-      ],
-      capabilities: {CloudCapability.asrStreaming},
-      asrModels: [
-        CloudASRModel(id: 'asr-streaming', name: '实时语音识别', isStreaming: true, description: '每月 5h 免费', priceHint: '3.20 元/h'),
-      ],
-      helpUrl: 'https://cloud.tencent.com/document/product/1093',
-    ),
-
-    CloudProvider(
       id: 'xfyun',
       name: '讯飞',
       credentialFields: [
@@ -147,7 +87,61 @@ class CloudProviders {
       helpUrl: 'https://www.xfyun.cn/services/voicedictation',
     ),
 
-    // ── 纯 LLM 服务商（无 ASR）──
+    // ══════════════════════════════════════════════════
+    // 二、非流式 ASR + LLM（说完后整段转写，适合海外用户）
+    // ══════════════════════════════════════════════════
+
+    CloudProvider(
+      id: 'groq',
+      name: 'Groq',
+      credentialFields: [
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true, placeholder: 'gsk_...'),
+      ],
+      capabilities: {CloudCapability.asrBatch, CloudCapability.llm},
+      asrModels: [
+        CloudASRModel(id: 'whisper-large-v3-turbo', name: 'Whisper V3 Turbo', isStreaming: false, description: '299x 实时速度', priceHint: '0.29 元/h'),
+        CloudASRModel(id: 'whisper-large-v3', name: 'Whisper Large V3', isStreaming: false, priceHint: '0.81 元/h'),
+      ],
+      llmModels: [
+        CloudLLMModel(id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', description: '推荐，极快', priceHint: '免费额度'),
+        CloudLLMModel(id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', description: '最快', priceHint: '免费额度'),
+        CloudLLMModel(id: 'gemma2-9b-it', name: 'Gemma2 9B', priceHint: '免费额度'),
+        CloudLLMModel(id: 'moonshotai/kimi-k2-instruct', name: 'Kimi K2 (via Groq)', description: 'MoE 旗舰'),
+      ],
+      llmBaseUrl: 'https://api.groq.com/openai/v1',
+      llmDefaultModel: 'llama-3.3-70b-versatile',
+      llmModelHint: '如 llama-3.3-70b-versatile',
+      helpUrl: 'https://console.groq.com/docs/quickstart',
+    ),
+
+    CloudProvider(
+      id: 'openai',
+      name: 'OpenAI',
+      credentialFields: [
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true, placeholder: 'sk-...'),
+      ],
+      capabilities: {CloudCapability.asrBatch, CloudCapability.llm},
+      asrModels: [
+        CloudASRModel(id: 'whisper-1', name: 'Whisper', isStreaming: false, priceHint: '2.63 元/h'),
+        CloudASRModel(id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', isStreaming: false, priceHint: '2.63 元/h'),
+        CloudASRModel(id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', isStreaming: false, priceHint: '1.31 元/h'),
+      ],
+      llmModels: [
+        CloudLLMModel(id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '推荐，性价比高', priceHint: '0.011 元/千 token'),
+        CloudLLMModel(id: 'gpt-4o', name: 'GPT-4o', priceHint: '0.18 元/千 token'),
+        CloudLLMModel(id: 'gpt-4.1', name: 'GPT-4.1', priceHint: '0.14 元/千 token'),
+        CloudLLMModel(id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', priceHint: '0.03 元/千 token'),
+        CloudLLMModel(id: 'o4-mini', name: 'o4-mini', description: '推理模型'),
+      ],
+      llmBaseUrl: 'https://api.openai.com/v1',
+      llmDefaultModel: 'gpt-4o-mini',
+      llmModelHint: '如 gpt-4o-mini, gpt-4o',
+      helpUrl: 'https://platform.openai.com/docs/overview',
+    ),
+
+    // ══════════════════════════════════════════════════
+    // 三、纯 LLM（仅用于 AI 润色，需搭配离线或流式 ASR）
+    // ══════════════════════════════════════════════════
 
     CloudProvider(
       id: 'deepseek',
@@ -167,25 +161,6 @@ class CloudProviders {
     ),
 
     CloudProvider(
-      id: 'anthropic',
-      name: 'Anthropic (Claude)',
-      credentialFields: [
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
-      ],
-      capabilities: {CloudCapability.llm},
-      llmModels: [
-        CloudLLMModel(id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', description: '推荐，能力均衡'),
-        CloudLLMModel(id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', description: '最快，便宜'),
-        CloudLLMModel(id: 'claude-opus-4-6', name: 'Claude Opus 4.6', description: '旗舰'),
-      ],
-      llmBaseUrl: 'https://api.anthropic.com',
-      llmDefaultModel: 'claude-sonnet-4-6',
-      llmModelHint: '如 claude-sonnet-4-6, claude-haiku-4-5-20251001',
-      llmApiFormat: LlmApiFormat.anthropic,
-      helpUrl: 'https://docs.anthropic.com/en/docs/initial-setup',
-    ),
-
-    CloudProvider(
       id: 'zhipu',
       name: '智谱 (GLM)',
       credentialFields: [
@@ -202,24 +177,6 @@ class CloudProviders {
       llmDefaultModel: 'glm-4-flash',
       llmModelHint: '如 glm-4-flash, glm-4-plus',
       helpUrl: 'https://open.bigmodel.cn/dev/howuse/introduction',
-    ),
-
-    CloudProvider(
-      id: 'gemini',
-      name: 'Google Gemini',
-      credentialFields: [
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
-      ],
-      capabilities: {CloudCapability.llm},
-      llmModels: [
-        CloudLLMModel(id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: '推荐，极快'),
-        CloudLLMModel(id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: '思考增强版'),
-        CloudLLMModel(id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: '旗舰'),
-      ],
-      llmBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-      llmDefaultModel: 'gemini-2.0-flash',
-      llmModelHint: '如 gemini-2.0-flash',
-      helpUrl: 'https://ai.google.dev/gemini-api/docs/openai',
     ),
 
     CloudProvider(
@@ -294,7 +251,64 @@ class CloudProviders {
       helpUrl: 'https://platform.minimax.io/docs/api-reference/text-openai-api',
     ),
 
-    // ── Legacy ──
+    CloudProvider(
+      id: 'gemini',
+      name: 'Google Gemini',
+      credentialFields: [
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
+      ],
+      capabilities: {CloudCapability.llm},
+      llmModels: [
+        CloudLLMModel(id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: '推荐，极快'),
+        CloudLLMModel(id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: '思考增强版'),
+        CloudLLMModel(id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: '旗舰'),
+      ],
+      llmBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      llmDefaultModel: 'gemini-2.0-flash',
+      llmModelHint: '如 gemini-2.0-flash',
+      helpUrl: 'https://ai.google.dev/gemini-api/docs/openai',
+    ),
+
+    CloudProvider(
+      id: 'anthropic',
+      name: 'Anthropic (Claude)',
+      credentialFields: [
+        CredentialField(key: 'api_key', label: 'API Key', isSecret: true),
+      ],
+      capabilities: {CloudCapability.llm},
+      llmModels: [
+        CloudLLMModel(id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', description: '推荐，能力均衡'),
+        CloudLLMModel(id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', description: '最快，便宜'),
+        CloudLLMModel(id: 'claude-opus-4-6', name: 'Claude Opus 4.6', description: '旗舰'),
+      ],
+      llmBaseUrl: 'https://api.anthropic.com',
+      llmDefaultModel: 'claude-sonnet-4-6',
+      llmModelHint: '如 claude-sonnet-4-6, claude-haiku-4-5-20251001',
+      llmApiFormat: LlmApiFormat.anthropic,
+      helpUrl: 'https://docs.anthropic.com/en/docs/initial-setup',
+    ),
+
+    // ══════════════════════════════════════════════════
+    // 四、纯流式 ASR（无 LLM，可搭配纯 LLM 服务商）
+    // ══════════════════════════════════════════════════
+
+    CloudProvider(
+      id: 'tencent',
+      name: '腾讯云',
+      credentialFields: [
+        CredentialField(key: 'secret_id', label: 'SecretId'),
+        CredentialField(key: 'secret_key', label: 'SecretKey', isSecret: true),
+      ],
+      capabilities: {CloudCapability.asrStreaming},
+      asrModels: [
+        CloudASRModel(id: 'asr-streaming', name: '实时语音识别', isStreaming: true, description: '每月 5h 免费', priceHint: '3.20 元/h'),
+      ],
+      helpUrl: 'https://cloud.tencent.com/document/product/1093',
+    ),
+
+    // ══════════════════════════════════════════════════
+    // 五、Legacy（旧版迁移兼容）
+    // ══════════════════════════════════════════════════
 
     CloudProvider(
       id: 'aliyun_nls',
