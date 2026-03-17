@@ -307,28 +307,36 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     Expanded(child: SingleChildScrollView(child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 服务商选择（仅新建时可选）
+                        // 服务商选择（仅新建时可选，编辑时显示为只读文本）
                         Row(
                           children: [
                             Text('${loc.cloudAccountProvider}:', style: AppTheme.body(builderContext)),
                             const SizedBox(width: 12),
-                            Expanded(
-                              child: MacosPopupButton<String>(
-                                value: selectedProviderId,
-                                items: CloudProviders.all.map((p) =>
-                                  MacosPopupMenuItem(value: p.id, child: Text(p.name)),
-                                ).toList(),
-                                onChanged: isEdit ? null : (v) {
-                                  if (v == null) return;
-                                  setDialogState(() {
-                                    selectedProviderId = v;
-                                    final p = CloudProviders.getById(v);
-                                    displayName = p?.name ?? v;
-                                    initCredControllers(v);
-                                  });
-                                },
+                            if (isEdit)
+                              Expanded(
+                                child: Text(
+                                  CloudProviders.getById(selectedProviderId)?.name ?? selectedProviderId,
+                                  style: AppTheme.body(builderContext).copyWith(color: MacosColors.systemGrayColor),
+                                ),
+                              )
+                            else
+                              Expanded(
+                                child: MacosPopupButton<String>(
+                                  value: selectedProviderId,
+                                  items: CloudProviders.all.map((p) =>
+                                    MacosPopupMenuItem(value: p.id, child: Text(p.name)),
+                                  ).toList(),
+                                  onChanged: (v) {
+                                    if (v == null) return;
+                                    setDialogState(() {
+                                      selectedProviderId = v;
+                                      final p = CloudProviders.getById(v);
+                                      displayName = p?.name ?? v;
+                                      initCredControllers(v);
+                                    });
+                                  },
+                                ),
                               ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 12),

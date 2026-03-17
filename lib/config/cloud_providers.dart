@@ -18,7 +18,7 @@ class CloudProviders {
       id: 'dashscope',
       name: '阿里云百炼',
       credentialFields: [
-        CredentialField(key: 'api_key', label: 'API Key', isSecret: true, placeholder: 'sk-...'),
+        CredentialField(key: 'api_key', label: 'API Key（语音识别 + AI 润色共用）', isSecret: true, placeholder: 'sk-...'),
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
       asrModels: [

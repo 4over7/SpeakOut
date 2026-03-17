@@ -1375,6 +1375,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildWorkModeAdvanced(AppLocalizations loc, String currentMode) {
+    // 云端模式下高级设置全部不适用，直接隐藏
+    if (currentMode == 'cloud') return const SizedBox.shrink();
     return Column(
       children: [
         // Collapsible header
