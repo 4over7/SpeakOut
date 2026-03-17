@@ -452,45 +452,77 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     final asrOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.asrStreaming) || f.scope.contains(CloudCapability.asrBatch)).toList();
     final llmOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.llm)).toList();
 
-    // If all fields are universal (no scope), show flat list
     final hasGroups = asrOnly.isNotEmpty || llmOnly.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 通用凭证（有分组时才显示标题）
         if (universal.isNotEmpty) ...[
-          if (hasGroups)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text('通用凭证', style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600)),
-            ),
-          ..._buildFieldList(universal, controllers),
+          if (hasGroups) _buildSectionCard(
+            icon: CupertinoIcons.lock_shield,
+            label: '通用凭证',
+            color: MacosColors.systemGrayColor,
+            fields: universal,
+            controllers: controllers,
+          )
+          else
+            ..._buildFieldList(universal, controllers),
         ],
+        // ASR 凭证区域
         if (asrOnly.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              MacosIcon(CupertinoIcons.waveform, size: 12, color: MacosColors.systemBlueColor),
-              const SizedBox(width: 4),
-              Text('语音识别 (ASR)', style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemBlueColor)),
-            ]),
+          if (universal.isNotEmpty) const SizedBox(height: 8),
+          _buildSectionCard(
+            icon: CupertinoIcons.waveform,
+            label: '语音识别 (ASR)',
+            color: MacosColors.systemBlueColor,
+            fields: asrOnly,
+            controllers: controllers,
           ),
-          ..._buildFieldList(asrOnly, controllers),
         ],
+        // LLM 凭证区域
         if (llmOnly.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              MacosIcon(CupertinoIcons.sparkles, size: 12, color: MacosColors.systemOrangeColor),
-              const SizedBox(width: 4),
-              Text('大语言模型 (LLM)', style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemOrangeColor)),
-            ]),
+          if (universal.isNotEmpty || asrOnly.isNotEmpty) const SizedBox(height: 8),
+          _buildSectionCard(
+            icon: CupertinoIcons.sparkles,
+            label: '大语言模型 (LLM)',
+            color: MacosColors.systemOrangeColor,
+            fields: llmOnly,
+            controllers: controllers,
           ),
-          ..._buildFieldList(llmOnly, controllers),
         ],
       ],
+    );
+  }
+
+  Widget _buildSectionCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required List<CredentialField> fields,
+    required Map<String, TextEditingController> controllers,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: color.withValues(alpha: 0.5), width: 3)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 分组标题
+          Row(children: [
+            MacosIcon(icon, size: 12, color: color),
+            const SizedBox(width: 5),
+            Text(label, style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: color)),
+          ]),
+          const SizedBox(height: 10),
+          // 字段列表
+          ..._buildFieldList(fields, controllers),
+        ],
+      ),
     );
   }
 
