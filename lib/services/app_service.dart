@@ -1,6 +1,7 @@
 import '../engine/core_engine.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
+import 'cloud_account_service.dart';
 import 'update_service.dart';
 import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
@@ -38,9 +39,11 @@ class AppService {
     await ConfigService().init();
     await ConfigService().migrateToWorkMode();
     applyVerboseLogging(); // Apply debug logging as early as possible
-    
+
     // 1.5 Other Services
     await ChatService().init();
+    await CloudAccountService().init();
+    await CloudAccountService().migrateFromLegacy();
     
     engine.updateStatus("正在启动键盘监听...");
     await Future.delayed(const Duration(milliseconds: 100));

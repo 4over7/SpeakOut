@@ -306,6 +306,29 @@ class ConfigService {
   String? get llmApiKeyOverride => _cachedLlmApiKey;
   String? get llmModelOverride => _prefs?.getString('llm_model');
 
+  // --- Cloud Account Selection ---
+  String? get selectedAsrAccountId => _prefs?.getString('selected_asr_account_id');
+  String? get selectedAsrModelId => _prefs?.getString('selected_asr_model_id');
+  String? get selectedLlmAccountId => _prefs?.getString('selected_llm_account_id');
+
+  Future<void> setSelectedAsrAccount(String? accountId, {String? modelId}) async {
+    if (accountId == null) {
+      await _prefs?.remove('selected_asr_account_id');
+      await _prefs?.remove('selected_asr_model_id');
+    } else {
+      await _prefs?.setString('selected_asr_account_id', accountId);
+      if (modelId != null) await _prefs?.setString('selected_asr_model_id', modelId);
+    }
+  }
+
+  Future<void> setSelectedLlmAccountId(String? accountId) async {
+    if (accountId == null) {
+      await _prefs?.remove('selected_llm_account_id');
+    } else {
+      await _prefs?.setString('selected_llm_account_id', accountId);
+    }
+  }
+
   // --- Agent Router Config ---
   String get agentRouterModel => _getStringWithDefault('agent_router_model', llmModel);
   Future<void> setAgentRouterModel(String model) async => await _prefs?.setString('agent_router_model', model);
