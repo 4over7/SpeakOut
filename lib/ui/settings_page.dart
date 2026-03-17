@@ -19,6 +19,10 @@ import 'package:speakout/config/app_log.dart';
 import 'vocab_settings_page.dart';
 import '../services/update_service.dart';
 import '../services/llm_service.dart';
+import '../services/cloud_account_service.dart';
+import '../config/cloud_providers.dart';
+import '../models/cloud_account.dart';
+import 'cloud_accounts_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -91,11 +95,11 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _aiPromptController = TextEditingController(text: ConfigService().aiCorrectionPrompt);
     _loadVersion();
-    _tabController = MacosTabController(initialIndex: 0, length: 5);
+    _tabController = MacosTabController(initialIndex: 0, length: 6);
     _tabController.addListener(() {
       final newIndex = _tabController.index;
       // Warn if leaving Work Mode tab with unsaved LLM changes
-      if (_selectedIndex == 1 && newIndex != 1 && _llmConfigDirty) {
+      if (_selectedIndex == 2 && newIndex != 2 && _llmConfigDirty) {
         _showUnsavedChangesDialog(newIndex);
         return;
       }
@@ -546,20 +550,24 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabGeneral, style: TextStyle(color: _selectedIndex == 0 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.cloud, color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabCloudAccounts, style: TextStyle(color: _selectedIndex == 1 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.waveform_circle_fill, color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabWorkMode, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.hand_draw, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
+              ),
+              SidebarItem(
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
               ),
             ],
           );
@@ -580,12 +588,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   padding: const EdgeInsets.all(20),
                   child: Builder(builder: (_) {
                     // Work Mode page manages its own scroll (fixed bottom save bar)
-                    if (_selectedIndex == 1) return _buildWorkModeView();
+                    if (_selectedIndex == 2) return _buildWorkModeView();
+                    // Cloud Accounts page has its own scroll
+                    if (_selectedIndex == 1) return const CloudAccountsPage();
                     return SingleChildScrollView(
                       child: Builder(builder: (_) {
                          if (_selectedIndex == 0) return _buildGeneralView();
-                         if (_selectedIndex == 2) return _buildTriggerView();
-                         if (_selectedIndex == 3) return _buildDiaryView();
+                         if (_selectedIndex == 3) return _buildTriggerView();
+                         if (_selectedIndex == 4) return _buildDiaryView();
                          return _buildAboutView(context, _version);
                       }),
                     );
@@ -952,6 +962,42 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         const SettingsDivider(),
+        // 账户中心 LLM 选择（如果有 LLM 能力的账户）
+        if (ConfigService().llmProviderType == 'cloud') ...[
+          Builder(builder: (_) {
+            final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+            if (llmAccounts.isEmpty) return const SizedBox.shrink();
+            final selectedId = ConfigService().selectedLlmAccountId ?? '';
+            return Column(
+              children: [
+                SettingsTile(
+                  label: loc.cloudAccountSelectLlm,
+                  subtitle: selectedId.isNotEmpty ? null : null,
+                  icon: CupertinoIcons.sparkles,
+                  child: MacosPopupButton<String>(
+                    value: selectedId,
+                    items: [
+                      const MacosPopupMenuItem(value: '', child: Text('Preset (手动配置)')),
+                      ...llmAccounts.map((a) {
+                        final provider = CloudProviders.getById(a.providerId);
+                        return MacosPopupMenuItem(
+                          value: a.id,
+                          child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) async {
+                      if (v == null) return;
+                      await ConfigService().setSelectedLlmAccountId(v.isEmpty ? null : v);
+                      setState(() {});
+                    },
+                  ),
+                ),
+                const SettingsDivider(),
+              ],
+            );
+          }),
+        ],
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -984,7 +1030,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
               ),
               const SizedBox(height: 16),
-              if (ConfigService().llmProviderType == 'cloud') ...[
+              // 如果选了账户中心的 LLM，隐藏手动配置区
+              if (ConfigService().llmProviderType == 'cloud' && (ConfigService().selectedLlmAccountId?.isNotEmpty ?? false)) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 16, color: AppTheme.accentColor),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Builder(builder: (_) {
+                          final account = CloudAccountService().getAccountById(ConfigService().selectedLlmAccountId!);
+                          final provider = account != null ? CloudProviders.getById(account.providerId) : null;
+                          final name = account?.displayName ?? provider?.name ?? '';
+                          return Text(
+                            'API Key 来自账户中心: $name',
+                            style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (ConfigService().llmProviderType == 'cloud') ...[
                 _buildCloudPresetSection(context, loc),
               ] else ...[
                 Text(loc.ollamaUrl, style: AppTheme.body(context)),
@@ -1015,38 +1088,106 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildCloudModeConfig(AppLocalizations loc) {
-    return SettingsGroup(
-      title: loc.aliyunConfig,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-          child: Text(loc.aliyunConfigDesc, style: AppTheme.caption(context)),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
-              const SizedBox(height: 8),
-              MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
-              const SizedBox(height: 8),
-              MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
-              const SizedBox(height: 12),
-              PushButton(
-                controlSize: ControlSize.regular,
-                onPressed: () async {
-                   await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
-                   if (mounted) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(content: Text("Saved Cloud Config!"), duration: Duration(seconds: 2)),
-                     );
-                   }
-                },
-                child: Text(loc.saveApply)
-              ),
-            ],
+    final asrAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.asrStreaming)
+      + CloudAccountService().getAccountsWithCapability(CloudCapability.asrBatch);
+    // Deduplicate by account id
+    final seen = <String>{};
+    final uniqueAsrAccounts = asrAccounts.where((a) => seen.add(a.id)).toList();
+
+    final selectedAsrId = ConfigService().selectedAsrAccountId;
+
+    if (uniqueAsrAccounts.isEmpty) {
+      // 没有配置 ASR 账户: 保留旧版阿里云直接输入
+      return SettingsGroup(
+        title: loc.aliyunConfig,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+            child: Text(loc.aliyunConfigDesc, style: AppTheme.caption(context)),
           ),
-        )
+          // 提示去账户中心配置
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedIndex = 1),
+              child: Row(
+                children: [
+                  MacosIcon(CupertinoIcons.arrow_right_circle, size: 14, color: AppTheme.accentColor),
+                  const SizedBox(width: 6),
+                  Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.accentColor)),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
+                const SizedBox(height: 8),
+                MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
+                const SizedBox(height: 8),
+                MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
+                const SizedBox(height: 12),
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  onPressed: () async {
+                     await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
+                     if (mounted) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         const SnackBar(content: Text("Saved Cloud Config!"), duration: Duration(seconds: 2)),
+                       );
+                     }
+                  },
+                  child: Text(loc.saveApply)
+                ),
+              ],
+            ),
+          )
+        ],
+      );
+    }
+
+    // 有 ASR 账户: 显示下拉选择
+    return SettingsGroup(
+      title: loc.cloudAccountSelectAsr,
+      children: [
+        SettingsTile(
+          label: loc.cloudAccountSelectAsr,
+          icon: CupertinoIcons.cloud,
+          child: MacosPopupButton<String>(
+            value: selectedAsrId ?? '',
+            items: [
+              const MacosPopupMenuItem(value: '', child: Text('--')),
+              ...uniqueAsrAccounts.map((a) {
+                final provider = CloudProviders.getById(a.providerId);
+                return MacosPopupMenuItem(
+                  value: a.id,
+                  child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
+                );
+              }),
+            ],
+            onChanged: (v) async {
+              if (v == null) return;
+              await ConfigService().setSelectedAsrAccount(v.isEmpty ? null : v);
+              setState(() {});
+            },
+          ),
+        ),
+        // 也保留旧版凭证输入区（折叠）
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: GestureDetector(
+            onTap: () => setState(() => _selectedIndex = 1),
+            child: Row(
+              children: [
+                MacosIcon(CupertinoIcons.plus_circle, size: 14, color: AppTheme.accentColor),
+                const SizedBox(width: 6),
+                Text(loc.cloudAccountAdd, style: TextStyle(fontSize: 12, color: AppTheme.accentColor)),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

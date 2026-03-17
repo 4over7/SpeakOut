@@ -634,4 +634,55 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiPolishMatrix =>
       'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output';
+
+  @override
+  String get tabCloudAccounts => 'Cloud Accounts';
+
+  @override
+  String get cloudAccountsTitle => 'Manage Cloud Accounts';
+
+  @override
+  String get cloudAccountAdd => 'Add Provider';
+
+  @override
+  String get cloudAccountEdit => 'Edit';
+
+  @override
+  String get cloudAccountDelete => 'Delete';
+
+  @override
+  String get cloudAccountCapabilityAsr => 'Speech Recognition';
+
+  @override
+  String get cloudAccountCapabilityLlm => 'AI Polish';
+
+  @override
+  String get cloudAccountNone => 'No accounts configured';
+
+  @override
+  String get cloudAccountSelectAsr => 'Select ASR Service';
+
+  @override
+  String get cloudAccountSelectLlm => 'Select LLM Service';
+
+  @override
+  String get cloudAccountGoConfig => 'Go to Cloud Accounts';
+
+  @override
+  String get cloudAccountSaved => 'Account saved';
+
+  @override
+  String get cloudAccountDeleted => 'Account deleted';
+
+  @override
+  String get cloudAccountDeleteConfirm => 'Delete this account?';
+
+  @override
+  String get cloudAccountProvider => 'Provider';
+
+  @override
+  String get cloudAccountName => 'Display Name';
+
+  @override
+  String get cloudAccountEnabled => 'Enabled';
 }

@@ -196,5 +196,22 @@
   "updateAction": "查看更新",
   "updateUpToDate": "已是最新版本",
   "llmRewrite": "LLM 智能改写",
-  "aiPolishMatrix": "LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出"
+  "aiPolishMatrix": "LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出",
+  "tabCloudAccounts": "云服务账户",
+  "cloudAccountsTitle": "管理云服务账户",
+  "cloudAccountAdd": "添加服务商",
+  "cloudAccountEdit": "编辑",
+  "cloudAccountDelete": "删除",
+  "cloudAccountCapabilityAsr": "语音识别",
+  "cloudAccountCapabilityLlm": "AI 润色",
+  "cloudAccountNone": "暂无配置，请添加云服务账户",
+  "cloudAccountSelectAsr": "选择 ASR 服务",
+  "cloudAccountSelectLlm": "选择 LLM 服务",
+  "cloudAccountGoConfig": "前往账户中心配置",
+  "cloudAccountSaved": "账户已保存",
+  "cloudAccountDeleted": "账户已删除",
+  "cloudAccountDeleteConfirm": "确定删除此账户？",
+  "cloudAccountProvider": "服务商",
+  "cloudAccountName": "显示名称",
+  "cloudAccountEnabled": "启用"
 }

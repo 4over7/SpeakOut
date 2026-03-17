@@ -1249,6 +1249,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output'**
   String get aiPolishMatrix;
+
+  /// No description provided for @tabCloudAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Accounts'**
+  String get tabCloudAccounts;
+
+  /// No description provided for @cloudAccountsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Cloud Accounts'**
+  String get cloudAccountsTitle;
+
+  /// No description provided for @cloudAccountAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Provider'**
+  String get cloudAccountAdd;
+
+  /// No description provided for @cloudAccountEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get cloudAccountEdit;
+
+  /// No description provided for @cloudAccountDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get cloudAccountDelete;
+
+  /// No description provided for @cloudAccountCapabilityAsr.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech Recognition'**
+  String get cloudAccountCapabilityAsr;
+
+  /// No description provided for @cloudAccountCapabilityLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish'**
+  String get cloudAccountCapabilityLlm;
+
+  /// No description provided for @cloudAccountNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No accounts configured'**
+  String get cloudAccountNone;
+
+  /// No description provided for @cloudAccountSelectAsr.
+  ///
+  /// In en, this message translates to:
+  /// **'Select ASR Service'**
+  String get cloudAccountSelectAsr;
+
+  /// No description provided for @cloudAccountSelectLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'Select LLM Service'**
+  String get cloudAccountSelectLlm;
+
+  /// No description provided for @cloudAccountGoConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Cloud Accounts'**
+  String get cloudAccountGoConfig;
+
+  /// No description provided for @cloudAccountSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Account saved'**
+  String get cloudAccountSaved;
+
+  /// No description provided for @cloudAccountDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deleted'**
+  String get cloudAccountDeleted;
+
+  /// No description provided for @cloudAccountDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this account?'**
+  String get cloudAccountDeleteConfirm;
+
+  /// No description provided for @cloudAccountProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get cloudAccountProvider;
+
+  /// No description provided for @cloudAccountName.
+  ///
+  /// In en, this message translates to:
+  /// **'Display Name'**
+  String get cloudAccountName;
+
+  /// No description provided for @cloudAccountEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get cloudAccountEnabled;
 }
 
 class _AppLocalizationsDelegate

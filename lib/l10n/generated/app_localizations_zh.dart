@@ -607,4 +607,55 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get aiPolishMatrix =>
       'LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出';
+
+  @override
+  String get tabCloudAccounts => '云服务账户';
+
+  @override
+  String get cloudAccountsTitle => '管理云服务账户';
+
+  @override
+  String get cloudAccountAdd => '添加服务商';
+
+  @override
+  String get cloudAccountEdit => '编辑';
+
+  @override
+  String get cloudAccountDelete => '删除';
+
+  @override
+  String get cloudAccountCapabilityAsr => '语音识别';
+
+  @override
+  String get cloudAccountCapabilityLlm => 'AI 润色';
+
+  @override
+  String get cloudAccountNone => '暂无配置，请添加云服务账户';
+
+  @override
+  String get cloudAccountSelectAsr => '选择 ASR 服务';
+
+  @override
+  String get cloudAccountSelectLlm => '选择 LLM 服务';
+
+  @override
+  String get cloudAccountGoConfig => '前往账户中心配置';
+
+  @override
+  String get cloudAccountSaved => '账户已保存';
+
+  @override
+  String get cloudAccountDeleted => '账户已删除';
+
+  @override
+  String get cloudAccountDeleteConfirm => '确定删除此账户？';
+
+  @override
+  String get cloudAccountProvider => '服务商';
+
+  @override
+  String get cloudAccountName => '显示名称';
+
+  @override
+  String get cloudAccountEnabled => '启用';
 }

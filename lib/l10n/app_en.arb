@@ -236,5 +236,22 @@
   "updateAction": "View Update",
   "updateUpToDate": "Up to date",
   "llmRewrite": "LLM Rewrite",
-  "aiPolishMatrix": "LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output"
+  "aiPolishMatrix": "LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output",
+  "tabCloudAccounts": "Cloud Accounts",
+  "cloudAccountsTitle": "Manage Cloud Accounts",
+  "cloudAccountAdd": "Add Provider",
+  "cloudAccountEdit": "Edit",
+  "cloudAccountDelete": "Delete",
+  "cloudAccountCapabilityAsr": "Speech Recognition",
+  "cloudAccountCapabilityLlm": "AI Polish",
+  "cloudAccountNone": "No accounts configured",
+  "cloudAccountSelectAsr": "Select ASR Service",
+  "cloudAccountSelectLlm": "Select LLM Service",
+  "cloudAccountGoConfig": "Go to Cloud Accounts",
+  "cloudAccountSaved": "Account saved",
+  "cloudAccountDeleted": "Account deleted",
+  "cloudAccountDeleteConfirm": "Delete this account?",
+  "cloudAccountProvider": "Provider",
+  "cloudAccountName": "Display Name",
+  "cloudAccountEnabled": "Enabled"
 }

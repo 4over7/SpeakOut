@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'config_service.dart';
+import 'cloud_account_service.dart';
 import '../config/app_constants.dart';
+import '../config/cloud_providers.dart';
+import '../models/cloud_account.dart' as cloud;
 
 class LLMService {
   static final LLMService _instance = LLMService._internal();
@@ -33,6 +36,40 @@ class LLMService {
     } catch (_) {}
   }
 
+  /// Resolve LLM config: prioritize CloudAccount, fall back to preset system.
+  /// Returns (apiKey, baseUrl, model, isAnthropic).
+  ({String apiKey, String baseUrl, String model, bool isAnthropic}) _resolveLlmConfig() {
+    // 1. Check if a CloudAccount is selected for LLM
+    final accountId = ConfigService().selectedLlmAccountId;
+    if (accountId != null && accountId.isNotEmpty) {
+      final account = CloudAccountService().getAccountById(accountId);
+      if (account != null && account.isEnabled) {
+        final provider = CloudProviders.getById(account.providerId);
+        if (provider != null && provider.hasLLM) {
+          final apiKey = account.credentials['api_key'] ?? '';
+          final baseUrl = provider.llmBaseUrl ?? '';
+          final model = provider.llmDefaultModel ?? '';
+          final isAnthropic = provider.llmApiFormat == cloud.LlmApiFormat.anthropic;
+          _log("Resolved LLM from CloudAccount: provider=${account.providerId}, keyLen=${apiKey.length}");
+          return (apiKey: apiKey, baseUrl: baseUrl, model: model, isAnthropic: isAnthropic);
+        }
+      }
+    }
+
+    // 2. Fall back to existing preset system
+    final presetId = ConfigService().llmPresetId;
+    final preset = AppConstants.kLlmPresets.firstWhere(
+      (p) => p.id == presetId,
+      orElse: () => AppConstants.kLlmPresets.last,
+    );
+    return (
+      apiKey: ConfigService().llmApiKey,
+      baseUrl: ConfigService().llmBaseUrl,
+      model: ConfigService().llmModel,
+      isAnthropic: preset.apiFormat == LlmApiFormat.anthropic,
+    );
+  }
+
   Future<String> correctText(String input, {List<String>? vocabHints}) async {
     if (input.trim().isEmpty) return input;
     if (!ConfigService().aiCorrectionEnabled) {
@@ -44,16 +81,11 @@ class LLMService {
     if (providerType == 'ollama') {
       return _correctTextOllama(input, vocabHints: vocabHints);
     }
-    // Check if current preset uses Anthropic format
-    final presetId = ConfigService().llmPresetId;
-    final preset = AppConstants.kLlmPresets.firstWhere(
-      (p) => p.id == presetId,
-      orElse: () => AppConstants.kLlmPresets.last,
-    );
-    if (preset.apiFormat == LlmApiFormat.anthropic) {
-      return _correctTextAnthropic(input, vocabHints: vocabHints);
+    final resolved = _resolveLlmConfig();
+    if (resolved.isAnthropic) {
+      return _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved);
     }
-    return _correctTextCloud(input, vocabHints: vocabHints);
+    return _correctTextCloud(input, vocabHints: vocabHints, resolved: resolved);
   }
 
   /// Streaming version: yields incremental text chunks as they arrive from LLM.
@@ -74,23 +106,20 @@ class LLMService {
       yield await _correctTextOllama(input, vocabHints: vocabHints);
       return;
     }
-    final presetId = ConfigService().llmPresetId;
-    final preset = AppConstants.kLlmPresets.firstWhere(
-      (p) => p.id == presetId,
-      orElse: () => AppConstants.kLlmPresets.last,
-    );
-    if (preset.apiFormat == LlmApiFormat.anthropic) {
-      yield await _correctTextAnthropic(input, vocabHints: vocabHints);
+    final resolved = _resolveLlmConfig();
+    if (resolved.isAnthropic) {
+      yield await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved);
       return;
     }
-    yield* _correctTextCloudStream(input, vocabHints: vocabHints);
+    yield* _correctTextCloudStream(input, vocabHints: vocabHints, resolved: resolved);
   }
 
   /// SSE streaming for OpenAI-compatible APIs
-  Stream<String> _correctTextCloudStream(String input, {List<String>? vocabHints}) async* {
-    final apiKey = ConfigService().llmApiKey;
-    final baseUrl = ConfigService().llmBaseUrl;
-    final model = ConfigService().llmModel;
+  Stream<String> _correctTextCloudStream(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved}) async* {
+    final r = resolved ?? _resolveLlmConfig();
+    final apiKey = r.apiKey;
+    final baseUrl = r.baseUrl;
+    final model = r.model;
     final systemPrompt = ConfigService().aiCorrectionPrompt;
 
     if (apiKey.isEmpty) {
@@ -173,10 +202,11 @@ class LLMService {
     return '<speech_text>\n$input\n</speech_text>$vocabSection';
   }
 
-  Future<String> _correctTextCloud(String input, {List<String>? vocabHints}) async {
-    final apiKey = ConfigService().llmApiKey;
-    final baseUrl = ConfigService().llmBaseUrl;
-    final model = ConfigService().llmModel;
+  Future<String> _correctTextCloud(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved}) async {
+    final r = resolved ?? _resolveLlmConfig();
+    final apiKey = r.apiKey;
+    final baseUrl = r.baseUrl;
+    final model = r.model;
     final systemPrompt = ConfigService().aiCorrectionPrompt;
 
     if (apiKey.isEmpty) {
@@ -227,10 +257,11 @@ class LLMService {
     return input;
   }
 
-  Future<String> _correctTextAnthropic(String input, {List<String>? vocabHints}) async {
-    final apiKey = ConfigService().llmApiKey;
-    final baseUrl = ConfigService().llmBaseUrl;
-    final model = ConfigService().llmModel;
+  Future<String> _correctTextAnthropic(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved}) async {
+    final r = resolved ?? _resolveLlmConfig();
+    final apiKey = r.apiKey;
+    final baseUrl = r.baseUrl;
+    final model = r.model;
     final systemPrompt = ConfigService().aiCorrectionPrompt;
 
     if (apiKey.isEmpty) {
@@ -394,11 +425,12 @@ class LLMService {
   // Imports for routing
   Future<Map<String, dynamic>?> routeIntent(String input, List<dynamic> tools) async {
     if (!ConfigService().aiCorrectionEnabled) return null;
-    
-    final apiKey = ConfigService().llmApiKey;
-    final baseUrl = ConfigService().llmBaseUrl;
+
+    final resolved = _resolveLlmConfig();
+    final apiKey = resolved.apiKey;
+    final baseUrl = resolved.baseUrl;
     final model = ConfigService().agentRouterModel; // Use dedicated router model
-    
+
     if (apiKey.isEmpty) return null;
     
     // Construct Tool Definitions
