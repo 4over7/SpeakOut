@@ -41,6 +41,21 @@ class ModelInfo {
 
   /// 是否支持 per-token 置信度（当前仅未来离线 Transducer 模型支持）
   bool get supportsConfidence => arch == ModelArch.transducerOffline;
+
+  /// 检查模型是否支持指定输入语言
+  bool supportsLanguage(String langCode) {
+    if (langCode == 'auto') return true;
+    if (lang == 'multilingual') return true;
+    // lang format: "zh-en", "zh-en-ja-ko-yue", "zh-en-dialect"
+    final supported = lang.split('-').toSet();
+    return supported.contains(langCode);
+  }
+
+  /// 返回模型支持的语言列表（用于 UI 展示）
+  List<String> get supportedLanguages {
+    if (lang == 'multilingual') return ['zh', 'en', 'ja', 'ko', 'yue'];
+    return lang.split('-').where((l) => l != 'dialect').toList();
+  }
 }
 
 class ModelManager {

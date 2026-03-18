@@ -1769,6 +1769,20 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
 
+  /// Language code → display name
+  String _langDisplayName(String code, AppLocalizations loc) {
+    return switch (code) {
+      'zh' => loc.langZh,
+      'en' => loc.langEn,
+      'ja' => loc.langJa,
+      'ko' => loc.langKo,
+      'yue' => loc.langYue,
+      'zh-Hans' => loc.langZhHans,
+      'zh-Hant' => loc.langZhHant,
+      _ => code,
+    };
+  }
+
   /// Build contextual hints for language settings
   List<Widget> _buildLanguageHints(AppLocalizations loc) {
     final hints = <Widget>[];
@@ -1801,20 +1815,15 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
 
-    // 2. Non-Chinese input + SenseVoice/Paraformer model → suggest Whisper
-    if (inputLang != 'auto' && inputLang != 'zh') {
-      final isChineseFirstModel = modelId.contains('sensevoice') ||
-          modelId.contains('paraformer') ||
-          modelId.contains('fire_red');
-      if (isChineseFirstModel && workMode != 'cloud') {
-        final langName = {
-          'en': loc.langEn, 'ja': loc.langJa,
-          'ko': loc.langKo, 'yue': loc.langYue,
-        }[inputLang] ?? inputLang;
+    // 2. Input language not supported by current model
+    if (inputLang != 'auto' && workMode != 'cloud') {
+      final model = ModelManager.allModels.where((m) => m.id == modelId).firstOrNull;
+      if (model != null && !model.supportsLanguage(inputLang)) {
+        final langName = _langDisplayName(inputLang, loc);
         hints.add(_languageHintBanner(
           loc.inputLangModelHint(langName),
           color: MacosColors.systemOrangeColor,
-          icon: CupertinoIcons.info_circle,
+          icon: CupertinoIcons.exclamationmark_triangle,
         ));
       }
     }
