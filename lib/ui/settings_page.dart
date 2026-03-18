@@ -1919,15 +1919,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  /// Check if current config implies translation mode
+  /// Check if current config implies translation mode (needs LLM).
+  /// True when output is explicitly set AND input can't guarantee a match.
   bool _isTranslationMode() {
     final input = ConfigService().inputLanguage;
     final output = ConfigService().outputLanguage;
-    if (input == 'auto' || output == 'auto') return false;
+    if (output == 'auto') return false;
+    if (input == 'auto') return true; // can't guarantee input matches output
     // Compare base language: zh-Hans/zh-Hant → zh
-    final inputBase = input;
     final outputBase = output.startsWith('zh') ? 'zh' : output;
-    return inputBase != outputBase;
+    return input != outputBase;
   }
 
   Widget _buildGeneralView() {

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
+import 'package:speakout/services/config_service.dart';
 
 /// OpenAI / Groq Whisper ASR Provider (Non-streaming)
 ///
@@ -70,16 +71,28 @@ class OpenAIASRProvider implements ASRProvider {
 
     try {
       final uri = Uri.parse('$_baseUrl/audio/transcriptions');
+      final inputLang = ConfigService().inputLanguage;
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $_apiKey'
         ..fields['model'] = _model
-        ..fields['language'] = 'zh'
-        ..fields['response_format'] = 'json'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          wav,
-          filename: 'audio.wav',
-        ));
+        ..fields['response_format'] = 'json';
+      // Only send language hint when explicitly set (auto = let Whisper detect)
+      if (inputLang != 'auto') {
+        // Map app lang codes to Whisper ISO-639-1 codes
+        request.fields['language'] = switch (inputLang) {
+          'zh' => 'zh',
+          'en' => 'en',
+          'ja' => 'ja',
+          'ko' => 'ko',
+          'yue' => 'zh', // Whisper doesn't have separate Cantonese code
+          _ => inputLang,
+        };
+      }
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        wav,
+        filename: 'audio.wav',
+      ));
 
       final response = await request.send().timeout(const Duration(seconds: 30));
       final body = await response.stream.bytesToString();
