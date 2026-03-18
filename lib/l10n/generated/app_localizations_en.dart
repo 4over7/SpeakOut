@@ -46,6 +46,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get apiConfig => 'API Config (OpenAI Compatible)';
 
   @override
+  String get outputScript => 'Output Script';
+
+  @override
+  String get outputScriptAuto => 'Auto';
+
+  @override
+  String get outputScriptSimplified => 'Simplified Chinese';
+
+  @override
+  String get outputScriptTraditional => 'Traditional Chinese';
+
+  @override
   String get systemPrompt => 'System Prompt';
 
   @override

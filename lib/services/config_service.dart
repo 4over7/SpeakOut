@@ -246,6 +246,10 @@ class ConfigService {
   }
   Future<void> setLlmModel(String model) async => await _prefs?.setString('llm_model', model);
 
+  // --- Output Script (simplified / traditional / auto) ---
+  String get outputScript => _prefs?.getString('output_script') ?? 'auto';
+  Future<void> setOutputScript(String script) async => await _prefs?.setString('output_script', script);
+
   // --- LLM Provider Type ---
   String get llmProviderType => _prefs?.getString('llm_provider_type') ?? AppConstants.kDefaultLlmProviderType;
   Future<void> setLlmProviderType(String type) async => await _prefs?.setString('llm_provider_type', type);

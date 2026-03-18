@@ -994,6 +994,25 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         const SettingsDivider(),
+        SettingsTile(
+          label: loc.outputScript,
+          icon: CupertinoIcons.textformat,
+          child: MacosPopupButton<String>(
+            value: ConfigService().outputScript,
+            items: [
+              MacosPopupMenuItem(value: 'auto', child: Text(loc.outputScriptAuto)),
+              MacosPopupMenuItem(value: 'simplified', child: Text(loc.outputScriptSimplified)),
+              MacosPopupMenuItem(value: 'traditional', child: Text(loc.outputScriptTraditional)),
+            ],
+            onChanged: (v) async {
+              if (v != null) {
+                await ConfigService().setOutputScript(v);
+                setState(() {});
+              }
+            },
+          ),
+        ),
+        const SettingsDivider(),
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

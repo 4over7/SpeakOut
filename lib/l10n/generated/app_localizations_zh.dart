@@ -45,6 +45,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get apiConfig => 'API 配置 (兼容 OpenAI 格式)';
 
   @override
+  String get outputScript => '输出字体';
+
+  @override
+  String get outputScriptAuto => '自动';
+
+  @override
+  String get outputScriptSimplified => '简体中文';
+
+  @override
+  String get outputScriptTraditional => '繁體中文';
+
+  @override
   String get systemPrompt => '系统提示词 (System Prompt)';
 
   @override

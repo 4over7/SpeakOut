@@ -170,6 +170,30 @@ abstract class AppLocalizations {
   /// **'API Config (OpenAI Compatible)'**
   String get apiConfig;
 
+  /// No description provided for @outputScript.
+  ///
+  /// In en, this message translates to:
+  /// **'Output Script'**
+  String get outputScript;
+
+  /// No description provided for @outputScriptAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get outputScriptAuto;
+
+  /// No description provided for @outputScriptSimplified.
+  ///
+  /// In en, this message translates to:
+  /// **'Simplified Chinese'**
+  String get outputScriptSimplified;
+
+  /// No description provided for @outputScriptTraditional.
+  ///
+  /// In en, this message translates to:
+  /// **'Traditional Chinese'**
+  String get outputScriptTraditional;
+
   /// No description provided for @systemPrompt.
   ///
   /// In en, this message translates to:

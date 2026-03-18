@@ -123,7 +123,7 @@ class LLMService {
     final apiKey = r.apiKey;
     final baseUrl = r.baseUrl;
     final model = r.model;
-    final systemPrompt = ConfigService().aiCorrectionPrompt;
+    final systemPrompt = _buildSystemPrompt();
 
     if (apiKey.isEmpty) {
       _log("API Key MISSING. Returning input.");
@@ -198,6 +198,18 @@ class LLMService {
     }
   }
 
+  /// Build effective system prompt with output script constraint appended.
+  String _buildSystemPrompt() {
+    final base = ConfigService().aiCorrectionPrompt;
+    final script = ConfigService().outputScript;
+    if (script == 'simplified') {
+      return '$base\n6. 输出必须使用简体中文。';
+    } else if (script == 'traditional') {
+      return '$base\n6. 輸出必須使用繁體中文。';
+    }
+    return base;
+  }
+
   String _buildUserMessage(String input, {List<String>? vocabHints}) {
     final vocabSection = (vocabHints != null && vocabHints.isNotEmpty)
         ? '\n\n<vocab_hints>\n${vocabHints.join(', ')}\n</vocab_hints>'
@@ -210,7 +222,7 @@ class LLMService {
     final apiKey = r.apiKey;
     final baseUrl = r.baseUrl;
     final model = r.model;
-    final systemPrompt = ConfigService().aiCorrectionPrompt;
+    final systemPrompt = _buildSystemPrompt();
 
     if (apiKey.isEmpty) {
       _log("API Key MISSING. Returning input.");
@@ -265,7 +277,7 @@ class LLMService {
     final apiKey = r.apiKey;
     final baseUrl = r.baseUrl;
     final model = r.model;
-    final systemPrompt = ConfigService().aiCorrectionPrompt;
+    final systemPrompt = _buildSystemPrompt();
 
     if (apiKey.isEmpty) {
       _log("API Key MISSING. Returning input.");
@@ -322,7 +334,7 @@ class LLMService {
   Future<String> _correctTextOllama(String input, {List<String>? vocabHints}) async {
     final baseUrl = ConfigService().ollamaBaseUrl;
     final model = ConfigService().ollamaModel;
-    final systemPrompt = ConfigService().aiCorrectionPrompt;
+    final systemPrompt = _buildSystemPrompt();
 
     _log("RAW INPUT: $input");
     _log("Calling Ollama: $baseUrl, model=$model, inputLen=${input.length}");
