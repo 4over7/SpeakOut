@@ -37,7 +37,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Language for text output. Auto-translates when different from input';
 
   @override
-  String get langAuto => 'Auto';
+  String get langAutoDetect => 'Auto-detect';
+
+  @override
+  String get langFollowInput => 'Follow input language';
 
   @override
   String get langZh => 'Chinese';

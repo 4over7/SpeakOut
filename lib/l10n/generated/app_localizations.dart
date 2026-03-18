@@ -152,11 +152,17 @@ abstract class AppLocalizations {
   /// **'Language for text output. Auto-translates when different from input'**
   String get outputLanguageDesc;
 
-  /// No description provided for @langAuto.
+  /// No description provided for @langAutoDetect.
   ///
   /// In en, this message translates to:
-  /// **'Auto'**
-  String get langAuto;
+  /// **'Auto-detect'**
+  String get langAutoDetect;
+
+  /// No description provided for @langFollowInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow input language'**
+  String get langFollowInput;
 
   /// No description provided for @langZh.
   ///

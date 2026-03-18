@@ -658,7 +658,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: _buildDropdown(
                     value: ConfigService().inputLanguage,
                     items: {
-                      'auto': loc.langAuto,
+                      'auto': loc.langAutoDetect,
                       'zh': loc.langZh,
                       'en': loc.langEn,
                       'ja': loc.langJa,
@@ -677,7 +677,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: _buildDropdown(
                     value: ConfigService().outputLanguage,
                     items: {
-                      'auto': loc.langAuto,
+                      'auto': loc.langFollowInput,
                       'zh-Hans': loc.langZhHans,
                       'zh-Hant': loc.langZhHant,
                       'en': loc.langEn,

@@ -36,7 +36,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get outputLanguageDesc => '文字输出的语言，不同于输入语言时自动翻译';
 
   @override
-  String get langAuto => '自动';
+  String get langAutoDetect => '自动检测';
+
+  @override
+  String get langFollowInput => '跟随输入语言';
 
   @override
   String get langZh => '中文';
