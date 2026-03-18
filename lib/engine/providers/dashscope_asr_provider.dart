@@ -98,7 +98,7 @@ class DashScopeASRProvider implements ASRProvider {
           'format': 'pcm',
           'sample_rate': 16000,
           'vocabulary_id': '',
-          'disfluency_removal_enabled': false,
+          'disfluency_removal_enabled': true,
           'punctuation_prediction_enabled': true,
           'inverse_text_normalization_enabled': true,
         },
