@@ -889,6 +889,8 @@ class CoreEngine {
     // Transition: stopping → processing
     _recordingState = RecordingState.processing;
 
+    // Wrap entire processing in try/finally to guarantee state recovery
+    try {
     if (_asrProvider != null) {
       ASRResult asrResult = ASRResult.textOnly("");
       try {
@@ -906,8 +908,7 @@ class CoreEngine {
         _log("ASR Error: ${asrResult.error}");
         _statusController.add("❌ ${asrResult.error}");
         _overlay.showThenClear("❌ ${asrResult.error}", const Duration(seconds: 4));
-        _cleanupRecordingState();
-        return;
+        return; // finally block handles cleanup
       }
 
       String finalText = asrResult.text;
@@ -920,6 +921,7 @@ class CoreEngine {
         _statusController.add("AI 润色中...");
         _overlay.updateText("🤖 AI Polishing...");
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
+        bool typewriterBegan = false;
         try {
           List<String>? vocabHints;
           if (ConfigService().vocabEnabled) {
@@ -940,6 +942,7 @@ class CoreEngine {
             const batchInterval = Duration(milliseconds: 120);
 
             _nativeInput?.injectClipboardBegin();
+            typewriterBegan = true;
             _log("[PERF] +${sw.elapsedMilliseconds}ms — typewriter mode: clipboard begin");
 
             await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints)) {
@@ -966,6 +969,7 @@ class CoreEngine {
               streamInjected = true;
             }
             _nativeInput?.injectClipboardEnd();
+            typewriterBegan = false;
 
             final polished = streamBuffer.toString().trim();
             if (polished.isNotEmpty) {
@@ -986,6 +990,10 @@ class CoreEngine {
           }
         } catch (e) {
           _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");
+          // Ensure typewriter clipboard session is properly ended
+          if (typewriterBegan) {
+            try { _nativeInput?.injectClipboardEnd(); } catch (_) {}
+          }
         }
       } else if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && _trimmedForCheck.length <= 2) {
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: '${finalText}')");
@@ -1036,10 +1044,11 @@ class CoreEngine {
         _log("[PERF] +${sw.elapsedMilliseconds}ms — no speech detected");
       }
     }
-
-    // Transition: processing → idle
-    _recordingState = RecordingState.idle;
-    _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");
+    } finally {
+      // Guarantee state recovery — no matter what happens above
+      _cleanupRecordingState();
+      _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");
+    }
   }
   
   @visibleForTesting
