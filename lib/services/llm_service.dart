@@ -202,6 +202,8 @@ class LLMService {
   static const _langNames = {
     'zh': '中文', 'zh-Hans': '简体中文', 'zh-Hant': '繁體中文',
     'en': 'English', 'ja': '日本語', 'ko': '한국어', 'yue': '粤语',
+    'es': 'Español', 'fr': 'Français', 'de': 'Deutsch',
+    'ru': 'Русский', 'pt': 'Português',
   };
 
   /// Build effective system prompt with language/translation constraints.

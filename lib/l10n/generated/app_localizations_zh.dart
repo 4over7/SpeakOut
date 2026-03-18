@@ -63,6 +63,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get langYue => '粤语';
 
   @override
+  String get langEs => 'Español';
+
+  @override
+  String get langFr => 'Français';
+
+  @override
+  String get langDe => 'Deutsch';
+
+  @override
+  String get langRu => 'Русский';
+
+  @override
+  String get langPt => 'Português';
+
+  @override
   String get translationModeHint => '口译模式';
 
   @override

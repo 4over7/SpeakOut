@@ -664,6 +664,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       'ja': loc.langJa,
                       'ko': loc.langKo,
                       'yue': loc.langYue,
+                      'es': loc.langEs,
+                      'fr': loc.langFr,
+                      'de': loc.langDe,
+                      'ru': loc.langRu,
+                      'pt': loc.langPt,
                     },
                     onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState((){}); }
                   ),
@@ -683,6 +688,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       'en': loc.langEn,
                       'ja': loc.langJa,
                       'ko': loc.langKo,
+                      'es': loc.langEs,
+                      'fr': loc.langFr,
+                      'de': loc.langDe,
+                      'ru': loc.langRu,
+                      'pt': loc.langPt,
                     },
                     onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState((){}); }
                   ),
@@ -1840,6 +1850,11 @@ class _SettingsPageState extends State<SettingsPage> {
       'yue' => loc.langYue,
       'zh-Hans' => loc.langZhHans,
       'zh-Hant' => loc.langZhHant,
+      'es' => loc.langEs,
+      'fr' => loc.langFr,
+      'de' => loc.langDe,
+      'ru' => loc.langRu,
+      'pt' => loc.langPt,
       _ => code,
     };
   }

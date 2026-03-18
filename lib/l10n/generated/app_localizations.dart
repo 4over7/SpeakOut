@@ -206,6 +206,36 @@ abstract class AppLocalizations {
   /// **'Cantonese'**
   String get langYue;
 
+  /// No description provided for @langEs.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get langEs;
+
+  /// No description provided for @langFr.
+  ///
+  /// In en, this message translates to:
+  /// **'French'**
+  String get langFr;
+
+  /// No description provided for @langDe.
+  ///
+  /// In en, this message translates to:
+  /// **'German'**
+  String get langDe;
+
+  /// No description provided for @langRu.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get langRu;
+
+  /// No description provided for @langPt.
+  ///
+  /// In en, this message translates to:
+  /// **'Portuguese'**
+  String get langPt;
+
   /// No description provided for @translationModeHint.
   ///
   /// In en, this message translates to:

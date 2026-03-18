@@ -64,6 +64,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get langYue => 'Cantonese';
 
   @override
+  String get langEs => 'Spanish';
+
+  @override
+  String get langFr => 'French';
+
+  @override
+  String get langDe => 'German';
+
+  @override
+  String get langRu => 'Russian';
+
+  @override
+  String get langPt => 'Portuguese';
+
+  @override
   String get translationModeHint => 'Translation Mode';
 
   @override
