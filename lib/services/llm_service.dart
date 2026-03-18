@@ -198,16 +198,39 @@ class LLMService {
     }
   }
 
-  /// Build effective system prompt with output script constraint appended.
+  /// Language code → human-readable name (for prompt injection)
+  static const _langNames = {
+    'zh': '中文', 'zh-Hans': '简体中文', 'zh-Hant': '繁體中文',
+    'en': 'English', 'ja': '日本語', 'ko': '한국어', 'yue': '粤语',
+  };
+
+  /// Build effective system prompt with language/translation constraints.
   String _buildSystemPrompt() {
     final base = ConfigService().aiCorrectionPrompt;
-    final script = ConfigService().outputScript;
-    if (script == 'simplified') {
-      return '$base\n6. 输出必须使用简体中文。';
-    } else if (script == 'traditional') {
-      return '$base\n6. 輸出必須使用繁體中文。';
+    final input = ConfigService().inputLanguage;
+    final output = ConfigService().outputLanguage;
+
+    // No constraint when both are auto
+    if (output == 'auto' && input == 'auto') return base;
+
+    final parts = <String>[base];
+
+    // Determine if translation is needed
+    final inputBase = input == 'auto' ? null : input;
+    final outputBase = output == 'auto' ? null : (output.startsWith('zh') ? 'zh' : output);
+    final isTranslation = inputBase != null && outputBase != null && inputBase != outputBase;
+
+    if (isTranslation) {
+      final inputName = _langNames[input] ?? input;
+      final outputName = _langNames[output] ?? output;
+      parts.add('6. The input is $inputName speech. Translate it into $outputName while fixing errors.');
+    } else if (output != 'auto') {
+      // Same language, just enforce script/language
+      final outputName = _langNames[output] ?? output;
+      parts.add('6. 输出必须使用$outputName。');
     }
-    return base;
+
+    return parts.join('\n');
   }
 
   String _buildUserMessage(String input, {List<String>? vocabHints}) {

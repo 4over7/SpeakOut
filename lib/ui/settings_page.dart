@@ -994,25 +994,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         const SettingsDivider(),
-        SettingsTile(
-          label: loc.outputScript,
-          icon: CupertinoIcons.textformat,
-          child: MacosPopupButton<String>(
-            value: ConfigService().outputScript,
-            items: [
-              MacosPopupMenuItem(value: 'auto', child: Text(loc.outputScriptAuto)),
-              MacosPopupMenuItem(value: 'simplified', child: Text(loc.outputScriptSimplified)),
-              MacosPopupMenuItem(value: 'traditional', child: Text(loc.outputScriptTraditional)),
-            ],
-            onChanged: (v) async {
-              if (v != null) {
-                await ConfigService().setOutputScript(v);
-                setState(() {});
-              }
-            },
-          ),
-        ),
-        const SettingsDivider(),
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -1773,6 +1754,17 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
 
+  /// Check if current config implies translation mode
+  bool _isTranslationMode() {
+    final input = ConfigService().inputLanguage;
+    final output = ConfigService().outputLanguage;
+    if (input == 'auto' || output == 'auto') return false;
+    // Compare base language: zh-Hans/zh-Hant → zh
+    final inputBase = input;
+    final outputBase = output.startsWith('zh') ? 'zh' : output;
+    return inputBase != outputBase;
+  }
+
   Widget _buildGeneralView() {
     final loc = AppLocalizations.of(context)!;
     
@@ -1782,7 +1774,7 @@ class _SettingsPageState extends State<SettingsPage> {
         SettingsGroup(
           title: loc.tabGeneral,
           children: [
-             // Language
+             // Interface Language
              SettingsTile(
                label: loc.language,
                icon: CupertinoIcons.globe,
@@ -1792,6 +1784,68 @@ class _SettingsPageState extends State<SettingsPage> {
                  onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState((){}); }
                ),
              ),
+             const SettingsDivider(),
+             // Input Language
+             SettingsTile(
+               label: loc.inputLanguage,
+               subtitle: loc.inputLanguageDesc,
+               icon: CupertinoIcons.mic,
+               child: _buildDropdown(
+                 value: ConfigService().inputLanguage,
+                 items: {
+                   'auto': loc.langAuto,
+                   'zh': loc.langZh,
+                   'en': loc.langEn,
+                   'ja': loc.langJa,
+                   'ko': loc.langKo,
+                   'yue': loc.langYue,
+                 },
+                 onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState((){}); }
+               ),
+             ),
+             const SettingsDivider(),
+             // Output Language
+             SettingsTile(
+               label: loc.outputLanguage,
+               subtitle: loc.outputLanguageDesc,
+               icon: CupertinoIcons.textformat,
+               child: _buildDropdown(
+                 value: ConfigService().outputLanguage,
+                 items: {
+                   'auto': loc.langAuto,
+                   'zh-Hans': loc.langZhHans,
+                   'zh-Hant': loc.langZhHant,
+                   'en': loc.langEn,
+                   'ja': loc.langJa,
+                   'ko': loc.langKo,
+                 },
+                 onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState((){}); }
+               ),
+             ),
+             // Translation mode hint
+             if (_isTranslationMode()) ...[
+               Padding(
+                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                 child: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                   decoration: BoxDecoration(
+                     color: MacosColors.systemBlueColor.withValues(alpha: 0.08),
+                     borderRadius: BorderRadius.circular(6),
+                     border: Border.all(color: MacosColors.systemBlueColor.withValues(alpha: 0.3)),
+                   ),
+                   child: Row(
+                     children: [
+                       const MacosIcon(CupertinoIcons.arrow_right_arrow_left, size: 14, color: MacosColors.systemBlueColor),
+                       const SizedBox(width: 8),
+                       Text(
+                         loc.translationModeHint,
+                         style: TextStyle(fontSize: 12, color: MacosColors.systemBlueColor),
+                       ),
+                     ],
+                   ),
+                 ),
+               ),
+             ],
              const SettingsDivider(),
              // Audio Input with Device Selection
              _buildAudioInputSection(loc),

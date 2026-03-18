@@ -119,7 +119,7 @@ abstract class AppLocalizations {
   /// No description provided for @language.
   ///
   /// In en, this message translates to:
-  /// **'Language'**
+  /// **'Interface Language'**
   String get language;
 
   /// No description provided for @langSystem.
@@ -127,6 +127,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'System Default'**
   String get langSystem;
+
+  /// No description provided for @inputLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Language'**
+  String get inputLanguage;
+
+  /// No description provided for @inputLanguageDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Language you speak'**
+  String get inputLanguageDesc;
+
+  /// No description provided for @outputLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Output Language'**
+  String get outputLanguage;
+
+  /// No description provided for @outputLanguageDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Language for text output. Auto-translates when different from input'**
+  String get outputLanguageDesc;
+
+  /// No description provided for @langAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get langAuto;
+
+  /// No description provided for @langZh.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese'**
+  String get langZh;
+
+  /// No description provided for @langZhHans.
+  ///
+  /// In en, this message translates to:
+  /// **'Simplified Chinese'**
+  String get langZhHans;
+
+  /// No description provided for @langZhHant.
+  ///
+  /// In en, this message translates to:
+  /// **'Traditional Chinese'**
+  String get langZhHant;
+
+  /// No description provided for @langEn.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get langEn;
+
+  /// No description provided for @langJa.
+  ///
+  /// In en, this message translates to:
+  /// **'Japanese'**
+  String get langJa;
+
+  /// No description provided for @langKo.
+  ///
+  /// In en, this message translates to:
+  /// **'Korean'**
+  String get langKo;
+
+  /// No description provided for @langYue.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantonese'**
+  String get langYue;
+
+  /// No description provided for @translationModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation Mode'**
+  String get translationModeHint;
 
   /// No description provided for @audioInput.
   ///
@@ -169,30 +247,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'API Config (OpenAI Compatible)'**
   String get apiConfig;
-
-  /// No description provided for @outputScript.
-  ///
-  /// In en, this message translates to:
-  /// **'Output Script'**
-  String get outputScript;
-
-  /// No description provided for @outputScriptAuto.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto'**
-  String get outputScriptAuto;
-
-  /// No description provided for @outputScriptSimplified.
-  ///
-  /// In en, this message translates to:
-  /// **'Simplified Chinese'**
-  String get outputScriptSimplified;
-
-  /// No description provided for @outputScriptTraditional.
-  ///
-  /// In en, this message translates to:
-  /// **'Traditional Chinese'**
-  String get outputScriptTraditional;
 
   /// No description provided for @systemPrompt.
   ///

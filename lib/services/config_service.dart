@@ -246,7 +246,16 @@ class ConfigService {
   }
   Future<void> setLlmModel(String model) async => await _prefs?.setString('llm_model', model);
 
-  // --- Output Script (simplified / traditional / auto) ---
+  // --- Input/Output Language ---
+  // inputLanguage: 'auto' | 'zh' | 'en' | 'ja' | 'ko' | 'yue'
+  String get inputLanguage => _prefs?.getString('input_language') ?? 'auto';
+  Future<void> setInputLanguage(String lang) async => await _prefs?.setString('input_language', lang);
+
+  // outputLanguage: 'auto' | 'zh-Hans' | 'zh-Hant' | 'en' | 'ja' | 'ko'
+  String get outputLanguage => _prefs?.getString('output_language') ?? 'auto';
+  Future<void> setOutputLanguage(String lang) async => await _prefs?.setString('output_language', lang);
+
+  // Deprecated: outputScript — migrated to outputLanguage
   String get outputScript => _prefs?.getString('output_script') ?? 'auto';
   Future<void> setOutputScript(String script) async => await _prefs?.setString('output_script', script);
 

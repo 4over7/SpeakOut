@@ -6,6 +6,7 @@ import 'package:web_socket_channel/io.dart';
 import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
+import 'package:speakout/services/config_service.dart';
 
 /// 阿里云百炼 ASR Provider (DashScope Realtime Transcription)
 ///
@@ -101,6 +102,8 @@ class DashScopeASRProvider implements ASRProvider {
           'disfluency_removal_enabled': true,
           'punctuation_prediction_enabled': true,
           'inverse_text_normalization_enabled': true,
+          if (ConfigService().inputLanguage != 'auto')
+            'language_hints': [ConfigService().inputLanguage],
         },
         'input': {},
       },

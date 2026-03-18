@@ -18,10 +18,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabModels => '语音模型';
 
   @override
-  String get language => '语言 (Language)';
+  String get language => '界面语言 (Interface)';
 
   @override
   String get langSystem => '跟随系统 (System Default)';
+
+  @override
+  String get inputLanguage => '输入语言 (Input)';
+
+  @override
+  String get inputLanguageDesc => '你说什么语言';
+
+  @override
+  String get outputLanguage => '输出语言 (Output)';
+
+  @override
+  String get outputLanguageDesc => '文字输出的语言，不同于输入语言时自动翻译';
+
+  @override
+  String get langAuto => '自动';
+
+  @override
+  String get langZh => '中文';
+
+  @override
+  String get langZhHans => '简体中文';
+
+  @override
+  String get langZhHant => '繁體中文';
+
+  @override
+  String get langEn => 'English';
+
+  @override
+  String get langJa => '日本語';
+
+  @override
+  String get langKo => '한국어';
+
+  @override
+  String get langYue => '粤语';
+
+  @override
+  String get translationModeHint => '口译模式';
 
   @override
   String get audioInput => '音频输入设备 (Audio Input)';
@@ -43,18 +82,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get apiConfig => 'API 配置 (兼容 OpenAI 格式)';
-
-  @override
-  String get outputScript => '输出字体';
-
-  @override
-  String get outputScriptAuto => '自动';
-
-  @override
-  String get outputScriptSimplified => '简体中文';
-
-  @override
-  String get outputScriptTraditional => '繁體中文';
 
   @override
   String get systemPrompt => '系统提示词 (System Prompt)';

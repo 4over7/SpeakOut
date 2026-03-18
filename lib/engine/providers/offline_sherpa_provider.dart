@@ -5,6 +5,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
+import 'package:speakout/services/config_service.dart';
 
 /// Offline (non-streaming) ASR Provider using sherpa-onnx OfflineRecognizer.
 ///
@@ -54,11 +55,12 @@ class OfflineSherpaProvider implements ASRProvider {
     } else if (modelType == 'whisper') {
       final encoder = _findFile(modelPath, "encoder");
       final decoder = _findFile(modelPath, "decoder");
+      final whisperLang = ConfigService().inputLanguage;
       modelConfig = sherpa.OfflineModelConfig(
         whisper: sherpa.OfflineWhisperModelConfig(
           encoder: encoder,
           decoder: decoder,
-          language: "zh",
+          language: whisperLang == 'auto' ? '' : whisperLang,
           task: "transcribe",
         ),
         tokens: _findTokens(modelPath),

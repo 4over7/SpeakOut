@@ -18,10 +18,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabModels => 'Voice Models';
 
   @override
-  String get language => 'Language';
+  String get language => 'Interface Language';
 
   @override
   String get langSystem => 'System Default';
+
+  @override
+  String get inputLanguage => 'Input Language';
+
+  @override
+  String get inputLanguageDesc => 'Language you speak';
+
+  @override
+  String get outputLanguage => 'Output Language';
+
+  @override
+  String get outputLanguageDesc =>
+      'Language for text output. Auto-translates when different from input';
+
+  @override
+  String get langAuto => 'Auto';
+
+  @override
+  String get langZh => 'Chinese';
+
+  @override
+  String get langZhHans => 'Simplified Chinese';
+
+  @override
+  String get langZhHant => 'Traditional Chinese';
+
+  @override
+  String get langEn => 'English';
+
+  @override
+  String get langJa => 'Japanese';
+
+  @override
+  String get langKo => 'Korean';
+
+  @override
+  String get langYue => 'Cantonese';
+
+  @override
+  String get translationModeHint => 'Translation Mode';
 
   @override
   String get audioInput => 'Audio Input Device';
@@ -44,18 +84,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apiConfig => 'API Config (OpenAI Compatible)';
-
-  @override
-  String get outputScript => 'Output Script';
-
-  @override
-  String get outputScriptAuto => 'Auto';
-
-  @override
-  String get outputScriptSimplified => 'Simplified Chinese';
-
-  @override
-  String get outputScriptTraditional => 'Traditional Chinese';
 
   @override
   String get systemPrompt => 'System Prompt';
