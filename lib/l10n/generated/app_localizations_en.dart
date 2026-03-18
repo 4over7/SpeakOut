@@ -735,4 +735,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudAccountEnabled => 'Enabled';
+
+  @override
+  String get languageSettings => 'Language';
+
+  @override
+  String get translationDisabledReason =>
+      'Translation requires AI polish, only available in Smart Mode';
 }

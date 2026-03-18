@@ -706,4 +706,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cloudAccountEnabled => '启用';
+
+  @override
+  String get languageSettings => '语言设置';
+
+  @override
+  String get translationDisabledReason => '口译模式需要 AI 润色，仅智能模式可用';
 }

@@ -228,5 +228,7 @@
   "cloudAccountDeleteConfirm": "确定删除此账户？",
   "cloudAccountProvider": "服务商",
   "cloudAccountName": "显示名称",
-  "cloudAccountEnabled": "启用"
+  "cloudAccountEnabled": "启用",
+  "languageSettings": "语言设置",
+  "translationDisabledReason": "口译模式需要 AI 润色，仅智能模式可用"
 }

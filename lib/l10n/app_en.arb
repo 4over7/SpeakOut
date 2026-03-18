@@ -268,5 +268,7 @@
   "cloudAccountDeleteConfirm": "Delete this account?",
   "cloudAccountProvider": "Provider",
   "cloudAccountName": "Display Name",
-  "cloudAccountEnabled": "Enabled"
+  "cloudAccountEnabled": "Enabled",
+  "languageSettings": "Language",
+  "translationDisabledReason": "Translation requires AI polish, only available in Smart Mode"
 }

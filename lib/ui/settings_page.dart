@@ -640,11 +640,60 @@ class _SettingsPageState extends State<SettingsPage> {
     final currentMode = ConfigService().workMode;
     final currentPresetId = ConfigService().llmPresetId;
     final provider = CloudProviders.getById(currentPresetId);
+    final isTranslation = _isTranslationMode();
 
     return Column(
       children: [
         Expanded(child: SingleChildScrollView(child: Column(
           children: [
+            // Language settings (moved from General tab)
+            SettingsGroup(
+              title: loc.languageSettings,
+              children: [
+                // Input Language
+                SettingsTile(
+                  label: loc.inputLanguage,
+                  subtitle: loc.inputLanguageDesc,
+                  icon: CupertinoIcons.mic,
+                  child: _buildDropdown(
+                    value: ConfigService().inputLanguage,
+                    items: {
+                      'auto': loc.langAuto,
+                      'zh': loc.langZh,
+                      'en': loc.langEn,
+                      'ja': loc.langJa,
+                      'ko': loc.langKo,
+                      'yue': loc.langYue,
+                    },
+                    onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState((){}); }
+                  ),
+                ),
+                const SettingsDivider(),
+                // Output Language
+                SettingsTile(
+                  label: loc.outputLanguage,
+                  subtitle: loc.outputLanguageDesc,
+                  icon: CupertinoIcons.textformat,
+                  child: _buildDropdown(
+                    value: ConfigService().outputLanguage,
+                    items: {
+                      'auto': loc.langAuto,
+                      'zh-Hans': loc.langZhHans,
+                      'zh-Hant': loc.langZhHant,
+                      'en': loc.langEn,
+                      'ja': loc.langJa,
+                      'ko': loc.langKo,
+                    },
+                    onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState((){}); }
+                  ),
+                ),
+                // Language hints (translation mode info, model compatibility)
+                ..._buildLanguageHints(loc),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
             // Mode selector
             SettingsGroup(
               title: loc.tabWorkMode,
@@ -655,6 +704,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: CupertinoIcons.lock_shield,
                   label: loc.workModeOffline,
                   description: loc.workModeOfflineDesc,
+                  enabled: !isTranslation,
+                  disabledReason: isTranslation ? loc.translationDisabledReason : null,
                 ),
                 const SettingsDivider(),
                 _buildModeRadio(
@@ -672,24 +723,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: CupertinoIcons.cloud,
                   label: loc.workModeCloud,
                   description: loc.workModeCloudDesc,
+                  enabled: !isTranslation,
+                  disabledReason: isTranslation ? loc.translationDisabledReason : null,
                 ),
               ],
             ),
-
-            // Translation mode warning on work mode page
-            if (_isTranslationMode() && currentMode != 'smart') ...[
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _languageHintBanner(
-                  currentMode == 'offline'
-                      ? loc.translationNeedsSmartMode
-                      : loc.translationCloudLimited,
-                  color: MacosColors.systemOrangeColor,
-                  icon: CupertinoIcons.exclamationmark_triangle,
-                ),
-              ),
-            ],
 
             const SizedBox(height: 16),
 
@@ -892,54 +930,67 @@ class _SettingsPageState extends State<SettingsPage> {
     required String label,
     required String description,
     String? badge,
+    bool enabled = true,
+    String? disabledReason,
   }) {
     final isSelected = value == groupValue;
     final color = _modeColor(value);
+    final disabledColor = MacosColors.systemGrayColor.withValues(alpha: 0.5);
 
     return GestureDetector(
-      onTap: () => _switchWorkMode(value),
-      child: Container(
-        decoration: isSelected ? BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          border: Border(left: BorderSide(color: color, width: 3)),
-        ) : null,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            MacosIcon(icon, size: 20, color: isSelected ? color : MacosColors.systemGrayColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: AppTheme.body(context).copyWith(
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected ? color : null,
-                  )),
-                  const SizedBox(height: 2),
-                  Text(description, style: AppTheme.caption(context).copyWith(
-                    color: MacosColors.secondaryLabelColor.resolveFrom(context),
-                  )),
-                ],
-              ),
-            ),
-            if (badge != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(4),
+      onTap: enabled ? () => _switchWorkMode(value) : null,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: Container(
+          decoration: isSelected ? BoxDecoration(
+            color: color.withValues(alpha: 0.06),
+            border: Border(left: BorderSide(color: color, width: 3)),
+          ) : null,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              MacosIcon(icon, size: 20, color: isSelected ? color : MacosColors.systemGrayColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: AppTheme.body(context).copyWith(
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected ? color : null,
+                    )),
+                    const SizedBox(height: 2),
+                    Text(description, style: AppTheme.caption(context).copyWith(
+                      color: MacosColors.secondaryLabelColor.resolveFrom(context),
+                    )),
+                    if (!enabled && disabledReason != null) ...[
+                      const SizedBox(height: 4),
+                      Text(disabledReason, style: TextStyle(
+                        fontSize: 11,
+                        color: disabledColor,
+                      )),
+                    ],
+                  ],
                 ),
-                child: Text(badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.white)),
               ),
-              const SizedBox(width: 8),
+              if (badge != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.white)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              MacosRadioButton<String>(
+                groupValue: groupValue,
+                value: value,
+                onChanged: enabled ? (v) => _switchWorkMode(v) : null,
+              ),
             ],
-            MacosRadioButton<String>(
-              groupValue: groupValue,
-              value: value,
-              onChanged: (v) => _switchWorkMode(v),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1484,79 +1535,89 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // Streaming models
-            SettingsGroup(
-              title: loc.streamingModels,
-              children: [
-                 Padding(
-                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                   child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
-                 ),
-                 ...ModelManager.availableModels.map((m) {
-                    return Column(
-                      children: [
-                        SettingsTile(
-                          label: _localizedModelName(m, loc),
-                          subtitle: _localizedModelDesc(m, loc),
-                          child: _buildActionBtn(
-                           context,
-                            isDownloaded: _downloadedStatus[m.id] ?? false,
-                            isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                            progress: _downloadProgressMap[m.id],
-                            statusText: _downloadStatusMap[m.id],
-                            isActive: _activeModelId == m.id,
-                            isOffline: false,
-                            onDownload: () => _download(m),
-                            onDelete: () => _delete(m),
-                            onActivate: () => _activate(m),
-                            modelUrl: m.url,
-                            onImport: () => _importModel(m),
+            // Streaming models (filtered by input language)
+            Builder(builder: (_) {
+              final inputLang = ConfigService().inputLanguage;
+              final filteredStreaming = ModelManager.availableModels
+                  .where((m) => m.supportsLanguage(inputLang)).toList();
+              return SettingsGroup(
+                title: loc.streamingModels,
+                children: [
+                   Padding(
+                     padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                     child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
+                   ),
+                   ...filteredStreaming.map((m) {
+                      return Column(
+                        children: [
+                          SettingsTile(
+                            label: _localizedModelName(m, loc),
+                            subtitle: _localizedModelDesc(m, loc),
+                            child: _buildActionBtn(
+                             context,
+                              isDownloaded: _downloadedStatus[m.id] ?? false,
+                              isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                              progress: _downloadProgressMap[m.id],
+                              statusText: _downloadStatusMap[m.id],
+                              isActive: _activeModelId == m.id,
+                              isOffline: false,
+                              onDownload: () => _download(m),
+                              onDelete: () => _delete(m),
+                              onActivate: () => _activate(m),
+                              modelUrl: m.url,
+                              onImport: () => _importModel(m),
+                            ),
                           ),
-                        ),
-                        if (m != ModelManager.availableModels.last) const SettingsDivider(),
-                      ],
-                    );
-                 }),
-              ],
-            ),
+                          if (m != filteredStreaming.last) const SettingsDivider(),
+                        ],
+                      );
+                   }),
+                ],
+              );
+            }),
 
             const SizedBox(height: 24),
 
-            // Offline models
-            SettingsGroup(
-              title: loc.offlineModels,
-              children: [
-                 Padding(
-                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                   child: Text(loc.offlineModelsDesc, style: AppTheme.caption(context)),
-                 ),
-                 ...ModelManager.offlineModels.map((m) {
-                    return Column(
-                      children: [
-                        SettingsTile(
-                          label: _localizedModelName(m, loc),
-                          subtitle: _localizedModelDesc(m, loc),
-                          child: _buildActionBtn(
-                           context,
-                            isDownloaded: _downloadedStatus[m.id] ?? false,
-                            isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                            progress: _downloadProgressMap[m.id],
-                            statusText: _downloadStatusMap[m.id],
-                            isActive: _activeModelId == m.id,
-                            isOffline: true,
-                            onDownload: () => _download(m),
-                            onDelete: () => _delete(m),
-                            onActivate: () => _activate(m),
-                            modelUrl: m.url,
-                            onImport: () => _importModel(m),
+            // Offline models (filtered by input language)
+            Builder(builder: (_) {
+              final inputLang = ConfigService().inputLanguage;
+              final filteredOffline = ModelManager.offlineModels
+                  .where((m) => m.supportsLanguage(inputLang)).toList();
+              return SettingsGroup(
+                title: loc.offlineModels,
+                children: [
+                   Padding(
+                     padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                     child: Text(loc.offlineModelsDesc, style: AppTheme.caption(context)),
+                   ),
+                   ...filteredOffline.map((m) {
+                      return Column(
+                        children: [
+                          SettingsTile(
+                            label: _localizedModelName(m, loc),
+                            subtitle: _localizedModelDesc(m, loc),
+                            child: _buildActionBtn(
+                             context,
+                              isDownloaded: _downloadedStatus[m.id] ?? false,
+                              isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                              progress: _downloadProgressMap[m.id],
+                              statusText: _downloadStatusMap[m.id],
+                              isActive: _activeModelId == m.id,
+                              isOffline: true,
+                              onDownload: () => _download(m),
+                              onDelete: () => _delete(m),
+                              onActivate: () => _activate(m),
+                              modelUrl: m.url,
+                              onImport: () => _importModel(m),
+                            ),
                           ),
-                        ),
-                        if (m != ModelManager.offlineModels.last) const SettingsDivider(),
-                      ],
-                    );
-                 }),
-              ],
-            ),
+                          if (m != filteredOffline.last) const SettingsDivider(),
+                        ],
+                      );
+                   }),
+                ],
+              );
+            }),
 
             const SizedBox(height: 24),
           ],
@@ -1871,10 +1932,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildGeneralView() {
     final loc = AppLocalizations.of(context)!;
-    
+
     return Column(
       children: [
-        // 1. General Config (Language & Audio)
+        // 1. General Config (Interface Language & Audio)
         SettingsGroup(
           title: loc.tabGeneral,
           children: [
@@ -1888,46 +1949,6 @@ class _SettingsPageState extends State<SettingsPage> {
                  onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState((){}); }
                ),
              ),
-             const SettingsDivider(),
-             // Input Language
-             SettingsTile(
-               label: loc.inputLanguage,
-               subtitle: loc.inputLanguageDesc,
-               icon: CupertinoIcons.mic,
-               child: _buildDropdown(
-                 value: ConfigService().inputLanguage,
-                 items: {
-                   'auto': loc.langAuto,
-                   'zh': loc.langZh,
-                   'en': loc.langEn,
-                   'ja': loc.langJa,
-                   'ko': loc.langKo,
-                   'yue': loc.langYue,
-                 },
-                 onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState((){}); }
-               ),
-             ),
-             const SettingsDivider(),
-             // Output Language
-             SettingsTile(
-               label: loc.outputLanguage,
-               subtitle: loc.outputLanguageDesc,
-               icon: CupertinoIcons.textformat,
-               child: _buildDropdown(
-                 value: ConfigService().outputLanguage,
-                 items: {
-                   'auto': loc.langAuto,
-                   'zh-Hans': loc.langZhHans,
-                   'zh-Hant': loc.langZhHant,
-                   'en': loc.langEn,
-                   'ja': loc.langJa,
-                   'ko': loc.langKo,
-                 },
-                 onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState((){}); }
-               ),
-             ),
-             // Language hints (translation mode warnings, model compatibility)
-             ..._buildLanguageHints(loc),
              const SettingsDivider(),
              // Audio Input with Device Selection
              _buildAudioInputSection(loc),

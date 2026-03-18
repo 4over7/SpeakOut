@@ -1441,6 +1441,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enabled'**
   String get cloudAccountEnabled;
+
+  /// No description provided for @languageSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get languageSettings;
+
+  /// No description provided for @translationDisabledReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation requires AI polish, only available in Smart Mode'**
+  String get translationDisabledReason;
 }
 
 class _AppLocalizationsDelegate
