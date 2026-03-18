@@ -63,6 +63,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get translationModeHint => '口译模式';
 
   @override
+  String get translationNeedsSmartMode =>
+      '口译需要 AI 润色，当前为离线/云端模式。请切换到「智能模式」以启用翻译。';
+
+  @override
+  String get translationCloudLimited => '云端模式不含 AI 润色，口译效果有限。推荐切换到「智能模式」。';
+
+  @override
+  String inputLangModelHint(Object lang) {
+    return '当前模型对$lang的支持有限，建议切换到 Whisper Large-v3 以获得更好的识别效果。';
+  }
+
+  @override
   String get audioInput => '音频输入设备 (Audio Input)';
 
   @override

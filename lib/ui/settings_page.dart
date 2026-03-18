@@ -676,6 +676,21 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
 
+            // Translation mode warning on work mode page
+            if (_isTranslationMode() && currentMode != 'smart') ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _languageHintBanner(
+                  currentMode == 'offline'
+                      ? loc.translationNeedsSmartMode
+                      : loc.translationCloudLimited,
+                  color: MacosColors.systemOrangeColor,
+                  icon: CupertinoIcons.exclamationmark_triangle,
+                ),
+              ),
+            ],
+
             const SizedBox(height: 16),
 
             // Mode-specific config
@@ -1754,6 +1769,86 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
 
+  /// Build contextual hints for language settings
+  List<Widget> _buildLanguageHints(AppLocalizations loc) {
+    final hints = <Widget>[];
+    final isTranslation = _isTranslationMode();
+    final workMode = ConfigService().workMode;
+    final inputLang = ConfigService().inputLanguage;
+    final modelId = ConfigService().activeModelId;
+
+    // 1. Translation mode + wrong work mode
+    if (isTranslation) {
+      if (workMode == 'offline') {
+        hints.add(_languageHintBanner(
+          loc.translationNeedsSmartMode,
+          color: MacosColors.systemOrangeColor,
+          icon: CupertinoIcons.exclamationmark_triangle,
+        ));
+      } else if (workMode == 'cloud') {
+        hints.add(_languageHintBanner(
+          loc.translationCloudLimited,
+          color: MacosColors.systemOrangeColor,
+          icon: CupertinoIcons.exclamationmark_triangle,
+        ));
+      } else {
+        // Smart mode — just show blue info
+        hints.add(_languageHintBanner(
+          loc.translationModeHint,
+          color: MacosColors.systemBlueColor,
+          icon: CupertinoIcons.arrow_right_arrow_left,
+        ));
+      }
+    }
+
+    // 2. Non-Chinese input + SenseVoice/Paraformer model → suggest Whisper
+    if (inputLang != 'auto' && inputLang != 'zh') {
+      final isChineseFirstModel = modelId.contains('sensevoice') ||
+          modelId.contains('paraformer') ||
+          modelId.contains('fire_red');
+      if (isChineseFirstModel && workMode != 'cloud') {
+        final langName = {
+          'en': loc.langEn, 'ja': loc.langJa,
+          'ko': loc.langKo, 'yue': loc.langYue,
+        }[inputLang] ?? inputLang;
+        hints.add(_languageHintBanner(
+          loc.inputLangModelHint(langName),
+          color: MacosColors.systemOrangeColor,
+          icon: CupertinoIcons.info_circle,
+        ));
+      }
+    }
+
+    return hints;
+  }
+
+  Widget _languageHintBanner(String text, {required Color color, required IconData icon}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: MacosIcon(icon, size: 14, color: color),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(text, style: TextStyle(fontSize: 12, color: color, height: 1.4)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Check if current config implies translation mode
   bool _isTranslationMode() {
     final input = ConfigService().inputLanguage;
@@ -1822,30 +1917,8 @@ class _SettingsPageState extends State<SettingsPage> {
                  onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState((){}); }
                ),
              ),
-             // Translation mode hint
-             if (_isTranslationMode()) ...[
-               Padding(
-                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                 child: Container(
-                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                   decoration: BoxDecoration(
-                     color: MacosColors.systemBlueColor.withValues(alpha: 0.08),
-                     borderRadius: BorderRadius.circular(6),
-                     border: Border.all(color: MacosColors.systemBlueColor.withValues(alpha: 0.3)),
-                   ),
-                   child: Row(
-                     children: [
-                       const MacosIcon(CupertinoIcons.arrow_right_arrow_left, size: 14, color: MacosColors.systemBlueColor),
-                       const SizedBox(width: 8),
-                       Text(
-                         loc.translationModeHint,
-                         style: TextStyle(fontSize: 12, color: MacosColors.systemBlueColor),
-                       ),
-                     ],
-                   ),
-                 ),
-               ),
-             ],
+             // Language hints (translation mode warnings, model compatibility)
+             ..._buildLanguageHints(loc),
              const SettingsDivider(),
              // Audio Input with Device Selection
              _buildAudioInputSection(loc),

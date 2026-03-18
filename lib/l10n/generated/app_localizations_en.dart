@@ -64,6 +64,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get translationModeHint => 'Translation Mode';
 
   @override
+  String get translationNeedsSmartMode =>
+      'Translation requires AI polish. Please switch to Smart Mode to enable it.';
+
+  @override
+  String get translationCloudLimited =>
+      'Cloud mode has no AI polish. Translation quality will be limited. Recommend Smart Mode.';
+
+  @override
+  String inputLangModelHint(Object lang) {
+    return 'Current model has limited support for $lang. Consider switching to Whisper Large-v3 for better recognition.';
+  }
+
+  @override
   String get audioInput => 'Audio Input Device';
 
   @override

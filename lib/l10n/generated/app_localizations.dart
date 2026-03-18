@@ -206,6 +206,24 @@ abstract class AppLocalizations {
   /// **'Translation Mode'**
   String get translationModeHint;
 
+  /// No description provided for @translationNeedsSmartMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation requires AI polish. Please switch to Smart Mode to enable it.'**
+  String get translationNeedsSmartMode;
+
+  /// No description provided for @translationCloudLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud mode has no AI polish. Translation quality will be limited. Recommend Smart Mode.'**
+  String get translationCloudLimited;
+
+  /// No description provided for @inputLangModelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Current model has limited support for {lang}. Consider switching to Whisper Large-v3 for better recognition.'**
+  String inputLangModelHint(Object lang);
+
   /// No description provided for @audioInput.
   ///
   /// In en, this message translates to:
