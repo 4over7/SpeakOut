@@ -57,10 +57,6 @@ class AppConstants {
   static const int kDefaultToggleMaxDuration = 300;   // 5 minutes (seconds)
   static const int kToggleThresholdMs = 1000;          // PTT/Toggle threshold
 
-  // ASR De-duplication (post-processing)
-  static const bool kDefaultDeduplicationEnabled = true;
-
-  
   // Update Check
   static const String kGitHubReleasesApi = 'https://api.github.com/repos/4over7/SpeakOut/releases/latest';
   static const String kGitHubReleasesUrl = 'https://github.com/4over7/SpeakOut/releases/latest';

@@ -492,20 +492,9 @@ void main() {
   });
 
   // =========================================================================
-  // 9. 去重/日志
+  // 9. 日志配置
   // =========================================================================
-  group('去重与日志配置', () {
-    test('deduplicationEnabled 默认值应为 AppConstants.kDefaultDeduplicationEnabled', () {
-      expect(config.deduplicationEnabled, AppConstants.kDefaultDeduplicationEnabled);
-    });
-
-    test('setDeduplicationEnabled 应持久化', () async {
-      await config.setDeduplicationEnabled(false);
-      expect(config.deduplicationEnabled, false);
-      await config.setDeduplicationEnabled(true);
-      expect(config.deduplicationEnabled, true);
-    });
-
+  group('日志配置', () {
     test('verboseLogging 默认值应为 false', () {
       expect(AppConstants.kVerboseLogging, false);
     });
@@ -534,7 +523,6 @@ void main() {
 
     // 恢复
     tearDownAll(() async {
-      await config.setDeduplicationEnabled(AppConstants.kDefaultDeduplicationEnabled);
       await config.setVerboseLogging(false);
       await config.setLogDirectory('');
     });

@@ -1,101 +1,43 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/engine/core_engine.dart';
+import 'package:speakout/engine/providers/dashscope_asr_provider.dart';
 
 void main() {
   // ═══════════════════════════════════════════════════════════
-  // 1. deduplicateText — 去重算法
-  //    注意: 此去重仅用于流式 ASR (SherpaProvider 实时模式)，
-  //    离线模型 (SenseVoice/Whisper/FireRedASR) 和云端 (Aliyun) 不走此逻辑。
-  //    以下测试验证算法本身的正确性。
+  // 1. DashScope 跨句重叠检测
   // ═══════════════════════════════════════════════════════════
-  group('deduplicateText', () {
-    test('空字符串 → 不变', () {
-      expect(CoreEngine.deduplicateText(''), '');
+  group('DashScope removeOverlap', () {
+    test('无重叠 → 原文返回', () {
+      expect(DashScopeASRProvider.removeOverlap('你好', '世界'), '世界');
     });
 
-    test('单字符 → 不变', () {
-      expect(CoreEngine.deduplicateText('好'), '好');
+    test('完全重叠 → 返回空', () {
+      expect(DashScopeASRProvider.removeOverlap('各种模式都支持', '各种模式都支持'), '');
     });
 
-    test('无重复 → 不变', () {
-      expect(CoreEngine.deduplicateText('你好世界'), '你好世界');
+    test('部分重叠 → 返回非重叠部分', () {
+      expect(DashScopeASRProvider.removeOverlap('各种模式都支持', '各种模式都支持很好'), '很好');
     });
 
-    test('单字重复: "识识别" → "识别"', () {
-      expect(CoreEngine.deduplicateText('识识别'), '识别');
+    test('committed 为空 → 原文返回', () {
+      expect(DashScopeASRProvider.removeOverlap('', '你好'), '你好');
     });
 
-    test('全部重复: "啊啊啊" → "啊"', () {
-      expect(CoreEngine.deduplicateText('啊啊啊'), '啊');
+    test('newText 为空 → 返回空', () {
+      expect(DashScopeASRProvider.removeOverlap('你好', ''), '');
     });
 
-    test('二字短语重复: "还是还是好" → "还是好"', () {
-      expect(CoreEngine.deduplicateText('还是还是好'), '还是好');
+    test('单字重叠不触发 (≥2 才算)', () {
+      expect(DashScopeASRProvider.removeOverlap('你好呀', '呀世界'), '呀世界');
     });
 
-    test('二字短语三次重复: "一下一下一下" → "一下"', () {
-      expect(CoreEngine.deduplicateText('一下一下一下'), '一下');
-    });
-
-    test('三字短语重复: "然后呢然后呢" → "然后呢"', () {
-      expect(CoreEngine.deduplicateText('然后呢然后呢'), '然后呢');
-    });
-
-    test('四字短语重复: "怎么回事怎么回事" → "怎么回事"', () {
-      expect(CoreEngine.deduplicateText('怎么回事怎么回事'), '怎么回事');
-    });
-
-    test('混合重复: "识识别还是还是好" → "识别还是好"', () {
-      expect(CoreEngine.deduplicateText('识识别还是还是好'), '识别还是好');
-    });
-
-    test('英文字符重复: "hheello" → "helo"', () {
-      expect(CoreEngine.deduplicateText('hheello'), 'helo');
-    });
-
-    test('长文本中嵌入重复', () {
-      expect(
-        CoreEngine.deduplicateText('今天天气很好好的'),
-        '今天气很好的',
-      );
-    });
-
-    test('数字重复: "112233" → "123"', () {
-      expect(CoreEngine.deduplicateText('112233'), '123');
-    });
-
-    test('标点不受影响: "你好。" → "你好。"', () {
-      expect(CoreEngine.deduplicateText('你好。'), '你好。');
+    test('2字重叠', () {
+      expect(DashScopeASRProvider.removeOverlap('我说完了', '完了再来'), '再来');
     });
   });
 
   // ═══════════════════════════════════════════════════════════
-  // 2. removeRepeatedPhrases — 短语去重子函数
-  // ═══════════════════════════════════════════════════════════
-  group('removeRepeatedPhrases', () {
-    test('短于 2*len → 不变', () {
-      expect(CoreEngine.removeRepeatedPhrases('ab', 2), 'ab');
-    });
-
-    test('len=2 无重复 → 不变', () {
-      expect(CoreEngine.removeRepeatedPhrases('abcd', 2), 'abcd');
-    });
-
-    test('len=2 有重复: "abab" → "ab"', () {
-      expect(CoreEngine.removeRepeatedPhrases('abab', 2), 'ab');
-    });
-
-    test('len=3 有重复: "abcabc" → "abc"', () {
-      expect(CoreEngine.removeRepeatedPhrases('abcabc', 3), 'abc');
-    });
-
-    test('len=2 部分重复: "ababcd" → "abcd"', () {
-      expect(CoreEngine.removeRepeatedPhrases('ababcd', 2), 'abcd');
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════
-  // 3. hasTerminalPunctuation — 末尾标点检测
+  // 2. hasTerminalPunctuation — 末尾标点检测
   // ═══════════════════════════════════════════════════════════
   group('hasTerminalPunctuation', () {
     test('空字符串 → false', () {
@@ -148,7 +90,7 @@ void main() {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // 4. RecordingState 枚举基础
+  // 3. RecordingState 枚举基础
   // ═══════════════════════════════════════════════════════════
   group('RecordingState enum', () {
     test('包含全部 5 种状态', () {

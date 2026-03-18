@@ -2002,15 +2002,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             const SettingsDivider(),
-            SettingsTile(
-              label: loc.asrDedup,
-              icon: CupertinoIcons.textformat_abc,
-              child: MacosSwitch(
-                value: ConfigService().deduplicationEnabled,
-                onChanged: (v) async { await ConfigService().setDeduplicationEnabled(v); setState((){}); },
-              ),
-            ),
-            const SettingsDivider(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(

@@ -99,6 +99,8 @@ class DashScopeASRProvider implements ASRProvider {
           'sample_rate': 16000,
           'vocabulary_id': '',
           'disfluency_removal_enabled': false,
+          'punctuation_prediction_enabled': true,
+          'inverse_text_normalization_enabled': true,
         },
         'input': {},
       },
@@ -129,11 +131,18 @@ class DashScopeASRProvider implements ASRProvider {
           final sentence = output['sentence'] as Map<String, dynamic>? ?? {};
           final text = sentence['text'] as String? ?? '';
           final endTime = sentence['end_time'] as int? ?? -1;
+          final sentenceId = sentence['sentence_id'] as int? ?? -1;
 
           if (endTime >= 0) {
-            // Sentence complete
-            _committedText += text;
+            // Sentence complete — strip overlap with committed text
+            final deduped = removeOverlap(_committedText, text);
+            _committedText += deduped;
             _currentSentence = '';
+            if (deduped != text) {
+              _log('sentence[$sentenceId] FINAL: "$text" (deduped: "$deduped")');
+            } else {
+              _log('sentence[$sentenceId] FINAL: "$text"');
+            }
           } else {
             // Intermediate result
             _currentSentence = text;
@@ -181,6 +190,22 @@ class DashScopeASRProvider implements ASRProvider {
     } else {
       _sendAudioChunk(pcmBytes);
     }
+  }
+
+  /// Remove overlap between the suffix of [committed] and the prefix of [newText].
+  /// e.g., committed="...各种模式都支持", newText="各种模式都支持" → returns ""
+  /// e.g., committed="...各种模式都支持", newText="各种模式都支持很好" → returns "很好"
+  @visibleForTesting
+  static String removeOverlap(String committed, String newText) {
+    if (committed.isEmpty || newText.isEmpty) return newText;
+    // Check from longest possible overlap down to 2 chars
+    final maxOverlap = newText.length < committed.length ? newText.length : committed.length;
+    for (int len = maxOverlap; len >= 2; len--) {
+      if (committed.endsWith(newText.substring(0, len))) {
+        return newText.substring(len);
+      }
+    }
+    return newText;
   }
 
   Uint8List _float32ToInt16Bytes(Float32List samples) {

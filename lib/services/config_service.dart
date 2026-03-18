@@ -290,10 +290,6 @@ class ConfigService {
   Future<void> setOllamaBaseUrl(String url) async => await _prefs?.setString('ollama_base_url', url);
   Future<void> setOllamaModel(String model) async => await _prefs?.setString('ollama_model', model);
 
-  // --- ASR De-duplication Config ---
-  bool get deduplicationEnabled => _prefs?.getBool('dedup_enabled') ?? AppConstants.kDefaultDeduplicationEnabled;
-  Future<void> setDeduplicationEnabled(bool enabled) async => await _prefs?.setBool('dedup_enabled', enabled);
-
   // Verbose logging (debug mode) — default false, never committed as true
   bool get verboseLogging => _prefs?.getBool('verbose_logging') ?? AppConstants.kVerboseLogging;
   Future<void> setVerboseLogging(bool enabled) async => await _prefs?.setBool('verbose_logging', enabled);

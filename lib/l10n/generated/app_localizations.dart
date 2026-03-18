@@ -950,12 +950,6 @@ abstract class AppLocalizations {
   /// **'Text Input (IME)'**
   String get textInjection;
 
-  /// No description provided for @asrDedup.
-  ///
-  /// In en, this message translates to:
-  /// **'ASR De-duplicate'**
-  String get asrDedup;
-
   /// No description provided for @recordingProtection.
   ///
   /// In en, this message translates to:

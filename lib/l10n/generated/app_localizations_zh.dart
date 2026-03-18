@@ -449,9 +449,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get textInjection => '文本注入（输入法）';
 
   @override
-  String get asrDedup => 'ASR 去重';
-
-  @override
   String get recordingProtection => '录音保护';
 
   @override
