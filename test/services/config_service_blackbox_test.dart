@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakout/services/config_service.dart';
@@ -636,8 +635,8 @@ void main() {
       // 注意: setLlmBaseUrl('') 会写入空字符串，getString 仍会返回空字符串而非 null
       // 所以 override 可能返回空字符串
       final override = config.llmBaseUrlOverride;
-      // override 应为 null 或 String
-      expect(override == null || override is String, true);
+      // override 应为 null 或 String (String? 类型)
+      expect(override, anyOf(isNull, isA<String>()));
     });
 
     test('llmBaseUrlOverride 设置自定义值后应返回该值', () async {
@@ -651,10 +650,8 @@ void main() {
     });
 
     test('llmApiKeyOverride 未设置时应为 null', () {
-      // Keychain 不可用时，缓存值可能为 null
-      // 这取决于初始化时 _preloadSecureKeys 的行为
       final override = config.llmApiKeyOverride;
-      expect(override == null || override is String, true);
+      expect(override, anyOf(isNull, isA<String>()));
     });
 
     // 恢复

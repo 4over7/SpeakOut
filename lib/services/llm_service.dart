@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'config_service.dart';
 import 'cloud_account_service.dart';
 import '../config/app_constants.dart';
+import '../config/app_log.dart';
 import '../config/cloud_providers.dart';
 
 class LLMService {
@@ -28,12 +28,7 @@ class LLMService {
   }
 
   void log(String msg) => _log(msg);
-  void _log(String msg) {
-    final line = "[${DateTime.now().toIso8601String()}] [LLM] $msg\n";
-    try {
-      File('/tmp/SpeakOut.log').writeAsStringSync(line, mode: FileMode.append);
-    } catch (_) {}
-  }
+  void _log(String msg) => AppLog.d('[LLM] $msg');
 
   /// Resolve LLM config: prioritize CloudAccount, fall back to preset system.
   /// Returns (apiKey, baseUrl, model, isAnthropic).
@@ -76,7 +71,7 @@ class LLMService {
   Future<String> correctText(String input, {List<String>? vocabHints}) async {
     if (input.trim().isEmpty) return input;
     if (!ConfigService().aiCorrectionEnabled) {
-      _log("RAW INPUT (AI OFF): $input");
+      _log("RAW INPUT (AI OFF): len=${input.length}");
       return input;
     }
 
@@ -99,7 +94,7 @@ class LLMService {
       return;
     }
     if (!ConfigService().aiCorrectionEnabled) {
-      _log("RAW INPUT (AI OFF): $input");
+      _log("RAW INPUT (AI OFF): len=${input.length}");
       yield input;
       return;
     }
@@ -131,7 +126,7 @@ class LLMService {
       return;
     }
 
-    _log("RAW INPUT: $input");
+    _log("RAW INPUT: len=${input.length}");
     _log("Calling Cloud LLM (stream): $baseUrl, model=$model, inputLen=${input.length}");
 
     try {
@@ -254,7 +249,7 @@ class LLMService {
       return input;
     }
 
-    _log("RAW INPUT: $input");
+    _log("RAW INPUT: len=${input.length}");
     _log("Calling Cloud LLM: $baseUrl, model=$model, inputLen=${input.length}");
 
     try {
@@ -309,7 +304,7 @@ class LLMService {
       return input;
     }
 
-    _log("RAW INPUT: $input");
+    _log("RAW INPUT: len=${input.length}");
     _log("Calling Anthropic: $baseUrl, model=$model, inputLen=${input.length}");
 
     try {
@@ -361,7 +356,7 @@ class LLMService {
     final model = ConfigService().ollamaModel;
     final systemPrompt = _buildSystemPrompt();
 
-    _log("RAW INPUT: $input");
+    _log("RAW INPUT: len=${input.length}");
     _log("Calling Ollama: $baseUrl, model=$model, inputLen=${input.length}");
 
     try {

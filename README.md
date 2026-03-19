@@ -97,7 +97,7 @@ flutter pub get
 # Static analysis
 flutter analyze
 
-# Run tests (549 tests)
+# Run tests
 flutter test
 
 # Build

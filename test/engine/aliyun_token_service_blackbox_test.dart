@@ -237,11 +237,10 @@ class _FakeHttpClientResponse extends Stream<List<int>>
     implements HttpClientResponse {
   @override
   final int statusCode;
-  final String _body;
   final List<int> _bodyBytes;
 
-  _FakeHttpClientResponse(this.statusCode, this._body)
-      : _bodyBytes = utf8.encode(_body);
+  _FakeHttpClientResponse(this.statusCode, String body)
+      : _bodyBytes = utf8.encode(body);
 
   @override
   int get contentLength => _bodyBytes.length;

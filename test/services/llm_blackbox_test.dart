@@ -37,15 +37,6 @@ String cloudOk(String content) =>
 String ollamaOk(String content) =>
     '{"message": {"content": "$content"}, "done": true}';
 
-/// Set config to Cloud mode with valid credentials
-Future<void> _setCloudMode() async {
-  final c = ConfigService();
-  await c.setAiCorrectionEnabled(true);
-  await c.setLlmProviderType('cloud');
-  // LLM API key is stored in secure storage, use the setter that exists
-  // For tests, we check if there's a way to set the key
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
