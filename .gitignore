@@ -57,3 +57,25 @@ assets/aliyun_config.json
 assets/llm_config.json
 SpeakOut.dmg
 *.dmg
+
+# Internal docs (keep local, not for GitHub)
+docs/dev_notes/
+docs/review/
+docs/wiki/payment_plan_*.md
+docs/wiki/*_research_*.md
+docs/wiki/*_refactor_*.md
+docs/wiki/*_fix_*.md
+docs/wiki/*_plan*.md
+docs/wiki/code_review_*.md
+docs/wiki/debug_mode_*.md
+docs/wiki/blackbox_testing_*.md
+docs/wiki/auto_update_*.md
+docs/wiki/ai_polish_*.md
+docs/wiki/audio_device_*.md
+docs/wiki/cloud_*.md
+docs/wiki/i18n_*.md
+docs/wiki/model_import_*.md
+docs/wiki/settings_reorganize_*.md
+docs/wiki/toggle_mode_*.md
+docs/wiki/unified_*.md
+docs/wiki/vocab_*.md
