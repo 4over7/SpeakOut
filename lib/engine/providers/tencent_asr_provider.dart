@@ -34,7 +34,7 @@ class TencentASRProvider implements ASRProvider {
   // Result tracking
   String _finalText = '';
   String? _errorMessage;
-  final Completer<ASRResult> _stopCompleter = Completer<ASRResult>();
+  Completer<ASRResult>? _stopCompleter;
 
   @override
   Stream<String> get textStream => _textController.stream;
@@ -66,6 +66,7 @@ class TencentASRProvider implements ASRProvider {
     _errorMessage = null;
     _pendingBuffer.clear();
     _isConnected = false;
+    _stopCompleter = Completer<ASRResult>();
 
     final url = _buildSignedUrl();
     _log('Connecting to Tencent ASR...');
@@ -120,7 +121,7 @@ class TencentASRProvider implements ASRProvider {
     }
 
     // Wait for server to finish or timeout
-    return _stopCompleter.future.timeout(
+    return (_stopCompleter?.future ?? Future.value(_buildResult())).timeout(
       const Duration(seconds: 5),
       onTimeout: () {
         _log('Stop timeout, returning current text');
@@ -183,8 +184,8 @@ class TencentASRProvider implements ASRProvider {
   }
 
   void _finishStop() {
-    if (!_stopCompleter.isCompleted) {
-      _stopCompleter.complete(_buildResult());
+    if (_stopCompleter != null && !_stopCompleter!.isCompleted) {
+      _stopCompleter!.complete(_buildResult());
     }
     _isConnected = false;
     try { _channel?.sink.close(); } catch (_) {}

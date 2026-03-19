@@ -297,6 +297,7 @@ class CloudProviders {
       credentialFields: [
         CredentialField(key: 'secret_id', label: 'SecretId'),
         CredentialField(key: 'secret_key', label: 'SecretKey', isSecret: true),
+        CredentialField(key: 'app_id', label: 'AppId'),
       ],
       capabilities: {CloudCapability.asrStreaming},
       asrModels: [

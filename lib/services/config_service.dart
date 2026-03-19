@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../config/app_constants.dart';
@@ -19,12 +20,13 @@ class ConfigService {
   static const String kDefaultTopUpUrl = "https://mianbaoduo.com"; 
   // Safe field: Nullable prefs
   SharedPreferences? _prefs;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   bool _initialized = false;
   Completer<void>? _initCompleter;
   // Default doc path (fallback if not init)
   String _defaultDocPath = "";
 
-  // In-memory cache for credential values (avoid repeated pref reads on hot path)
+  // In-memory cache for credential values (loaded from Keychain at startup)
   String? _cachedAliyunAkId;
   String? _cachedAliyunAkSecret;
   String? _cachedAliyunAppKey;
@@ -149,26 +151,18 @@ class ConfigService {
   String get aliyunAppKey => _cachedAliyunAppKey ?? AppConstants.kDefaultAliyunAppKey;
 
   Future<void> setAliyunCredentials(String id, String secret, String appKey) async {
-    if (id.isEmpty) {
-      await _prefs?.remove('aliyun_ak_id');
-      _cachedAliyunAkId = null;
-    } else {
-      await _prefs?.setString('aliyun_ak_id', id);
-      _cachedAliyunAkId = id;
-    }
-    if (secret.isEmpty) {
-      await _prefs?.remove('aliyun_ak_secret');
-      _cachedAliyunAkSecret = null;
-    } else {
-      await _prefs?.setString('aliyun_ak_secret', secret);
-      _cachedAliyunAkSecret = secret;
-    }
-    if (appKey.isEmpty) {
-      await _prefs?.remove('aliyun_app_key');
-      _cachedAliyunAppKey = null;
-    } else {
-      await _prefs?.setString('aliyun_app_key', appKey);
-      _cachedAliyunAppKey = appKey;
+    _cachedAliyunAkId = id.isEmpty ? null : id;
+    _cachedAliyunAkSecret = secret.isEmpty ? null : secret;
+    _cachedAliyunAppKey = appKey.isEmpty ? null : appKey;
+    try {
+      if (id.isEmpty) { await _secureStorage.delete(key: 'aliyun_ak_id'); }
+      else { await _secureStorage.write(key: 'aliyun_ak_id', value: id); }
+      if (secret.isEmpty) { await _secureStorage.delete(key: 'aliyun_ak_secret'); }
+      else { await _secureStorage.write(key: 'aliyun_ak_secret', value: secret); }
+      if (appKey.isEmpty) { await _secureStorage.delete(key: 'aliyun_app_key'); }
+      else { await _secureStorage.write(key: 'aliyun_app_key', value: appKey); }
+    } catch (e) {
+      AppLog.d('[ConfigService] setAliyunCredentials secure storage error: $e');
     }
   }
   
@@ -236,12 +230,12 @@ class ConfigService {
   Future<void> setAiCorrectionPrompt(String prompt) async => await _prefs?.setString('ai_correct_prompt', prompt);
   Future<void> setLlmBaseUrl(String url) async => await _prefs?.setString('llm_base_url', url);
   Future<void> setLlmApiKey(String key) async {
-    if (key.isEmpty) {
-      await _prefs?.remove('llm_api_key');
-      _cachedLlmApiKey = null;
-    } else {
-      await _prefs?.setString('llm_api_key', key);
-      _cachedLlmApiKey = key;
+    _cachedLlmApiKey = key.isEmpty ? null : key;
+    try {
+      if (key.isEmpty) { await _secureStorage.delete(key: 'llm_api_key'); }
+      else { await _secureStorage.write(key: 'llm_api_key', value: key); }
+    } catch (e) {
+      AppLog.d('[ConfigService] setLlmApiKey secure storage error: $e');
     }
   }
   Future<void> setLlmModel(String model) async => await _prefs?.setString('llm_model', model);
@@ -350,13 +344,32 @@ class ConfigService {
     _updateLocaleNotifier();
   }
 
-  /// Load credential values from SharedPreferences into memory cache
+  /// Load credential values from Keychain into memory cache.
+  /// Also migrates old SharedPreferences credentials to Keychain on first run.
   Future<void> _preloadSecureKeys() async {
-    if (_prefs == null) return;
-    _cachedAliyunAkId = _prefs!.getString('aliyun_ak_id');
-    _cachedAliyunAkSecret = _prefs!.getString('aliyun_ak_secret');
-    _cachedAliyunAppKey = _prefs!.getString('aliyun_app_key');
-    _cachedLlmApiKey = _prefs!.getString('llm_api_key');
+    try {
+      // Migrate old SharedPreferences → Keychain (one-time)
+      if (_prefs != null) {
+        for (final key in ['aliyun_ak_id', 'aliyun_ak_secret', 'aliyun_app_key', 'llm_api_key']) {
+          final oldVal = _prefs!.getString(key);
+          if (oldVal != null && oldVal.isNotEmpty) {
+            final existing = await _secureStorage.read(key: key);
+            if (existing == null || existing.isEmpty) {
+              await _secureStorage.write(key: key, value: oldVal);
+            }
+            await _prefs!.remove(key);
+            AppLog.d('[ConfigService] Migrated $key from SharedPreferences to Keychain');
+          }
+        }
+      }
+
+      _cachedAliyunAkId = await _secureStorage.read(key: 'aliyun_ak_id');
+      _cachedAliyunAkSecret = await _secureStorage.read(key: 'aliyun_ak_secret');
+      _cachedAliyunAppKey = await _secureStorage.read(key: 'aliyun_app_key');
+      _cachedLlmApiKey = await _secureStorage.read(key: 'llm_api_key');
+    } catch (e) {
+      AppLog.d('[ConfigService] _preloadSecureKeys error: $e');
+    }
   }
 
   void _updateLocaleNotifier() {
