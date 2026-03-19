@@ -18,11 +18,12 @@ void main() {
     setUp(() async {
       SharedPreferences.setMockInitialValues({
         'ai_correct_enabled': true,
-        'llm_api_key': 'test_key',
         'llm_base_url': 'https://api.openai.com/v1',
         'llm_provider_type': 'cloud',
       });
       await ConfigService().init();
+      // API key via setter — writes to memory cache (Keychain unavailable in tests)
+      await ConfigService().setLlmApiKey('test_key');
       service = LLMService();
     });
 

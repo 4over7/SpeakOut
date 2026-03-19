@@ -19,6 +19,7 @@ class VolcengineASRProvider implements ASRProvider {
 
   late String _appKey;
   late String _accessKey;
+  String _resourceId = 'volc.bigasr.sauc.duration';
 
   bool _isReady = false;
   bool _isConnected = false;
@@ -46,6 +47,8 @@ class VolcengineASRProvider implements ASRProvider {
   Future<void> initialize(Map<String, dynamic> config) async {
     _appKey = config['appKey'] as String? ?? '';
     _accessKey = config['accessKey'] as String? ?? '';
+    final cluster = config['cluster'] as String? ?? '';
+    if (cluster.isNotEmpty) _resourceId = cluster;
 
     if (_appKey.isEmpty || _accessKey.isEmpty) {
       throw Exception('Volcengine ASR: appKey, accessKey required');
@@ -73,7 +76,7 @@ class VolcengineASRProvider implements ASRProvider {
         headers: {
           'X-Api-App-Key': _appKey,
           'X-Api-Access-Key': _accessKey,
-          'X-Api-Resource-Id': 'volc.bigasr.sauc.duration',
+          'X-Api-Resource-Id': _resourceId,
         },
       );
       _channel!.stream.listen(

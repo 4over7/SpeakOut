@@ -63,6 +63,7 @@ class ASRProviderFactory {
         return {
           'appKey': account.credentials['asr_app_id'] ?? '',
           'accessKey': account.credentials['asr_token'] ?? '',
+          'cluster': account.credentials['asr_cluster'] ?? '',
         };
       case 'xfyun':
         return {
