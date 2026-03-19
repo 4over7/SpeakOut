@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/cloud_account.dart';
@@ -9,7 +10,8 @@ import 'config_service.dart';
 /// 统一云服务账户管理
 ///
 /// Singleton. 管理所有云服务商的账户 CRUD、持久化、旧数据迁移。
-/// 凭证存储在 SharedPreferences（内存缓存 + 持久化）。
+/// 账户元数据存储在 SharedPreferences，敏感凭证存储在系统 Keychain
+/// (macOS) / Keystore (Android) via flutter_secure_storage。
 class CloudAccountService {
   static final CloudAccountService _instance = CloudAccountService._internal();
   factory CloudAccountService() => _instance;
@@ -17,8 +19,10 @@ class CloudAccountService {
 
   static const String _kAccountsKey = 'cloud_accounts';
   static const String _kMigratedKey = 'cloud_accounts_migrated';
+  static const String _kSecureMigratedKey = 'cloud_cred_secure_migrated';
 
   SharedPreferences? _prefs;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final List<CloudAccount> _accounts = [];
   bool _initialized = false;
 
@@ -27,6 +31,7 @@ class CloudAccountService {
   Future<void> init() async {
     if (_initialized) return;
     _prefs = await SharedPreferences.getInstance();
+    await _migrateCredentialsToSecureStorage();
     await _loadAccounts();
     _initialized = true;
   }
@@ -91,11 +96,15 @@ class CloudAccountService {
       final list = jsonDecode(json) as List;
       for (final item in list) {
         final account = CloudAccount.fromJson(item as Map<String, dynamic>);
-        // Load credential values
+        // Load credential values from secure storage
         final keys = (item['credentialKeys'] as List?)?.cast<String>() ?? [];
         for (final key in keys) {
-          final value = _prefs?.getString('cloud_cred_${account.id}_$key') ?? '';
-          if (value.isNotEmpty) account.credentials[key] = value;
+          try {
+            final value = await _secureStorage.read(key: 'cloud_cred_${account.id}_$key') ?? '';
+            if (value.isNotEmpty) account.credentials[key] = value;
+          } catch (e) {
+            AppLog.d('CloudAccountService: failed to read credential $key for ${account.id}: $e');
+          }
         }
         _accounts.add(account);
       }
@@ -112,17 +121,54 @@ class CloudAccountService {
 
   Future<void> _saveCredentials(CloudAccount account) async {
     for (final entry in account.credentials.entries) {
-      await _prefs?.setString('cloud_cred_${account.id}_${entry.key}', entry.value);
+      try {
+        await _secureStorage.write(key: 'cloud_cred_${account.id}_${entry.key}', value: entry.value);
+      } catch (e) {
+        AppLog.d('CloudAccountService: failed to save credential ${entry.key} for ${account.id}: $e');
+      }
     }
   }
 
   Future<void> _clearCredentials(String accountId, Iterable<String> keys) async {
     for (final key in keys) {
-      await _prefs?.remove('cloud_cred_${accountId}_$key');
+      try {
+        await _secureStorage.delete(key: 'cloud_cred_${accountId}_$key');
+      } catch (e) {
+        AppLog.d('CloudAccountService: failed to delete credential $key for $accountId: $e');
+      }
     }
   }
 
-  // ── 旧数据迁移 ──
+  // ── SharedPreferences → Keychain 一次性迁移 ──
+
+  Future<void> _migrateCredentialsToSecureStorage() async {
+    if (_prefs?.getBool(_kSecureMigratedKey) ?? false) return;
+
+    int migrated = 0;
+    // 扫描所有 cloud_cred_ 开头的 SharedPreferences 键
+    final allKeys = _prefs?.getKeys() ?? {};
+    for (final key in allKeys) {
+      if (!key.startsWith('cloud_cred_')) continue;
+      final value = _prefs?.getString(key) ?? '';
+      if (value.isEmpty) continue;
+      try {
+        // 写入 Keychain
+        await _secureStorage.write(key: key, value: value);
+        // 从 SharedPreferences 中删除
+        await _prefs?.remove(key);
+        migrated++;
+      } catch (e) {
+        AppLog.d('CloudAccountService: secure migration failed for $key: $e');
+      }
+    }
+
+    await _prefs?.setBool(_kSecureMigratedKey, true);
+    if (migrated > 0) {
+      AppLog.d('CloudAccountService: migrated $migrated credentials to secure storage');
+    }
+  }
+
+  // ── 旧数据迁移（Legacy → CloudAccount） ──
 
   Future<void> migrateFromLegacy() async {
     if (_prefs?.getBool(_kMigratedKey) ?? false) return;
@@ -150,13 +196,10 @@ class CloudAccountService {
     }
 
     // 2. 迁移 LLM Preset 凭证
-    // 查找所有有保存 API key 的 preset
     for (final presetId in ['dashscope', 'volcengine', 'openai', 'deepseek', 'anthropic', 'zhipu', 'gemini', 'moonshot', 'minimax', 'groq']) {
       final savedKey = _prefs?.getString('llm_preset_${presetId}_api_key') ?? '';
       if (savedKey.isEmpty) continue;
-      // 检查是否已有该服务商的账户
       if (getAccountByProviderId(presetId) != null) continue;
-      // 检查服务商是否在注册表中
       final provider = CloudProviders.getById(presetId);
       if (provider == null) continue;
 
