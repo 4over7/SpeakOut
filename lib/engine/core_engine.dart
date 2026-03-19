@@ -118,19 +118,7 @@ class CoreEngine {
 
   final _overlay = OverlayController();
 
-  // Debug Logger - writes to file asynchronously
-  static final _logFile = File('/tmp/SpeakOut.log');
-  static bool _logCleared = false;
-
-  void _log(String msg) {
-    // 每次启动清空旧日志，避免无限增长
-    if (!_logCleared) {
-      _logFile.writeAsStringSync('');
-      _logCleared = true;
-    }
-    final line = "[${DateTime.now().toIso8601String()}] [CoreEngine] $msg\n";
-    _logFile.writeAsStringSync(line, mode: FileMode.append);
-  }
+  void _log(String msg) => AppLog.d('[CoreEngine] $msg');
 
   /// Release all resources. Call when app is shutting down.
   void dispose() {
@@ -932,6 +920,8 @@ class CoreEngine {
           final useTypewriter = mode != RecordingMode.diary
               && ConfigService().typewriterEnabled
               && !(_nativeInput?.isTerminalApp() ?? false);
+          const llmTimeout = Duration(seconds: 15);
+
           if (useTypewriter) {
             // Typewriter mode (alpha): streaming LLM + clipboard injection
             final streamBuffer = StringBuffer();
@@ -945,7 +935,13 @@ class CoreEngine {
             typewriterBegan = true;
             _log("[PERF] +${sw.elapsedMilliseconds}ms — typewriter mode: clipboard begin");
 
-            await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints)) {
+            // Wrap stream with timeout: if no data for 15s, abort
+            bool timedOut = false;
+            await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: (sink) {
+              timedOut = true;
+              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream TIMEOUT (${llmTimeout.inSeconds}s)");
+              sink.close();
+            })) {
               streamBuffer.write(chunk);
               batchBuffer.write(chunk);
               if (firstChunk) {
@@ -974,6 +970,9 @@ class CoreEngine {
             final polished = streamBuffer.toString().trim();
             if (polished.isNotEmpty) {
               finalText = polished;
+            } else if (timedOut) {
+              // Timeout with no data: fall back to raw ASR text
+              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish timeout, using raw ASR text");
             }
             if (streamInjected) {
               _typewriterInjected = true;
@@ -981,11 +980,17 @@ class CoreEngine {
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
           } else if (mode != RecordingMode.diary) {
             // Normal mode: non-streaming LLM, inject once at end
-            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
+            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: () {
+              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
+              return finalText;
+            });
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done, len=${finalText.length}");
           } else {
             // Diary mode: non-streaming (need complete text for file save)
-            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints);
+            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: () {
+              _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
+              return finalText;
+            });
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done");
           }
         } catch (e) {
