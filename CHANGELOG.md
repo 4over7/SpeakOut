@@ -1,5 +1,13 @@
 # SpeakOut Version History
 
+## [1.5.15] - 2026-03-20
+
+### 工程质量收口
+
+- **图标 squircle 圆角** — 所有 macOS 版本显示统一圆角（Big Sur~Tahoe 兼容）
+- **静态分析完全清零** — `dart analyze lib test` = 0 issue
+- **Flaky test 修复** — 531 测试稳定全通过
+
 ## [1.5.14] - 2026-03-20
 
 ### 安全、稳定性与多云 ASR 扩展
