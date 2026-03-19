@@ -45,7 +45,6 @@ class AppLog {
     if (enabled) {
       debugPrint(message);
       _sink?.writeln('${DateTime.now().toIso8601String()} $message');
-      _sink?.flush();
     }
   }
 }

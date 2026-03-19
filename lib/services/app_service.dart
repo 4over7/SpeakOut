@@ -21,10 +21,10 @@ class AppService {
 
   /// Apply verbose logging + log directory to AppLog and native C layer.
   /// Call this after ConfigService.init() and whenever settings change.
-  void applyVerboseLogging() {
+  Future<void> applyVerboseLogging() async {
     final enabled = ConfigService().verboseLogging;
     AppLog.enabled = enabled;
-    if (enabled) AppLog.init();
+    if (enabled) await AppLog.init();
     engine.nativeInput?.setDebugLogging(enabled);
     final dir = ConfigService().logDirectory;
     if (dir.isNotEmpty) {
@@ -39,7 +39,7 @@ class AppService {
     // 1. Config
     await ConfigService().init();
     await ConfigService().migrateToWorkMode();
-    applyVerboseLogging(); // Apply debug logging as early as possible
+    await applyVerboseLogging(); // Apply debug logging as early as possible
 
     // 1.5 Other Services
     await ChatService().init();
