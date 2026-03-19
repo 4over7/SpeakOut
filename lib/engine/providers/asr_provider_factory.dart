@@ -3,6 +3,9 @@ import '../asr_provider.dart';
 import 'aliyun_provider.dart';
 import 'dashscope_asr_provider.dart';
 import 'openai_asr_provider.dart';
+import 'tencent_asr_provider.dart';
+import 'volcengine_asr_provider.dart';
+import 'xfyun_asr_provider.dart';
 
 /// ASR Provider 工厂
 ///
@@ -19,9 +22,12 @@ class ASRProviderFactory {
         return OpenAIASRProvider();
       case 'aliyun_nls':
         return AliyunProvider();
-      // volcengine: TODO — implement VolcEngineASRProvider
-      // tencent: TODO — implement TencentASRProvider
-      // xfyun: TODO — implement XfyunASRProvider
+      case 'volcengine':
+        return VolcengineASRProvider();
+      case 'xfyun':
+        return XfyunASRProvider();
+      case 'tencent':
+        return TencentASRProvider();
       default:
         throw Exception('Unsupported ASR provider: $providerId');
     }
@@ -52,6 +58,24 @@ class ASRProviderFactory {
           'accessKeyId': account.credentials['access_key_id'] ?? '',
           'accessKeySecret': account.credentials['access_key_secret'] ?? '',
           'appKey': account.credentials['app_key'] ?? '',
+        };
+      case 'volcengine':
+        return {
+          'appKey': account.credentials['app_key'] ?? '',
+          'accessKey': account.credentials['access_token'] ?? '',
+        };
+      case 'xfyun':
+        return {
+          'appId': account.credentials['app_id'] ?? '',
+          'apiKey': account.credentials['api_key'] ?? '',
+          'apiSecret': account.credentials['api_secret'] ?? '',
+        };
+      case 'tencent':
+        return {
+          'secretId': account.credentials['secret_id'] ?? '',
+          'secretKey': account.credentials['secret_key'] ?? '',
+          'appId': account.credentials['app_id'] ?? '',
+          'model': model.id,
         };
       default:
         return {'apiKey': account.credentials['api_key'] ?? ''};

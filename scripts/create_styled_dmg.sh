@@ -9,6 +9,12 @@ NEW_BUILD=$((CURRENT_BUILD + 1))
 sed -i '' "s/+${CURRENT_BUILD}/+${NEW_BUILD}/" pubspec.yaml
 echo "📦 Build number: ${CURRENT_BUILD} → ${NEW_BUILD}"
 
+# Sync version to Gateway
+VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+sed -i '' "s/version: '.*'/version: '${VERSION}'/" gateway/src/index.js
+sed -i '' "s/build: [0-9]*/build: ${NEW_BUILD}/" gateway/src/index.js
+echo "🔄 Gateway synced: v${VERSION}+${NEW_BUILD}"
+
 # Build
 echo "🔨 Building ${APP_NAME} (Release)..."
 flutter build macos --release
