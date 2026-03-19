@@ -2,6 +2,8 @@
 ///
 /// AliyunTokenService.generateToken 使用 package:http 的 http.get()，
 /// 底层走 dart:io HttpClient，通过 HttpOverrides 拦截网络请求。
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -12,12 +14,12 @@ import 'package:speakout/engine/providers/aliyun_token_service.dart';
 // Mock HttpClient 基础设施
 // ═══════════════════════════════════════════════════════════
 
-typedef MockRequestHandler = Future<_MockResult> Function(Uri url);
+typedef MockRequestHandler = Future<MockResult> Function(Uri url);
 
-class _MockResult {
+class MockResult {
   final int statusCode;
   final String body;
-  _MockResult(this.statusCode, this.body);
+  MockResult(this.statusCode, this.body);
 }
 
 class _TestHttpOverrides extends HttpOverrides {
@@ -341,7 +343,7 @@ void main() {
   /// 设置 mock HTTP 返回
   void mockHttp({required int statusCode, required String body}) {
     HttpOverrides.global = _TestHttpOverrides((url) async {
-      return _MockResult(statusCode, body);
+      return MockResult(statusCode, body);
     });
   }
 
@@ -574,7 +576,7 @@ void main() {
       Uri? capturedUrl;
       HttpOverrides.global = _TestHttpOverrides((url) async {
         capturedUrl = url;
-        return _MockResult(
+        return MockResult(
           200,
           jsonEncode({'Token': {'Id': 'test-token'}}),
         );
@@ -596,7 +598,7 @@ void main() {
       Uri? capturedUrl;
       HttpOverrides.global = _TestHttpOverrides((url) async {
         capturedUrl = url;
-        return _MockResult(200, jsonEncode({'Token': {'Id': 'x'}}));
+        return MockResult(200, jsonEncode({'Token': {'Id': 'x'}}));
       });
 
       await AliyunTokenService.generateToken('k', 's');

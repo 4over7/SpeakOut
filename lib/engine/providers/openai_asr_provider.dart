@@ -62,7 +62,7 @@ class OpenAIASRProvider implements ASRProvider {
   Future<ASRResult> stop() async {
     if (_totalSamples == 0) return ASRResult.textOnly('');
 
-    _log('Encoding ${_totalSamples} samples to WAV...');
+    _log('Encoding $_totalSamples samples to WAV...');
     final wav = _encodeWav();
     _audioChunks.clear();
     _totalSamples = 0;

@@ -2,7 +2,8 @@
 ///
 /// Generated from test cases in docs/test_cases_ai_polish.md
 /// Test cases derived from requirements only (no implementation peeking).
-import 'dart:async';
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
@@ -610,6 +611,14 @@ void main() {
   // Request 结构验证
   // ═══════════════════════════════════════════════════════════
   group('Request 结构', () {
+    setUp(() async {
+      // Ensure cloud mode with valid key for request structure tests
+      await ConfigService().setLlmProviderType('cloud');
+      await ConfigService().setAiCorrectionEnabled(true);
+      await ConfigService().setLlmApiKey('test_key');
+      service = LLMService();
+    });
+
     test('Cloud: 请求包含 system + user 两条 messages', () async {
       Map<String, dynamic>? body;
       service.setClient(cloudMock(

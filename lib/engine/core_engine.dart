@@ -903,9 +903,9 @@ class CoreEngine {
 
       // AI Polish (with vocab hints injected into LLM prompt)
       // Skip LLM for trivial input: pure punctuation, whitespace, or ≤2 chars
-      final _trimmedForCheck = finalText.replaceAll(RegExp(r'[\s\p{P}]', unicode: true), '');
-      final _shouldCallLlm = finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && _trimmedForCheck.length > 2;
-      if (_shouldCallLlm) {
+      final trimmedForCheck = finalText.replaceAll(RegExp(r'[\s\p{P}]', unicode: true), '');
+      final shouldCallLlm = finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && trimmedForCheck.length > 2;
+      if (shouldCallLlm) {
         _statusController.add("AI 润色中...");
         _overlay.updateText("🤖 AI Polishing...");
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
@@ -1000,8 +1000,8 @@ class CoreEngine {
             try { _nativeInput?.injectClipboardEnd(); } catch (_) {}
           }
         }
-      } else if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && _trimmedForCheck.length <= 2) {
-        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: '${finalText}')");
+      } else if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && trimmedForCheck.length <= 2) {
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: '$finalText')");
       } else if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
         // Offline fallback: direct replacement when AI is disabled
         finalText = VocabService().applyReplacements(finalText);

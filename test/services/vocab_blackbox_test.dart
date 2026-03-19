@@ -2,6 +2,8 @@
 ///
 /// Generated from test cases in docs/test_cases_ai_polish.md
 /// Test cases derived from requirements only (no implementation peeking).
+library;
+
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

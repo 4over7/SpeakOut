@@ -1,6 +1,8 @@
 /// Black-box tests for NotificationService — 通知服务模块
 ///
 /// Test cases derived from requirements only (no implementation peeking).
+library;
+
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/services/notification_service.dart';

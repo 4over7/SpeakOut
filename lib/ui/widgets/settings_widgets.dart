@@ -65,7 +65,7 @@ class SettingsTile extends StatelessWidget {
                 Row(
                   children: [
                     Text(label, style: AppTheme.body(context)),
-                    if (trailing != null) trailing!,
+                    ?trailing,
                   ],
                 ),
                 if (subtitle != null)

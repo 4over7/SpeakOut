@@ -2,6 +2,8 @@
 ///
 /// 覆盖场景：并发追加、超长文本压力、路径含空格/中文、未设置 diaryPath
 /// 基础功能测试见 diary_service_test.dart
+library;
+
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';

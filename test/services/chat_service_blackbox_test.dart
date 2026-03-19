@@ -2,6 +2,8 @@
 ///
 /// Test cases derived from requirements only (no implementation peeking).
 /// Focuses on public API behavior: add methods, stream, persistence, trimming.
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
