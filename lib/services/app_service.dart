@@ -24,6 +24,7 @@ class AppService {
   void applyVerboseLogging() {
     final enabled = ConfigService().verboseLogging;
     AppLog.enabled = enabled;
+    if (enabled) AppLog.init();
     engine.nativeInput?.setDebugLogging(enabled);
     final dir = ConfigService().logDirectory;
     if (dir.isNotEmpty) {
