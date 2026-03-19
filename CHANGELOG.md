@@ -1,5 +1,24 @@
 # SpeakOut Version History
 
+## [1.5.14] - 2026-03-20
+
+### 安全、稳定性与多云 ASR 扩展
+
+#### 安全整改（独立第三方评审通过）
+- **凭证迁移到系统 Keychain** — API key 等敏感凭证从 SharedPreferences 迁移到 flutter_secure_storage，旧数据自动迁移并删除
+- **日志隐私治理** — LLMService/CoreEngine 日志统一走 AppLog，原始语音文本不再落盘，仅记录长度
+
+#### 新增云端 ASR 服务商
+- **火山引擎 Seed-ASR** — V3 BigModel 二进制帧协议，中文精度最高
+- **讯飞实时语音听写** — WebSocket 流式识别，支持 202 种方言
+- **腾讯云实时语音识别** — WebSocket 流式识别，每月 5 小时免费
+
+#### 稳定性改进
+- **LLM 15 秒超时保护** — API 卡住时自动放弃润色，直接输出原文
+- **AppLog 异步缓冲** — 日志不再阻塞主线程，try-catch 兜底永不 crash 调用方
+- **Gateway 版本自动同步** — build 脚本自动从 pubspec.yaml 同步版本号
+- **静态分析 warning 清零** — 0 warning, 531 测试通过
+
 ## [1.5.13] - 2026-03-19
 
 ### 文本注入可靠性修复

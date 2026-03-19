@@ -219,5 +219,13 @@ Copyright © 2026 Leon. All Rights Reserved.
 ---
 
 *Made with ❤️ by Leon. Powered by Flutter, Sherpa-ONNX, Aliyun NLS & Ollama.*
+
+---
+
+## Contact
+
+<a href="https://x.com/4over7"><img src="https://img.shields.io/badge/X-@4over7-000?logo=x" alt="X" /></a>
+
+<img src="assets/wx.jpg" width="200" alt="WeChat" />
 </content>
 </invoke>
