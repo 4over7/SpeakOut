@@ -569,17 +569,14 @@ void inject_clipboard_end(void) {
   }
 }
 
-// Main entry: auto-detect and use the right method
+// Main entry: always use clipboard paste for reliability.
+// CGEvent keyboard injection drops characters in apps with heavy UI (WeChat, Slack, etc.)
+// due to async HID event queue. Clipboard paste is 100% reliable.
 void inject_text(const char *text) {
   if (text == NULL || text[0] == '\0')
     return;
 
-  if (is_terminal_app()) {
-    log_to_file("Inject: Using clipboard paste (terminal detected)");
-    inject_via_clipboard(text);
-  } else {
-    inject_via_keyboard(text);
-  }
+  inject_via_clipboard(text);
 }
 
 // 4. Check Permission (with prompt dialog)
