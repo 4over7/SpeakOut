@@ -7,6 +7,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../ffi/native_input_base.dart';
 import '../ffi/native_input_factory.dart';
 import '../config/app_constants.dart';
+import '../services/billing_service.dart';
 import '../services/config_service.dart';
 import '../services/llm_service.dart';
 import '../services/vocab_service.dart';
@@ -78,6 +79,7 @@ class CoreEngine {
   sherpa.OfflinePunctuation? _punctuation;
   bool _punctuationEnabled = false;
   bool _typewriterInjected = false;
+  DateTime? _recordingStartTime;
 
   // Configuration
   int pttKeyCode = 58; 
@@ -744,6 +746,7 @@ class CoreEngine {
 
       // Transition: starting → recording
       _recordingState = RecordingState.recording;
+      _recordingStartTime = DateTime.now();
       _log("Recording started (mode=${mode.name}).");
 
       // Handle deferred stop (key released during async startup)
@@ -1050,6 +1053,16 @@ class CoreEngine {
       }
     }
     } finally {
+      // Report usage for billing (only when cloud services were consumed)
+      if (_recordingStartTime != null) {
+        final recordingSeconds = DateTime.now().difference(_recordingStartTime!).inSeconds;
+        final usedCloud = ConfigService().workMode == 'cloud' ||
+            (ConfigService().workMode == 'smart' && ConfigService().aiCorrectionEnabled);
+        if (usedCloud && recordingSeconds > 0) {
+          BillingService().reportUsage(recordingSeconds);
+        }
+        _recordingStartTime = null;
+      }
       // Guarantee state recovery — no matter what happens above
       _cleanupRecordingState();
       _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");
