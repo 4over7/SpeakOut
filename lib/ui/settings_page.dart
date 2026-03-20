@@ -23,7 +23,7 @@ import '../services/llm_service.dart';
 import '../services/cloud_account_service.dart';
 import '../config/cloud_providers.dart';
 import '../models/cloud_account.dart';
-import 'billing_page.dart';
+// import 'billing_page.dart'; // 暂时隐藏
 import 'cloud_accounts_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -591,13 +591,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 leading: MacosIcon(CupertinoIcons.cloud, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
                 label: Text(loc.tabCloudAccounts, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
               ),
+              // 订阅 tab 暂时隐藏，等支付宝/Stripe 开通后恢复
+              // SidebarItem(
+              //   leading: MacosIcon(CupertinoIcons.creditcard, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
+              //   label: Text('订阅', style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
+              // ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.creditcard, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
-                label: Text('订阅', style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
-              ),
-              SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 6 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 6 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
               ),
             ],
           );
@@ -621,7 +622,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     if (_selectedIndex == 1) return _buildWorkModeView();
                     // Cloud Accounts page has its own scroll
                     if (_selectedIndex == 4) return const CloudAccountsPage();
-                    if (_selectedIndex == 5) return const BillingPage();
+                    // if (_selectedIndex == 5) return const BillingPage(); // 暂时隐藏
                     return SingleChildScrollView(
                       child: Builder(builder: (_) {
                          if (_selectedIndex == 0) return _buildGeneralView();

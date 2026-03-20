@@ -1,5 +1,5 @@
 import '../engine/core_engine.dart';
-import 'billing_service.dart';
+// import 'billing_service.dart'; // 暂时隐藏
 import 'config_service.dart';
 import 'chat_service.dart';
 import 'cloud_account_service.dart';
@@ -96,8 +96,8 @@ class AppService {
     // 5. Check for updates (non-blocking)
     UpdateService().checkForUpdate();
 
-    // 6. Billing (non-blocking)
-    BillingService().init();
+    // 6. Billing (暂时禁用，等支付宝/Stripe 开通后恢复)
+    // BillingService().init();
   }
   
   Future<void> _initASR() async {
