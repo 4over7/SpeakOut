@@ -337,7 +337,11 @@ class ConfigService {
   Future<void> setAgentRouterModel(String model) async => await _prefs?.setString('agent_router_model', model);
 
   // --- I18n ---
-  String get appLanguage => _prefs?.getString('app_language') ?? 'system'; 
+  String get appLanguage => _prefs?.getString('app_language') ?? 'system';
+
+  // --- Device ID (for billing) ---
+  String? get deviceId => _prefs?.getString('billing_device_id');
+  Future<void> setDeviceId(String id) async => await _prefs?.setString('billing_device_id', id);
   
   Future<void> setAppLanguage(String lang) async {
     await _prefs?.setString('app_language', lang);
