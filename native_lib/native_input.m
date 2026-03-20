@@ -630,9 +630,10 @@ int check_key_pressed(int keyCode) {
 #define NUM_BUFFERS 10
 #define BUFFER_DURATION_MS 100 // 100ms per buffer = 1600 samples @ 16kHz
 
-// Ring buffer: 600 seconds (10 min) of 16kHz mono Int16 = 9600000 samples (~18.3MB)
-// Matches max recording duration to prevent data loss in offline mode.
-#define RING_BUFFER_SAMPLES 9600000
+// Ring buffer: 60 seconds of 16kHz mono Int16 = 960000 samples (~1.8MB)
+// Transfer buffer between AudioQueue callback and Dart polling.
+// Polling every 100ms keeps it well under capacity; 60s provides ample margin.
+#define RING_BUFFER_SAMPLES 960000
 
 // Audio Recording State
 static char preferredDeviceUID[256] = {0};
