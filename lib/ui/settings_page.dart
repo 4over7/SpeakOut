@@ -657,26 +657,14 @@ class _SettingsPageState extends State<SettingsPage> {
             SettingsGroup(
               title: loc.languageSettings,
               children: [
-                // Input Language
+                // Input Language (filtered by cloud ASR model capability in cloud mode)
                 SettingsTile(
                   label: loc.inputLanguage,
                   subtitle: loc.inputLanguageDesc,
                   icon: CupertinoIcons.mic,
                   child: _buildDropdown(
                     value: ConfigService().inputLanguage,
-                    items: {
-                      'auto': loc.langAutoDetect,
-                      'zh': loc.langZh,
-                      'en': loc.langEn,
-                      'ja': loc.langJa,
-                      'ko': loc.langKo,
-                      'yue': loc.langYue,
-                      'es': loc.langEs,
-                      'fr': loc.langFr,
-                      'de': loc.langDe,
-                      'ru': loc.langRu,
-                      'pt': loc.langPt,
-                    },
+                    items: _buildInputLanguageItems(loc),
                     onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState((){}); }
                   ),
                 ),
@@ -1017,6 +1005,15 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mode == null) return;
     final oldMode = ConfigService().workMode;
     await ConfigService().setWorkMode(mode);
+
+    // Reset input language if current selection is not supported by cloud ASR model
+    if (mode == 'cloud') {
+      final cloudModel = _getCurrentCloudAsrModel();
+      final inputLang = ConfigService().inputLanguage;
+      if (cloudModel != null && inputLang != 'auto' && !cloudModel.supportsLanguage(inputLang)) {
+        await ConfigService().setInputLanguage('auto');
+      }
+    }
 
     // Re-init ASR when switching between sherpa <-> aliyun
     if (mode == 'cloud' && oldMode != 'cloud') {
@@ -1864,6 +1861,46 @@ class _SettingsPageState extends State<SettingsPage> {
       'pt' => loc.langPt,
       _ => code,
     };
+  }
+
+  /// Build input language dropdown items, filtered by cloud ASR model capability.
+  Map<String, String> _buildInputLanguageItems(AppLocalizations loc) {
+    final allItems = {
+      'auto': loc.langAutoDetect,
+      'zh': loc.langZh,
+      'en': loc.langEn,
+      'ja': loc.langJa,
+      'ko': loc.langKo,
+      'yue': loc.langYue,
+      'es': loc.langEs,
+      'fr': loc.langFr,
+      'de': loc.langDe,
+      'ru': loc.langRu,
+      'pt': loc.langPt,
+    };
+
+    // In cloud mode, filter by current ASR model's supported languages
+    if (ConfigService().workMode == 'cloud') {
+      final cloudAsrModel = _getCurrentCloudAsrModel();
+      if (cloudAsrModel != null && cloudAsrModel.supportedLanguages.isNotEmpty) {
+        return Map.fromEntries(allItems.entries.where((e) =>
+          e.key == 'auto' || cloudAsrModel.supportsLanguage(e.key)));
+      }
+    }
+    return allItems;
+  }
+
+  /// Get the currently selected cloud ASR model (if any).
+  CloudASRModel? _getCurrentCloudAsrModel() {
+    final asrAccountId = ConfigService().selectedAsrAccountId ?? '';
+    final asrAccount = CloudAccountService().getAccountById(asrAccountId);
+    if (asrAccount == null) return null;
+    final asrProvider = CloudProviders.getById(asrAccount.providerId);
+    if (asrProvider == null) return null;
+    final asrModelId = ConfigService().selectedAsrModelId;
+    return asrProvider.asrModels
+        .where((m) => m.id == asrModelId).firstOrNull
+        ?? (asrProvider.asrModels.isNotEmpty ? asrProvider.asrModels.first : null);
   }
 
   /// Build contextual hints for language settings
