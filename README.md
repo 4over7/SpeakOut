@@ -21,6 +21,8 @@
 
 A macOS desktop app that turns your voice into text — offline by default, with optional cloud enhancement. Press a hotkey, speak naturally, and text appears at your cursor. Supports 11 languages, real-time translation, and AI-powered text polishing.
 
+**Works 100% offline with production-quality results.** No account, no API key, no internet required. Just install, download a model, and start speaking. Cloud features (AI polish, translation, cloud ASR) are optional enhancements — the core voice input experience is fully local.
+
 **Core principles**: privacy first (audio never leaves your device in offline mode), low latency (sub-second response), and zero configuration (works out of the box).
 
 ---
@@ -193,7 +195,7 @@ Copyright © 2026 Leon. All Rights Reserved.
 
 ## 功能亮点
 
-- **离线优先** — 8 款本地语音模型，音频不出设备，基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)
+- **完全离线可用** — 无需账号、无需联网、无需 API Key，安装即用。8 款本地模型基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，中英识别准确率媲美云端，音频不出设备
 - **11 种语言** — 中英日韩粤 + 西法德俄葡，支持自动检测和实时翻译
 - **三种工作模式** — 纯离线（隐私优先）/ 智能（离线识别 + AI 润色）/ 云端（高精度）
 - **6 家云端 ASR** — 阿里云百炼、Groq、OpenAI、火山引擎、讯飞、腾讯云
