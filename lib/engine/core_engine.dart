@@ -42,7 +42,7 @@ class CoreEngine {
   late final NativeInputBase? _nativeInput;
   Timer? _audioPollTimer;
   ffi.Pointer<ffi.Int16>? _pollBuffer;  // Reusable buffer for polling
-  static const int _pollBufferSamples = 16000;  // Max 1 second per poll (16kHz)
+  static const int _pollBufferSamples = AppConstants.kAudioPollBufferSamples;
   
   // Audio Device Management
   AudioDeviceService? _audioDeviceService;
@@ -690,7 +690,7 @@ class CoreEngine {
       // 4. WATCHDOG (PTT only — diary has reliable key-up, toggle doesn't need it)
       _watchdogTimer?.cancel();
       if (mode == RecordingMode.ptt && !_isToggleMode) {
-        _watchdogTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+        _watchdogTimer = Timer.periodic(Duration(milliseconds: AppConstants.kKeyWatchdogIntervalMs), (timer) {
           if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
           final isPhysicallyDown = _nativeInput.isKeyPressed(pttKeyCode);
           if (!isPhysicallyDown) {
@@ -719,20 +719,20 @@ class CoreEngine {
       _silenceCheckTimer?.cancel();
       _silencePollCount = 0;
       _lastSilenceNotify = null;
-      _silenceCheckTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      _silenceCheckTimer = Timer.periodic(Duration(milliseconds: AppConstants.kSilenceCheckIntervalMs), (timer) {
         if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
         final level = _nativeInput.getAudioLevel();
         if (level < 0.01) {
           _silencePollCount++;
         } else {
-          if (_silencePollCount >= 10) {
+          if (_silencePollCount >= AppConstants.kSilenceThresholdCount) {
             // Was silent, now got audio — hide hint
             _overlay.hideSilenceHint();
           }
           _silencePollCount = 0;
         }
         // 2 seconds continuous silence (10 × 200ms), with 10s cooldown
-        if (_silencePollCount >= 10) {
+        if (_silencePollCount >= AppConstants.kSilenceThresholdCount) {
           final now = DateTime.now();
           if (_lastSilenceNotify == null ||
               now.difference(_lastSilenceNotify!).inSeconds >= 10) {
@@ -770,8 +770,7 @@ class CoreEngine {
     // Allocate a reusable native buffer for polling
     _pollBuffer ??= pkg_ffi.calloc<ffi.Int16>(_pollBufferSamples);
     
-    // Poll every 50ms — at 16kHz this means ~800 samples per poll
-    _audioPollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+    _audioPollTimer = Timer.periodic(Duration(milliseconds: AppConstants.kAudioPollIntervalMs), (_) {
       _pollAudioRingBuffer();
     });
   }
@@ -887,8 +886,8 @@ class CoreEngine {
     _log("[PERF] +${sw.elapsedMilliseconds}ms — yield done");
 
     // Give ASR time to process the last audio chunks before stopping hardware
-    await Future.delayed(const Duration(milliseconds: 200));
-    _log("[PERF] +${sw.elapsedMilliseconds}ms — 200ms delay done");
+    await Future.delayed(Duration(milliseconds: AppConstants.kEngineShutdownDelayMs));
+    _log("[PERF] +${sw.elapsedMilliseconds}ms — shutdown delay done");
 
     // HARDWARE SHUTDOWN
     try {
@@ -915,7 +914,7 @@ class CoreEngine {
     if (_asrProvider != null) {
       ASRResult asrResult = ASRResult.textOnly("");
       try {
-        asrResult = await _asrProvider!.stop().timeout(const Duration(seconds: 6), onTimeout: () {
+        asrResult = await _asrProvider!.stop().timeout(AppConstants.kAsrStopTimeout, onTimeout: () {
           _log("ASR Provider Stop Timeout!");
           return ASRResult.textOnly("");
         });
@@ -928,7 +927,7 @@ class CoreEngine {
       if (asrResult.error != null) {
         _log("ASR Error: ${asrResult.error}");
         _statusController.add("❌ ${asrResult.error}");
-        _overlay.showThenClear("❌ ${asrResult.error}", const Duration(seconds: 4));
+        _overlay.showThenClear("❌ ${asrResult.error}", AppConstants.kErrorDisplayDuration);
         return; // finally block handles cleanup
       }
 
@@ -953,7 +952,7 @@ class CoreEngine {
           final useTypewriter = mode != RecordingMode.diary
               && ConfigService().typewriterEnabled
               && !(_nativeInput?.isTerminalApp() ?? false);
-          const llmTimeout = Duration(seconds: 15);
+          final llmTimeout = AppConstants.kLlmPolishTimeout;
 
           if (useTypewriter) {
             // Typewriter mode (alpha): streaming LLM + clipboard injection
@@ -962,7 +961,7 @@ class CoreEngine {
             bool firstChunk = true;
             bool streamInjected = false;
             var lastInjectTime = DateTime.now();
-            const batchInterval = Duration(milliseconds: 120);
+            const batchInterval = Duration(milliseconds: AppConstants.kTypewriterBatchIntervalMs);
 
             _nativeInput?.injectClipboardBegin();
             typewriterBegan = true;
@@ -1061,7 +1060,7 @@ class CoreEngine {
           DiaryService().appendNote(finalText).then((err) {
             if (err == null) {
               _statusController.add("✅ Saved Note");
-              _overlay.showThenClear("✅ Saved Note", const Duration(seconds: 2));
+              _overlay.showThenClear("✅ Saved Note", AppConstants.kSuccessDisplayDuration);
             } else {
               _statusController.add("❌ Save Failed");
               _log("Diary Save Error: $err");

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/billing_model.dart';
+import '../config/app_constants.dart';
 import '../config/app_log.dart';
 import 'config_service.dart';
 
@@ -49,7 +50,7 @@ class BillingService {
         Uri.parse('$_baseUrl/device/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'deviceId': deviceId}),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kBillingRequestTimeout);
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -70,7 +71,7 @@ class BillingService {
       final resp = await http.get(
         Uri.parse('$_baseUrl/billing/status'),
         headers: {'Authorization': 'Bearer $deviceId'},
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kBillingRequestTimeout);
 
       if (resp.statusCode == 200) {
         final status = BillingStatus.fromJson(jsonDecode(resp.body));
@@ -88,7 +89,7 @@ class BillingService {
     try {
       final resp = await http.get(
         Uri.parse('$_baseUrl/billing/plans'),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kBillingRequestTimeout);
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -115,7 +116,7 @@ class BillingService {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'planId': planId, 'channel': channel}),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(AppConstants.kBillingOrderTimeout);
 
       if (resp.statusCode == 200) {
         return BillingOrder.fromJson(jsonDecode(resp.body));
@@ -138,7 +139,7 @@ class BillingService {
       final resp = await http.get(
         Uri.parse('$_baseUrl/billing/order/$orderId'),
         headers: {'Authorization': 'Bearer $deviceId'},
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kBillingRequestTimeout);
 
       if (resp.statusCode == 200) {
         return BillingOrder.fromJson(jsonDecode(resp.body));
@@ -152,8 +153,8 @@ class BillingService {
   /// 轮询订单状态，支付成功后自动刷新配额
   /// 返回 Stream，3秒间隔，最多 5 分钟
   Stream<BillingOrder> pollOrderStatus(String orderId) async* {
-    const interval = Duration(seconds: 3);
-    const maxDuration = Duration(minutes: 5);
+    final interval = AppConstants.kBillingPollInterval;
+    final maxDuration = AppConstants.kBillingPollMaxDuration;
     final deadline = DateTime.now().add(maxDuration);
 
     while (DateTime.now().isBefore(deadline)) {
@@ -184,7 +185,7 @@ class BillingService {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'seconds': seconds}),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kBillingRequestTimeout);
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;

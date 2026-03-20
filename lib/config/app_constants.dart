@@ -173,6 +173,62 @@ class AppConstants {
     ),
   ];
 
+  // ── Audio ──
+  /// 音频采样率 (Hz)
+  static const int kSampleRate = 16000;
+  /// 音频轮询间隔 (ms)，CoreEngine 从 ring buffer 读取音频的频率
+  static const int kAudioPollIntervalMs = 50;
+  /// 单次轮询最大样本数，等于 1 秒 @ 16kHz
+  static const int kAudioPollBufferSamples = 16000;
+
+  // ── Core Engine Timing ──
+  /// 物理按键释放检测间隔 (ms)，防止 CGEventTap 丢失 keyUp 事件
+  static const int kKeyWatchdogIntervalMs = 200;
+  /// 静音检测轮询间隔 (ms)
+  static const int kSilenceCheckIntervalMs = 200;
+  /// 连续静音多少次算"无声音"（次数 × 间隔 = 总时长，10 × 200ms = 2s）
+  static const int kSilenceThresholdCount = 10;
+  /// 录音停止后等待 ASR 处理最后数据的延迟 (ms)
+  static const int kEngineShutdownDelayMs = 200;
+  /// ASR provider stop() 超时，云端识别可能需要较长时间
+  static const Duration kAsrStopTimeout = Duration(seconds: 6);
+  /// 错误信息在悬浮窗显示的持续时间
+  static const Duration kErrorDisplayDuration = Duration(seconds: 4);
+  /// 成功提示显示时间
+  static const Duration kSuccessDisplayDuration = Duration(seconds: 2);
+
+  // ── LLM ──
+  /// AI 润色超时：stream 模式下 N 秒无数据则放弃，直接输出原文
+  static const Duration kLlmPolishTimeout = Duration(seconds: 15);
+  /// LLM 流式请求整体超时
+  static const Duration kLlmStreamTimeout = Duration(seconds: 30);
+  /// LLM 非流式请求超时
+  static const Duration kLlmSyncTimeout = Duration(seconds: 10);
+  /// LLM 测试连接超时
+  static const Duration kLlmTestTimeout = Duration(seconds: 15);
+  /// LLM 默认温度参数（润色/翻译）
+  static const double kLlmDefaultTemperature = 0.3;
+  /// LLM 严格模式温度（意图路由，需要确定性输出）
+  static const double kLlmStrictTemperature = 0.1;
+  /// Anthropic API 最大输出 token 数
+  static const int kAnthropicMaxTokens = 1024;
+  /// Anthropic API 版本号
+  static const String kAnthropicApiVersion = '2023-06-01';
+
+  // ── Text Injection ──
+  /// 打字机模式剪贴板批次注入间隔 (ms)
+  static const int kTypewriterBatchIntervalMs = 120;
+
+  // ── Billing ──
+  /// 计费 API 常规请求超时
+  static const Duration kBillingRequestTimeout = Duration(seconds: 10);
+  /// 创建订单请求超时（涉及第三方支付 API）
+  static const Duration kBillingOrderTimeout = Duration(seconds: 15);
+  /// 支付结果轮询间隔
+  static const Duration kBillingPollInterval = Duration(seconds: 3);
+  /// 支付结果轮询最长等待时间
+  static const Duration kBillingPollMaxDuration = Duration(minutes: 5);
+
   // UI Layout
   static const double kStandardPadding = 16.0;
   static const double kSmallPadding = 8.0;

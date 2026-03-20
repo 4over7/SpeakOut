@@ -139,7 +139,7 @@ class LLMService {
           {"role": "system", "content": systemPrompt},
           {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
         ],
-        "temperature": 0.3,
+        "temperature": AppConstants.kLlmDefaultTemperature,
         "stream": true,
       };
 
@@ -150,7 +150,7 @@ class LLMService {
         })
         ..body = jsonEncode(body);
 
-      final streamedResponse = await client.send(request).timeout(const Duration(seconds: 30));
+      final streamedResponse = await client.send(request).timeout(AppConstants.kLlmStreamTimeout);
 
       if (streamedResponse.statusCode != 200) {
         final respBody = await streamedResponse.stream.bytesToString();
@@ -262,7 +262,7 @@ class LLMService {
           {"role": "system", "content": systemPrompt},
           {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
         ],
-        "temperature": 0.3,
+        "temperature": AppConstants.kLlmDefaultTemperature,
       };
 
       final response = await client.post(
@@ -272,7 +272,7 @@ class LLMService {
           "Authorization": "Bearer $apiKey",
         },
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kLlmSyncTimeout);
 
       if (response.statusCode == 200) {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
@@ -313,12 +313,12 @@ class LLMService {
 
       final body = {
         "model": model,
-        "max_tokens": 1024,
+        "max_tokens": AppConstants.kAnthropicMaxTokens,
         "system": systemPrompt,
         "messages": [
           {"role": "user", "content": _buildUserMessage(input, vocabHints: vocabHints)}
         ],
-        "temperature": 0.3,
+        "temperature": AppConstants.kLlmDefaultTemperature,
       };
 
       final response = await client.post(
@@ -326,10 +326,10 @@ class LLMService {
         headers: {
           "Content-Type": "application/json",
           "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+          "anthropic-version": AppConstants.kAnthropicApiVersion,
         },
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kLlmSyncTimeout);
 
       if (response.statusCode == 200) {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
@@ -372,7 +372,7 @@ class LLMService {
         "stream": false,
         "think": false,
         "options": {
-          "temperature": 0.3,
+          "temperature": AppConstants.kLlmDefaultTemperature,
         },
       };
 
@@ -380,7 +380,7 @@ class LLMService {
         uri,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kLlmSyncTimeout);
 
       if (response.statusCode == 200) {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
@@ -416,9 +416,9 @@ class LLMService {
       if (apiFormat == LlmApiFormat.anthropic) {
         final resp = await client.post(
           Uri.parse('$baseUrl/v1/messages'),
-          headers: {"Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01"},
+          headers: {"Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": AppConstants.kAnthropicApiVersion},
           body: jsonEncode({"model": model, "max_tokens": 5, "messages": [{"role": "user", "content": "Hi"}]}),
-        ).timeout(const Duration(seconds: 15));
+        ).timeout(AppConstants.kLlmTestTimeout);
         _log("TEST: Anthropic response ${resp.statusCode}");
         if (resp.statusCode == 200) return (true, '连接成功 ($model)');
         final body = jsonDecode(resp.body);
@@ -428,7 +428,7 @@ class LLMService {
           Uri.parse('$baseUrl/chat/completions'),
           headers: {"Content-Type": "application/json", "Authorization": "Bearer $apiKey"},
           body: jsonEncode({"model": model, "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 5}),
-        ).timeout(const Duration(seconds: 15));
+        ).timeout(AppConstants.kLlmTestTimeout);
         _log("TEST: OpenAI response ${resp.statusCode}");
         if (resp.statusCode == 200) return (true, '连接成功 ($model)');
         final body = jsonDecode(resp.body);
@@ -449,7 +449,7 @@ class LLMService {
         Uri.parse('$baseUrl/api/chat'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"model": model, "messages": [{"role": "user", "content": "Hi"}], "stream": false}),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(AppConstants.kLlmTestTimeout);
       if (resp.statusCode == 200) return (true, '连接成功 ($model)');
       return (false, '${resp.statusCode}: ${resp.body}');
     } catch (e) {
@@ -505,7 +505,7 @@ Rules:
           "Authorization": "Bearer $apiKey",
         },
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConstants.kLlmSyncTimeout);
 
       if (response.statusCode == 200) {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
