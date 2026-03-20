@@ -7,63 +7,118 @@
   **Offline-First AI Voice Input for macOS**
   *Hold a key. Speak. Auto-type.*
 
-  [Download Latest Release](https://github.com/4over7/SpeakOut/releases/latest)
+  [Download](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [Changelog](CHANGELOG.md)
+
+  ![Platform](https://img.shields.io/badge/platform-macOS%2013+-blue)
+  ![Tests](https://img.shields.io/badge/tests-531%20passed-brightgreen)
+  ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
 </div>
 
 ---
 
+## What is SpeakOut?
+
+A macOS desktop app that turns your voice into text — offline by default, with optional cloud enhancement. Press a hotkey, speak naturally, and text appears at your cursor. Supports 11 languages, real-time translation, and AI-powered text polishing.
+
+**Core principles**: privacy first (audio never leaves your device in offline mode), low latency (sub-second response), and zero configuration (works out of the box).
+
+---
+
 ## Features
 
-### Voice Input (Offline)
+### Voice Input
 
-Two trigger modes: **Hold to Speak (PTT)** — hold a key, speak, release to type; **Tap to Toggle** — tap to start, tap again to stop.
+| | Offline Mode | Smart Mode | Cloud Mode |
+|---|---|---|---|
+| **ASR Engine** | Sherpa-ONNX (local) | Sherpa-ONNX (local) | Cloud ASR (Groq, DashScope, etc.) |
+| **AI Polish** | — | LLM correction + translation | — |
+| **Privacy** | 100% offline | ASR offline, LLM via cloud | Audio sent to cloud |
+| **Latency** | Fastest | +0.5~1s for LLM | Depends on network |
 
-- **8 ASR Models** — SenseVoice, Paraformer, Whisper Large-v3, FireRedASR, and more. Choose by accuracy, size, or language.
-- **Streaming & Offline Modes** — Real-time subtitles while speaking (streaming), or higher accuracy after release (offline).
-- **Toggle Mode** — Tap once to start recording, tap again to stop. Ideal for hands-free or walking scenarios. Default max duration: 5 minutes.
-- **Multilingual** — Chinese, English, Japanese, Korean, Cantonese, dialects, and 90+ languages (Whisper).
-- **Fully Offline** — Powered by [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx). No audio leaves your device.
+- **8 Offline Models** — SenseVoice, Paraformer, Whisper Large-v3, FireRedASR, and more
+- **Two Trigger Modes** — Hold to Speak (PTT) or Tap to Toggle
+- **Streaming & Offline** — Real-time subtitles while speaking, or higher accuracy after release
+
+### 11 Languages + Translation
+
+| Languages | Input | Output | Translation |
+|-----------|-------|--------|-------------|
+| Chinese, English, Japanese, Korean, Cantonese | All modes | All modes | — |
+| Spanish, French, German, Russian, Portuguese | Whisper / Cloud | Smart Mode | Via LLM |
+
+- **Auto-detect** — Let the model detect what language you're speaking
+- **Translation Mode** — Set different input/output languages (e.g., speak Chinese → output English). Requires Smart Mode.
+- **Script Control** — Choose Simplified or Traditional Chinese output
+
+### Cloud ASR (6 Providers)
+
+| Provider | Protocol | Highlights |
+|----------|----------|------------|
+| **DashScope** (Aliyun) | WebSocket | Paraformer realtime, Chinese optimized |
+| **Groq** | REST (Whisper) | Fast, 99 languages |
+| **OpenAI** | REST (Whisper/GPT-4o) | Most accurate multilingual |
+| **Volcengine** (ByteDance) | WebSocket (binary) | Seed-ASR, highest Chinese accuracy |
+| **iFlytek** | WebSocket | 202 dialects |
+| **Tencent Cloud** | WebSocket | 5h/month free |
+
+### AI Polish (Smart Mode)
+
+LLM post-processing: fix homophones, remove filler words, translate, enforce output language.
+
+- **12 LLM Providers** — DashScope, DeepSeek, Volcengine, OpenAI, Anthropic, Zhipu, Kimi, MiniMax, Gemini, iFlytek, Groq, Ollama (local)
+- **Professional Vocabulary** — Industry dictionaries (Tech/Medical/Legal/Finance/Education) + personal dictionary
+- **Typewriter Mode** (Alpha) — Stream LLM output character by character to cursor
 
 ### Flash Notes
 
 Capture thoughts without switching apps.
 
-- **Dedicated Hotkey** — `Right Option` (configurable). Hold to speak, release, auto-saved. Or tap to toggle.
-- **Daily Markdown** — Timestamped entries appended to `YYYY-MM-DD.md`.
-- **Custom Save Directory** — Choose where notes are stored.
-- **Toggle Mode** — Same tap-to-toggle workflow available for note capture.
+- **Dedicated Hotkey** — Hold to speak, release to auto-save
+- **Daily Markdown** — Timestamped entries in `YYYY-MM-DD.md`
+- **Custom Directory** — Choose where notes are stored
 
-### AI Polish (Beta)
+### Smart Audio
 
-Optional LLM post-processing to remove filler words and polish text.
-
-- **Cloud API** — Any OpenAI-compatible endpoint.
-- **Ollama (Local)** — Run LLM locally for full privacy. Latency as low as 130ms.
-- **Professional Vocab** — Industry preset dictionaries (Tech/Medical/Legal/Finance/Education) + personal dictionary. Terminology injected as context hints to LLM for domain-aware recognition.
-
-### Cloud ASR (Optional)
-
-Switch to Aliyun Smart Voice for cloud-based recognition when needed.
-
-### Smart Audio Device Management
-
-Detects Bluetooth headset connect/disconnect events instantly. Optionally auto-switches back to the built-in mic for better quality — without blocking keyboard events.
+- **Bluetooth Detection** — Auto-detects headset connect/disconnect
+- **Device Selection** — Choose preferred mic in settings
 
 ---
 
 ## Install
 
-1. Download `SpeakOut.dmg` from [Releases](https://github.com/4over7/SpeakOut/releases/latest).
-2. Drag to `/Applications`.
-3. First launch: run `xattr -cr /Applications/SpeakOut.app` in Terminal (required until we have Developer ID signing).
-4. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**.
-5. Follow the onboarding wizard to download a voice model.
+1. Download `SpeakOut.dmg` from [Releases](https://github.com/4over7/SpeakOut/releases/latest)
+2. Drag to `/Applications`
+3. First launch: `xattr -cr /Applications/SpeakOut.app` (required until Developer ID signing)
+4. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**
+5. Follow the onboarding wizard to download a voice model
 
 ### System Requirements
 
 - macOS 13+ (Ventura or later)
-- ~230MB disk space for default model (SenseVoice), up to ~1.4GB for large models
+- ~230MB for default model, up to ~1.4GB for Whisper/FireRedASR
+
+---
+
+## Offline Models
+
+### Streaming (Real-time subtitles)
+
+| Model | Languages | Size |
+|-------|-----------|------|
+| Zipformer Bilingual | Zh/En | ~490MB |
+| Paraformer Streaming | Zh/En | ~1GB |
+
+### Offline (Higher accuracy)
+
+| Model | Languages | Size | Notes |
+|-------|-----------|------|-------|
+| **SenseVoice 2024** | Zh/En/Ja/Ko/Yue | ~228MB | Default, built-in punctuation |
+| SenseVoice 2025 | Zh/En/Ja/Ko/Yue | ~158MB | Cantonese enhanced |
+| Paraformer Offline | Zh/En | ~217MB | Mature & stable |
+| Paraformer Dialect | Zh/En + Sichuan | ~218MB | Dialect support |
+| Whisper Large-v3 | 99 languages | ~1.0GB | Best multilingual |
+| FireRedASR Large | Zh/En + dialects | ~1.4GB | Highest capacity |
 
 ---
 
@@ -71,45 +126,36 @@ Detects Bluetooth headset connect/disconnect events instantly. Optionally auto-s
 
 ```
 Hotkey → native_input.m (CGEventTap)
-  → C Ring Buffer (16kHz PCM audio)
-  → CoreEngine FFI polling → VAD/AGC
-  → ASR (Sherpa offline / Aliyun cloud)
-  → LLM correction (optional)
-  → Text injection (Accessibility API) | Flash Note | Agent (planned)
+  → C Ring Buffer (16kHz PCM)
+  → CoreEngine FFI polling
+  → ASR (8 offline models / 6 cloud providers)
+  → LLM polish + translation (optional, 12 providers)
+  → Clipboard paste to active app
 ```
 
 | Layer | Path | Description |
 |-------|------|-------------|
-| Engine | `lib/engine/` | CoreEngine orchestrator, ASR providers, model management |
-| Service | `lib/services/` | Config, LLM, diary, audio devices, app lifecycle |
-| UI | `lib/ui/` | macOS-native UI (macos_ui), settings, onboarding, overlay |
-| Native | `native_lib/native_input.m` | Objective-C: CGEventTap keyboard + AudioQueue ring buffer |
-| Gateway | `gateway/` | Cloudflare Workers backend (Hono) |
+| Engine | `lib/engine/` | CoreEngine, ASR providers, model management |
+| Service | `lib/services/` | Config, LLM, billing, diary, audio devices |
+| UI | `lib/ui/` | macOS-native UI (macos_ui), settings, overlay |
+| Native | `native_lib/` | Objective-C: CGEventTap + AudioQueue ring buffer |
+| Gateway | `gateway/` | Cloudflare Workers (Hono): license, billing, version check |
+
+**Codebase**: ~29,000 lines across 86 files. 531 tests.
 
 ---
 
 ## Build from Source
 
 ```bash
-# Dependencies
-flutter pub get
+flutter pub get          # Dependencies
+flutter analyze          # Static analysis (0 issues)
+flutter test             # Run tests (531 tests)
+flutter build macos --release  # Build
+./scripts/install.sh     # Install to /Applications
+./scripts/create_styled_dmg.sh  # Create DMG
 
-# Static analysis
-flutter analyze
-
-# Run tests
-flutter test
-
-# Build
-flutter build macos --release
-
-# Install to /Applications (with code signing)
-./scripts/install.sh
-
-# Create DMG
-./scripts/create_styled_dmg.sh
-
-# Compile native library (after modifying native_input.m)
+# Native library (after modifying native_input.m)
 cd native_lib && clang -dynamiclib -framework Cocoa -framework Carbon \
   -framework AVFoundation -framework AudioToolbox -framework CoreAudio \
   -framework Accelerate -o libnative_input.dylib native_input.m -fobjc-arc
@@ -117,31 +163,12 @@ cd native_lib && clang -dynamiclib -framework Cocoa -framework Carbon \
 
 ---
 
-## Supported Models
+## Security
 
-### Streaming (Real-time)
-
-| Model | Languages | Size |
-|-------|-----------|------|
-| Zipformer Bilingual | Zh/En | ~490MB |
-| Paraformer Bilingual | Zh/En | ~1GB |
-
-### Offline (High Accuracy)
-
-| Model | Languages | Size | Notes |
-|-------|-----------|------|-------|
-| **SenseVoice 2024** | Zh/En/Ja/Ko/Yue | ~228MB | Built-in punctuation (default) |
-| SenseVoice 2025 | Zh/En/Ja/Ko/Yue | ~158MB | Cantonese enhanced |
-| Paraformer Offline | Zh/En | ~217MB | Mature & stable |
-| Paraformer Dialect 2025 | Zh/En + dialects | ~218MB | Sichuan/Chongqing |
-| Whisper Large-v3 | 99 languages | ~1.0GB | Best multilingual |
-| FireRedASR Large | Zh/En + dialects | ~1.4GB | Highest capacity |
-
----
-
-## i18n
-
-Full Chinese and English localization. Language follows system setting or can be manually set in Settings.
+- **Offline Mode** — Audio never leaves your device
+- **Credentials** — API keys stored in macOS Keychain (flutter_secure_storage)
+- **Logging** — User speech content never logged by default; developer mode only records metadata
+- **Independent Review** — Passed 4 rounds of independent third-party security review
 
 ---
 
@@ -158,67 +185,32 @@ Copyright © 2026 Leon. All Rights Reserved.
   **macOS 离线优先 AI 语音输入**
   *按住按键，说话，自动输入。*
 
-  [下载最新版](https://github.com/4over7/SpeakOut/releases/latest)
+  [下载最新版](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [更新日志](CHANGELOG.md)
 
 </div>
 
 ---
 
-## 功能
+## 功能亮点
 
-### 语音输入（离线）
-
-两种触发方式：**长按说话 (PTT)** — 按住说话，松开输入；**单击切换 (Toggle)** — 单击开始，再次单击结束。
-
-- **8 款语音模型** — SenseVoice、Paraformer、Whisper Large-v3、FireRedASR 等，按精度、体积或语言自由选择。
-- **流式 & 离线模式** — 边说边出字（流式），或松开后高精度识别（离线）。
-- **Toggle 模式** — 单击开始录音，再次单击结束。适合走动、站立等不方便长按的场景，默认最大时长 5 分钟保护。
-- **多语言** — 中、英、日、韩、粤语、方言，以及 90+ 种语言（Whisper）。
-- **完全离线** — 基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，音频不出设备。
-
-### 闪念笔记
-
-无需切换应用即可捕捉灵感。
-
-- **独立热键** — `Right Option`（可配置），按住说话松开保存，或单击切换。
-- **每日 Markdown** — 带时间戳，追加写入 `YYYY-MM-DD.md`。
-- **自定义保存目录** — 自由选择笔记存放位置。
-- **Toggle 模式** — 闪念笔记同样支持单击切换录音。
-
-### AI 润色（Beta）
-
-可选的 LLM 后处理，去除口水词、润色文本。
-
-- **云端 API** — 支持任何 OpenAI 兼容接口。
-- **Ollama 本地** — 本地运行 LLM，完全私密，延迟低至 130ms。
-- **专业词汇** — 行业预设词典（软件/医疗/法律/金融/教育）+ 个人词库。术语以上下文提示注入 LLM，实现领域感知识别。
-
-### 云端识别（可选）
-
-需要时可切换到阿里云智能语音进行云端识别。
-
-### 智能音频设备管理
-
-蓝牙耳机插拔时自动检测当前使用的麦克风是否仍可用，可选自动切回内置麦克风，全程不影响键盘响应。
-
----
+- **离线优先** — 8 款本地语音模型，音频不出设备，基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)
+- **11 种语言** — 中英日韩粤 + 西法德俄葡，支持自动检测和实时翻译
+- **三种工作模式** — 纯离线（隐私优先）/ 智能（离线识别 + AI 润色）/ 云端（高精度）
+- **6 家云端 ASR** — 阿里云百炼、Groq、OpenAI、火山引擎、讯飞、腾讯云
+- **12 家 LLM** — 百炼、DeepSeek、豆包、OpenAI、Claude、智谱、Kimi、MiniMax、Gemini、讯飞、Groq、Ollama 本地
+- **闪念笔记** — 独立热键，语音直接保存为 Markdown
+- **专业词汇** — 行业词典 + 个人词库，术语注入 LLM 实现领域感知
+- **安全存储** — API 密钥存入系统 Keychain，通过独立第三方安全评审
 
 ## 安装
 
-1. 从 [Releases](https://github.com/4over7/SpeakOut/releases/latest) 下载 `SpeakOut.dmg`。
-2. 拖到 `/Applications`。
-3. 首次启动前在终端执行：`xattr -cr /Applications/SpeakOut.app`（无 Developer ID 签名前必需）。
-4. 授权权限：**输入监控**、**辅助功能**、**麦克风**。
-5. 按引导流程下载语音模型即可使用。
+1. 从 [Releases](https://github.com/4over7/SpeakOut/releases/latest) 下载 `SpeakOut.dmg`
+2. 拖到 `/Applications`
+3. 首次启动前：`xattr -cr /Applications/SpeakOut.app`
+4. 授权：**输入监控**、**辅助功能**、**麦克风**
+5. 按引导下载语音模型即可使用
 
-### 系统要求
-
-- macOS 13+（Ventura 或更高）
-- 磁盘空间：默认模型（SenseVoice）约 230MB，最大模型（FireRedASR）约 1.4GB
-
----
-
-*Made with ❤️ by Leon. Powered by Flutter, Sherpa-ONNX, Aliyun NLS & Ollama.*
+**系统要求**：macOS 13+，磁盘空间 230MB ~ 1.4GB（取决于模型选择）
 
 ---
 
@@ -227,5 +219,3 @@ Copyright © 2026 Leon. All Rights Reserved.
 <a href="https://x.com/4over7"><img src="https://img.shields.io/badge/X-@4over7-000?logo=x" alt="X" /></a>
 
 <img src="assets/wx.jpg" width="200" alt="WeChat" />
-</content>
-</invoke>
