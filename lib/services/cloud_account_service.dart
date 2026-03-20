@@ -60,6 +60,15 @@ class CloudAccountService {
     _accounts.removeWhere((a) => a.id == accountId);
     await _saveAccounts();
     await _clearCredentials(accountId, account.credentials.keys);
+
+    // 如果被删除的账户正被选用，清除选择
+    if (ConfigService().selectedAsrAccountId == accountId) {
+      await ConfigService().setSelectedAsrAccount(null);
+    }
+    if (ConfigService().selectedLlmAccountId == accountId) {
+      await ConfigService().setSelectedLlmAccountId(null);
+    }
+
     AppLog.d('CloudAccountService: removed account $accountId');
   }
 

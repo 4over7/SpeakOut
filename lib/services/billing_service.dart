@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../models/billing_model.dart';
 import '../config/app_constants.dart';
 import '../config/app_log.dart';
@@ -205,7 +206,7 @@ class BillingService {
       }
     } catch (e) {
       _log('Report usage failed: $e');
-      // 用量上报失败不阻断用户使用，下次会补报
+      // 用量上报失败不阻断用户使用，本次用量将丢失
     }
   }
 
@@ -217,9 +218,7 @@ class BillingService {
   }
 
   String _generateDeviceId() {
-    // 生成持久化的设备 UUID
-    final bytes = List.generate(16, (_) => DateTime.now().microsecond % 256);
-    return 'dev-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('')}';
+    return 'dev-${const Uuid().v4()}';
   }
 
   void _log(String msg) => AppLog.d('[BillingService] $msg');

@@ -54,13 +54,25 @@ class CloudASRModel {
   final String? description;
   final String? priceHint;
 
+  /// 此模型支持的输入语言列表（如 ['zh', 'en']）。
+  /// 为空表示支持所有语言（如 DashScope 的 language_hints 机制）。
+  final List<String> supportedLanguages;
+
   const CloudASRModel({
     required this.id,
     required this.name,
     required this.isStreaming,
     this.description,
     this.priceHint,
+    this.supportedLanguages = const [],
   });
+
+  /// 检查此模型是否支持指定语言。空列表表示不限制（支持所有）。
+  bool supportsLanguage(String langCode) {
+    if (langCode == 'auto') return true;
+    if (supportedLanguages.isEmpty) return true;
+    return supportedLanguages.contains(langCode);
+  }
 }
 
 /// 静态服务商定义（注册表中的一项）
@@ -77,6 +89,11 @@ class CloudProvider {
   final LlmApiFormat llmApiFormat;
   final String helpUrl;
 
+  /// 用于 LLM 鉴权的凭证字段 key（默认 'api_key'）。
+  /// 当服务商的 LLM 凭证字段名不是 'api_key' 时需要显式指定，
+  /// 例如讯飞星火使用 'api_password'。
+  final String llmApiKeyField;
+
   const CloudProvider({
     required this.id,
     required this.name,
@@ -89,6 +106,7 @@ class CloudProvider {
     this.llmModelHint,
     this.llmApiFormat = LlmApiFormat.openai,
     this.helpUrl = '',
+    this.llmApiKeyField = 'api_key',
   });
 
   bool get hasASR => capabilities.contains(CloudCapability.asrStreaming) ||

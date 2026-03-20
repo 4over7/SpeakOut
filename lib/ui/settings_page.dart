@@ -1898,7 +1898,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
 
-    // 2. Input language not supported by current model
+    // 2. Input language not supported by current offline model
     if (inputLang != 'auto' && workMode != 'cloud') {
       final model = ModelManager.allModels.where((m) => m.id == modelId).firstOrNull;
       if (model != null && !model.supportsLanguage(inputLang)) {
@@ -1908,6 +1908,30 @@ class _SettingsPageState extends State<SettingsPage> {
           color: MacosColors.systemOrangeColor,
           icon: CupertinoIcons.exclamationmark_triangle,
         ));
+      }
+    }
+
+    // 3. Input language not supported by current cloud ASR provider
+    if (inputLang != 'auto' && workMode == 'cloud') {
+      final asrAccountId = ConfigService().selectedAsrAccountId;
+      if (asrAccountId != null) {
+        final asrAccount = CloudAccountService().getAccountById(asrAccountId);
+        if (asrAccount != null) {
+          final asrProvider = CloudProviders.getById(asrAccount.providerId);
+          if (asrProvider != null) {
+            final asrModelId = ConfigService().selectedAsrModelId;
+            final asrModel = asrProvider.asrModels
+                .where((m) => m.id == asrModelId).firstOrNull
+                ?? (asrProvider.asrModels.isNotEmpty ? asrProvider.asrModels.first : null);
+            if (asrModel != null && !asrModel.supportsLanguage(inputLang)) {
+              hints.add(_languageHintBanner(
+                loc.cloudAsrLangUnsupported,
+                color: MacosColors.systemOrangeColor,
+                icon: CupertinoIcons.exclamationmark_triangle,
+              ));
+            }
+          }
+        }
       }
     }
 

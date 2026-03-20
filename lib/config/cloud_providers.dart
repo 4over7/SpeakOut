@@ -49,7 +49,7 @@ class CloudProviders {
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
       asrModels: [
-        CloudASRModel(id: 'seed-asr', name: '豆包 Seed-ASR', isStreaming: true, description: '中文精度最高', priceHint: '1.00 元/h'),
+        CloudASRModel(id: 'seed-asr', name: '豆包 Seed-ASR', isStreaming: true, description: '中文精度最高', priceHint: '1.00 元/h', supportedLanguages: ['zh', 'en']),
       ],
       llmModels: [
         CloudLLMModel(id: 'doubao-seed-2-0-mini-260215', name: 'Doubao Seed-2.0 Mini', description: '速度最快', priceHint: '0.0002 元/千 token'),
@@ -72,8 +72,9 @@ class CloudProviders {
         CredentialField(key: 'api_password', label: 'API Password (星火)', isSecret: true, scope: {CloudCapability.llm}, placeholder: 'Bearer Token for HTTP API'),
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
+      llmApiKeyField: 'api_password',
       asrModels: [
-        CloudASRModel(id: 'iat', name: '语音听写', isStreaming: true, description: '202 种方言', priceHint: '按次计费'),
+        CloudASRModel(id: 'iat', name: '语音听写', isStreaming: true, description: '202 种方言', priceHint: '按次计费', supportedLanguages: ['zh', 'en']),
       ],
       llmModels: [
         CloudLLMModel(id: 'lite', name: '星火 Lite', description: '免费，速度快', priceHint: '免费'),
@@ -301,7 +302,7 @@ class CloudProviders {
       ],
       capabilities: {CloudCapability.asrStreaming},
       asrModels: [
-        CloudASRModel(id: 'asr-streaming', name: '实时语音识别', isStreaming: true, description: '每月 5h 免费', priceHint: '3.20 元/h'),
+        CloudASRModel(id: 'asr-streaming', name: '实时语音识别', isStreaming: true, description: '每月 5h 免费', priceHint: '3.20 元/h', supportedLanguages: ['zh', 'en']),
       ],
       helpUrl: 'https://cloud.tencent.com/document/product/1093',
     ),

@@ -276,5 +276,6 @@
   "cloudAccountName": "Display Name",
   "cloudAccountEnabled": "Enabled",
   "languageSettings": "Language",
-  "translationDisabledReason": "Translation requires AI polish, only available in Smart Mode"
+  "translationDisabledReason": "Translation requires AI polish, only available in Smart Mode",
+  "cloudAsrLangUnsupported": "Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition."
 }

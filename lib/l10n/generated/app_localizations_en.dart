@@ -760,4 +760,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get translationDisabledReason =>
       'Translation requires AI polish, only available in Smart Mode';
+
+  @override
+  String get cloudAsrLangUnsupported =>
+      'Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition.';
 }

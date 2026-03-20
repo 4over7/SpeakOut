@@ -1489,6 +1489,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Translation requires AI polish, only available in Smart Mode'**
   String get translationDisabledReason;
+
+  /// No description provided for @cloudAsrLangUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition.'**
+  String get cloudAsrLangUnsupported;
 }
 
 class _AppLocalizationsDelegate

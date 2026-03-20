@@ -40,7 +40,7 @@ class LLMService {
       if (account != null && account.isEnabled) {
         final provider = CloudProviders.getById(account.providerId);
         if (provider != null && provider.hasLLM) {
-          final apiKey = account.credentials['api_key'] ?? '';
+          final apiKey = account.credentials[provider.llmApiKeyField] ?? '';
           final baseUrl = provider.llmBaseUrl ?? '';
           // 优先用用户选择的模型，否则回退到服务商默认
           final savedModel = ConfigService().llmModelOverride;

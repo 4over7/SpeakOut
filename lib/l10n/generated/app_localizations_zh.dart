@@ -730,4 +730,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get translationDisabledReason => '口译模式需要 AI 润色，仅智能模式可用';
+
+  @override
+  String get cloudAsrLangUnsupported => '当前云端 ASR 服务仅支持中文和英文，已选语言将回退到中文识别。';
 }

@@ -148,11 +148,12 @@ void main() {
     test('Cloud 模式: request body 包含 system prompt 和 speech_text 标签', () async {
       SharedPreferences.setMockInitialValues({
         'ai_correct_enabled': true,
-        'llm_api_key': 'test_key',
         'llm_base_url': 'https://api.openai.com/v1',
         'llm_provider_type': 'cloud',
       });
       await ConfigService().init();
+      // API key 通过 setter 写入内存缓存（测试环境无 Keychain）
+      await ConfigService().setLlmApiKey('test_key');
       final service = LLMService();
 
       Map<String, dynamic>? capturedBody;

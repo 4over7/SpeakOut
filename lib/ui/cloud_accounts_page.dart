@@ -431,7 +431,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                             controlSize: ControlSize.regular,
                             secondary: true,
                             onPressed: testLoading ? null : () async {
-                              final apiKey = credControllers['api_key']?.text ?? '';
+                              final apiKey = credControllers[provider.llmApiKeyField]?.text ?? '';
                               final baseUrl = provider.llmBaseUrl ?? '';
                               final model = provider.llmDefaultModel ?? '';
                               setDialogState(() { testLoading = true; testResult = null; });
