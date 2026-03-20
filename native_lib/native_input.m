@@ -630,8 +630,9 @@ int check_key_pressed(int keyCode) {
 #define NUM_BUFFERS 10
 #define BUFFER_DURATION_MS 100 // 100ms per buffer = 1600 samples @ 16kHz
 
-// Ring buffer: ~30 seconds of 16kHz mono Int16 = 480000 samples (~940KB)
-#define RING_BUFFER_SAMPLES 480000
+// Ring buffer: 600 seconds (10 min) of 16kHz mono Int16 = 9600000 samples (~18.3MB)
+// Matches max recording duration to prevent data loss in offline mode.
+#define RING_BUFFER_SAMPLES 9600000
 
 // Audio Recording State
 static char preferredDeviceUID[256] = {0};
@@ -872,6 +873,61 @@ void stop_audio_recording() {
   audioQueue = NULL;
 
   log_to_file("Audio: Recording stopped");
+}
+
+/// Save the current ring buffer contents to a WAV file (16kHz mono 16-bit PCM).
+/// Called from Dart when developer mode is on, before ring buffer is reset.
+/// Returns 1 on success, 0 on failure.
+int save_recording_wav(const char *path) {
+  if (path == NULL || path[0] == '\0') return 0;
+
+  uint64_t wp = atomic_load_explicit(&ringWritePos, memory_order_relaxed);
+  uint64_t rp = atomic_load_explicit(&ringReadPos, memory_order_relaxed);
+  if (wp <= rp) return 0; // no data
+
+  uint64_t sampleCount = wp - rp;
+  if (sampleCount > RING_BUFFER_SAMPLES) sampleCount = RING_BUFFER_SAMPLES;
+
+  uint32_t dataSize = (uint32_t)(sampleCount * 2); // 16-bit = 2 bytes per sample
+  uint32_t fileSize = 44 + dataSize;
+
+  FILE *f = fopen(path, "wb");
+  if (!f) return 0;
+
+  // WAV header
+  uint16_t numChannels = 1;
+  uint32_t sampleRate = 16000;
+  uint16_t bitsPerSample = 16;
+  uint32_t byteRate = sampleRate * numChannels * bitsPerSample / 8;
+  uint16_t blockAlign = numChannels * bitsPerSample / 8;
+  uint32_t chunkSize = fileSize - 8;
+  uint32_t subchunk1Size = 16;
+  uint16_t audioFormat = 1; // PCM
+
+  fwrite("RIFF", 1, 4, f);
+  fwrite(&chunkSize, 4, 1, f);
+  fwrite("WAVE", 1, 4, f);
+  fwrite("fmt ", 1, 4, f);
+  fwrite(&subchunk1Size, 4, 1, f);
+  fwrite(&audioFormat, 2, 1, f);
+  fwrite(&numChannels, 2, 1, f);
+  fwrite(&sampleRate, 4, 1, f);
+  fwrite(&byteRate, 4, 1, f);
+  fwrite(&blockAlign, 2, 1, f);
+  fwrite(&bitsPerSample, 2, 1, f);
+  fwrite("data", 1, 4, f);
+  fwrite(&dataSize, 4, 1, f);
+
+  // PCM data from ring buffer
+  uint64_t startPos = wp - sampleCount;
+  for (uint64_t i = 0; i < sampleCount; i++) {
+    int16_t sample = ringBuffer[(startPos + i) % RING_BUFFER_SAMPLES];
+    fwrite(&sample, 2, 1, f);
+  }
+
+  fclose(f);
+  log_to_file("Audio: Saved recording to %s (%llu samples, %.1fs)", path, sampleCount, (double)sampleCount / 16000.0);
+  return 1;
 }
 
 // Check if currently recording

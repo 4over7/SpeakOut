@@ -32,6 +32,7 @@ class NativeInputFFI implements NativeInputBase {
   late NativeFreeDart _nativeFree;
   late GetAvailableAudioSamplesDart _getAvailableAudioSamples;
   late ReadAudioBufferDart _readAudioBuffer;
+  late SaveRecordingWavDart _saveRecordingWav;
 
   bool _deviceBound = false;
   late GetAudioInputDevicesDart _getAudioInputDevices;
@@ -200,6 +201,9 @@ class NativeInputFFI implements NativeInputBase {
       _readAudioBuffer = _dylib
           .lookup<NativeFunction<ReadAudioBufferC>>('read_audio_buffer')
           .asFunction();
+      _saveRecordingWav = _dylib
+          .lookup<NativeFunction<SaveRecordingWavC>>('save_recording_wav')
+          .asFunction();
       _audioBound = true;
       _log("Audio FFI bindings SUCCESS");
     } catch (e) {
@@ -258,6 +262,18 @@ class NativeInputFFI implements NativeInputBase {
     _bindAudioFunctions();
     if (!_audioBound) return 0;
     return _readAudioBuffer(outSamples, maxSamples);
+  }
+
+  @override
+  bool saveRecordingWav(String path) {
+    _bindAudioFunctions();
+    if (!_audioBound) return false;
+    final pathPtr = path.toNativeUtf8();
+    try {
+      return _saveRecordingWav(pathPtr) == 1;
+    } finally {
+      calloc.free(pathPtr);
+    }
   }
 
   // ============ AUDIO DEVICE MANAGEMENT ============

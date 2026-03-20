@@ -830,6 +830,27 @@ class CoreEngine {
      _overlay.hide();
   }
 
+  /// Save recording WAV for debugging. Keeps last 10 files, rotating.
+  void _saveDebugRecording() {
+    final ni = _nativeInput;
+    if (ni == null) return;
+    final dir = Directory('${Platform.environment['HOME']}/Library/Application Support/com.speakout.speakout/recordings');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+
+    // Rotate: keep last 10
+    final existing = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.wav')).toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+    while (existing.length >= 10) {
+      existing.removeAt(0).deleteSync();
+    }
+
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final path = '${dir.path}/rec_$timestamp.wav';
+    if (ni.saveRecordingWav(path)) {
+      _log("Debug recording saved: $path");
+    }
+  }
+
   Future<void> _stopAudioSafely() async {
     _stopAudioPolling();  // Stop polling BEFORE stopping AudioQueue
     if (_audioStarted) {
@@ -874,6 +895,15 @@ class CoreEngine {
       await _stopAudioSafely();
     } catch (e) {
       _log("Audio Stop Error: $e");
+    }
+
+    // Save recording for debugging (developer mode only)
+    if (AppLog.enabled) {
+      try {
+        _saveDebugRecording();
+      } catch (e) {
+        _log("Save recording error: $e");
+      }
     }
     _log("[PERF] +${sw.elapsedMilliseconds}ms — audio stopped");
 

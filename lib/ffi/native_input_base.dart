@@ -36,6 +36,9 @@ typedef CheckMicrophonePermissionDart = int Function();
 typedef NativeFreeC = Void Function(Pointer<Void>);
 typedef NativeFreeDart = void Function(Pointer<Void>);
 
+typedef SaveRecordingWavC = Int32 Function(Pointer<Utf8> path);
+typedef SaveRecordingWavDart = int Function(Pointer<Utf8> path);
+
 // Ring Buffer polling types
 typedef GetAvailableAudioSamplesC = Int32 Function();
 typedef GetAvailableAudioSamplesDart = int Function();
@@ -137,7 +140,8 @@ abstract class NativeInputBase {
   void nativeFree(Pointer<Void> ptr);
   int getAvailableAudioSamples();
   int readAudioBuffer(Pointer<Int16> outSamples, int maxSamples);
-  
+  bool saveRecordingWav(String path);
+
   // Audio Device Management
   String getAudioInputDevices();
   String getCurrentInputDevice();
