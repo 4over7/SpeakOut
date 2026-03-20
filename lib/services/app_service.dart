@@ -1,4 +1,5 @@
 import '../engine/core_engine.dart';
+import 'billing_service.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
 import 'cloud_account_service.dart';
@@ -94,6 +95,9 @@ class AppService {
 
     // 5. Check for updates (non-blocking)
     UpdateService().checkForUpdate();
+
+    // 6. Billing (non-blocking)
+    BillingService().init();
   }
   
   Future<void> _initASR() async {
