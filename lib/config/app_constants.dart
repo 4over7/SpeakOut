@@ -222,7 +222,7 @@ class AppConstants {
   /// AI 梳理超时（非流式，等完整结果）
   static const Duration kOrganizeTimeout = Duration(seconds: 15);
   /// AI 梳理默认 System Prompt
-  static const String kDefaultOrganizePrompt = """将用户的口语化文字改写为结构清晰、表达专业的书面语。
+  static const String kDefaultOrganizePrompt = """你是一位专业的文字编辑。用户会给你一段口语化、可能杂乱无章的文字。将用户的口语化文字改写为结构清晰、表达专业的书面语。
 
 规则：
 - 只输出改写后的文字，禁止输出标题、编号、分析过程、前缀说明
