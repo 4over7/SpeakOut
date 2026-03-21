@@ -84,6 +84,7 @@ class CloudProviders {
       llmDefaultModel: 'lite',
       llmModelHint: '如 lite, generalv3.5, max-32k',
       helpUrl: 'https://www.xfyun.cn/services/voicedictation',
+      warning: '讯飞开放平台控制台较为复杂，开发者未能完成鉴权验证，该服务商的 ASR 和 LLM 功能均未经测试，请谨慎使用。',
     ),
 
     // ══════════════════════════════════════════════════

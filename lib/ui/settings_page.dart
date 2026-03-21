@@ -1211,6 +1211,63 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 12),
         // Model selector
         _buildLlmModelSelector(selectedAccount, selectedProvider),
+        const SizedBox(height: 12),
+        // LLM 服务商推荐
+        _buildLlmRecommendation(),
+      ],
+    );
+  }
+
+  /// LLM 服务商推荐（基于实测延迟数据）
+  Widget _buildLlmRecommendation() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              MacosIcon(CupertinoIcons.lightbulb, size: 14, color: AppTheme.accentColor),
+              const SizedBox(width: 6),
+              Text('选型参考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildRecommendItem('DeepSeek deepseek-chat', '极致速度', '~129ms', '高峰期可能波动'),
+          const SizedBox(height: 4),
+          _buildRecommendItem('阿里云百炼 qwen-turbo', '稳定首选', '~573ms', '波动最小，质量稳定'),
+          const SizedBox(height: 6),
+          Text(
+            '数据来源：2026-03-21 实测，非流式 API，中国大陆网络',
+            style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecommendItem(String model, String tag, String latency, String note) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(3),
+            color: AppTheme.accentColor.withValues(alpha: 0.12),
+          ),
+          child: Text(tag, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
+        ),
+        const SizedBox(width: 6),
+        Text(model, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+        const SizedBox(width: 6),
+        Text(latency, style: const TextStyle(fontSize: 11, color: MacosColors.systemGrayColor)),
+        const SizedBox(width: 6),
+        Expanded(child: Text(note, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor), overflow: TextOverflow.ellipsis)),
       ],
     );
   }

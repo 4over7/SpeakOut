@@ -190,6 +190,16 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     )).toList(),
                   ),
                 ],
+                if (provider?.warning != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 11, color: MacosColors.systemOrangeColor),
+                      const SizedBox(width: 4),
+                      Expanded(child: Text('未验证', style: TextStyle(fontSize: 10, color: MacosColors.systemOrangeColor, fontWeight: FontWeight.w500))),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -367,6 +377,29 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                         ),
                         const SizedBox(height: 16),
 
+                        // 服务商警告
+                        if (provider?.warning != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 14, color: MacosColors.systemOrangeColor),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(provider!.warning!, style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4))),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         // 凭证字段
                         if (provider != null) ...[
                           Container(

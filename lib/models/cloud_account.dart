@@ -94,6 +94,9 @@ class CloudProvider {
   /// 例如讯飞星火使用 'api_password'。
   final String llmApiKeyField;
 
+  /// 服务商级别的警告提示（橙色横幅，显示在云账户编辑对话框和账户列表中）
+  final String? warning;
+
   const CloudProvider({
     required this.id,
     required this.name,
@@ -107,6 +110,7 @@ class CloudProvider {
     this.llmApiFormat = LlmApiFormat.openai,
     this.helpUrl = '',
     this.llmApiKeyField = 'api_key',
+    this.warning,
   });
 
   bool get hasASR => capabilities.contains(CloudCapability.asrStreaming) ||
