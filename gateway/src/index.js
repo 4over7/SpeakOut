@@ -26,7 +26,7 @@ app.options('*', (c) => c.body(null, 204));
 app.get('/version', (c) => {
     return c.json({
         version: '1.5.18',
-        build: 131,
+        build: 132,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
         release_notes: '',
     });
