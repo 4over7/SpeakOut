@@ -951,8 +951,7 @@ class CoreEngine {
           }
 
           final useTypewriter = mode != RecordingMode.diary
-              && ConfigService().typewriterEnabled
-              && !(_nativeInput?.isTerminalApp() ?? false);
+              && ConfigService().typewriterEnabled;
           final llmTimeout = AppConstants.kLlmPolishTimeout;
 
           if (useTypewriter) {
