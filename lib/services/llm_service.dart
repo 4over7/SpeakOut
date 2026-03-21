@@ -68,6 +68,15 @@ class LLMService {
     );
   }
 
+  /// 清洗 LLM 输出：去除推理标签（think 等）
+  static String _cleanLlmOutput(String text) {
+    // Remove <think>...</think> blocks (including multiline)
+    var cleaned = text.replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '');
+    // Remove standalone <think> or </think> tags (unclosed)
+    cleaned = cleaned.replaceAll(RegExp(r'</?think>', caseSensitive: false), '');
+    return cleaned.trim();
+  }
+
   Future<String> correctText(String input, {List<String>? vocabHints}) async {
     if (input.trim().isEmpty) return input;
     if (!ConfigService().aiCorrectionEnabled) {
@@ -76,14 +85,18 @@ class LLMService {
     }
 
     final providerType = ConfigService().llmProviderType;
+    String result;
     if (providerType == 'ollama') {
-      return _correctTextOllama(input, vocabHints: vocabHints);
+      result = await _correctTextOllama(input, vocabHints: vocabHints);
+    } else {
+      final resolved = _resolveLlmConfig();
+      if (resolved.isAnthropic) {
+        result = await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved);
+      } else {
+        result = await _correctTextCloud(input, vocabHints: vocabHints, resolved: resolved);
+      }
     }
-    final resolved = _resolveLlmConfig();
-    if (resolved.isAnthropic) {
-      return _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved);
-    }
-    return _correctTextCloud(input, vocabHints: vocabHints, resolved: resolved);
+    return _cleanLlmOutput(result);
   }
 
   /// Streaming version: yields incremental text chunks as they arrive from LLM.

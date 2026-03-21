@@ -1008,7 +1008,10 @@ class CoreEngine {
             _nativeInput?.injectClipboardEnd();
             typewriterBegan = false;
 
-            final polished = streamBuffer.toString().trim();
+            var polished = streamBuffer.toString().trim();
+            // 清洗 <think>...</think> 推理标签
+            polished = polished.replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '').trim();
+            polished = polished.replaceAll(RegExp(r'</?think>', caseSensitive: false), '').trim();
             if (polished.isNotEmpty) {
               finalText = polished;
             } else if (timedOut) {
