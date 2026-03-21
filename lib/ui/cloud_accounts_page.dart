@@ -291,6 +291,8 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
 
     initCredControllers(selectedProviderId);
 
+    final visibleSecrets = <String>{};  // 当前可见的密钥字段
+
     showMacosSheet(
       context: context,
       builder: (sheetContext) {
@@ -373,7 +375,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                               color: MacosColors.systemGrayColor.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: _buildCredentialFieldsGrouped(provider, credControllers),
+                            child: _buildCredentialFieldsGrouped(provider, credControllers, visibleSecrets: visibleSecrets, setDialogState: setDialogState),
                           ),
                           // 帮助链接
                           if (provider.helpUrl.isNotEmpty) ...[
@@ -519,7 +521,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   }
 
   /// Build credential fields grouped by scope (通用 / ASR / LLM)
-  Widget _buildCredentialFieldsGrouped(CloudProvider provider, Map<String, TextEditingController> controllers) {
+  Widget _buildCredentialFieldsGrouped(CloudProvider provider, Map<String, TextEditingController> controllers, {Set<String>? visibleSecrets, void Function(void Function())? setDialogState}) {
     final universal = provider.credentialFields.where((f) => f.scope.isEmpty).toList();
     final asrOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.asrStreaming) || f.scope.contains(CloudCapability.asrBatch)).toList();
     final llmOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.llm)).toList();
@@ -537,9 +539,11 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             color: MacosColors.systemGrayColor,
             fields: universal,
             controllers: controllers,
+            visibleSecrets: visibleSecrets,
+            setDialogState: setDialogState,
           )
           else
-            ..._buildFieldList(universal, controllers),
+            ..._buildFieldList(universal, controllers, visibleSecrets: visibleSecrets, setState: setDialogState),
         ],
         // ASR 凭证区域
         if (asrOnly.isNotEmpty) ...[
@@ -550,6 +554,8 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             color: MacosColors.systemBlueColor,
             fields: asrOnly,
             controllers: controllers,
+            visibleSecrets: visibleSecrets,
+            setDialogState: setDialogState,
           ),
         ],
         // LLM 凭证区域
@@ -561,6 +567,8 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             color: MacosColors.systemOrangeColor,
             fields: llmOnly,
             controllers: controllers,
+            visibleSecrets: visibleSecrets,
+            setDialogState: setDialogState,
           ),
         ],
       ],
@@ -573,6 +581,8 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     required Color color,
     required List<CredentialField> fields,
     required Map<String, TextEditingController> controllers,
+    Set<String>? visibleSecrets,
+    void Function(void Function())? setDialogState,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -592,15 +602,16 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           ]),
           const SizedBox(height: 10),
           // 字段列表
-          ..._buildFieldList(fields, controllers),
+          ..._buildFieldList(fields, controllers, visibleSecrets: visibleSecrets, setState: setDialogState),
         ],
       ),
     );
   }
 
-  List<Widget> _buildFieldList(List<CredentialField> fields, Map<String, TextEditingController> controllers) {
+  List<Widget> _buildFieldList(List<CredentialField> fields, Map<String, TextEditingController> controllers, {Set<String>? visibleSecrets, void Function(void Function())? setState}) {
     return fields.map((field) {
       final ctrl = controllers[field.key] ??= TextEditingController();
+      final isObscured = field.isSecret && !(visibleSecrets?.contains(field.key) ?? false);
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Column(
@@ -608,10 +619,32 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           children: [
             Text(field.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
             const SizedBox(height: 4),
-            MacosTextField(
-              placeholder: field.placeholder ?? field.label,
-              obscureText: field.isSecret,
-              controller: ctrl,
+            Row(
+              children: [
+                Expanded(
+                  child: MacosTextField(
+                    placeholder: field.placeholder ?? field.label,
+                    obscureText: isObscured,
+                    controller: ctrl,
+                  ),
+                ),
+                if (field.isSecret && setState != null)
+                  MacosIconButton(
+                    icon: MacosIcon(
+                      isObscured ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
+                      size: 14,
+                      color: MacosColors.systemGrayColor,
+                    ),
+                    backgroundColor: MacosColors.transparent,
+                    onPressed: () => setState(() {
+                      if (visibleSecrets!.contains(field.key)) {
+                        visibleSecrets.remove(field.key);
+                      } else {
+                        visibleSecrets.add(field.key);
+                      }
+                    }),
+                  ),
+              ],
             ),
           ],
         ),
