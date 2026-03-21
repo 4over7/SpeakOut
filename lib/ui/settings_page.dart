@@ -2750,10 +2750,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         type: FileType.custom,
                       );
                       if (path != null) {
-                        final count = await ConfigBackupService.exportToFile(path);
+                        final result = await ConfigBackupService.exportToFile(path);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(count >= 0 ? '已导出 $count 项配置' : '导出失败'),
+                            content: Text(result.success ? '已导出：${result.message}' : '导出失败：${result.error}'),
                             behavior: SnackBarBehavior.floating,
                           ));
                         }
@@ -2777,11 +2777,14 @@ class _SettingsPageState extends State<SettingsPage> {
                         type: FileType.custom,
                       );
                       if (result != null && result.files.single.path != null) {
-                        final count = await ConfigBackupService.importFromFile(result.files.single.path!);
+                        final importResult = await ConfigBackupService.importFromFile(result.files.single.path!);
                         if (mounted) {
                           setState(() {}); // 刷新 UI
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(count >= 0 ? '已导入 $count 项配置' : '导入失败：文件格式不正确'),
+                            content: Text(importResult.success
+                              ? '${importResult.message}，配置已生效'
+                              : '导入失败：${importResult.error}'),
+                            backgroundColor: importResult.success ? MacosColors.systemGreenColor : null,
                             behavior: SnackBarBehavior.floating,
                           ));
                         }

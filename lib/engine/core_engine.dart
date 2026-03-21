@@ -732,6 +732,15 @@ class CoreEngine {
           }
           _silencePollCount = 0;
         }
+        // 8. OFFLINE DURATION WARNING — toggle mode + offline model + exceeds threshold
+        if (_isToggleMode && _isOfflineASR && _recordingStartTime != null) {
+          final elapsed = DateTime.now().difference(_recordingStartTime!).inSeconds;
+          if (elapsed == AppConstants.kOfflineModelDurationWarningSeconds) {
+            _overlay.updateText("⚠️ 超过30秒，识别效果可能下降");
+            NotificationService().notify('离线模型超过30秒识别效果可能下降，建议切换到流式模型');
+          }
+        }
+
         // 2 seconds continuous silence (10 × 200ms), with 10s cooldown
         if (_silencePollCount >= AppConstants.kSilenceThresholdCount) {
           final now = DateTime.now();

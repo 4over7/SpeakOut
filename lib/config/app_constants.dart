@@ -190,6 +190,8 @@ class AppConstants {
   static const int kSilenceThresholdCount = 10;
   /// 录音停止后等待 ASR 处理最后数据的延迟 (ms)
   static const int kEngineShutdownDelayMs = 200;
+  /// 离线模型录音时长提醒阈值 (秒)，超过后提示用户效果可能下降
+  static const int kOfflineModelDurationWarningSeconds = 30;
   /// ASR provider stop() 超时，云端识别可能需要较长时间
   static const Duration kAsrStopTimeout = Duration(seconds: 6);
   /// 错误信息在悬浮窗显示的持续时间
