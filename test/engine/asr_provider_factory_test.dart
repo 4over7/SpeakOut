@@ -55,22 +55,18 @@ void main() {
   });
 
   group('ASRProviderFactory.buildConfig', () {
-    test('volcengine maps asr_app_id, asr_token, asr_cluster', () {
+    test('volcengine maps asr_api_key', () {
       final account = CloudAccount(
         id: 'test',
         providerId: 'volcengine',
         displayName: 'Test',
         credentials: {
-          'asr_app_id': 'my_app',
-          'asr_token': 'my_token',
-          'asr_cluster': 'my_cluster',
+          'asr_api_key': 'my_speech_key',
         },
       );
       final model = CloudASRModel(id: 'seed-asr', name: 'Seed', isStreaming: true);
       final config = ASRProviderFactory.buildConfig(account, model);
-      expect(config['appKey'], 'my_app');
-      expect(config['accessKey'], 'my_token');
-      expect(config['cluster'], 'my_cluster');
+      expect(config['apiKey'], 'my_speech_key');
     });
 
     test('xfyun maps app_id, api_key, api_secret', () {

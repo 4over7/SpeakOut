@@ -43,9 +43,7 @@ class CloudProviders {
       name: '火山引擎 (豆包)',
       credentialFields: [
         CredentialField(key: 'api_key', label: '方舟 API Key', isSecret: true, scope: {CloudCapability.llm}),
-        CredentialField(key: 'asr_app_id', label: 'ASR App ID', scope: {CloudCapability.asrStreaming}),
-        CredentialField(key: 'asr_token', label: 'ASR Access Token', isSecret: true, scope: {CloudCapability.asrStreaming}),
-        CredentialField(key: 'asr_cluster', label: 'ASR Cluster', placeholder: 'volcengine_streaming_common', scope: {CloudCapability.asrStreaming}),
+        CredentialField(key: 'asr_api_key', label: '豆包语音 API Key', isSecret: true, scope: {CloudCapability.asrStreaming}, placeholder: '在豆包语音新版控制台 → API Key管理 中获取'),
       ],
       capabilities: {CloudCapability.asrStreaming, CloudCapability.llm},
       asrModels: [

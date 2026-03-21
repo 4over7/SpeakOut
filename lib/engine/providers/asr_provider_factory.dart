@@ -61,9 +61,7 @@ class ASRProviderFactory {
         };
       case 'volcengine':
         return {
-          'appKey': account.credentials['asr_app_id'] ?? '',
-          'accessKey': account.credentials['asr_token'] ?? '',
-          'cluster': account.credentials['asr_cluster'] ?? '',
+          'apiKey': account.credentials['asr_api_key'] ?? '',
         };
       case 'xfyun':
         return {

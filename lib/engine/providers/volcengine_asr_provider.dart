@@ -17,9 +17,7 @@ class VolcengineASRProvider implements ASRProvider {
   IOWebSocketChannel? _channel;
   StreamController<String> _textController = StreamController<String>.broadcast();
 
-  late String _appKey;
-  late String _accessKey;
-  String _resourceId = 'volc.bigasr.sauc.duration';
+  late String _apiKey;
 
   bool _isReady = false;
   bool _isConnected = false;
@@ -45,13 +43,10 @@ class VolcengineASRProvider implements ASRProvider {
 
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
-    _appKey = config['appKey'] as String? ?? '';
-    _accessKey = config['accessKey'] as String? ?? '';
-    final cluster = config['cluster'] as String? ?? '';
-    if (cluster.isNotEmpty) _resourceId = cluster;
+    _apiKey = config['apiKey'] as String? ?? '';
 
-    if (_appKey.isEmpty || _accessKey.isEmpty) {
-      throw Exception('Volcengine ASR: appKey, accessKey required');
+    if (_apiKey.isEmpty) {
+      throw Exception('Volcengine ASR: apiKey required');
     }
 
     _isReady = true;
@@ -74,9 +69,8 @@ class VolcengineASRProvider implements ASRProvider {
       _channel = IOWebSocketChannel.connect(
         Uri.parse(url),
         headers: {
-          'X-Api-App-Key': _appKey,
-          'X-Api-Access-Key': _accessKey,
-          'X-Api-Resource-Id': _resourceId,
+          'X-Api-Key': _apiKey,
+          'X-Api-Resource-Id': 'volc.seedasr.sauc.duration',
         },
       );
       _channel!.stream.listen(
