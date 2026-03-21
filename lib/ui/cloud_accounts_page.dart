@@ -272,7 +272,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     String selectedProviderId = existingAccount?.providerId ?? CloudProviders.all.first.id;
     String displayName = existingAccount?.displayName ?? '';
     final credControllers = <String, TextEditingController>{};
-    String? testResult;
+    List<(bool, String)> testResults = [];  // (success, message) per service
     bool testLoading = false;
 
     // 初始化凭证控制器
@@ -403,29 +403,29 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     ))),
                     const SizedBox(height: 16),
 
-                    // 测试结果
-                    if (testResult != null)
+                    // 测试结果（每行一个服务）
+                    if (testResults.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            MacosIcon(
-                              testResult!.startsWith('✅') ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.xmark_circle_fill,
-                              size: 14,
-                              color: testResult!.startsWith('✅') ? MacosColors.systemGreenColor : MacosColors.systemRedColor,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                testResult!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: testResult!.startsWith('✅') ? MacosColors.systemGreenColor : MacosColors.systemRedColor,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: testResults.map((r) {
+                            final (ok, msg) = r;
+                            final color = ok ? MacosColors.systemGreenColor : MacosColors.systemRedColor;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                children: [
+                                  MacosIcon(
+                                    ok ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.xmark_circle_fill,
+                                    size: 14, color: color,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(child: Text(msg, style: TextStyle(fontSize: 12, color: color), overflow: TextOverflow.ellipsis)),
+                                ],
                               ),
-                            ),
-                          ],
+                            );
+                          }).toList(),
                         ),
                       ),
 
@@ -433,25 +433,44 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        if (provider != null && provider.hasLLM) ...[
+                        if (provider != null && (provider.hasLLM || provider.hasASR)) ...[
                           PushButton(
                             controlSize: ControlSize.regular,
                             secondary: true,
                             onPressed: testLoading ? null : () async {
-                              final apiKey = credControllers[provider.llmApiKeyField]?.text ?? '';
-                              final baseUrl = provider.llmBaseUrl ?? '';
-                              final model = provider.llmDefaultModel ?? '';
-                              setDialogState(() { testLoading = true; testResult = null; });
-                              final (ok, msg) = await LLMService().testConnectionWith(
-                                apiKey: apiKey,
-                                baseUrl: baseUrl,
-                                model: model,
-                                apiFormat: provider.llmApiFormat,
-                              );
-                              setDialogState(() {
-                                testLoading = false;
-                                testResult = ok ? '✅ $msg' : '❌ $msg';
-                              });
+                              setDialogState(() { testLoading = true; testResults = []; });
+                              final results = <(bool, String)>[];
+
+                              // Test LLM
+                              if (provider.hasLLM) {
+                                final apiKey = credControllers[provider.llmApiKeyField]?.text ?? '';
+                                if (apiKey.isNotEmpty) {
+                                  final (ok, msg) = await LLMService().testConnectionWith(
+                                    apiKey: apiKey,
+                                    baseUrl: provider.llmBaseUrl ?? '',
+                                    model: provider.llmDefaultModel ?? '',
+                                    apiFormat: provider.llmApiFormat,
+                                  );
+                                  results.add((ok, 'LLM: $msg'));
+                                } else {
+                                  results.add((false, 'LLM: API Key 未填写'));
+                                }
+                              }
+
+                              // Test ASR (check key presence only, no live connection test)
+                              if (provider.hasASR) {
+                                final asrFields = provider.credentialFields
+                                    .where((f) => f.appliesTo(CloudCapability.asrStreaming) || f.appliesTo(CloudCapability.asrBatch))
+                                    .toList();
+                                final allFilled = asrFields.every((f) => (credControllers[f.key]?.text ?? '').isNotEmpty);
+                                if (allFilled && asrFields.isNotEmpty) {
+                                  results.add((true, 'ASR: 凭证已填写（需实际录音验证）'));
+                                } else {
+                                  results.add((false, 'ASR: 凭证未完整填写'));
+                                }
+                              }
+
+                              setDialogState(() { testLoading = false; testResults = results; });
                             },
                             child: testLoading
                               ? const SizedBox(width: 16, height: 16, child: ProgressCircle(value: null))
