@@ -53,6 +53,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _akSecretController = TextEditingController();
   final TextEditingController _appKeyController = TextEditingController();
   late final TextEditingController _aiPromptController;
+  late final TextEditingController _organizePromptController;
   // LLM API config controllers (persistent to survive setState rebuilds)
   final TextEditingController _llmApiKeyController = TextEditingController();
   final TextEditingController _llmBaseUrlController = TextEditingController();
@@ -74,6 +75,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String _toggleDiaryKeyName = "";
   bool _isCapturingToggleInputKey = false;
   bool _isCapturingToggleDiaryKey = false;
+  bool _isCapturingOrganizeKey = false;
   bool _isCheckingUpdate = false;
   bool _versionCopied = false;
   String? _updateResult;
@@ -102,7 +104,8 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _aiPromptController = TextEditingController(text: ConfigService().aiCorrectionPrompt);
     _loadVersion();
-    _tabController = MacosTabController(initialIndex: 0, length: 6);
+    _organizePromptController = TextEditingController(text: ConfigService().organizePrompt);
+    _tabController = MacosTabController(initialIndex: 0, length: 7);
     _tabController.addListener(() {
       final newIndex = _tabController.index;
       // Warn if leaving Work Mode tab with unsaved LLM changes
@@ -152,6 +155,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _akSecretController.dispose();
     _appKeyController.dispose();
     _aiPromptController.dispose();
+    _organizePromptController.dispose();
     _llmApiKeyController.dispose();
     _llmBaseUrlController.dispose();
     _llmModelController.dispose();
@@ -221,7 +225,16 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
 
-    if (_isCapturingToggleInputKey) {
+    if (_isCapturingOrganizeKey) {
+       // AI 梳理快捷键与所有录音键冲突检测
+       final allRecordingKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode].where((k) => k != 0);
+       if (allRecordingKeys.contains(keyCode)) {
+         _stopKeyCapture();
+         return;
+       }
+       await config.setOrganizeKey(keyCode, displayName, modifiers: requiredMods);
+       setState(() => _isCapturingOrganizeKey = false);
+    } else if (_isCapturingToggleInputKey) {
        await config.setToggleInputKey(keyCode, displayName, modifiers: requiredMods);
        setState(() {
          _toggleInputKeyName = displayName;
@@ -270,16 +283,14 @@ class _SettingsPageState extends State<SettingsPage> {
   }
   
   // --- Key Capture Logic ---
-  void _startKeyCapture({bool isDiary = false, bool isToggleInput = false, bool isToggleDiary = false}) {
+  void _startKeyCapture([String target = 'ptt']) {
     setState(() {
-       if (isToggleInput) {
-         _isCapturingToggleInputKey = true;
-       } else if (isToggleDiary) {
-         _isCapturingToggleDiaryKey = true;
-       } else if (isDiary) {
-         _isCapturingDiaryKey = true;
-       } else {
-         _isCapturingKey = true;
+       switch (target) {
+         case 'toggleInput': _isCapturingToggleInputKey = true;
+         case 'toggleDiary': _isCapturingToggleDiaryKey = true;
+         case 'diary': _isCapturingDiaryKey = true;
+         case 'organize': _isCapturingOrganizeKey = true;
+         default: _isCapturingKey = true;
        }
     });
 
@@ -291,7 +302,7 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     // Timeout
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey)) {
+      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey || _isCapturingOrganizeKey)) {
         _stopKeyCapture();
       }
     });
@@ -324,6 +335,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _isCapturingDiaryKey = false;
         _isCapturingToggleInputKey = false;
         _isCapturingToggleDiaryKey = false;
+        _isCapturingOrganizeKey = false;
       });
     }
   }
@@ -585,21 +597,25 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: Text(loc.tabTrigger, style: TextStyle(color: _selectedIndex == 2 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.text_alignleft, color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabOrganize, style: TextStyle(color: _selectedIndex == 3 ? AppTheme.accentColor : unselectedColor)),
               ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.cloud, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabCloudAccounts, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.book, color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.diaryMode, style: TextStyle(color: _selectedIndex == 4 ? AppTheme.accentColor : unselectedColor)),
+              ),
+              SidebarItem(
+                leading: MacosIcon(CupertinoIcons.cloud, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabCloudAccounts, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
               ),
               // 订阅 tab 暂时隐藏，等支付宝/Stripe 开通后恢复
               // SidebarItem(
-              //   leading: MacosIcon(CupertinoIcons.creditcard, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
-              //   label: Text('订阅', style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
+              //   leading: MacosIcon(CupertinoIcons.creditcard, color: _selectedIndex == 6 ? AppTheme.accentColor : unselectedColor),
+              //   label: Text('订阅', style: TextStyle(color: _selectedIndex == 6 ? AppTheme.accentColor : unselectedColor)),
               // ),
               SidebarItem(
-                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor),
-                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 5 ? AppTheme.accentColor : unselectedColor)),
+                leading: MacosIcon(CupertinoIcons.info_circle, color: _selectedIndex == 6 ? AppTheme.accentColor : unselectedColor),
+                label: Text(loc.tabAbout, style: TextStyle(color: _selectedIndex == 6 ? AppTheme.accentColor : unselectedColor)),
               ),
             ],
           );
@@ -622,13 +638,14 @@ class _SettingsPageState extends State<SettingsPage> {
                     // Work Mode page manages its own scroll (fixed bottom save bar)
                     if (_selectedIndex == 1) return _buildWorkModeView();
                     // Cloud Accounts page has its own scroll
-                    if (_selectedIndex == 4) return const CloudAccountsPage();
-                    // if (_selectedIndex == 5) return const BillingPage(); // 暂时隐藏
+                    if (_selectedIndex == 5) return const CloudAccountsPage();
+                    // if (_selectedIndex == 6) return const BillingPage(); // 暂时隐藏
                     return SingleChildScrollView(
                       child: Builder(builder: (_) {
                          if (_selectedIndex == 0) return _buildGeneralView();
                          if (_selectedIndex == 2) return _buildTriggerView();
-                         if (_selectedIndex == 3) return _buildDiaryView();
+                         if (_selectedIndex == 3) return _buildOrganizeView();
+                         if (_selectedIndex == 4) return _buildDiaryView();
                          return _buildAboutView(context, _version);
                       }),
                     );
@@ -1166,7 +1183,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Expanded(child: Text(loc.cloudAccountNone, style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor))),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: () => setState(() => _selectedIndex = 4), // Navigate to Cloud Accounts tab
+              onTap: () => setState(() => _selectedIndex = 5), // Navigate to Cloud Accounts tab
               child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, decoration: TextDecoration.underline)),
             ),
           ],
@@ -1410,7 +1427,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: GestureDetector(
-              onTap: () => setState(() => _selectedIndex = 4), // 云服务账户 tab
+              onTap: () => setState(() => _selectedIndex = 5), // 云服务账户 tab
               child: Row(
                 children: [
                   MacosIcon(CupertinoIcons.arrow_right_circle, size: 14, color: AppTheme.accentColor),
@@ -1520,7 +1537,7 @@ class _SettingsPageState extends State<SettingsPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: GestureDetector(
-            onTap: () => setState(() => _selectedIndex = 4), // 云服务账户 tab
+            onTap: () => setState(() => _selectedIndex = 5), // 云服务账户 tab
             child: Row(
               children: [
                 MacosIcon(CupertinoIcons.plus_circle, size: 14, color: AppTheme.accentColor),
@@ -2106,6 +2123,142 @@ class _SettingsPageState extends State<SettingsPage> {
 
 
 
+  // --- View: AI 梳理 (Organize) ---
+  Widget _buildOrganizeView() {
+    final loc = AppLocalizations.of(context)!;
+    final config = ConfigService();
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 基本设置
+          SettingsGroup(
+            title: loc.tabOrganize,
+            children: [
+              SettingsTile(
+                label: loc.organizeEnabled,
+                icon: CupertinoIcons.text_alignleft,
+                child: MacosSwitch(
+                  value: config.organizeEnabled,
+                  onChanged: (v) async {
+                    await config.setOrganizeEnabled(v);
+                    setState(() {});
+                  },
+                ),
+              ),
+              if (config.organizeEnabled) ...[
+                const SettingsDivider(),
+                _buildKeyCaptureTile(loc.organizeHotkey, CupertinoIcons.keyboard,
+                  keyName: config.organizeKeyName.isEmpty ? '未设置' : config.organizeKeyName,
+                  isCapturing: _isCapturingOrganizeKey,
+                  onEdit: () => _startKeyCapture('organize'),
+                  onClear: config.organizeKeyCode != 0 ? () async {
+                    await config.clearOrganizeKey();
+                    setState(() {});
+                  } : null,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 功能说明
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: MacosIcon(CupertinoIcons.lightbulb, size: 16, color: AppTheme.accentColor),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.organizeDesc,
+                    style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 梳理指令
+          if (config.organizeEnabled) ...[
+            SettingsGroup(
+              title: loc.organizePrompt,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(loc.organizePrompt, style: AppTheme.body(context)),
+                          GestureDetector(
+                            onTap: () async {
+                              await config.setOrganizePrompt(AppConstants.kDefaultOrganizePrompt);
+                              _organizePromptController.text = AppConstants.kDefaultOrganizePrompt;
+                              setState(() {});
+                            },
+                            child: Text(loc.organizeResetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      MacosTextField(
+                        maxLines: 8,
+                        controller: _organizePromptController,
+                        decoration: BoxDecoration(
+                          color: AppTheme.getInputBackground(context),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.getBorder(context)),
+                        ),
+                        onChanged: (v) => config.setOrganizePrompt(v),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // LLM 服务提示
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MacosColors.systemGrayColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemGrayColor),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(loc.organizeLlmHint, style: AppTheme.caption(context))),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = 1), // 跳转到工作模式 tab
+                    child: Text(loc.organizeGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // --- View: Diary (闪念笔记) ---
   Widget _buildDiaryView() {
     final loc = AppLocalizations.of(context)!;
@@ -2176,14 +2329,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 loc.pttMode, CupertinoIcons.keyboard_chevron_compact_down,
                 isCapturing: _isCapturingDiaryKey,
                 keyName: _diaryKeyName,
-                onEdit: () => _startKeyCapture(isDiary: true),
+                onEdit: () => _startKeyCapture('diary'),
               ),
               const SettingsDivider(),
               _buildKeyCaptureTile(
                 loc.toggleModeTip, CupertinoIcons.book,
                 isCapturing: _isCapturingToggleDiaryKey,
                 keyName: _toggleDiaryKeyName,
-                onEdit: () => _startKeyCapture(isToggleDiary: true),
+                onEdit: () => _startKeyCapture('toggleDiary'),
                 onClear: () async {
                   await ConfigService().clearToggleDiaryKey();
                   setState(() => _toggleDiaryKeyName = "");
@@ -2284,7 +2437,7 @@ class _SettingsPageState extends State<SettingsPage> {
               loc.toggleModeTip, CupertinoIcons.text_cursor,
               isCapturing: _isCapturingToggleInputKey,
               keyName: _toggleInputKeyName,
-              onEdit: () => _startKeyCapture(isToggleInput: true),
+              onEdit: () => _startKeyCapture('toggleInput'),
               onClear: () async {
                 await ConfigService().clearToggleInputKey();
                 setState(() => _toggleInputKeyName = "");

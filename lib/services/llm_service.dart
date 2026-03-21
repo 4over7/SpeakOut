@@ -413,6 +413,126 @@ class LLMService {
     return input;
   }
   
+  /// AI 梳理：深度重组文字结构（非流式，一次性返回完整结果）
+  /// 使用独立的 organizePrompt，复用已配置的 LLM 服务商。
+  Future<String> organizeText(String input) async {
+    if (input.trim().isEmpty) return input;
+
+    final providerType = ConfigService().llmProviderType;
+    final organizePrompt = ConfigService().organizePrompt;
+
+    if (providerType == 'ollama') {
+      return _callLlmGeneric(
+        input: input,
+        systemPrompt: organizePrompt,
+        callOllama: true,
+      );
+    }
+
+    final resolved = _resolveLlmConfig();
+    if (resolved.apiKey.isEmpty) {
+      _log("[Organize] API Key MISSING");
+      return '';
+    }
+
+    return _callLlmGeneric(
+      input: input,
+      systemPrompt: organizePrompt,
+      resolved: resolved,
+    );
+  }
+
+  /// 通用 LLM 调用（非流式），支持自定义 system prompt
+  Future<String> _callLlmGeneric({
+    required String input,
+    required String systemPrompt,
+    ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved,
+    bool callOllama = false,
+  }) async {
+    _log("[Generic] inputLen=${input.length}");
+
+    try {
+      final client = _effectiveClient;
+
+      if (callOllama) {
+        final baseUrl = ConfigService().ollamaBaseUrl;
+        final model = ConfigService().ollamaModel;
+        final resp = await client.post(
+          Uri.parse('$baseUrl/api/chat'),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "model": model,
+            "messages": [
+              {"role": "system", "content": systemPrompt},
+              {"role": "user", "content": input},
+            ],
+            "stream": false,
+            "think": false,
+            "options": {"temperature": AppConstants.kLlmDefaultTemperature},
+          }),
+        ).timeout(AppConstants.kOrganizeTimeout);
+        if (resp.statusCode == 200) {
+          final content = jsonDecode(utf8.decode(resp.bodyBytes))['message']?['content']?.toString();
+          return _cleanLlmOutput(content?.trim() ?? '');
+        }
+        _log("[Generic] Ollama ERROR: ${resp.statusCode}");
+        return '';
+      }
+
+      final r = resolved!;
+      if (r.isAnthropic) {
+        final resp = await client.post(
+          Uri.parse('${r.baseUrl}/v1/messages'),
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": r.apiKey,
+            "anthropic-version": AppConstants.kAnthropicApiVersion,
+          },
+          body: jsonEncode({
+            "model": r.model,
+            "max_tokens": AppConstants.kAnthropicMaxTokens,
+            "system": systemPrompt,
+            "messages": [{"role": "user", "content": input}],
+            "temperature": AppConstants.kLlmDefaultTemperature,
+          }),
+        ).timeout(AppConstants.kOrganizeTimeout);
+        if (resp.statusCode == 200) {
+          final content = (jsonDecode(utf8.decode(resp.bodyBytes))['content'] as List?)
+              ?.firstWhere((b) => b['type'] == 'text', orElse: () => null)?['text']?.toString();
+          return _cleanLlmOutput(content?.trim() ?? '');
+        }
+        _log("[Generic] Anthropic ERROR: ${resp.statusCode}");
+        return '';
+      }
+
+      // OpenAI-compatible
+      final resp = await client.post(
+        Uri.parse('${r.baseUrl}/chat/completions'),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${r.apiKey}",
+        },
+        body: jsonEncode({
+          "model": r.model,
+          "messages": [
+            {"role": "system", "content": systemPrompt},
+            {"role": "user", "content": input},
+          ],
+          "temperature": AppConstants.kLlmDefaultTemperature,
+        }),
+      ).timeout(AppConstants.kOrganizeTimeout);
+      if (resp.statusCode == 200) {
+        final content = jsonDecode(utf8.decode(resp.bodyBytes))['choices']?[0]?['message']?['content']?.toString();
+        return _cleanLlmOutput(content?.trim() ?? '');
+      }
+      _log("[Generic] Cloud ERROR: ${resp.statusCode} - ${resp.body}");
+      return '';
+    } catch (e) {
+      _log("[Generic] EXCEPTION: $e");
+      return '';
+    }
+  }
+
   /// Test LLM connection with explicit parameters (no Keychain dependency)
   Future<(bool, String)> testConnectionWith({
     required String apiKey,

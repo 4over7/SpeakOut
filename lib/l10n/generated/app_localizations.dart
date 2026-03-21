@@ -506,6 +506,60 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get change;
 
+  /// No description provided for @tabOrganize.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Organize'**
+  String get tabOrganize;
+
+  /// No description provided for @organizeEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable AI Organize'**
+  String get organizeEnabled;
+
+  /// No description provided for @organizeHotkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Organize Hotkey'**
+  String get organizeHotkey;
+
+  /// No description provided for @organizeHotkeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select text then press this hotkey'**
+  String get organizeHotkeyHint;
+
+  /// No description provided for @organizePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Organize Instructions'**
+  String get organizePrompt;
+
+  /// No description provided for @organizeResetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Default'**
+  String get organizeResetDefault;
+
+  /// No description provided for @organizeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Select any text and press the hotkey. AI will extract key points, restructure logic, and express professionally while preserving the original meaning.'**
+  String get organizeDesc;
+
+  /// No description provided for @organizeLlmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the LLM provider configured in Work Mode'**
+  String get organizeLlmHint;
+
+  /// No description provided for @organizeGoConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to config →'**
+  String get organizeGoConfig;
+
   /// No description provided for @tabAbout.
   ///
   /// In en, this message translates to:

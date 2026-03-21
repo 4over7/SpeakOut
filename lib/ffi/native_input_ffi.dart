@@ -449,6 +449,42 @@ class NativeInputFFI implements NativeInputBase {
     return _isLikelyTelephoneQuality() == 1;
   }
 
+  // ============ AI ORGANIZE (copy_selection / press_key) ============
+
+  bool _organizeBound = false;
+  late CopySelectionDart _copySelection;
+  late PressKeyDart _pressKey;
+
+  void _bindOrganizeFunctions() {
+    if (_organizeBound) return;
+    try {
+      _copySelection = _dylib
+          .lookup<NativeFunction<CopySelectionC>>('copy_selection')
+          .asFunction();
+      _pressKey = _dylib
+          .lookup<NativeFunction<PressKeyC>>('press_key')
+          .asFunction();
+      _organizeBound = true;
+      _log("Organize FFI bindings SUCCESS");
+    } catch (e) {
+      _log("Organize FFI bindings FAILED: $e");
+    }
+  }
+
+  @override
+  void copySelection() {
+    _bindOrganizeFunctions();
+    if (!_organizeBound) return;
+    _copySelection();
+  }
+
+  @override
+  void pressKey(int keyCode, int modifierFlags) {
+    _bindOrganizeFunctions();
+    if (!_organizeBound) return;
+    _pressKey(keyCode, modifierFlags);
+  }
+
   // ============ CLIPBOARD STREAMING INJECTION ============
 
   bool _clipboardBound = false;

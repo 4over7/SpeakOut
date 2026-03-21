@@ -127,6 +127,26 @@ class ConfigService {
   int get toggleMaxDuration => _prefs?.getInt('toggle_max_duration') ?? AppConstants.kDefaultToggleMaxDuration;
   Future<void> setToggleMaxDuration(int seconds) async => await _prefs?.setInt('toggle_max_duration', seconds);
 
+  // --- AI 梳理 (Organize) ---
+  bool get organizeEnabled => _prefs?.getBool('organize_enabled') ?? false;
+  int get organizeKeyCode => _prefs?.getInt('organize_key_code') ?? 0; // 0 = 未设置
+  int get organizeModifiers => _prefs?.getInt('organize_modifiers') ?? 0;
+  String get organizeKeyName => _prefs?.getString('organize_key_name') ?? '';
+  String get organizePrompt => _getStringWithDefault('organize_prompt', AppConstants.kDefaultOrganizePrompt);
+
+  Future<void> setOrganizeEnabled(bool v) async => await _prefs?.setBool('organize_enabled', v);
+  Future<void> setOrganizeKey(int code, String name, {int modifiers = 0}) async {
+    await _prefs?.setInt('organize_key_code', code);
+    await _prefs?.setString('organize_key_name', name);
+    await _prefs?.setInt('organize_modifiers', modifiers);
+  }
+  Future<void> clearOrganizeKey() async {
+    await _prefs?.remove('organize_key_code');
+    await _prefs?.remove('organize_key_name');
+    await _prefs?.remove('organize_modifiers');
+  }
+  Future<void> setOrganizePrompt(String v) async => await _prefs?.setString('organize_prompt', v);
+
   // --- Model ---
 
   String get activeModelId => _prefs?.getString(AppConstants.kKeyActiveModelId) ?? AppConstants.kDefaultModelId;

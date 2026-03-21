@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../ffi/native_input_base.dart';
 import '../ffi/native_input_factory.dart';
@@ -80,6 +81,7 @@ class CoreEngine {
   bool _punctuationEnabled = false;
   bool _typewriterInjected = false;
   DateTime? _recordingStartTime;
+  bool _isOrganizing = false;
 
   // Configuration
   int pttKeyCode = 58; 
@@ -543,7 +545,15 @@ class CoreEngine {
       return;
     }
 
-    // 4. Pure PTT / diary keys (existing logic)
+    // 4. AI 梳理快捷键（仅 keyDown，不涉及录音状态机）
+    final organizeCode = config.organizeKeyCode;
+    if (isDown && config.organizeEnabled && organizeCode != 0 &&
+        matchKey(organizeCode, config.organizeModifiers)) {
+      _handleOrganize();
+      return;
+    }
+
+    // 5. Pure PTT / diary keys (existing logic)
     // Guard: if toggle mode is active, ignore keyUp from PTT/diary keys
     // to prevent the keyUp from a toggle-start tap from stopping recording.
     if (_isToggleMode && !isDown) return;
@@ -555,6 +565,79 @@ class CoreEngine {
       _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
     } else if (diaryMatch) {
       _handleModeKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
+    }
+  }
+
+  /// AI 梳理：选中文字 → Cmd+C → LLM → 光标到末尾 → 换行 → 粘贴结果
+  Future<void> _handleOrganize() async {
+    if (_isOrganizing || _recordingState != RecordingState.idle) return;
+    final ni = _nativeInput;
+    if (ni == null) return;
+    _isOrganizing = true;
+    _log("[Organize] 开始梳理");
+
+    final overlay = OverlayController();
+
+    try {
+      // 1. 保存剪贴板 + Cmd+C 复制选中文字
+      ni.injectClipboardBegin();
+      ni.copySelection();
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      // 2. 读取剪贴板
+      final clipData = await Clipboard.getData('text/plain');
+      final selectedText = clipData?.text?.trim() ?? '';
+      if (selectedText.isEmpty) {
+        _log("[Organize] 未检测到选中文字");
+        ni.injectClipboardEnd();
+        overlay.recordingMode = "organize";
+        overlay.updateText("未检测到选中文字");
+        await overlay.show();
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
+      _log("[Organize] 获取到 ${selectedText.length} 字");
+
+      // 3. 显示悬浮窗
+      overlay.recordingMode = "organize";
+      overlay.updateText("梳理中...");
+      await overlay.show();
+
+      // 4. 调用 LLM
+      final result = await LLMService().organizeText(selectedText)
+          .timeout(AppConstants.kOrganizeTimeout);
+
+      if (result.isEmpty) {
+        _log("[Organize] LLM 返回空结果");
+        overlay.updateText("梳理失败");
+        await Future.delayed(const Duration(seconds: 2));
+        ni.injectClipboardEnd();
+        await overlay.hide();
+        return;
+      }
+
+      // 5. 光标移到选区末尾 → 换行 → 粘贴结果
+      ni.pressKey(124, 0); // → 键，取消选区
+      await Future.delayed(const Duration(milliseconds: 50));
+      ni.pressKey(36, 0);  // Return 换行
+      await Future.delayed(const Duration(milliseconds: 50));
+      ni.injectClipboardChunk(result);
+      await Future.delayed(const Duration(milliseconds: 100));
+      ni.injectClipboardEnd();
+
+      overlay.updateText("✓");
+      _log("[Organize] 完成，输出 ${result.length} 字");
+      await Future.delayed(const Duration(seconds: 1));
+      await overlay.hide();
+    } catch (e) {
+      _log("[Organize] 错误: $e");
+      try { ni.injectClipboardEnd(); } catch (_) {}
+      overlay.updateText("梳理失败");
+      await Future.delayed(const Duration(seconds: 2));
+      await overlay.hide();
+    } finally {
+      _isOrganizing = false;
     }
   }
 

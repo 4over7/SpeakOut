@@ -113,6 +113,12 @@ typedef GetAudioLevelDart = double Function();
 typedef CheckIsTerminalAppC = Int32 Function();
 typedef CheckIsTerminalAppDart = int Function();
 
+// AI 梳理: copy selection (Cmd+C) and press key
+typedef CopySelectionC = Void Function();
+typedef CopySelectionDart = void Function();
+typedef PressKeyC = Void Function(Int32 keyCode, Int32 modifierFlags);
+typedef PressKeyDart = void Function(int keyCode, int modifierFlags);
+
 // Clipboard streaming injection
 typedef InjectClipboardBeginC = Void Function();
 typedef InjectClipboardBeginDart = void Function();
@@ -159,6 +165,10 @@ abstract class NativeInputBase {
   // Signal Quality Analysis
   String analyzeAudioQuality(Pointer<Int16> samples, int sampleCount, int sampleRate);
   bool isLikelyTelephoneQuality();
+
+  // AI 梳理: copy selection and simulate keypress
+  void copySelection();
+  void pressKey(int keyCode, int modifierFlags);
 
   // Clipboard streaming injection (for typewriter effect)
   void injectClipboardBegin();

@@ -228,6 +228,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get change => 'Change';
 
   @override
+  String get tabOrganize => 'AI Organize';
+
+  @override
+  String get organizeEnabled => 'Enable AI Organize';
+
+  @override
+  String get organizeHotkey => 'Organize Hotkey';
+
+  @override
+  String get organizeHotkeyHint => 'Select text then press this hotkey';
+
+  @override
+  String get organizePrompt => 'Organize Instructions';
+
+  @override
+  String get organizeResetDefault => 'Reset Default';
+
+  @override
+  String get organizeDesc =>
+      'Select any text and press the hotkey. AI will extract key points, restructure logic, and express professionally while preserving the original meaning.';
+
+  @override
+  String get organizeLlmHint => 'Uses the LLM provider configured in Work Mode';
+
+  @override
+  String get organizeGoConfig => 'Go to config →';
+
+  @override
   String get tabAbout => 'About';
 
   @override

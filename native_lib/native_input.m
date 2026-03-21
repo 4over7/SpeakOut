@@ -569,6 +569,49 @@ void inject_clipboard_end(void) {
   }
 }
 
+// --- AI 梳理辅助函数 ---
+
+// 模拟 Cmd+C 复制选中文字到剪贴板
+void copy_selection(void) {
+  @autoreleasepool {
+    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+    if (!source) return;
+    CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 8, true);  // 8 = 'c'
+    CGEventRef keyUp   = CGEventCreateKeyboardEvent(source, 8, false);
+    if (keyDown && keyUp) {
+      CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
+      CGEventSetFlags(keyUp,   kCGEventFlagMaskCommand);
+      CGEventPost(kCGAnnotatedSessionEventTap, keyDown);
+      CGEventPost(kCGAnnotatedSessionEventTap, keyUp);
+    }
+    if (keyDown) CFRelease(keyDown);
+    if (keyUp) CFRelease(keyUp);
+    CFRelease(source);
+    usleep(100000); // 100ms 等待剪贴板更新
+  }
+}
+
+// 模拟任意按键（用于 → 取消选区、Return 换行等）
+void press_key(int keyCode, int modifierFlags) {
+  @autoreleasepool {
+    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+    if (!source) return;
+    CGEventRef keyDown = CGEventCreateKeyboardEvent(source, (CGKeyCode)keyCode, true);
+    CGEventRef keyUp   = CGEventCreateKeyboardEvent(source, (CGKeyCode)keyCode, false);
+    if (keyDown && keyUp) {
+      if (modifierFlags) {
+        CGEventSetFlags(keyDown, (CGEventFlags)modifierFlags);
+        CGEventSetFlags(keyUp,   (CGEventFlags)modifierFlags);
+      }
+      CGEventPost(kCGAnnotatedSessionEventTap, keyDown);
+      CGEventPost(kCGAnnotatedSessionEventTap, keyUp);
+    }
+    if (keyDown) CFRelease(keyDown);
+    if (keyUp) CFRelease(keyUp);
+    CFRelease(source);
+  }
+}
+
 // Main entry: always use clipboard paste for reliability.
 // CGEvent keyboard injection drops characters in apps with heavy UI (WeChat, Slack, etc.)
 // due to async HID event queue. Clipboard paste is 100% reliable.

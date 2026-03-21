@@ -29,6 +29,7 @@ class OverlayController {
     if (!_hasNativeOverlay) return;
     String mode = isOfflineMode ? "offline" : "streaming";
     if (recordingMode == "diary") mode = "diary";
+    if (recordingMode == "organize") mode = "organize";
     _invoke('showRecording', {"mode": mode});
   }
 

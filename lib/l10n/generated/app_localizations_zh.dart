@@ -220,6 +220,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get change => '更改';
 
   @override
+  String get tabOrganize => 'AI 梳理';
+
+  @override
+  String get organizeEnabled => '启用 AI 梳理';
+
+  @override
+  String get organizeHotkey => '梳理快捷键';
+
+  @override
+  String get organizeHotkeyHint => '选中文字后按此快捷键触发';
+
+  @override
+  String get organizePrompt => '梳理指令';
+
+  @override
+  String get organizeResetDefault => '恢复默认';
+
+  @override
+  String get organizeDesc => '选中任意文字后按快捷键，AI 将提取核心观点、重组逻辑结构、专业化表达，但不改变原意。';
+
+  @override
+  String get organizeLlmHint => '使用「工作模式」中配置的 LLM 服务商';
+
+  @override
+  String get organizeGoConfig => '前往配置 →';
+
+  @override
   String get tabAbout => '关于';
 
   @override
