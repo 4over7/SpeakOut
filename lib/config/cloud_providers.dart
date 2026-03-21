@@ -226,7 +226,7 @@ class CloudProviders {
         CloudLLMModel(id: 'MiniMax-M2.5', name: 'MiniMax M2.5', description: '推荐，MoE 旗舰'),
         CloudLLMModel(id: 'MiniMax-M1', name: 'MiniMax M1', description: '推理增强'),
       ],
-      llmBaseUrl: 'https://api.minimax.chat/v1/openai',
+      llmBaseUrl: 'https://api.minimaxi.com/v1',
       llmDefaultModel: 'MiniMax-M2.5',
       llmModelHint: '如 MiniMax-M2.5, MiniMax-M1',
       helpUrl: 'https://platform.minimaxi.com/document/introduction',
