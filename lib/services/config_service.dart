@@ -59,6 +59,13 @@ class ConfigService {
     _initCompleter!.complete();
   }
 
+  /// 重新加载配置（导入配置后调用，刷新内存缓存）
+  Future<void> reload() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _preloadSecureKeys();
+    _updateLocaleNotifier();
+  }
+
   // --- Hotkey ---
 
   int get pttKeyCode => _prefs?.getInt(AppConstants.kKeyPttKeyCode) ?? AppConstants.kDefaultPttKeyCode;
@@ -352,7 +359,7 @@ class ConfigService {
   /// Also migrates old SharedPreferences credentials to Keychain on first run.
   Future<void> _preloadSecureKeys() async {
     try {
-      // Migrate old SharedPreferences → Keychain (one-time)
+      // Migrate old SharedPreferences → Keychain (one-time, verify before delete)
       if (_prefs != null) {
         for (final key in ['aliyun_ak_id', 'aliyun_ak_secret', 'aliyun_app_key', 'llm_api_key']) {
           final oldVal = _prefs!.getString(key);
@@ -360,9 +367,18 @@ class ConfigService {
             final existing = await _secureStorage.read(key: key);
             if (existing == null || existing.isEmpty) {
               await _secureStorage.write(key: key, value: oldVal);
+              // 验证写入成功
+              final readBack = await _secureStorage.read(key: key);
+              if (readBack == oldVal) {
+                await _prefs!.remove(key);
+                AppLog.d('[ConfigService] Migrated $key to Keychain (verified)');
+              } else {
+                AppLog.d('[ConfigService] Keychain verify failed for $key, keeping SharedPreferences');
+              }
+            } else {
+              // Keychain 已有值，删除旧的 SharedPreferences
+              await _prefs!.remove(key);
             }
-            await _prefs!.remove(key);
-            AppLog.d('[ConfigService] Migrated $key from SharedPreferences to Keychain');
           }
         }
       }

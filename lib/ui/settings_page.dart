@@ -24,6 +24,7 @@ import '../services/cloud_account_service.dart';
 import '../config/cloud_providers.dart';
 import '../models/cloud_account.dart';
 // import 'billing_page.dart'; // 暂时隐藏
+import '../services/config_backup_service.dart';
 import 'cloud_accounts_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -2721,6 +2722,72 @@ class _SettingsPageState extends State<SettingsPage> {
                           },
                         ),
                     ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 配置备份与恢复
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: SettingsGroup(
+              title: '配置备份',
+              children: [
+                SettingsTile(
+                  label: '导出配置',
+                  subtitle: '将所有设置和凭证导出为文件（含明文密钥，请妥善保管）',
+                  icon: CupertinoIcons.arrow_up_doc,
+                  child: PushButton(
+                    controlSize: ControlSize.regular,
+                    secondary: true,
+                    onPressed: () async {
+                      final path = await FilePicker.platform.saveFile(
+                        dialogTitle: '导出配置文件',
+                        fileName: 'speakout_config.json',
+                        allowedExtensions: ['json'],
+                        type: FileType.custom,
+                      );
+                      if (path != null) {
+                        final count = await ConfigBackupService.exportToFile(path);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(count >= 0 ? '已导出 $count 项配置' : '导出失败'),
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                        }
+                      }
+                    },
+                    child: const Text('导出'),
+                  ),
+                ),
+                const SettingsDivider(),
+                SettingsTile(
+                  label: '导入配置',
+                  subtitle: '从备份文件恢复所有设置，立即生效',
+                  icon: CupertinoIcons.arrow_down_doc,
+                  child: PushButton(
+                    controlSize: ControlSize.regular,
+                    secondary: true,
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        dialogTitle: '选择配置文件',
+                        allowedExtensions: ['json'],
+                        type: FileType.custom,
+                      );
+                      if (result != null && result.files.single.path != null) {
+                        final count = await ConfigBackupService.importFromFile(result.files.single.path!);
+                        if (mounted) {
+                          setState(() {}); // 刷新 UI
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(count >= 0 ? '已导入 $count 项配置' : '导入失败：文件格式不正确'),
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                        }
+                      }
+                    },
+                    child: const Text('导入'),
                   ),
                 ),
               ],

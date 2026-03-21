@@ -36,6 +36,13 @@ class CloudAccountService {
     _initialized = true;
   }
 
+  /// 重新加载账户数据（导入配置后调用）
+  Future<void> reload() async {
+    _accounts.clear();
+    _prefs = await SharedPreferences.getInstance();
+    await _loadAccounts();
+  }
+
   // ── CRUD ──
 
   Future<String> addAccount(CloudAccount account) async {
@@ -163,11 +170,18 @@ class CloudAccountService {
       try {
         // 写入 Keychain
         await _secureStorage.write(key: key, value: value);
-        // 从 SharedPreferences 中删除
-        await _prefs?.remove(key);
-        migrated++;
+        // 验证写入成功（read back）
+        final readBack = await _secureStorage.read(key: key);
+        if (readBack == value) {
+          // 确认成功后才删除旧数据
+          await _prefs?.remove(key);
+          migrated++;
+        } else {
+          AppLog.d('CloudAccountService: Keychain verify failed for $key, keeping SharedPreferences copy');
+        }
       } catch (e) {
         AppLog.d('CloudAccountService: secure migration failed for $key: $e');
+        // 不删除 SharedPreferences，保留数据安全
       }
     }
 
