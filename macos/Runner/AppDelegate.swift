@@ -11,8 +11,10 @@ class AppDelegate: FlutterAppDelegate {
   var isShowingRecording = false
   var currentOverlayMode: String = "streaming" // "streaming" or "offline"
 
-  // Mint Green accent color (#2ECC71)
+  // Mint Green accent color (#2ECC71) for normal recording
   let accentColor = NSColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 1.0)
+  // Purple accent color (#9B59B6) for diary/flash note mode
+  let diaryColor = NSColor(red: 0.61, green: 0.35, blue: 0.71, alpha: 1.0)
 
   // Native audio level function pointer from dylib
   typealias GetAudioLevelFunc = @convention(c) () -> Float
@@ -88,8 +90,10 @@ class AppDelegate: FlutterAppDelegate {
 
     guard let targetScreen = screen else { return }
 
-    let isOffline = (mode == "offline")
-    // Offline: compact (waveform only), Streaming: full width (waveform + subtitle)
+    let isDiary = (mode == "diary")
+    let isOffline = (mode == "offline") || isDiary  // diary also uses compact mode
+    let barColor = isDiary ? diaryColor : accentColor
+    // Offline/Diary: compact (waveform only), Streaming: full width (waveform + subtitle)
     let panelWidth: CGFloat = isOffline ? 120 : 400
     let panelHeight: CGFloat = 50
 
@@ -150,7 +154,7 @@ class AppDelegate: FlutterAppDelegate {
       let barView = NSView(
         frame: NSRect(x: barX, y: waveY, width: barWidth, height: 8))
       barView.wantsLayer = true
-      barView.layer?.backgroundColor = accentColor.cgColor
+      barView.layer?.backgroundColor = barColor.cgColor
       barView.layer?.cornerRadius = barWidth / 2
       backgroundView.addSubview(barView)
       waveformViews.append(barView)

@@ -19,12 +19,17 @@ class OverlayController {
   /// Whether the current ASR is offline (no real-time subtitles)
   bool isOfflineMode = false;
 
+  /// Current recording mode: "ptt" or "diary"
+  String recordingMode = "ptt";
+
   /// Whether native overlay is available (macOS only)
   bool get _hasNativeOverlay => Platform.isMacOS;
 
   Future<void> show() async {
     if (!_hasNativeOverlay) return;
-    _invoke('showRecording', {"mode": isOfflineMode ? "offline" : "streaming"});
+    String mode = isOfflineMode ? "offline" : "streaming";
+    if (recordingMode == "diary") mode = "diary";
+    _invoke('showRecording', {"mode": mode});
   }
 
   Future<void> hide() async {

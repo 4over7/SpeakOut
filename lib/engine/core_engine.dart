@@ -669,6 +669,7 @@ class CoreEngine {
     _recordingController.add(true);
 
     // 2. UI FEEDBACK (fire-and-forget)
+    _overlay.recordingMode = mode == RecordingMode.diary ? "diary" : "ptt";
     if (mode == RecordingMode.diary) {
       _overlay.updateText("📝 Note...");
     }
