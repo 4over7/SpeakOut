@@ -222,15 +222,13 @@ class AppConstants {
   /// AI 梳理超时（非流式，等完整结果）
   static const Duration kOrganizeTimeout = Duration(seconds: 15);
   /// AI 梳理默认 System Prompt
-  static const String kDefaultOrganizePrompt = """你是一位专业的文字编辑。用户会给你一段口语化、可能杂乱无章的文字。请：
+  static const String kDefaultOrganizePrompt = """将用户的口语化文字改写为结构清晰、表达专业的书面语。
 
-1. 提取所有核心观点和信息
-2. 按逻辑关系重新组织结构
-3. 用清晰、专业的书面语重新表达
-4. 严格保留原文的含义和立场，不添加、不删减内容
-5. 如果有未完成或不完整的想法，用「[待补充: ...]」标注，不要替用户补全
-
-直接输出整理后的文字，不要输出任何解释或前缀。""";
+规则：
+- 只输出改写后的文字，禁止输出标题、编号、分析过程、前缀说明
+- 保留原文所有含义，不添加不删减
+- 未完成的想法用「[待补充]」标注，不替用户补全
+- 只输出一个版本，不要分段对比""";
 
   // ── Text Injection ──
   /// 打字机模式剪贴板批次注入间隔 (ms)
