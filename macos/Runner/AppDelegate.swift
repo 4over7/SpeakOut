@@ -81,6 +81,7 @@ class AppDelegate: FlutterAppDelegate {
 
   private func showRecordingOverlay(initialText: String, mode: String = "streaming") {
     NSLog("[Overlay] showRecordingOverlay called with text: %@, mode: %@", initialText, mode)
+    let previousMode = currentOverlayMode
     currentOverlayMode = mode
 
     // 1. Always calculate target position logic FIRST (Dynamic Multi-Monitor Support)
@@ -101,8 +102,8 @@ class AppDelegate: FlutterAppDelegate {
     let xPos = targetScreen.frame.origin.x + (targetScreen.frame.width - panelWidth) / 2
     let yPos = targetScreen.frame.origin.y + 60
 
-    // 2. If mode changed or window doesn't exist, recreate
-    if let panel = recordingOverlayWindow, panel.frame.width == panelWidth {
+    // 2. If same mode and window exists, reuse; otherwise recreate
+    if let panel = recordingOverlayWindow, panel.frame.width == panelWidth && previousMode == mode {
       // Same mode, reuse existing window
       panel.setFrameOrigin(NSPoint(x: xPos, y: yPos))
       panel.orderFront(nil)
