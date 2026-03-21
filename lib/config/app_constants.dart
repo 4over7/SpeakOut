@@ -198,12 +198,13 @@ class AppConstants {
   static const Duration kSuccessDisplayDuration = Duration(seconds: 2);
 
   // ── LLM ──
-  /// AI 润色超时：stream 模式下 N 秒无数据则放弃，直接输出原文
-  static const Duration kLlmPolishTimeout = Duration(seconds: 15);
-  /// LLM 流式请求整体超时
-  static const Duration kLlmStreamTimeout = Duration(seconds: 30);
-  /// LLM 非流式请求超时
-  static const Duration kLlmSyncTimeout = Duration(seconds: 10);
+  /// AI 润色超时（打字机/流式）：首 token 超过此时间未到则放弃，直接输出原文。
+  /// 流式模式首 token 正常应在 1 秒内，8 秒还没到说明服务有问题。
+  static const Duration kLlmPolishTimeout = Duration(seconds: 8);
+  /// LLM 流式请求整体超时（首 token 到达后，后续数据的最大等待间隔）
+  static const Duration kLlmStreamTimeout = Duration(seconds: 15);
+  /// LLM 非流式请求超时（等待完整结果，需要更长时间）
+  static const Duration kLlmSyncTimeout = Duration(seconds: 15);
   /// LLM 测试连接超时
   static const Duration kLlmTestTimeout = Duration(seconds: 15);
   /// LLM 默认温度参数（润色/翻译）
