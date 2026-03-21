@@ -113,6 +113,28 @@ class CloudProvider {
                      capabilities.contains(CloudCapability.asrBatch);
   bool get hasLLM => capabilities.contains(CloudCapability.llm);
   bool get hasStreamingASR => capabilities.contains(CloudCapability.asrStreaming);
+
+  /// 检查账户是否至少有一项能力的凭证已填写
+  /// [credentials] 是用户填写的凭证 Map
+  bool hasAnyValidCredentials(Map<String, String> credentials) {
+    // 通用凭证（scope 为空）只要有一个非空就算有效
+    final universalFields = credentialFields.where((f) => f.scope.isEmpty);
+    final hasUniversal = universalFields.any((f) => (credentials[f.key] ?? '').isNotEmpty);
+    if (hasUniversal) return true;
+
+    // 否则检查各能力组是否有完整凭证
+    return hasValidCredentialsFor(CloudCapability.llm, credentials) ||
+           hasValidCredentialsFor(CloudCapability.asrStreaming, credentials) ||
+           hasValidCredentialsFor(CloudCapability.asrBatch, credentials);
+  }
+
+  /// 检查指定能力的凭证是否已填写（该能力的所有必填字段都非空）
+  bool hasValidCredentialsFor(CloudCapability cap, Map<String, String> credentials) {
+    if (!capabilities.contains(cap)) return false;
+    final fields = credentialFields.where((f) => f.appliesTo(cap));
+    if (fields.isEmpty) return false;
+    return fields.every((f) => (credentials[f.key] ?? '').isNotEmpty);
+  }
 }
 
 /// 用户的云服务账户实例

@@ -198,21 +198,26 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              MacosSwitch(
-                value: account.isEnabled,
-                onChanged: (v) async {
-                  final updated = CloudAccount(
-                    id: account.id,
-                    providerId: account.providerId,
-                    displayName: account.displayName,
-                    credentials: account.credentials,
-                    isEnabled: v,
-                    createdAt: account.createdAt,
-                  );
-                  await CloudAccountService().updateAccount(updated);
-                  _refreshAccounts();
-                },
-              ),
+              Builder(builder: (_) {
+                final provider = CloudProviders.getById(account.providerId);
+                final canEnable = provider != null &&
+                    provider.hasAnyValidCredentials(account.credentials);
+                return MacosSwitch(
+                  value: account.isEnabled,
+                  onChanged: canEnable ? (v) async {
+                    final updated = CloudAccount(
+                      id: account.id,
+                      providerId: account.providerId,
+                      displayName: account.displayName,
+                      credentials: account.credentials,
+                      isEnabled: v,
+                      createdAt: account.createdAt,
+                    );
+                    await CloudAccountService().updateAccount(updated);
+                    _refreshAccounts();
+                  } : null,  // 凭证为空时禁用开关
+                );
+              }),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -470,13 +475,17 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                               creds[entry.key] = entry.value.text;
                             }
 
+                            // 凭证全空时自动禁用
+                            final hasAnyCred = provider != null &&
+                                provider.hasAnyValidCredentials(creds);
+
                             if (isEdit) {
                               final updated = CloudAccount(
                                 id: existingAccount.id,
                                 providerId: existingAccount.providerId,
                                 displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
                                 credentials: creds,
-                                isEnabled: existingAccount.isEnabled,
+                                isEnabled: hasAnyCred && existingAccount.isEnabled,
                                 createdAt: existingAccount.createdAt,
                               );
                               await CloudAccountService().updateAccount(updated);
@@ -486,7 +495,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                                 providerId: selectedProviderId,
                                 displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
                                 credentials: creds,
-                                isEnabled: true,
+                                isEnabled: hasAnyCred,
                               );
                               await CloudAccountService().addAccount(account);
                             }
