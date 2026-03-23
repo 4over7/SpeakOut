@@ -82,6 +82,8 @@ class CoreEngine {
   bool _typewriterInjected = false;
   DateTime? _recordingStartTime;
   bool _isOrganizing = false;
+  /// 最近一次 ASR 原文（供 UI 做对比展示）
+  String? lastAsrOriginal;
 
   // Configuration
   int pttKeyCode = 58; 
@@ -1148,6 +1150,8 @@ class CoreEngine {
         _log("[PERF] +${sw.elapsedMilliseconds}ms — punctuation done");
       }
 
+      // 保存 ASR 原文供主界面对比（仅当 LLM 有改动时）
+      lastAsrOriginal = (originalAsrText != finalText) ? originalAsrText : null;
       _resultController.add(finalText);
 
       if (finalText.isNotEmpty) {
