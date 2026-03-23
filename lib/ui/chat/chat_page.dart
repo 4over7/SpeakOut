@@ -206,6 +206,9 @@ class _ChatPageState extends State<ChatPage> {
                         fontSize: 13,
                       ),
                     ),
+                    // ASR vs LLM 对比（仅 dictation 且有差异时显示）
+                    if (msg.role == ChatRole.dictation && msg.metadata?["asrOriginal"] != null)
+                      _buildAsrComparison(msg),
                     const SizedBox(height: 4),
                     Text(timeStr, style: TextStyle(
                       fontSize: 10,
@@ -226,6 +229,66 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
   
+  /// ASR 原文 vs LLM 润色对比（可折叠）
+  Widget _buildAsrComparison(ChatMessage msg) {
+    final asrOriginal = msg.metadata!["asrOriginal"] as String;
+    final llmResult = msg.text;
+    final diffChars = asrOriginal.length - llmResult.length;
+    final diffLabel = diffChars > 0 ? '精简 $diffChars 字' : (diffChars < 0 ? '扩展 ${-diffChars} 字' : '等长');
+
+    return StatefulBuilder(
+      builder: (context, setInnerState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => setInnerState(() => _expandedComparisons[msg.id] = !(_expandedComparisons[msg.id] ?? false)),
+              child: Row(
+                children: [
+                  Icon(
+                    (_expandedComparisons[msg.id] ?? false) ? CupertinoIcons.chevron_down : CupertinoIcons.chevron_right,
+                    size: 10,
+                    color: AppTheme.accentColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'AI 润色 · $diffLabel',
+                    style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            if (_expandedComparisons[msg.id] ?? false) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemGrayColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('原始识别', style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    SelectableText(
+                      asrOriginal,
+                      style: TextStyle(fontSize: 11, color: MacosColors.systemGrayColor, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  // 记录哪些消息的对比区域是展开的
+  final Map<String, bool> _expandedComparisons = {};
+
   void _showContextMenu(BuildContext context, Offset position, ChatMessage msg) {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     

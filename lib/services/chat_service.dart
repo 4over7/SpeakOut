@@ -62,8 +62,12 @@ class ChatService {
     );
   }
   
-  void addDictation(String text) {
-    _addMessage(text, ChatRole.dictation);
+  void addDictation(String text, {String? asrOriginal}) {
+    Map<String, dynamic>? metadata;
+    if (asrOriginal != null && asrOriginal != text) {
+      metadata = {"asrOriginal": asrOriginal};
+    }
+    _addMessage(text, ChatRole.dictation, metadata: metadata);
   }
   
   Future<void> clearHistory() async {

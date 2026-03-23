@@ -1025,6 +1025,7 @@ class CoreEngine {
       }
 
       String finalText = asrResult.text;
+      final originalAsrText = asrResult.text; // 保留 ASR 原文用于 UI 对比
 
       // AI Polish (with vocab hints injected into LLM prompt)
       // Skip LLM for trivial input: pure punctuation, whitespace, or ≤2 chars
@@ -1167,7 +1168,7 @@ class CoreEngine {
             _nativeInput?.inject(finalText);
           }
           _typewriterInjected = false;
-          ChatService().addDictation(finalText);
+          ChatService().addDictation(finalText, asrOriginal: originalAsrText);
           _statusController.add("Ready");
         }
         _log("[PERF] +${sw.elapsedMilliseconds}ms — inject/save done");
