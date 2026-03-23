@@ -1885,8 +1885,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: () {
-                    _engine.audioDeviceService?.switchToBuiltinMic();
+                  onTap: () async {
+                    final service = _engine.audioDeviceService;
+                    if (service == null) return;
+                    service.switchToBuiltinMic();
+                    final builtIn = service.builtInMicrophone;
+                    if (builtIn != null && builtIn.id.isNotEmpty) {
+                      await ConfigService().setAudioInputDeviceId(builtIn.id, name: builtIn.name);
+                    }
                     _loadAudioDevices();
                   },
                   child: Text(
