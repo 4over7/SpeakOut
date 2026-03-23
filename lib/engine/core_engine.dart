@@ -1014,7 +1014,7 @@ class CoreEngine {
       } catch (e) {
         _log("Provider Stop Error: $e");
       }
-      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned: '${asrResult.text.length > 30 ? '${asrResult.text.substring(0, 30)}...' : asrResult.text}'");
+      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned (${asrResult.text.length}字): '${asrResult.text}'");
 
       // 云端 ASR 错误（鉴权失败、配额超限等）
       if (asrResult.error != null) {
@@ -1111,14 +1111,14 @@ class CoreEngine {
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
               return finalText;
             });
-            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done, len=${finalText.length}");
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): '$finalText'");
           } else {
             // Diary mode: non-streaming (need complete text for file save)
             finalText = await LLMService().correctText(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: () {
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
               return finalText;
             });
-            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done");
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): '$finalText'");
           }
         } catch (e) {
           _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");

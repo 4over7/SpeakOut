@@ -139,8 +139,8 @@ class LLMService {
       return;
     }
 
-    _log("RAW INPUT: len=${input.length}");
-    _log("Calling Cloud LLM (stream): $baseUrl, model=$model, inputLen=${input.length}");
+    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("Calling Cloud LLM (stream): $baseUrl, model=$model");
 
     try {
       final client = _effectiveClient;
@@ -199,7 +199,7 @@ class LLMService {
       }
 
       final result = fullBuffer.toString().trim();
-      _log("LLM STREAM SUCCESS. Output differs: ${result != input}, totalLen=${result.length}");
+      _log("LLM STREAM SUCCESS (${result.length}字, differs=${result != input}): '$result'");
     } catch (e) {
       _log("LLM STREAM EXCEPTION: $e");
       yield input;
@@ -262,8 +262,8 @@ class LLMService {
       return input;
     }
 
-    _log("RAW INPUT: len=${input.length}");
-    _log("Calling Cloud LLM: $baseUrl, model=$model, inputLen=${input.length}");
+    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("Calling Cloud LLM: $baseUrl, model=$model");
 
     try {
       final client = _effectiveClient;
@@ -291,7 +291,7 @@ class LLMService {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
         final content = json['choices']?[0]?['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
-          _log("LLM SUCCESS. Output differs: ${content.trim() != input}");
+          _log("LLM SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
           return content.trim();
         }
         _log("LLM returned empty content.");
@@ -317,8 +317,8 @@ class LLMService {
       return input;
     }
 
-    _log("RAW INPUT: len=${input.length}");
-    _log("Calling Anthropic: $baseUrl, model=$model, inputLen=${input.length}");
+    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("Calling Anthropic: $baseUrl, model=$model");
 
     try {
       final client = _effectiveClient;
@@ -350,7 +350,7 @@ class LLMService {
             ?.firstWhere((b) => b['type'] == 'text', orElse: () => null)
             ?['text']?.toString();
         if (content != null && content.isNotEmpty) {
-          _log("Anthropic SUCCESS. Output differs: ${content.trim() != input}");
+          _log("Anthropic SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
           return content.trim();
         }
         _log("Anthropic returned empty content.");
@@ -369,8 +369,8 @@ class LLMService {
     final model = ConfigService().ollamaModel;
     final systemPrompt = _buildSystemPrompt();
 
-    _log("RAW INPUT: len=${input.length}");
-    _log("Calling Ollama: $baseUrl, model=$model, inputLen=${input.length}");
+    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("Calling Ollama: $baseUrl, model=$model");
 
     try {
       final client = _effectiveClient;
@@ -399,7 +399,7 @@ class LLMService {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
         final content = json['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
-          _log("Ollama SUCCESS. Output differs: ${content.trim() != input}");
+          _log("Ollama SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
           return content.trim();
         }
         _log("Ollama returned empty content.");
