@@ -121,8 +121,13 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadActiveModel();
     _loadAliyunConfig();
     _loadAudioDevices();
+    // 监听设备插拔，自动刷新列表
+    _deviceChangeSubscription = _engine.audioDeviceService?.deviceChanges.listen((_) {
+      if (mounted) _loadAudioDevices();
+    });
   }
-  
+
+  StreamSubscription? _deviceChangeSubscription;
   bool _useSystemDefaultAudio = true;
 
   void _loadAudioDevices() {
@@ -149,6 +154,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     _keySubscription?.cancel();
+    _deviceChangeSubscription?.cancel();
     _keyCaptureFocusNode.dispose();
     _tabController.dispose();
     _akIdController.dispose();
