@@ -180,7 +180,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   String _currentKeyName = ""; // Loaded from config in initState
   String _recognizedText = "";
   String? _asrOriginalText;
-  bool _showAsrComparison = false;
   String _versionString = "";
   
   AppNotification? _currentNotification;
@@ -259,7 +258,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
         setState(() {
           _recognizedText = text;
           _asrOriginalText = _appService.engine.lastAsrOriginal;
-          _showAsrComparison = false; // 新结果时收起对比
         });
         // Clear OVERLAY text after 5 seconds (but keep main UI result)
         _overlayText = text;
@@ -764,51 +762,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                 textAlign: TextAlign.center,
                               ),
                               if (_asrOriginalText != null) ...[
-                                const SizedBox(height: 6),
-                                GestureDetector(
-                                  onTap: () => setState(() => _showAsrComparison = !_showAsrComparison),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        _showAsrComparison ? CupertinoIcons.chevron_down : CupertinoIcons.chevron_right,
-                                        size: 10, color: AppTheme.accentColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        () {
-                                          final diff = _asrOriginalText!.length - _recognizedText.length;
-                                          final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
-                                          return 'AI 润色 · $label';
-                                        }(),
-                                        style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
-                                      ),
-                                    ],
-                                  ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  () {
+                                    final diff = _asrOriginalText!.length - _recognizedText.length;
+                                    final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
+                                    return '✨ AI 润色 · $label';
+                                  }(),
+                                  style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
                                 ),
-                                if (_showAsrComparison)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('原始识别', style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor, fontWeight: FontWeight.w600)),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _asrOriginalText!,
-                                            style: TextStyle(fontSize: 11, color: MacosColors.systemGrayColor, height: 1.4),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
                               ],
                             ],
                           ),
