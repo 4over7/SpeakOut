@@ -25,8 +25,8 @@ app.options('*', (c) => c.body(null, 204));
 // ═══════════════════════════════════════════════════════════
 app.get('/version', (c) => {
     return c.json({
-        version: '1.5.18',
-        build: 132,
+        version: '1.5.19',
+        build: 134,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
         release_notes: '',
     });
@@ -423,7 +423,7 @@ async function alipayPrecreate(env, order) {
         charset: 'utf-8',
         sign_type: 'RSA2',
         timestamp: formatAlipayTime(new Date()),
-        version: '1.5.18',
+        version: '1.5.19',
         notify_url: notifyUrl,
         biz_content: bizContent,
     };
