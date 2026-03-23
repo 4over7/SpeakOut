@@ -1810,7 +1810,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildAudioInputSection(AppLocalizations loc) {
-    final isBluetooth = _currentAudioDevice?.isBluetooth ?? false;
+    // 只在"系统默认"且系统默认恰好是蓝牙时才显示警告
+    // 用户手动选了设备说明他知道自己在做什么，不再提示
+    final isBluetooth = _useSystemDefaultAudio && (_currentAudioDevice?.isBluetooth ?? false);
     return Column(
       children: [
         SettingsTile(
