@@ -17,6 +17,7 @@ class OfflineSherpaProvider implements ASRProvider {
 
   // Accumulate audio chunks during recording
   final List<Float32List> _audioChunks = [];
+  int _totalAccumulatedSamples = 0;
 
   StreamController<String> _textController = StreamController<String>.broadcast();
 
@@ -29,10 +30,14 @@ class OfflineSherpaProvider implements ASRProvider {
   @override
   bool get isReady => _isInit && _recognizer != null;
 
+  String _activeModelInfo = '';
+
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
     final modelPath = config['modelPath'] as String;
     final modelType = config['modelType'] as String? ?? 'sense_voice';
+    _activeModelInfo = '$modelType (${modelPath.split('/').last})';
+    AppLog.d("[OfflineSherpaProvider] Initializing: $_activeModelInfo");
 
     // Ensure cleanup before re-init
     await dispose();
@@ -75,6 +80,71 @@ class OfflineSherpaProvider implements ASRProvider {
         fireRedAsr: sherpa.OfflineFireRedAsrModelConfig(
           encoder: encoder,
           decoder: decoder,
+        ),
+        tokens: "$modelPath/tokens.txt",
+        numThreads: 2,
+        provider: "cpu",
+        debug: false,
+      );
+    } else if (modelType == 'funasr_nano') {
+      final encoderAdaptor = _findFile(modelPath, "encoder_adaptor");
+      final llm = _findFile(modelPath, "llm");
+      final embedding = _findFile(modelPath, "embedding");
+      final tokenizer = "$modelPath/tokenizer.json";
+      modelConfig = sherpa.OfflineModelConfig(
+        funasrNano: sherpa.OfflineFunAsrNanoModelConfig(
+          encoderAdaptor: encoderAdaptor,
+          llm: llm,
+          embedding: embedding,
+          tokenizer: tokenizer,
+        ),
+        tokens: "$modelPath/tokens.txt",
+        numThreads: 2,
+        provider: "cpu",
+        debug: false,
+      );
+    } else if (modelType == 'fire_red_asr_ctc') {
+      final model = _findFile(modelPath, "model");
+      modelConfig = sherpa.OfflineModelConfig(
+        fireRedAsrCtc: sherpa.OfflineFireRedAsrCtcModelConfig(
+          model: model,
+        ),
+        tokens: "$modelPath/tokens.txt",
+        numThreads: 2,
+        provider: "cpu",
+        debug: false,
+      );
+    } else if (modelType == 'moonshine') {
+      final preprocessor = _findFile(modelPath, "preprocess");
+      final encoder = _findFile(modelPath, "encode");
+      final uncachedDecoder = _findFile(modelPath, "uncached");
+      final cachedDecoder = _findFile(modelPath, "cached");
+      modelConfig = sherpa.OfflineModelConfig(
+        moonshine: sherpa.OfflineMoonshineModelConfig(
+          preprocessor: preprocessor,
+          encoder: encoder,
+          uncachedDecoder: uncachedDecoder,
+          cachedDecoder: cachedDecoder,
+        ),
+        tokens: _findTokens(modelPath),
+        numThreads: 2,
+        provider: "cpu",
+        debug: false,
+      );
+    } else if (modelType == 'telespeech_ctc') {
+      final model = _findFile(modelPath, "model");
+      modelConfig = sherpa.OfflineModelConfig(
+        telespeechCtc: model,
+        tokens: "$modelPath/tokens.txt",
+        numThreads: 2,
+        provider: "cpu",
+        debug: false,
+      );
+    } else if (modelType == 'dolphin') {
+      final model = _findFile(modelPath, "model");
+      modelConfig = sherpa.OfflineModelConfig(
+        dolphin: sherpa.OfflineDolphinModelConfig(
+          model: model,
         ),
         tokens: "$modelPath/tokens.txt",
         numThreads: 2,
@@ -127,6 +197,7 @@ class OfflineSherpaProvider implements ASRProvider {
   Future<void> start() async {
     if (!_isInit || _recognizer == null) throw Exception("Offline Sherpa not initialized");
     _audioChunks.clear();
+    _totalAccumulatedSamples = 0;
   }
 
   @override
@@ -134,6 +205,7 @@ class OfflineSherpaProvider implements ASRProvider {
     if (_recognizer == null) return;
     // Accumulate audio — no real-time decoding
     _audioChunks.add(Float32List.fromList(samples));
+    _totalAccumulatedSamples += samples.length;
   }
 
   @override
@@ -147,7 +219,14 @@ class OfflineSherpaProvider implements ASRProvider {
         totalSamples += chunk.length;
       }
 
-      if (totalSamples == 0) return ASRResult.textOnly("");
+      if (totalSamples == 0) {
+        AppLog.d("[OfflineSherpaProvider] No audio accumulated (0 chunks)");
+        return ASRResult.textOnly("");
+      }
+
+      final durationSec = (totalSamples / 16000.0).toStringAsFixed(1);
+      final accMatch = totalSamples == _totalAccumulatedSamples ? 'OK' : 'MISMATCH(acc=$_totalAccumulatedSamples)';
+      AppLog.d("[OfflineSherpaProvider] Decoding [$_activeModelInfo]: ${_audioChunks.length} chunks, $totalSamples samples (${durationSec}s), check=$accMatch");
 
       final merged = Float32List(totalSamples);
       int offset = 0;
@@ -165,6 +244,7 @@ class OfflineSherpaProvider implements ASRProvider {
 
       final result = _recognizer!.getResult(stream);
       final text = result.text.trim();
+      AppLog.d("[OfflineSherpaProvider] Result (${text.length}字, ${durationSec}s audio): '$text'");
 
       stream.free();
 

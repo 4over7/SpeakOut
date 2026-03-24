@@ -21,7 +21,7 @@ class ModelInfo {
   final String name;
   final String description;
   final String url;
-  final String type; // 'zipformer', 'paraformer', 'sense_voice', 'offline_paraformer', 'whisper', 'fire_red_asr'
+  final String type; // 'zipformer', 'paraformer', 'sense_voice', 'offline_paraformer', 'whisper', 'fire_red_asr', 'funasr_nano', 'fire_red_asr_ctc', 'moonshine', 'telespeech_ctc', 'dolphin'
   final String lang;
   final bool isOffline; // true = non-streaming (batch recognition after recording)
   final bool hasPunctuation; // true = model outputs punctuation, no need for punctuation model
@@ -60,16 +60,7 @@ class ModelInfo {
 
 class ModelManager {
   static const List<ModelInfo> availableModels = [
-    // Zipformer (Transducer)
-    ModelInfo(
-      id: "zipformer_bi_2023_02_20",
-      name: "Zipformer Bilingual (Recommended)",
-      description: "Balanced streaming model (Zh/En). Download: ~490MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
-      type: "zipformer",
-      lang: "zh-en",
-      arch: ModelArch.transducerStreaming,
-    ),
+    // Paraformer streaming (good quality, no repetition issues)
     ModelInfo(
       id: "paraformer_bi_zh_en",
       name: "Paraformer Bilingual (Streaming)",
@@ -79,10 +70,25 @@ class ModelManager {
       lang: "zh-en",
       arch: ModelArch.ctcStreaming,
     ),
+    // Zipformer hidden: severe repetition issues (Transducer architecture)
+    // Kept in code for existing users who already downloaded it
+  ];
+
+  /// 已隐藏但需保留定义的模型（已下载的用户仍可使用）
+  static const List<ModelInfo> _hiddenModels = [
+    ModelInfo(
+      id: "zipformer_bi_2023_02_20",
+      name: "Zipformer Bilingual (Not Recommended)",
+      description: "Zh/En streaming, severe repetition issues. ~490MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
+      type: "zipformer",
+      lang: "zh-en",
+      arch: ModelArch.transducerStreaming,
+    ),
   ];
 
   static const List<ModelInfo> offlineModels = [
-    // --- Recommended ---
+    // ====== 1. Recommended (existing) ======
     ModelInfo(
       id: "sensevoice_zh_en_int8",
       name: "SenseVoice 2024 (Recommended)",
@@ -125,11 +131,110 @@ class ModelManager {
       isOffline: true,
       arch: ModelArch.ctcOffline,
     ),
-    // --- Large models ---
+
+    // ====== 2. New recommended: FunASR Nano / FireRedASR v2 / SenseVoice+Nano ======
+    ModelInfo(
+      id: "funasr_nano_int8",
+      name: "FunASR Nano (LLM-based)",
+      description: "Qwen3-0.6B, 31 languages + 7 dialects + 26 accents, built-in punctuation & hotwords. ~716MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2",
+      type: "funasr_nano",
+      lang: "zh-en-ja-dialect",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "fire_red_asr2_ctc_int8",
+      name: "FireRedASR v2 CTC",
+      description: "v2 upgrade, 1/3 size of v1, CTC architecture. ~496MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2",
+      type: "fire_red_asr_ctc",
+      lang: "zh-en-dialect",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "sensevoice_funasr_nano_int8",
+      name: "SenseVoice + FunASR Nano",
+      description: "SenseVoice encoder + Nano decoder, compact. ~179MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-funasr-nano-int8-2025-12-17.tar.bz2",
+      type: "funasr_nano",
+      lang: "zh-en-ja",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+
+    // ====== 3. Lightweight ======
+    ModelInfo(
+      id: "moonshine_base_zh",
+      name: "Moonshine Base 中文",
+      description: "Ultra-light 95MB, Chinese only. ~95MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-zh-quantized-2026-02-27.tar.bz2",
+      type: "moonshine",
+      lang: "zh",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "telespeech_ctc_int8",
+      name: "TeleSpeech CTC",
+      description: "China Telecom TeleAI, Chinese + dialects. ~175MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-telespeech-ctc-int8-zh-2024-06-04.tar.bz2",
+      type: "telespeech_ctc",
+      lang: "zh-dialect",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "dolphin_base_int8",
+      name: "Dolphin Base",
+      description: "DataOcean AI, ultra-light multilingual CTC. ~77MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-dolphin-base-ctc-multi-lang-int8-2025-04-02.tar.bz2",
+      type: "dolphin",
+      lang: "multilingual",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+
+    // ====== 4. Whisper variants ======
+    ModelInfo(
+      id: "whisper_turbo",
+      name: "Whisper Turbo",
+      description: "OpenAI Turbo, 6x faster than Large-v3, 99 languages. ~538MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherper-onnx-whisper-turbo.tar.bz2",
+      type: "whisper",
+      lang: "multilingual",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.whisperLike,
+    ),
+    ModelInfo(
+      id: "whisper_distil_large_v3_5",
+      name: "Whisper Distil Large-v3.5",
+      description: "Distilled Whisper, half size of Large-v3, 99 languages. ~504MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-distil-large-v3.5.tar.bz2",
+      type: "whisper",
+      lang: "multilingual",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.whisperLike,
+    ),
+    ModelInfo(
+      id: "whisper_medium_aishell",
+      name: "Whisper Medium AISHELL",
+      description: "Whisper fine-tuned on Chinese AISHELL dataset. ~655MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-medium-aishell.tar.bz2",
+      type: "whisper",
+      lang: "zh",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.whisperLike,
+    ),
     ModelInfo(
       id: "whisper_large_v3",
       name: "Whisper Large-v3",
-      description: "OpenAI Whisper, best for: Zh/En/Ja/Ko/Fr/De/Es/Ru + 90 more. ~1.0GB",
+      description: "OpenAI, 99 languages, slow decoding, Chinese quality lower than SenseVoice. ~1.0GB",
       url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-large-v3.tar.bz2",
       type: "whisper",
       lang: "multilingual",
@@ -137,6 +242,8 @@ class ModelManager {
       hasPunctuation: true,
       arch: ModelArch.whisperLike,
     ),
+
+    // ====== 5. Large (existing) ======
     ModelInfo(
       id: "fire_red_asr_large",
       name: "FireRedASR Large",
@@ -149,7 +256,7 @@ class ModelManager {
     ),
   ];
 
-  static List<ModelInfo> get allModels => [...availableModels, ...offlineModels];
+  static List<ModelInfo> get allModels => [...availableModels, ...offlineModels, ..._hiddenModels];
 
   // Punctuation model for adding punctuation to ASR output
   static const punctuationModelUrl = 

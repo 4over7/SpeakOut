@@ -84,6 +84,8 @@ class CoreEngine {
   bool _isOrganizing = false;
   /// 最近一次 ASR 原文（供 UI 做对比展示）
   String? lastAsrOriginal;
+  /// 最近一次 LLM 润色是否成功（null=未调用，true=成功，false=失败）
+  bool? lastLlmSuccess;
 
   // Configuration
   int pttKeyCode = 58; 
@@ -294,7 +296,7 @@ class CoreEngine {
     Map<String, dynamic> config = {};
     
     // Check if this is an offline model type
-    final isOfflineModel = modelType == 'sense_voice' || modelType == 'offline_paraformer' || modelType == 'whisper' || modelType == 'fire_red_asr';
+    final isOfflineModel = modelType == 'sense_voice' || modelType == 'offline_paraformer' || modelType == 'whisper' || modelType == 'fire_red_asr' || modelType == 'funasr_nano' || modelType == 'fire_red_asr_ctc' || modelType == 'moonshine' || modelType == 'telespeech_ctc' || modelType == 'dolphin';
 
     // Cloud Account path: use unified account system
     final accountId = ConfigService().selectedAsrAccountId;
@@ -1028,6 +1030,7 @@ class CoreEngine {
 
       String finalText = asrResult.text;
       final originalAsrText = asrResult.text; // 保留 ASR 原文用于 UI 对比
+      lastLlmSuccess = null; // 重置
 
       // AI Polish (with vocab hints injected into LLM prompt)
       // Skip LLM for trivial input: pure punctuation, whitespace, or ≤2 chars
@@ -1130,6 +1133,7 @@ class CoreEngine {
             try { _nativeInput?.injectClipboardEnd(); } catch (_) {}
           }
         }
+        lastLlmSuccess = LLMService().lastCallSucceeded;
       } else if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && trimmedForCheck.length <= 2) {
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: '$finalText')");
       } else if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
