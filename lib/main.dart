@@ -180,6 +180,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   String _currentKeyName = ""; // Loaded from config in initState
   String _recognizedText = "";
   String? _asrOriginalText;
+  bool? _lastLlmSuccess; // null=未调用, true=成功, false=失败
   String _versionString = "";
   
   AppNotification? _currentNotification;
@@ -258,6 +259,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
         setState(() {
           _recognizedText = text;
           _asrOriginalText = _appService.engine.lastAsrOriginal;
+          _lastLlmSuccess = _appService.engine.lastLlmSuccess;
         });
         // Clear OVERLAY text after 5 seconds (but keep main UI result)
         _overlayText = text;
@@ -761,16 +763,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                 style: AppTheme.body(context),
                                 textAlign: TextAlign.center,
                               ),
-                              if (_asrOriginalText != null) ...[
+                              if (_lastLlmSuccess != null) ...[
                                 const SizedBox(height: 4),
-                                Text(
-                                  () {
-                                    final diff = _asrOriginalText!.length - _recognizedText.length;
-                                    final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
-                                    return '✨ AI 润色 · $label';
-                                  }(),
-                                  style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
-                                ),
+                                if (_lastLlmSuccess == false)
+                                  const Text(
+                                    '⚠️ AI 润色未生效',
+                                    style: TextStyle(fontSize: 10, color: Color(0xFFE67E22), fontWeight: FontWeight.w500),
+                                  )
+                                else if (_asrOriginalText != null)
+                                  Text(
+                                    () {
+                                      final diff = _asrOriginalText!.length - _recognizedText.length;
+                                      final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
+                                      return '✨ AI 润色 · $label';
+                                    }(),
+                                    style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
+                                  )
+                                else
+                                  Text(
+                                    '✨ AI 润色 · 无修改',
+                                    style: TextStyle(fontSize: 10, color: AppTheme.accentColor.withValues(alpha: 0.6), fontWeight: FontWeight.w500),
+                                  ),
                               ],
                             ],
                           ),

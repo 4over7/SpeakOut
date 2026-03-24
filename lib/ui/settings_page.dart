@@ -451,10 +451,56 @@ class _SettingsPageState extends State<SettingsPage> {
       if (confirmed != true) return;
     }
 
+    final previousModelId = _activeModelId;
     setState(() => _activatingId = model.id);
     await _modelManager.setActiveModel(model.id);
     final path = await _modelManager.getActiveModelPath();
-    if (path != null) await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+    if (path != null) {
+      try {
+        await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+      } catch (e) {
+        // 初始化失败 → 回滚到之前的模型
+        if (previousModelId != null) {
+          await _modelManager.setActiveModel(previousModelId);
+          await ConfigService().setActiveModelId(previousModelId);
+        }
+        setState(() { _activatingId = null; });
+        if (mounted) _showError('模型激活失败: $e');
+        return;
+      }
+      // 模型无内置标点 → 提示用户 + 自动加载标点模型
+      if (!model.hasPunctuation) {
+        final punctPath = await _modelManager.getPunctuationModelPath();
+        if (punctPath != null) {
+          await _engine.initPunctuation(punctPath, activeModelName: model.name);
+          if (mounted) {
+            _showInfoSnackBar('已自动加载标点模型');
+          }
+        } else if (mounted) {
+          final confirmed = await showMacosAlertDialog<bool>(
+            context: context,
+            builder: (_) => MacosAlertDialog(
+              appIcon: const MacosIcon(CupertinoIcons.textformat_abc, size: 48),
+              title: const Text('该模型不含标点符号'),
+              message: const Text('此模型输出的文字没有标点。建议下载标点模型以获得更好的阅读体验。\n\n是否前往下载？'),
+              primaryButton: PushButton(
+                controlSize: ControlSize.large,
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('去下载'),
+              ),
+              secondaryButton: PushButton(
+                controlSize: ControlSize.large,
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('暂不需要'),
+              ),
+            ),
+          );
+          if (confirmed == true) {
+            _downloadPunctuation();
+          }
+        }
+      }
+    }
     await ConfigService().setActiveModelId(model.id);
     setState(() { _activatingId = null; _activeModelId = model.id; });
   }
@@ -536,6 +582,11 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _deletePunctuation() async {
     await _modelManager.deletePunctuationModel();
     await _refresh();
+  }
+
+  void _showInfoSnackBar(String msg) {
+    if (!mounted) return;
+    _engine.updateStatus('ℹ️ $msg');
   }
 
   void _showError(String msg) {
@@ -1047,6 +1098,13 @@ class _SettingsPageState extends State<SettingsPage> {
       final model = _modelManager.getModelById(_activeModelId ?? '');
       if (path != null && model != null) {
         await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+        // 模型无内置标点 → 自动加载标点模型
+        if (!model.hasPunctuation && !_engine.isPunctuationEnabled) {
+          final punctPath = await _modelManager.getPunctuationModelPath();
+          if (punctPath != null) {
+            await _engine.initPunctuation(punctPath, activeModelName: model.name);
+          }
+        }
       }
     }
     setState(() {});
@@ -1630,50 +1688,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // Streaming models (filtered by input language)
-            Builder(builder: (_) {
-              final inputLang = ConfigService().inputLanguage;
-              final filteredStreaming = ModelManager.availableModels
-                  .where((m) => m.supportsLanguage(inputLang)).toList();
-              return SettingsGroup(
-                title: loc.streamingModels,
-                children: [
-                   Padding(
-                     padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                     child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
-                   ),
-                   ...filteredStreaming.map((m) {
-                      return Column(
-                        children: [
-                          SettingsTile(
-                            label: _localizedModelName(m, loc),
-                            subtitle: _localizedModelDesc(m, loc),
-                            child: _buildActionBtn(
-                             context,
-                              isDownloaded: _downloadedStatus[m.id] ?? false,
-                              isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                              progress: _downloadProgressMap[m.id],
-                              statusText: _downloadStatusMap[m.id],
-                              isActive: _activeModelId == m.id,
-                              isOffline: false,
-                              onDownload: () => _download(m),
-                              onDelete: () => _delete(m),
-                              onActivate: () => _activate(m),
-                              modelUrl: m.url,
-                              onImport: () => _importModel(m),
-                            ),
-                          ),
-                          if (m != filteredStreaming.last) const SettingsDivider(),
-                        ],
-                      );
-                   }),
-                ],
-              );
-            }),
-
-            const SizedBox(height: 24),
-
-            // Offline models (filtered by input language)
+            // Offline models (filtered by input language) — shown first (recommended)
             Builder(builder: (_) {
               final inputLang = ConfigService().inputLanguage;
               final filteredOffline = ModelManager.offlineModels
@@ -1707,6 +1722,49 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                           ),
                           if (m != filteredOffline.last) const SettingsDivider(),
+                        ],
+                      );
+                   }),
+                ],
+              );
+            }),
+
+            const SizedBox(height: 24),
+
+            // Streaming models (filtered by input language) — shown after offline
+            Builder(builder: (_) {
+              final inputLang = ConfigService().inputLanguage;
+              final filteredStreaming = ModelManager.availableModels
+                  .where((m) => m.supportsLanguage(inputLang)).toList();
+              return SettingsGroup(
+                title: loc.streamingModels,
+                children: [
+                   Padding(
+                     padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                     child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
+                   ),
+                   ...filteredStreaming.map((m) {
+                      return Column(
+                        children: [
+                          SettingsTile(
+                            label: _localizedModelName(m, loc),
+                            subtitle: _localizedModelDesc(m, loc),
+                            child: _buildActionBtn(
+                             context,
+                              isDownloaded: _downloadedStatus[m.id] ?? false,
+                              isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
+                              progress: _downloadProgressMap[m.id],
+                              statusText: _downloadStatusMap[m.id],
+                              isActive: _activeModelId == m.id,
+                              isOffline: false,
+                              onDownload: () => _download(m),
+                              onDelete: () => _delete(m),
+                              onActivate: () => _activate(m),
+                              modelUrl: m.url,
+                              onImport: () => _importModel(m),
+                            ),
+                          ),
+                          if (m != filteredStreaming.last) const SettingsDivider(),
                         ],
                       );
                    }),

@@ -25,12 +25,13 @@ class AppService {
   Future<void> applyVerboseLogging() async {
     final enabled = ConfigService().verboseLogging;
     AppLog.enabled = enabled;
-    if (enabled) await AppLog.init();
-    engine.nativeInput?.setDebugLogging(enabled);
     final dir = ConfigService().logDirectory;
     if (dir.isNotEmpty) {
+      AppLog.customLogDirectory = dir;
       engine.nativeInput?.setLogDirectory(dir);
     }
+    if (enabled) await AppLog.init();
+    engine.nativeInput?.setDebugLogging(enabled);
   }
 
   /// 初始化应用核心服务

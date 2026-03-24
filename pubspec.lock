@@ -985,50 +985,50 @@ packages:
     dependency: "direct main"
     description:
       name: sherpa_onnx
-      sha256: "3e864a08018656f1c51d17a0aa43d021a2f78a7bb5cff15476d5a0dc4dff2956"
+      sha256: "6f4d7fe496ee133367c2a38376249f26511a44297b940dde541af8cc84d2bf08"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.33"
   sherpa_onnx_android:
     dependency: transitive
     description:
       name: sherpa_onnx_android
-      sha256: bc690be549b33ff0bc5d518ca9b4df1013a175ef84c25646298d1bedd3a6e305
+      sha256: "568fbcbc4baf48bd80ae1478d60e97e922917177ce6a556fa19bbb6b0f2b801d"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.33"
   sherpa_onnx_ios:
     dependency: transitive
     description:
       name: sherpa_onnx_ios
-      sha256: "4f0bba765dafd9c9062a3be062aa11f7a012a0b34964244e3588c824d5fd6bbc"
+      sha256: "067702a9fbf70de0a999137f7e78429f601e848ea03e93f69584232c1662f89c"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.33"
   sherpa_onnx_linux:
     dependency: transitive
     description:
       name: sherpa_onnx_linux
-      sha256: bcad6925062f7a79a4f3b4b672d2485f5b02074e31d5b7f0a4f1ddf718a8a821
+      sha256: "4faf444f3c71651a2dd65bbd53de2fc642ec3f03829524ba56df92f2cf597ec1"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.33"
   sherpa_onnx_macos:
     dependency: transitive
     description:
       name: sherpa_onnx_macos
-      sha256: d6718808d4384e2babca6718b9bac668e98ed8d00a1492ac4d09ecf2b406f6e6
+      sha256: "25bb40a810609b7988d51d04ab2d8597974ed7069e6a8b3e8860bb6451136dde"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.33"
   sherpa_onnx_windows:
     dependency: transitive
     description:
       name: sherpa_onnx_windows
-      sha256: ef6bc7a4c313d8ca710513a206fb650c4527e955068d8b4137b5a846f4809ead
+      sha256: "1a06882e3d3cec2e6cf97376a3b9b6f4df9094f7b84e13bd765f31280ee6d4c0"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.33"
   sky_engine:
     dependency: transitive
     description: flutter

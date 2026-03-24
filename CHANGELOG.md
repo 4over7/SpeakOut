@@ -1,5 +1,28 @@
 # SpeakOut Version History
 
+## [1.5.21] - 2026-03-25
+
+### ASR 模型大扩展 — 15 款模型实测、8 款精选上架
+
+- **新增 8 款非流式模型** — FireRedASR v2 CTC (496MB)、SenseVoice+FunASR Nano (179MB)、Whisper Turbo (538MB)、Dolphin Base (77MB) 等，按推荐度排序
+- **隐藏 8 款不合格模型** — Zipformer（重复）、TeleSpeech（质量极差）、Whisper Large-v3/Distil/AISHELL（中文差）、FunASR Nano/Moonshine（SDK 不兼容）、FireRedASR v1（被 v2 取代）
+- **标点模型自动联动** — 切换到无标点模型时自动加载标点模型或弹窗提示下载
+- **模型激活失败回滚** — 初始化失败不再误显示"使用中"，自动恢复上一个可用模型
+- **sherpa-onnx SDK 升级** — 1.12.28 → 1.12.33
+
+### LLM 润色状态标签
+
+- **三态显示** — 成功（✨ AI 润色 · 精简 X 字）、无修改（✨ AI 润色 · 无修改）、失败（⚠️ AI 润色未生效）
+- 用户可直观判断 LLM 是否正常工作
+
+### 其他改进
+
+- **日志目录修复** — AppLog 正确读取用户设置的日志目录，Dart 和原生层日志统一
+- **i18n 修正** — "离线模式/模型"统一为"非流式模型"，避免与工作模式概念混淆
+- **诊断日志增强** — OfflineSherpaProvider 记录模型名、chunks 数、samples 数
+- **根目录精简** — 移除 wiki 子模块、tools 目录、.metadata、视频文件
+- **557 测试通过**
+
 ## [1.5.20] - 2026-03-24
 
 ### ASR vs LLM 对比展示

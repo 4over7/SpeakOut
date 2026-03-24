@@ -55,10 +55,11 @@ void main() {
   // 1. 基础属性
   // ═══════════════════════════════════════════════════════════
   group('基础属性', () {
-    test('allModels 包含所有 streaming + offline 模型', () {
+    test('allModels 包含所有 streaming + offline + hidden 模型', () {
       expect(
         ModelManager.allModels.length,
-        ModelManager.availableModels.length + ModelManager.offlineModels.length,
+        greaterThanOrEqualTo(
+          ModelManager.availableModels.length + ModelManager.offlineModels.length),
       );
     });
 
@@ -169,7 +170,7 @@ void main() {
       SharedPreferences.setMockInitialValues({'active_model_id': model.id});
       final path = await manager.getActiveModelPath();
       expect(path, isNotNull, reason: '嵌套子目录下的 tokens.txt 应该能找到');
-      expect(path, endsWith('nested'));
+      expect(path, endsWith(dirName));
     });
   });
 

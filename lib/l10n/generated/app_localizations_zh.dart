@@ -337,20 +337,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingModelsDesc => '边说边出字，适合长段听写。';
 
   @override
-  String get offlineModels => '离线模型（高精度）';
+  String get offlineModels => '非流式模型（高精度）';
 
   @override
   String get offlineModelsDesc => '松开按键后一次性识别，精度更高，录音时无实时字幕。';
 
   @override
-  String get switchToOfflineTitle => '切换到离线模式？';
+  String get switchToOfflineTitle => '切换到非流式模型？';
 
   @override
   String get switchToOfflineBody =>
-      '离线模型在松开按键后才开始识别，录音过程中不会显示实时字幕，但识别精度更高。是否继续？';
+      '非流式模型在松开按键后才开始识别，录音过程中不会显示实时字幕，但识别精度更高。是否继续？';
 
   @override
-  String get switchToStreamingTitle => '切换到流式模式？';
+  String get switchToStreamingTitle => '切换到流式模型？';
 
   @override
   String get switchToStreamingBody => '流式模型会在说话时实时显示文字，精度可能略低。是否继续？';
@@ -408,7 +408,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modeStreaming => '流式';
 
   @override
-  String get modeOffline => '离线';
+  String get modeOffline => '非流式';
 
   @override
   String get chooseModel => '选择语音模型';

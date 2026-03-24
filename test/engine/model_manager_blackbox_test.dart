@@ -13,11 +13,6 @@ void main() {
   });
 
   group('availableModels (流式模型列表)', () {
-    test('应包含 Zipformer Bilingual 模型', () {
-      final ids = ModelManager.availableModels.map((m) => m.id).toList();
-      expect(ids, contains('zipformer_bi_2023_02_20'));
-    });
-
     test('应包含 Paraformer Bilingual (Streaming) 模型', () {
       final ids = ModelManager.availableModels.map((m) => m.id).toList();
       expect(ids, contains('paraformer_bi_zh_en'));
@@ -56,14 +51,14 @@ void main() {
       expect(ids, contains('offline_paraformer_dialect_2025'));
     });
 
-    test('应包含 Whisper Large-v3 模型', () {
+    test('应包含 FireRedASR v2 CTC 模型', () {
       final ids = ModelManager.offlineModels.map((m) => m.id).toList();
-      expect(ids, contains('whisper_large_v3'));
+      expect(ids, contains('fire_red_asr2_ctc_int8'));
     });
 
-    test('应包含 FireRedASR Large 模型', () {
+    test('应包含 Whisper Turbo 模型', () {
       final ids = ModelManager.offlineModels.map((m) => m.id).toList();
-      expect(ids, contains('fire_red_asr_large'));
+      expect(ids, contains('whisper_turbo'));
     });
 
     test('离线模型的 isOffline 应为 true', () {
@@ -79,19 +74,21 @@ void main() {
   });
 
   group('allModels (全部模型合集)', () {
-    test('allModels 应等于 availableModels + offlineModels', () {
-      final allIds = ModelManager.allModels.map((m) => m.id).toList();
-      final expectedIds = [
-        ...ModelManager.availableModels.map((m) => m.id),
-        ...ModelManager.offlineModels.map((m) => m.id),
-      ];
-      expect(allIds, equals(expectedIds));
+    test('allModels 应包含 availableModels + offlineModels + hiddenModels', () {
+      final allIds = ModelManager.allModels.map((m) => m.id).toSet();
+      // 可见模型必须在 allModels 中
+      for (final m in ModelManager.availableModels) {
+        expect(allIds, contains(m.id));
+      }
+      for (final m in ModelManager.offlineModels) {
+        expect(allIds, contains(m.id));
+      }
     });
 
-    test('allModels 长度应等于 availableModels + offlineModels 长度之和', () {
+    test('allModels 长度应 >= availableModels + offlineModels', () {
       expect(
         ModelManager.allModels.length,
-        equals(ModelManager.availableModels.length +
+        greaterThanOrEqualTo(ModelManager.availableModels.length +
             ModelManager.offlineModels.length),
       );
     });

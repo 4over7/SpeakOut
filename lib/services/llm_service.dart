@@ -27,6 +27,11 @@ class LLMService {
     return _defaultClient!;
   }
 
+  /// 最近一次 correctText / correctTextStream 调用是否成功
+  /// true = LLM 成功返回（无论是否有修改）
+  /// false = 调用失败（API 错误、超时、空响应、Key 缺失等）
+  bool lastCallSucceeded = false;
+
   void log(String msg) => _log(msg);
   void _log(String msg) => AppLog.d('[LLM] $msg');
 
@@ -78,6 +83,7 @@ class LLMService {
   }
 
   Future<String> correctText(String input, {List<String>? vocabHints}) async {
+    lastCallSucceeded = false;
     if (input.trim().isEmpty) return input;
     if (!ConfigService().aiCorrectionEnabled) {
       _log("RAW INPUT (AI OFF): len=${input.length}");
@@ -96,12 +102,14 @@ class LLMService {
         result = await _correctTextCloud(input, vocabHints: vocabHints, resolved: resolved);
       }
     }
+    // lastCallSucceeded 由各 _correctText* 方法在成功时设为 true
     return _cleanLlmOutput(result);
   }
 
   /// Streaming version: yields incremental text chunks as they arrive from LLM.
   /// Falls back to non-streaming for Anthropic/Ollama.
   Stream<String> correctTextStream(String input, {List<String>? vocabHints}) async* {
+    lastCallSucceeded = false;
     if (input.trim().isEmpty) {
       yield input;
       return;
@@ -199,6 +207,9 @@ class LLMService {
       }
 
       final result = fullBuffer.toString().trim();
+      if (result.isNotEmpty) {
+        lastCallSucceeded = true;
+      }
       _log("LLM STREAM SUCCESS (${result.length}字, differs=${result != input}): '$result'");
     } catch (e) {
       _log("LLM STREAM EXCEPTION: $e");
@@ -292,6 +303,7 @@ class LLMService {
         final content = json['choices']?[0]?['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
           _log("LLM SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
+          lastCallSucceeded = true;
           return content.trim();
         }
         _log("LLM returned empty content.");
@@ -351,6 +363,7 @@ class LLMService {
             ?['text']?.toString();
         if (content != null && content.isNotEmpty) {
           _log("Anthropic SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
+          lastCallSucceeded = true;
           return content.trim();
         }
         _log("Anthropic returned empty content.");
@@ -400,6 +413,7 @@ class LLMService {
         final content = json['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
           _log("Ollama SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
+          lastCallSucceeded = true;
           return content.trim();
         }
         _log("Ollama returned empty content.");

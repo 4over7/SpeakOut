@@ -85,10 +85,84 @@ class ModelManager {
       lang: "zh-en",
       arch: ModelArch.transducerStreaming,
     ),
+    ModelInfo(
+      id: "telespeech_ctc_int8",
+      name: "TeleSpeech CTC (Not Recommended)",
+      description: "China Telecom, extremely poor Chinese quality. ~175MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-telespeech-ctc-int8-zh-2024-06-04.tar.bz2",
+      type: "telespeech_ctc",
+      lang: "zh-dialect",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "funasr_nano_int8",
+      name: "FunASR Nano (SDK Incompatible)",
+      description: "Requires newer sherpa-onnx native library. ~716MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2",
+      type: "funasr_nano",
+      lang: "zh-en-ja-dialect",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "moonshine_base_zh",
+      name: "Moonshine Base 中文 (SDK Incompatible)",
+      description: "Decodes but returns empty. ~95MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-zh-quantized-2026-02-27.tar.bz2",
+      type: "moonshine",
+      lang: "zh",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "whisper_large_v3",
+      name: "Whisper Large-v3 (Not Recommended)",
+      description: "Very slow, poor Chinese. ~1.0GB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-large-v3.tar.bz2",
+      type: "whisper",
+      lang: "multilingual",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.whisperLike,
+    ),
+    ModelInfo(
+      id: "whisper_distil_large_v3_5",
+      name: "Whisper Distil (Not Recommended)",
+      description: "Translates Chinese to English instead of transcribing. ~504MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-distil-large-v3.5.tar.bz2",
+      type: "whisper",
+      lang: "multilingual",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.whisperLike,
+    ),
+    ModelInfo(
+      id: "whisper_medium_aishell",
+      name: "Whisper Medium AISHELL (Not Recommended)",
+      description: "Poor Chinese quality despite fine-tuning. ~655MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-medium-aishell.tar.bz2",
+      type: "whisper",
+      lang: "zh",
+      isOffline: true,
+      hasPunctuation: true,
+      arch: ModelArch.whisperLike,
+    ),
+    ModelInfo(
+      id: "fire_red_asr_large",
+      name: "FireRedASR v1 (Superseded by v2)",
+      description: "Use v2 CTC instead. ~1.4GB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr-large-zh_en-2025-02-16.tar.bz2",
+      type: "fire_red_asr",
+      lang: "zh-en-dialect",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
   ];
 
   static const List<ModelInfo> offlineModels = [
-    // ====== 1. Recommended (existing) ======
+    // ⭐⭐⭐ 推荐
     ModelInfo(
       id: "sensevoice_zh_en_int8",
       name: "SenseVoice 2024 (Recommended)",
@@ -101,23 +175,43 @@ class ModelManager {
       arch: ModelArch.ctcOffline,
     ),
     ModelInfo(
+      id: "offline_paraformer_zh",
+      name: "Paraformer Offline",
+      description: "Zh/En, fastest decoding (70x realtime). ~217MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2",
+      type: "offline_paraformer",
+      lang: "zh-en",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "fire_red_asr2_ctc_int8",
+      name: "FireRedASR v2 CTC",
+      description: "XiaoHongShu, Zh/En + dialects, CTC architecture. ~496MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2",
+      type: "fire_red_asr_ctc",
+      lang: "zh-en-dialect",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    ModelInfo(
+      id: "sensevoice_funasr_nano_int8",
+      name: "SenseVoice + FunASR Nano",
+      description: "SenseVoice encoder + Nano decoder, compact. ~179MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-funasr-nano-int8-2025-12-17.tar.bz2",
+      type: "sense_voice",
+      lang: "zh-en-ja",
+      isOffline: true,
+      arch: ModelArch.ctcOffline,
+    ),
+    // ⭐⭐ 可用
+    ModelInfo(
       id: "sensevoice_zh_en_int8_2025",
       name: "SenseVoice 2025",
       description: "Cantonese enhanced (21.8k hrs), no built-in punctuation. ~158MB",
       url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2",
       type: "sense_voice",
       lang: "zh-en-ja-ko-yue",
-      isOffline: true,
-      arch: ModelArch.ctcOffline,
-    ),
-    // --- Paraformer ---
-    ModelInfo(
-      id: "offline_paraformer_zh",
-      name: "Paraformer Offline",
-      description: "Zh/En, mature & stable. ~217MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2024-03-09.tar.bz2",
-      type: "offline_paraformer",
-      lang: "zh-en",
       isOffline: true,
       arch: ModelArch.ctcOffline,
     ),
@@ -131,60 +225,16 @@ class ModelManager {
       isOffline: true,
       arch: ModelArch.ctcOffline,
     ),
-
-    // ====== 2. New recommended: FunASR Nano / FireRedASR v2 / SenseVoice+Nano ======
     ModelInfo(
-      id: "funasr_nano_int8",
-      name: "FunASR Nano (LLM-based)",
-      description: "Qwen3-0.6B, 31 languages + 7 dialects + 26 accents, built-in punctuation & hotwords. ~716MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-funasr-nano-int8-2025-12-30.tar.bz2",
-      type: "funasr_nano",
-      lang: "zh-en-ja-dialect",
+      id: "whisper_turbo",
+      name: "Whisper Turbo",
+      description: "OpenAI, 99 languages, built-in punctuation. ~538MB",
+      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-turbo.tar.bz2",
+      type: "whisper",
+      lang: "multilingual",
       isOffline: true,
       hasPunctuation: true,
-      arch: ModelArch.ctcOffline,
-    ),
-    ModelInfo(
-      id: "fire_red_asr2_ctc_int8",
-      name: "FireRedASR v2 CTC",
-      description: "v2 upgrade, 1/3 size of v1, CTC architecture. ~496MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2",
-      type: "fire_red_asr_ctc",
-      lang: "zh-en-dialect",
-      isOffline: true,
-      arch: ModelArch.ctcOffline,
-    ),
-    ModelInfo(
-      id: "sensevoice_funasr_nano_int8",
-      name: "SenseVoice + FunASR Nano",
-      description: "SenseVoice encoder + Nano decoder, compact. ~179MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-funasr-nano-int8-2025-12-17.tar.bz2",
-      type: "funasr_nano",
-      lang: "zh-en-ja",
-      isOffline: true,
-      arch: ModelArch.ctcOffline,
-    ),
-
-    // ====== 3. Lightweight ======
-    ModelInfo(
-      id: "moonshine_base_zh",
-      name: "Moonshine Base 中文",
-      description: "Ultra-light 95MB, Chinese only. ~95MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-zh-quantized-2026-02-27.tar.bz2",
-      type: "moonshine",
-      lang: "zh",
-      isOffline: true,
-      arch: ModelArch.ctcOffline,
-    ),
-    ModelInfo(
-      id: "telespeech_ctc_int8",
-      name: "TeleSpeech CTC",
-      description: "China Telecom TeleAI, Chinese + dialects. ~175MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-telespeech-ctc-int8-zh-2024-06-04.tar.bz2",
-      type: "telespeech_ctc",
-      lang: "zh-dialect",
-      isOffline: true,
-      arch: ModelArch.ctcOffline,
+      arch: ModelArch.whisperLike,
     ),
     ModelInfo(
       id: "dolphin_base_int8",
@@ -193,64 +243,6 @@ class ModelManager {
       url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-dolphin-base-ctc-multi-lang-int8-2025-04-02.tar.bz2",
       type: "dolphin",
       lang: "multilingual",
-      isOffline: true,
-      arch: ModelArch.ctcOffline,
-    ),
-
-    // ====== 4. Whisper variants ======
-    ModelInfo(
-      id: "whisper_turbo",
-      name: "Whisper Turbo",
-      description: "OpenAI Turbo, 6x faster than Large-v3, 99 languages. ~538MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherper-onnx-whisper-turbo.tar.bz2",
-      type: "whisper",
-      lang: "multilingual",
-      isOffline: true,
-      hasPunctuation: true,
-      arch: ModelArch.whisperLike,
-    ),
-    ModelInfo(
-      id: "whisper_distil_large_v3_5",
-      name: "Whisper Distil Large-v3.5",
-      description: "Distilled Whisper, half size of Large-v3, 99 languages. ~504MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-distil-large-v3.5.tar.bz2",
-      type: "whisper",
-      lang: "multilingual",
-      isOffline: true,
-      hasPunctuation: true,
-      arch: ModelArch.whisperLike,
-    ),
-    ModelInfo(
-      id: "whisper_medium_aishell",
-      name: "Whisper Medium AISHELL",
-      description: "Whisper fine-tuned on Chinese AISHELL dataset. ~655MB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-medium-aishell.tar.bz2",
-      type: "whisper",
-      lang: "zh",
-      isOffline: true,
-      hasPunctuation: true,
-      arch: ModelArch.whisperLike,
-    ),
-    ModelInfo(
-      id: "whisper_large_v3",
-      name: "Whisper Large-v3",
-      description: "OpenAI, 99 languages, slow decoding, Chinese quality lower than SenseVoice. ~1.0GB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-large-v3.tar.bz2",
-      type: "whisper",
-      lang: "multilingual",
-      isOffline: true,
-      hasPunctuation: true,
-      arch: ModelArch.whisperLike,
-    ),
-
-    // ====== 5. Large (existing) ======
-    ModelInfo(
-      id: "fire_red_asr_large",
-      name: "FireRedASR Large",
-      description: "Zh/En + Sichuan/Henan dialects, highest capacity. ~1.4GB",
-      url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr-large-zh_en-2025-02-16.tar.bz2",
-      type: "fire_red_asr",
-      lang: "zh-en-dialect",
       isOffline: true,
       arch: ModelArch.ctcOffline,
     ),
@@ -327,12 +319,14 @@ class ModelManager {
     await prefs.setString('active_model_id', id);
   }
 
-  /// 检查目录下是否有 tokens 文件 (tokens.txt 或 *-tokens.txt，如 large-v3-tokens.txt)
+  /// 检查目录下是否有 tokens 文件 (tokens.txt / *-tokens.txt / tokenizer.json)
   Future<bool> _hasTokensFile(String dirPath) async {
     if (await File('$dirPath/tokens.txt').exists()) return true;
+    if (await File('$dirPath/tokenizer.json').exists()) return true;
     try {
-      final entries = Directory(dirPath).listSync();
-      return entries.any((e) => e is File && e.path.endsWith('-tokens.txt'));
+      final entries = Directory(dirPath).listSync(recursive: true);
+      return entries.any((e) => e is File &&
+          (e.path.endsWith('tokens.txt') || e.path.endsWith('tokenizer.json')));
     } catch (_) {
       return false;
     }
@@ -428,41 +422,57 @@ class ModelManager {
       if (await finalModelDir.exists()) await finalModelDir.delete(recursive: true);
 
       // Analyze tempExtractDir content
-      // Find tokens file: tokens.txt or *-tokens.txt (e.g. large-v3-tokens.txt for Whisper)
-      File? tokenFile;
+      // Find anchor file: tokens.txt / *-tokens.txt / tokenizer.json (FunASR Nano)
+      File? anchorFile;
+      final anchorPatterns = ['*tokens.txt', 'tokenizer.json'];
+
       if (Platform.isMacOS || Platform.isLinux) {
-         try {
-           final result = await Process.run('find', [tempExtractDir.path, '-name', '*tokens.txt']);
-           if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
-              final lines = result.stdout.toString().trim().split('\n');
-              if (lines.isNotEmpty) {
-                 tokenFile = File(lines.first.trim());
-                 AppLog.d("[Verification] Native find success: ${tokenFile.path}");
-              }
+         for (final pattern in anchorPatterns) {
+           if (anchorFile != null) break;
+           try {
+             final result = await Process.run('find', [tempExtractDir.path, '-name', pattern]);
+             if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
+                final lines = result.stdout.toString().trim().split('\n');
+                if (lines.isNotEmpty) {
+                   anchorFile = File(lines.first.trim());
+                   AppLog.d("[Verification] Native find success: ${anchorFile.path}");
+                }
+             }
+           } catch (e) {
+             AppLog.d("[Verification] Native find failed: $e");
            }
-         } catch (e) {
-           AppLog.d("[Verification] Native find failed: $e");
          }
       }
 
       // Fallback to Dart search
-      if (tokenFile == null) {
+      if (anchorFile == null) {
           final entities = tempExtractDir.listSync(recursive: true);
           AppLog.d("[Extraction] Entities: ${entities.length}");
           for (var e in entities) {
-            if (e.path.endsWith('tokens.txt')) {
-               tokenFile = File(e.path);
+            if (e.path.endsWith('tokens.txt') || e.path.endsWith('tokenizer.json')) {
+               anchorFile = File(e.path);
                break;
             }
           }
 
-          if (tokenFile == null) {
+          if (anchorFile == null) {
              final fileList = entities.map((e) => e.path.split(Platform.pathSeparator).last).take(10).join(', ');
-             throw Exception("Invalid Model: *tokens.txt not found. Found: $fileList...");
+             throw Exception("Invalid Model: tokens.txt/tokenizer.json not found. Found: $fileList...");
           }
       }
 
-      final sourceDir = tokenFile.parent;
+      // Determine model root: anchor file's parent, but if that dir has no .onnx files,
+      // go up one level (e.g. FunASR Nano: tokenizer.json is in Qwen3-0.6B/ subdirectory)
+      var sourceDir = anchorFile.parent;
+      final hasOnnx = sourceDir.listSync().any((e) => e is File && e.path.endsWith('.onnx'));
+      if (!hasOnnx && sourceDir.parent.path != tempExtractDir.path) {
+        // Check parent for onnx files
+        final parentHasOnnx = sourceDir.parent.listSync().any((e) => e is File && e.path.endsWith('.onnx'));
+        if (parentHasOnnx) {
+          AppLog.d("[Extraction] Anchor was in subdirectory, using parent as model root");
+          sourceDir = sourceDir.parent;
+        }
+      }
       AppLog.d("[Extraction] Found tokens in: ${sourceDir.path}");
       AppLog.d("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
 

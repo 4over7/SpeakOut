@@ -743,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @offlineModels.
   ///
   /// In en, this message translates to:
-  /// **'Offline Models (High Accuracy)'**
+  /// **'Non-streaming Models (High Accuracy)'**
   String get offlineModels;
 
   /// No description provided for @offlineModelsDesc.
@@ -755,19 +755,19 @@ abstract class AppLocalizations {
   /// No description provided for @switchToOfflineTitle.
   ///
   /// In en, this message translates to:
-  /// **'Switch to Offline Mode?'**
+  /// **'Switch to Non-streaming Model?'**
   String get switchToOfflineTitle;
 
   /// No description provided for @switchToOfflineBody.
   ///
   /// In en, this message translates to:
-  /// **'Offline models recognize after you release the key — no real-time subtitles during recording. Accuracy is higher. Continue?'**
+  /// **'Non-streaming models recognize after you release the key — no real-time subtitles during recording. Accuracy is higher. Continue?'**
   String get switchToOfflineBody;
 
   /// No description provided for @switchToStreamingTitle.
   ///
   /// In en, this message translates to:
-  /// **'Switch to Streaming Mode?'**
+  /// **'Switch to Streaming Model?'**
   String get switchToStreamingTitle;
 
   /// No description provided for @switchToStreamingBody.
@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// No description provided for @modeOffline.
   ///
   /// In en, this message translates to:
-  /// **'Offline'**
+  /// **'Non-streaming'**
   String get modeOffline;
 
   /// No description provided for @chooseModel.

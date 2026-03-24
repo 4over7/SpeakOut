@@ -21,7 +21,7 @@ PODS:
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
-  - sherpa_onnx_macos (1.12.28):
+  - sherpa_onnx_macos (1.12.33):
     - FlutterMacOS
   - system_tray (0.0.1):
     - FlutterMacOS
@@ -91,7 +91,7 @@ SPEC CHECKSUMS:
   record_macos: 7f227161b93c49e7e34fe681c5891c8622c8cc8b
   screen_retriever_macos: 452e51764a9e1cdb74b3c541238795849f21557f
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
-  sherpa_onnx_macos: f588e127ac6b1ad89cb6fa004baea930f33a16df
+  sherpa_onnx_macos: d1ecbe41b04c4ce6ad90bf1485d9495fac83c23e
   system_tray: 53f0cdb020c3fbee711d3fe45ae7ce730e033d2b
   url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
   window_manager: b729e31d38fb04905235df9ea896128991cad99e

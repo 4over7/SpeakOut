@@ -349,21 +349,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shows text in real-time as you speak. Best for long dictation.';
 
   @override
-  String get offlineModels => 'Offline Models (High Accuracy)';
+  String get offlineModels => 'Non-streaming Models (High Accuracy)';
 
   @override
   String get offlineModelsDesc =>
       'Recognizes after recording stops. Higher accuracy, no real-time subtitles.';
 
   @override
-  String get switchToOfflineTitle => 'Switch to Offline Mode?';
+  String get switchToOfflineTitle => 'Switch to Non-streaming Model?';
 
   @override
   String get switchToOfflineBody =>
-      'Offline models recognize after you release the key — no real-time subtitles during recording. Accuracy is higher. Continue?';
+      'Non-streaming models recognize after you release the key — no real-time subtitles during recording. Accuracy is higher. Continue?';
 
   @override
-  String get switchToStreamingTitle => 'Switch to Streaming Mode?';
+  String get switchToStreamingTitle => 'Switch to Streaming Model?';
 
   @override
   String get switchToStreamingBody =>
@@ -425,7 +425,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeStreaming => 'Streaming';
 
   @override
-  String get modeOffline => 'Offline';
+  String get modeOffline => 'Non-streaming';
 
   @override
   String get chooseModel => 'Choose a Voice Model';

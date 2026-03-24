@@ -27,15 +27,34 @@ class AppLog {
 
   static IOSink? _sink;
   static bool _initAttempted = false;
+  static String? _activeLogDirectory; // 当前生效的日志目录
   // ignore: unused_field — held to prevent GC
   static Timer? _flushTimer;
 
-  /// Initialize log file. Called once at startup.
+  /// 自定义日志目录（来自设置页"日志输出目录"）
+  static String? customLogDirectory;
+
+  /// Initialize log file. Called at startup and when log directory changes.
   static Future<void> init() async {
-    if (_initAttempted) return;
+    // 如果目录没变且已初始化，跳过
+    if (_initAttempted && customLogDirectory == _activeLogDirectory) return;
+    // 关闭旧 sink
+    if (_sink != null) {
+      try { await _sink!.flush(); _sink!.close(); } catch (_) {}
+      _sink = null;
+    }
     _initAttempted = true;
+    _activeLogDirectory = customLogDirectory;
     try {
-      final dir = await getApplicationSupportDirectory();
+      final Directory dir;
+      if (customLogDirectory != null && customLogDirectory!.isNotEmpty) {
+        dir = Directory(customLogDirectory!);
+        if (!dir.existsSync()) {
+          dir.createSync(recursive: true);
+        }
+      } else {
+        dir = await getApplicationSupportDirectory();
+      }
       final file = File('${dir.path}/speakout.log');
       // Truncate if > 5MB to prevent unbounded growth
       if (file.existsSync() && file.lengthSync() > 5 * 1024 * 1024) {

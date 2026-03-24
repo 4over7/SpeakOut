@@ -79,3 +79,15 @@ docs/wiki/settings_reorganize_*.md
 docs/wiki/toggle_mode_*.md
 docs/wiki/unified_*.md
 docs/wiki/vocab_*.md
+
+# Flutter generated
+.metadata
+
+# Videos / large media
+*.mp4
+
+# Old directories (merged into scripts/)
+tools/
+
+# Wiki submodule (managed via GitHub Wiki separately)
+wiki/

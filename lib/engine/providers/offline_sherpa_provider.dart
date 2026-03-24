@@ -90,18 +90,20 @@ class OfflineSherpaProvider implements ASRProvider {
       final encoderAdaptor = _findFile(modelPath, "encoder_adaptor");
       final llm = _findFile(modelPath, "llm");
       final embedding = _findFile(modelPath, "embedding");
-      final tokenizer = "$modelPath/tokenizer.json";
+      // tokenizer.json 在 Qwen3-0.6B/ 子目录里，递归查找
+      final tokenizerFile = _findFileRecursive(modelPath, "tokenizer.json");
+      AppLog.d("[OfflineSherpaProvider] FunASR Nano paths: encoderAdaptor=$encoderAdaptor, llm=$llm, embedding=$embedding, tokenizer=$tokenizerFile");
       modelConfig = sherpa.OfflineModelConfig(
         funasrNano: sherpa.OfflineFunAsrNanoModelConfig(
           encoderAdaptor: encoderAdaptor,
           llm: llm,
           embedding: embedding,
-          tokenizer: tokenizer,
+          tokenizer: tokenizerFile,
         ),
-        tokens: "$modelPath/tokens.txt",
+        tokens: "",
         numThreads: 2,
         provider: "cpu",
-        debug: false,
+        debug: true,
       );
     } else if (modelType == 'fire_red_asr_ctc') {
       final model = _findFile(modelPath, "model");
@@ -115,16 +117,19 @@ class OfflineSherpaProvider implements ASRProvider {
         debug: false,
       );
     } else if (modelType == 'moonshine') {
-      final preprocessor = _findFile(modelPath, "preprocess");
-      final encoder = _findFile(modelPath, "encode");
-      final uncachedDecoder = _findFile(modelPath, "uncached");
-      final cachedDecoder = _findFile(modelPath, "cached");
+      // Moonshine 中文版文件: encoder_model.ort + decoder_model_merged.ort
+      // 标准 Moonshine: preprocessor.onnx + encoder.onnx + uncached_decoder.onnx + cached_decoder.onnx
+      final encoder = _findFileAny(modelPath, ["preprocess", "encoder_model", "encoder"]);
+      final decoder = _findFileAny(modelPath, ["decoder_model_merged", "uncached"]);
+      // 如果是 merged decoder 格式（只有 encoder + merged decoder），用 mergedDecoder
+      final isMergedFormat = decoder.contains("merged");
       modelConfig = sherpa.OfflineModelConfig(
         moonshine: sherpa.OfflineMoonshineModelConfig(
-          preprocessor: preprocessor,
-          encoder: encoder,
-          uncachedDecoder: uncachedDecoder,
-          cachedDecoder: cachedDecoder,
+          preprocessor: isMergedFormat ? "" : encoder,
+          encoder: isMergedFormat ? encoder : _findFileAny(modelPath, ["encode"]),
+          uncachedDecoder: isMergedFormat ? "" : decoder,
+          cachedDecoder: isMergedFormat ? "" : _findFileAny(modelPath, ["cached"]),
+          mergedDecoder: isMergedFormat ? decoder : "",
         ),
         tokens: _findTokens(modelPath),
         numThreads: 2,
@@ -268,6 +273,37 @@ class OfflineSherpaProvider implements ASRProvider {
       _audioChunks.clear();
       return ASRResult.textOnly("");
     }
+  }
+
+  /// Find a file matching any of [patterns] in [dirPath], supports .onnx and .ort.
+  String _findFileAny(String dirPath, List<String> patterns) {
+    final dir = Directory(dirPath);
+    if (!dir.existsSync()) throw Exception("Model dir not found: $dirPath");
+    final files = dir.listSync().whereType<File>().toList();
+    for (final pattern in patterns) {
+      // Try int8.onnx, .onnx, .ort
+      for (final ext in ['.int8.onnx', '.onnx', '.ort']) {
+        final match = files.where((f) => f.path.contains(pattern) && f.path.endsWith(ext)).firstOrNull;
+        if (match != null) return match.path;
+      }
+    }
+    throw Exception("Missing file for ${patterns.join('/')} in $dirPath");
+  }
+
+  /// Find a file by exact name recursively in [dirPath] and subdirectories.
+  String _findFileRecursive(String dirPath, String fileName) {
+    final dir = Directory(dirPath);
+    if (!dir.existsSync()) throw Exception("Model dir not found: $dirPath");
+    // Check root first
+    final rootFile = File('$dirPath/$fileName');
+    if (rootFile.existsSync()) return rootFile.path;
+    // Search subdirectories
+    for (final entity in dir.listSync(recursive: true)) {
+      if (entity is File && entity.path.endsWith(fileName)) {
+        return entity.path;
+      }
+    }
+    throw Exception("Missing file $fileName in $dirPath (recursive)");
   }
 
   /// Find a file matching [pattern] in [dirPath], preferring int8 variants.
