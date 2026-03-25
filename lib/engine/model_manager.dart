@@ -427,7 +427,7 @@ class ModelManager {
       File? anchorFile;
       final anchorPatterns = ['*tokens.txt', 'tokenizer.json'];
 
-      if ((Platform.isMacOS || Platform.isLinux) && !Distribution.isAppStore) {
+      if (Platform.isMacOS || Platform.isLinux) {
          for (final pattern in anchorPatterns) {
            if (anchorFile != null) break;
            try {
@@ -790,8 +790,9 @@ Future<void> _extractModelTask(List<String> args) async {
   final file = File(tarPath);
   
   // 1. Try Native Tar (MacOS/Linux) - Much faster and memory efficient
-  // App Store 沙盒禁止启动外部进程，跳过 native tar
-  if ((Platform.isMacOS || Platform.isLinux) && !Distribution.isAppStore) {
+  // 1. Try Native Tar (MacOS/Linux) - Much faster and memory efficient
+  // App Store 沙盒下 Process.run 会抛异常，自动走 Dart 回退
+  if (Platform.isMacOS || Platform.isLinux) {
      try {
        await Directory(destDir).create(recursive: true);
        // -x: extract, -f: file. bzip2 is usually auto-detected or we can use -j
