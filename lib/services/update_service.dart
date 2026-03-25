@@ -59,11 +59,11 @@ class UpdateService {
       final info = await PackageInfo.fromPlatform();
       final localVersion = info.version;
 
-      // 主路径: GitHub Releases API
-      var remote = await _checkGitHub();
+      // 主路径: Gateway（私有仓库 GitHub API 不返回 assets）
+      var remote = await _checkGateway();
 
-      // 降级: Gateway /version
-      remote ??= await _checkGateway();
+      // 降级: GitHub Releases API
+      remote ??= await _checkGitHub();
 
       if (remote == null) {
         AppLog.d('UpdateService: version check failed (both sources)');
@@ -134,7 +134,8 @@ class UpdateService {
       if (version == null) return null;
 
       final url = (json['download_url'] as String?) ?? AppConstants.kGitHubReleasesUrl;
-      return _RemoteVersion(version, url);
+      final dmgUrl = json['dmg_url'] as String?;
+      return _RemoteVersion(version, url, dmgUrl: dmgUrl);
     } catch (e) {
       AppLog.d('UpdateService: Gateway check failed: $e');
       return null;

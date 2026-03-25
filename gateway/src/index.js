@@ -28,6 +28,7 @@ app.get('/version', (c) => {
         version: '1.5.22',
         build: 162,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
+        dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.5.22/SpeakOut.dmg',
         release_notes: '',
     });
 });
