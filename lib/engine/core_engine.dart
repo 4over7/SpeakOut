@@ -531,7 +531,20 @@ class CoreEngine {
       }
     }
 
-    // 2. Shared key: toggle key == PTT/diary key → use time-threshold logic
+    // 2. 即时翻译快捷键（最高优先级，覆盖 shared/PTT/toggle）
+    final translateCode = config.translateKeyCode;
+    if (config.translateEnabled && translateCode != 0 &&
+        matchKey(translateCode, config.translateModifiers)) {
+      if (isDown && _recordingState == RecordingState.idle) {
+        _translateOverride = config.translateTargetLanguage;
+        _activeHotkeyCode = translateCode;
+        _log("[Translate] Quick translate → $_translateOverride, key=$translateCode");
+      }
+      _handleModeKey(isDown, RecordingMode.ptt, _translateKeyHeld, (v) => _translateKeyHeld = v);
+      return;
+    }
+
+    // 3. Shared key: toggle key == PTT/diary key → use time-threshold logic
     final bool isSharedPtt = toggleInputCode != 0 && toggleInputCode == pttKeyCode && keyCode == pttKeyCode;
     final bool isSharedDiary = toggleDiaryCode != 0 && config.diaryEnabled && toggleDiaryCode == config.diaryKeyCode && keyCode == config.diaryKeyCode;
 
@@ -544,7 +557,7 @@ class CoreEngine {
       return;
     }
 
-    // 3. Independent toggle keys (not shared with PTT/diary)
+    // 4. Independent toggle keys (not shared with PTT/diary)
     if (isDown && toggleInputCode != 0 && matchKey(toggleInputCode, config.toggleInputModifiers)) {
       _handleToggleKey(RecordingMode.ptt);
       return;
@@ -554,24 +567,11 @@ class CoreEngine {
       return;
     }
 
-    // 4. AI 梳理快捷键（仅 keyDown，不涉及录音状态机）
+    // 5. AI 梳理快捷键（仅 keyDown，不涉及录音状态机）
     final organizeCode = config.organizeKeyCode;
     if (isDown && config.organizeEnabled && organizeCode != 0 &&
         matchKey(organizeCode, config.organizeModifiers)) {
       _handleOrganize();
-      return;
-    }
-
-    // 5. 即时翻译快捷键（PTT 风格，带翻译覆盖）
-    final translateCode = config.translateKeyCode;
-    if (config.translateEnabled && translateCode != 0 &&
-        matchKey(translateCode, config.translateModifiers)) {
-      if (isDown && _recordingState == RecordingState.idle) {
-        _translateOverride = config.translateTargetLanguage;
-        _activeHotkeyCode = translateCode;
-        _log("[Translate] Quick translate → $_translateOverride, key=$translateCode");
-      }
-      _handleModeKey(isDown, RecordingMode.ptt, _translateKeyHeld, (v) => _translateKeyHeld = v);
       return;
     }
 
