@@ -27,7 +27,7 @@ DMG_NAME="SpeakOut.dmg"
 DMG_TEMP="SpeakOut_temp.dmg"
 VOLUME_NAME="SpeakOut"
 STAGING_DIR="build/dmg_staging"
-SIGN_IDENTITY="Apple Development: 4over7@gmail.com (G6X3766L63)"
+SIGN_IDENTITY="Apple Development: Lindan Wang (GQ2A45YPF3)"
 
 PWD=$(pwd)
 DMG_TEMP_PATH="${PWD}/${DMG_TEMP}"
