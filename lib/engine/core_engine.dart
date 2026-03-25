@@ -500,7 +500,9 @@ class CoreEngine {
   // Key state debouncing
   bool _pttKeyHeld = false;
   bool _diaryKeyHeld = false;
+  bool _translateKeyHeld = false;
   bool _deferredStop = false;
+  int? _activeHotkeyCode; // The key that started the current recording (for watchdog)
 
   void _handleKey(int keyCode, bool isDown, int modifierFlags) {
     // macOS 26+: Globe/Fn key sends keyCode 179 (kCGEventKeyDown) in addition
@@ -566,9 +568,10 @@ class CoreEngine {
         matchKey(translateCode, config.translateModifiers)) {
       if (isDown && _recordingState == RecordingState.idle) {
         _translateOverride = config.translateTargetLanguage;
-        _log("[Translate] Quick translate → ${_translateOverride}");
+        _activeHotkeyCode = translateCode;
+        _log("[Translate] Quick translate → $_translateOverride, key=$translateCode");
       }
-      _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
+      _handleModeKey(isDown, RecordingMode.ptt, _translateKeyHeld, (v) => _translateKeyHeld = v);
       return;
     }
 
@@ -581,6 +584,7 @@ class CoreEngine {
     final bool diaryMatch = config.diaryEnabled && matchKey(config.diaryKeyCode, config.diaryModifiers);
 
     if (pttMatch) {
+      if (isDown && _recordingState == RecordingState.idle) _activeHotkeyCode = pttKeyCode;
       _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
     } else if (diaryMatch) {
       _handleModeKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
@@ -793,11 +797,12 @@ class CoreEngine {
       // 4. WATCHDOG (PTT only — diary has reliable key-up, toggle doesn't need it)
       _watchdogTimer?.cancel();
       if (mode == RecordingMode.ptt && !_isToggleMode) {
+        final watchKeyCode = _activeHotkeyCode ?? pttKeyCode;
         _watchdogTimer = Timer.periodic(Duration(milliseconds: AppConstants.kKeyWatchdogIntervalMs), (timer) {
           if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
-          final isPhysicallyDown = _nativeInput.isKeyPressed(pttKeyCode);
+          final isPhysicallyDown = _nativeInput.isKeyPressed(watchKeyCode);
           if (!isPhysicallyDown) {
-            _log("Watchdog: Key UP physically, forcing stop.");
+            _log("Watchdog: Key $watchKeyCode UP physically, forcing stop.");
             timer.cancel();
             stopRecording();
           }
@@ -932,6 +937,7 @@ class CoreEngine {
      _audioStarted = false;
      _deferredStop = false;
      _isToggleMode = false;
+     _activeHotkeyCode = null;
      _toggleMaxTimer?.cancel();
      _toggleMaxTimer = null;
      _stopAudioPolling();
