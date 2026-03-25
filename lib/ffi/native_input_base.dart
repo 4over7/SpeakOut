@@ -113,6 +113,10 @@ typedef GetAudioLevelDart = double Function();
 typedef CheckIsTerminalAppC = Int32 Function();
 typedef CheckIsTerminalAppDart = int Function();
 
+// Auto-update: launch external script
+typedef LaunchUpdaterC = Void Function(Pointer<Utf8> scriptPath);
+typedef LaunchUpdaterDart = void Function(Pointer<Utf8> scriptPath);
+
 // AI 梳理: copy selection (Cmd+C) and press key
 typedef CopySelectionC = Void Function();
 typedef CopySelectionDart = void Function();
@@ -183,4 +187,7 @@ abstract class NativeInputBase {
 
   // Check if frontmost app is a terminal emulator
   bool isTerminalApp();
+
+  // Launch external updater script (for auto-update)
+  void launchUpdater(String scriptPath);
 }

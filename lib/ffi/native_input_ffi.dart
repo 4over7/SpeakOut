@@ -593,4 +593,26 @@ class NativeInputFFI implements NativeInputBase {
     }
     return _checkIsTerminalApp() == 1;
   }
+
+  // --- Auto-Update ---
+  late LaunchUpdaterDart _launchUpdater;
+  bool _updaterBound = false;
+
+  @override
+  void launchUpdater(String scriptPath) {
+    if (!_updaterBound) {
+      try {
+        _launchUpdater = _dylib
+            .lookup<NativeFunction<LaunchUpdaterC>>('launch_updater')
+            .asFunction();
+        _updaterBound = true;
+      } catch (e) {
+        _log("LaunchUpdater FFI binding FAILED: $e");
+        return;
+      }
+    }
+    final ptr = scriptPath.toNativeUtf8();
+    _launchUpdater(ptr);
+    calloc.free(ptr);
+  }
 }

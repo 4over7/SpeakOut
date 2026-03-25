@@ -2986,8 +2986,13 @@ class _SettingsPageState extends State<SettingsPage> {
                             const SizedBox(width: 8),
                             GestureDetector(
                               onTap: () {
-                                final url = UpdateService().downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
-                                launchUrl(Uri.parse(url));
+                                final svc = UpdateService();
+                                if (svc.canAutoUpdate) {
+                                  svc.downloadUpdate();
+                                } else {
+                                  final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+                                  launchUrl(Uri.parse(url));
+                                }
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -2995,7 +3000,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                   color: AppTheme.accentColor,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: Text(loc.updateAction, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+                                child: Text(
+                                  UpdateService().canAutoUpdate ? '下载更新' : loc.updateAction,
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                ),
                               ),
                             ),
                           ],

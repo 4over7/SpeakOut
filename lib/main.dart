@@ -186,12 +186,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   AppNotification? _currentNotification;
   Timer? _notificationTimer;
 
+  // Auto-update state
+  UpdateState _updateState = UpdateState.idle;
+  double _downloadProgress = 0;
+
   // Stream subscriptions — cancelled in dispose
   StreamSubscription<String>? _statusSub;
   StreamSubscription<AppNotification>? _notifSub;
   StreamSubscription<bool>? _recordingSub;
   StreamSubscription<String>? _resultSub;
   StreamSubscription<String>? _partialSub;
+  StreamSubscription<UpdateState>? _updateStateSub;
+  StreamSubscription<double>? _updateProgressSub;
 
   @override
   void initState() {
@@ -253,6 +259,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
       }
     });
     
+    // Subscribe to update state changes
+    _updateStateSub = UpdateService().stateChanges.listen((state) {
+      if (mounted) setState(() => _updateState = state);
+    });
+    _updateProgressSub = UpdateService().downloadProgress.listen((p) {
+      if (mounted) setState(() => _downloadProgress = p);
+    });
+
     // Subscribe to recognized text results (final)
     _resultSub = _appService.engine.resultStream.listen((text) {
       if (mounted && text.isNotEmpty) {
@@ -329,6 +343,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     _recordingSub?.cancel();
     _resultSub?.cancel();
     _partialSub?.cancel();
+    _updateStateSub?.cancel();
+    _updateProgressSub?.cancel();
     super.dispose();
   }
   
@@ -808,30 +824,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                           ),
                           if (UpdateService().hasUpdate && UpdateService().latestVersion != null) ...[
                             const SizedBox(width: 10),
-                            GestureDetector(
-                              onTap: () {
-                                final url = UpdateService().downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
-                                launchUrl(Uri.parse(url));
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: MacosColors.systemOrangeColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(CupertinoIcons.arrow_down_circle_fill, size: 12, color: Colors.white),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${UpdateService().latestVersion} 可用',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                            _buildUpdateBadge(),
                           ],
                         ],
                       ),
@@ -845,5 +838,100 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
         ],
       ),
     );
+  }
+
+  Widget _buildUpdateBadge() {
+    final svc = UpdateService();
+    final version = svc.latestVersion ?? '';
+
+    String label;
+    Color bgColor;
+    IconData icon;
+    VoidCallback? onTap;
+
+    switch (_updateState) {
+      case UpdateState.downloading:
+        final pct = (_downloadProgress * 100).toInt();
+        label = '$pct%';
+        bgColor = MacosColors.systemBlueColor;
+        icon = CupertinoIcons.arrow_down_circle;
+        onTap = null;
+      case UpdateState.readyToInstall:
+        label = '安装并重启';
+        bgColor = MacosColors.systemGreenColor;
+        icon = CupertinoIcons.checkmark_circle_fill;
+        onTap = _handleInstallAndRestart;
+      case UpdateState.installing:
+        label = '安装中...';
+        bgColor = MacosColors.systemGreenColor;
+        icon = CupertinoIcons.arrow_2_circlepath;
+        onTap = null;
+      case UpdateState.failed:
+        label = '$version 可用';
+        bgColor = MacosColors.systemOrangeColor;
+        icon = CupertinoIcons.arrow_down_circle_fill;
+        onTap = () => _handleUpdateTap();
+      default: // idle, checking
+        label = '$version 可用';
+        bgColor = MacosColors.systemOrangeColor;
+        icon = CupertinoIcons.arrow_down_circle_fill;
+        onTap = () => _handleUpdateTap();
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: Colors.white),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+            ),
+            if (_updateState == UpdateState.downloading) ...[
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 40,
+                height: 4,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: _downloadProgress,
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleUpdateTap() {
+    final svc = UpdateService();
+    if (svc.canAutoUpdate) {
+      svc.downloadUpdate();
+    } else {
+      final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+      launchUrl(Uri.parse(url));
+    }
+  }
+
+  void _handleInstallAndRestart() {
+    final svc = UpdateService();
+    final scriptPath = svc.prepareInstall();
+    _appService.engine.nativeInput?.launchUpdater(scriptPath);
+    Future.delayed(const Duration(milliseconds: 500), () {
+      exit(0);
+    });
   }
 }

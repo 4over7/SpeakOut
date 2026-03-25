@@ -1595,6 +1595,24 @@ const char *analyze_audio_quality(const int16_t *samples, int sampleCount,
 /// Quick check if current audio appears to be telephone quality
 /// Uses device transport type + sample rate as heuristic
 /// Returns 1 if likely telephone quality, 0 otherwise
+// Launch an external shell script (for auto-update: replaces app after exit)
+void launch_updater(const char *scriptPath) {
+  @autoreleasepool {
+    NSString *path = [NSString stringWithUTF8String:scriptPath];
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = @"/bin/bash";
+    task.arguments = @[path];
+    task.standardOutput = [NSFileHandle fileHandleWithNullDevice];
+    task.standardError = [NSFileHandle fileHandleWithNullDevice];
+    @try {
+      [task launch];
+      log_to_file("launch_updater: launched %s (pid=%d)", scriptPath, task.processIdentifier);
+    } @catch (NSException *e) {
+      log_to_file("launch_updater: failed to launch %s: %s", scriptPath, e.reason.UTF8String);
+    }
+  }
+}
+
 int is_likely_telephone_quality() {
   AudioObjectPropertyAddress propAddr = {
       kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal,
