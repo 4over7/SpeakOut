@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:speakout/config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
+import 'package:speakout/config/distribution.dart';
 
 /// 模型架构分类，用于确定 Phase 2 置信度支持能力
 enum ModelArch {
@@ -426,7 +427,7 @@ class ModelManager {
       File? anchorFile;
       final anchorPatterns = ['*tokens.txt', 'tokenizer.json'];
 
-      if (Platform.isMacOS || Platform.isLinux) {
+      if ((Platform.isMacOS || Platform.isLinux) && !Distribution.isAppStore) {
          for (final pattern in anchorPatterns) {
            if (anchorFile != null) break;
            try {
@@ -789,7 +790,8 @@ Future<void> _extractModelTask(List<String> args) async {
   final file = File(tarPath);
   
   // 1. Try Native Tar (MacOS/Linux) - Much faster and memory efficient
-  if (Platform.isMacOS || Platform.isLinux) {
+  // App Store 沙盒禁止启动外部进程，跳过 native tar
+  if ((Platform.isMacOS || Platform.isLinux) && !Distribution.isAppStore) {
      try {
        await Directory(destDir).create(recursive: true);
        // -x: extract, -f: file. bzip2 is usually auto-detected or we can use -j

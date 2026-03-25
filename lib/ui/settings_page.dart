@@ -3206,6 +3206,17 @@ class _SettingsPageState extends State<SettingsPage> {
             loc.aboutCopyright,
             style: AppTheme.caption(context).copyWith(color: MacosColors.quaternaryLabelColor)
           ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => launchUrl(Uri.parse('https://github.com/4over7/SpeakOut/wiki/Privacy-Policy')),
+            child: Text(
+              '隐私政策',
+              style: AppTheme.caption(context).copyWith(
+                color: AppTheme.accentColor,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
 
           const SizedBox(height: 48),
 

@@ -34,8 +34,9 @@ class UpdateService {
   final _stateController = StreamController<UpdateState>.broadcast();
   Stream<UpdateState> get stateChanges => _stateController.stream;
 
-  static const _dmgPath = '/tmp/SpeakOut-update.dmg';
-  static const _helperPath = '/tmp/speakout_update.sh';
+  // 使用系统临时目录（沙盒兼容）
+  static String get _dmgPath => '${Directory.systemTemp.path}/SpeakOut-update.dmg';
+  static String get _helperPath => '${Directory.systemTemp.path}/speakout_update.sh';
 
   void _setState(UpdateState s) {
     _state = s;
@@ -260,9 +261,10 @@ open "$installDir/$appName"
     return _helperPath;
   }
 
-  /// Install update and restart the app.
+  /// Install update and restart the app (GitHub distribution only).
   /// Returns the helper script path; caller should launch it via FFI then exit.
   String prepareInstall() {
+    if (!Distribution.supportsAutoUpdate) return '';
     _setState(UpdateState.installing);
     return _writeHelperScript();
   }
