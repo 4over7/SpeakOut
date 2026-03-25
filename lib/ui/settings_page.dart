@@ -76,6 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _isCapturingToggleInputKey = false;
   bool _isCapturingToggleDiaryKey = false;
   bool _isCapturingOrganizeKey = false;
+  bool _isCapturingTranslateKey = false;
   bool _isCheckingUpdate = false;
   bool _versionCopied = false;
   String? _updateResult;
@@ -231,9 +232,18 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
 
-    if (_isCapturingOrganizeKey) {
+    if (_isCapturingTranslateKey) {
+       // 即时翻译快捷键与所有录音键、梳理键冲突检测
+       final allKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode, config.organizeKeyCode].where((k) => k != 0);
+       if (allKeys.contains(keyCode)) {
+         _stopKeyCapture();
+         return;
+       }
+       await config.setTranslateKey(keyCode, displayName, modifiers: requiredMods);
+       setState(() => _isCapturingTranslateKey = false);
+    } else if (_isCapturingOrganizeKey) {
        // AI 梳理快捷键与所有录音键冲突检测
-       final allRecordingKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode].where((k) => k != 0);
+       final allRecordingKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode, config.translateKeyCode].where((k) => k != 0);
        if (allRecordingKeys.contains(keyCode)) {
          _stopKeyCapture();
          return;
@@ -296,6 +306,7 @@ class _SettingsPageState extends State<SettingsPage> {
          case 'toggleDiary': _isCapturingToggleDiaryKey = true;
          case 'diary': _isCapturingDiaryKey = true;
          case 'organize': _isCapturingOrganizeKey = true;
+         case 'translate': _isCapturingTranslateKey = true;
          default: _isCapturingKey = true;
        }
     });
@@ -308,7 +319,7 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     // Timeout
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey || _isCapturingOrganizeKey)) {
+      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey || _isCapturingOrganizeKey || _isCapturingTranslateKey)) {
         _stopKeyCapture();
       }
     });
@@ -342,6 +353,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _isCapturingToggleInputKey = false;
         _isCapturingToggleDiaryKey = false;
         _isCapturingOrganizeKey = false;
+        _isCapturingTranslateKey = false;
       });
     }
   }
@@ -2490,6 +2502,18 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  /// Check if any LLM API key is configured (cloud account or legacy preset)
+  String _resolveLlmApiKey() {
+    final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+    if (llmAccounts.isNotEmpty) {
+      final savedId = ConfigService().selectedLlmAccountId ?? '';
+      final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : llmAccounts.first.id;
+      final account = CloudAccountService().getAccountById(effectiveId);
+      return account?.credentials['api_key'] ?? '';
+    }
+    return ConfigService().llmApiKey;
+  }
+
   Widget _buildTriggerView() {
     final loc = AppLocalizations.of(context)!;
     return Column(
@@ -2560,6 +2584,81 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
             ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // 3. Quick Translate group
+        SettingsGroup(
+          title: loc.quickTranslate,
+          children: [
+            SettingsTile(
+              label: loc.quickTranslate,
+              subtitle: loc.quickTranslateDesc,
+              icon: CupertinoIcons.globe,
+              child: MacosSwitch(
+                value: ConfigService().translateEnabled,
+                onChanged: (v) async {
+                  await ConfigService().setTranslateEnabled(v);
+                  setState(() {});
+                },
+              ),
+            ),
+            if (ConfigService().translateEnabled) ...[
+              const SettingsDivider(),
+              _buildKeyCaptureTile(
+                loc.translateHotkey, CupertinoIcons.keyboard,
+                isCapturing: _isCapturingTranslateKey,
+                keyName: ConfigService().translateKeyName,
+                onEdit: () => _startKeyCapture('translate'),
+                onClear: () async {
+                  await ConfigService().clearTranslateKey();
+                  setState(() {});
+                },
+              ),
+              const SettingsDivider(),
+              SettingsTile(
+                label: loc.translateTargetLanguage,
+                icon: CupertinoIcons.textformat,
+                child: _buildDropdown(
+                  value: ConfigService().translateTargetLanguage,
+                  items: {
+                    'en': loc.langEn,
+                    'zh-Hans': loc.langZhHans,
+                    'zh-Hant': loc.langZhHant,
+                    'ja': loc.langJa,
+                    'ko': loc.langKo,
+                    'es': loc.langEs,
+                    'fr': loc.langFr,
+                    'de': loc.langDe,
+                    'ru': loc.langRu,
+                    'pt': loc.langPt,
+                  },
+                  onChanged: (v) async {
+                    await ConfigService().setTranslateTargetLanguage(v!);
+                    setState(() {});
+                  },
+                ),
+              ),
+              // LLM 未配置警告
+              if (_resolveLlmApiKey().isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      MacosIcon(CupertinoIcons.exclamationmark_triangle, color: Colors.orange, size: 14),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loc.translateNoLlm,
+                          style: AppTheme.caption(context).copyWith(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ],
         ),
       ],

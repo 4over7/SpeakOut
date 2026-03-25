@@ -489,6 +489,9 @@ class CoreEngine {
     return (stripped & requiredFlags) == requiredFlags;
   }
 
+  // Quick translate override: non-null → this recording translates to the specified language
+  String? _translateOverride;
+
   // Toggle mode state
   bool _isToggleMode = false;        // Current recording was started by toggle
   Timer? _toggleMaxTimer;            // Max recording duration timer
@@ -557,7 +560,19 @@ class CoreEngine {
       return;
     }
 
-    // 5. Pure PTT / diary keys (existing logic)
+    // 5. 即时翻译快捷键（PTT 风格，带翻译覆盖）
+    final translateCode = config.translateKeyCode;
+    if (config.translateEnabled && translateCode != 0 &&
+        matchKey(translateCode, config.translateModifiers)) {
+      if (isDown && _recordingState == RecordingState.idle) {
+        _translateOverride = config.translateTargetLanguage;
+        _log("[Translate] Quick translate → ${_translateOverride}");
+      }
+      _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
+      return;
+    }
+
+    // 6. Pure PTT / diary keys (existing logic)
     // Guard: if toggle mode is active, ignore keyUp from PTT/diary keys
     // to prevent the keyUp from a toggle-start tap from stopping recording.
     if (_isToggleMode && !isDown) return;
@@ -1035,10 +1050,12 @@ class CoreEngine {
       // AI Polish (with vocab hints injected into LLM prompt)
       // Skip LLM for trivial input: pure punctuation, whitespace, or ≤2 chars
       final trimmedForCheck = finalText.replaceAll(RegExp(r'[\s\p{P}]', unicode: true), '');
-      final shouldCallLlm = finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && trimmedForCheck.length > 2;
+      final isQuickTranslate = _translateOverride != null;
+      final shouldCallLlm = finalText.isNotEmpty && trimmedForCheck.length > 2 &&
+          (ConfigService().aiCorrectionEnabled || isQuickTranslate);
       if (shouldCallLlm) {
-        _statusController.add("AI 润色中...");
-        _overlay.updateText("🤖 AI Polishing...");
+        _statusController.add(isQuickTranslate ? "翻译中..." : "AI 润色中...");
+        _overlay.updateText(isQuickTranslate ? "🌐 Translating..." : "🤖 AI Polishing...");
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
         bool typewriterBegan = false;
         try {
@@ -1067,7 +1084,7 @@ class CoreEngine {
 
             // Wrap stream with timeout: if no data for 15s, abort
             bool timedOut = false;
-            await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: (sink) {
+            await for (final chunk in LLMService().correctTextStream(finalText, vocabHints: vocabHints, translateTo: _translateOverride).timeout(llmTimeout, onTimeout: (sink) {
               timedOut = true;
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream TIMEOUT (${llmTimeout.inSeconds}s)");
               sink.close();
@@ -1113,14 +1130,14 @@ class CoreEngine {
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
           } else if (mode != RecordingMode.diary) {
             // Normal mode: non-streaming LLM, inject once at end
-            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: () {
+            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints, translateTo: _translateOverride).timeout(llmTimeout, onTimeout: () {
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
               return finalText;
             });
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): '$finalText'");
           } else {
             // Diary mode: non-streaming (need complete text for file save)
-            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints).timeout(llmTimeout, onTimeout: () {
+            finalText = await LLMService().correctText(finalText, vocabHints: vocabHints, translateTo: _translateOverride).timeout(llmTimeout, onTimeout: () {
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
               return finalText;
             });
@@ -1196,6 +1213,8 @@ class CoreEngine {
         }
         _recordingStartTime = null;
       }
+      // Clear quick translate override
+      _translateOverride = null;
       // Guarantee state recovery — no matter what happens above
       _cleanupRecordingState();
       _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");

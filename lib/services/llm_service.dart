@@ -82,10 +82,11 @@ class LLMService {
     return cleaned.trim();
   }
 
-  Future<String> correctText(String input, {List<String>? vocabHints}) async {
+  Future<String> correctText(String input, {List<String>? vocabHints, String? translateTo}) async {
     lastCallSucceeded = false;
     if (input.trim().isEmpty) return input;
-    if (!ConfigService().aiCorrectionEnabled) {
+    // translateTo 强制启用 LLM（即使 AI 润色关闭）
+    if (!ConfigService().aiCorrectionEnabled && translateTo == null) {
       _log("RAW INPUT (AI OFF): len=${input.length}");
       return input;
     }
@@ -93,13 +94,13 @@ class LLMService {
     final providerType = ConfigService().llmProviderType;
     String result;
     if (providerType == 'ollama') {
-      result = await _correctTextOllama(input, vocabHints: vocabHints);
+      result = await _correctTextOllama(input, vocabHints: vocabHints, translateTo: translateTo);
     } else {
       final resolved = _resolveLlmConfig();
       if (resolved.isAnthropic) {
-        result = await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved);
+        result = await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved, translateTo: translateTo);
       } else {
-        result = await _correctTextCloud(input, vocabHints: vocabHints, resolved: resolved);
+        result = await _correctTextCloud(input, vocabHints: vocabHints, resolved: resolved, translateTo: translateTo);
       }
     }
     // lastCallSucceeded 由各 _correctText* 方法在成功时设为 true
@@ -108,13 +109,13 @@ class LLMService {
 
   /// Streaming version: yields incremental text chunks as they arrive from LLM.
   /// Falls back to non-streaming for Anthropic/Ollama.
-  Stream<String> correctTextStream(String input, {List<String>? vocabHints}) async* {
+  Stream<String> correctTextStream(String input, {List<String>? vocabHints, String? translateTo}) async* {
     lastCallSucceeded = false;
     if (input.trim().isEmpty) {
       yield input;
       return;
     }
-    if (!ConfigService().aiCorrectionEnabled) {
+    if (!ConfigService().aiCorrectionEnabled && translateTo == null) {
       _log("RAW INPUT (AI OFF): len=${input.length}");
       yield input;
       return;
@@ -122,24 +123,24 @@ class LLMService {
 
     final providerType = ConfigService().llmProviderType;
     if (providerType == 'ollama') {
-      yield await _correctTextOllama(input, vocabHints: vocabHints);
+      yield await _correctTextOllama(input, vocabHints: vocabHints, translateTo: translateTo);
       return;
     }
     final resolved = _resolveLlmConfig();
     if (resolved.isAnthropic) {
-      yield await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved);
+      yield await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved, translateTo: translateTo);
       return;
     }
-    yield* _correctTextCloudStream(input, vocabHints: vocabHints, resolved: resolved);
+    yield* _correctTextCloudStream(input, vocabHints: vocabHints, resolved: resolved, translateTo: translateTo);
   }
 
   /// SSE streaming for OpenAI-compatible APIs
-  Stream<String> _correctTextCloudStream(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved}) async* {
+  Stream<String> _correctTextCloudStream(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved, String? translateTo}) async* {
     final r = resolved ?? _resolveLlmConfig();
     final apiKey = r.apiKey;
     final baseUrl = r.baseUrl;
     final model = r.model;
-    final systemPrompt = _buildSystemPrompt();
+    final systemPrompt = _buildSystemPrompt(translateTo: translateTo);
 
     if (apiKey.isEmpty) {
       _log("API Key MISSING. Returning input.");
@@ -226,10 +227,11 @@ class LLMService {
   };
 
   /// Build effective system prompt with language/translation constraints.
-  String _buildSystemPrompt() {
+  /// [translateTo] overrides outputLanguage for one-shot quick translate.
+  String _buildSystemPrompt({String? translateTo}) {
     final base = ConfigService().aiCorrectionPrompt;
     final input = ConfigService().inputLanguage;
-    final output = ConfigService().outputLanguage;
+    final output = translateTo ?? ConfigService().outputLanguage;
 
     // No constraint when both are auto
     if (output == 'auto' && input == 'auto') return base;
@@ -261,12 +263,12 @@ class LLMService {
     return '<speech_text>\n$input\n</speech_text>$vocabSection';
   }
 
-  Future<String> _correctTextCloud(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved}) async {
+  Future<String> _correctTextCloud(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved, String? translateTo}) async {
     final r = resolved ?? _resolveLlmConfig();
     final apiKey = r.apiKey;
     final baseUrl = r.baseUrl;
     final model = r.model;
-    final systemPrompt = _buildSystemPrompt();
+    final systemPrompt = _buildSystemPrompt(translateTo: translateTo);
 
     if (apiKey.isEmpty) {
       _log("API Key MISSING. Returning input.");
@@ -317,12 +319,12 @@ class LLMService {
     return input;
   }
 
-  Future<String> _correctTextAnthropic(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved}) async {
+  Future<String> _correctTextAnthropic(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved, String? translateTo}) async {
     final r = resolved ?? _resolveLlmConfig();
     final apiKey = r.apiKey;
     final baseUrl = r.baseUrl;
     final model = r.model;
-    final systemPrompt = _buildSystemPrompt();
+    final systemPrompt = _buildSystemPrompt(translateTo: translateTo);
 
     if (apiKey.isEmpty) {
       _log("API Key MISSING. Returning input.");
@@ -377,10 +379,10 @@ class LLMService {
     return input;
   }
 
-  Future<String> _correctTextOllama(String input, {List<String>? vocabHints}) async {
+  Future<String> _correctTextOllama(String input, {List<String>? vocabHints, String? translateTo}) async {
     final baseUrl = ConfigService().ollamaBaseUrl;
     final model = ConfigService().ollamaModel;
-    final systemPrompt = _buildSystemPrompt();
+    final systemPrompt = _buildSystemPrompt(translateTo: translateTo);
 
     _log("RAW INPUT (${input.length}字): '$input'");
     _log("Calling Ollama: $baseUrl, model=$model");

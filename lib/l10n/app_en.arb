@@ -286,5 +286,10 @@
   "cloudAccountEnabled": "Enabled",
   "languageSettings": "Language",
   "translationDisabledReason": "Translation requires AI polish, only available in Smart Mode",
-  "cloudAsrLangUnsupported": "Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition."
+  "cloudAsrLangUnsupported": "Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition.",
+  "quickTranslate": "Quick Translate",
+  "quickTranslateDesc": "Press hotkey to record, result auto-translates to target language (does not affect normal recording settings)",
+  "translateTargetLanguage": "Target Language",
+  "translateHotkey": "Translate Hotkey",
+  "translateNoLlm": "Quick Translate requires an LLM service. Please add one in Cloud Accounts."
 }

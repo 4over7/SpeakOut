@@ -792,4 +792,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cloudAsrLangUnsupported =>
       'Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition.';
+
+  @override
+  String get quickTranslate => 'Quick Translate';
+
+  @override
+  String get quickTranslateDesc =>
+      'Press hotkey to record, result auto-translates to target language (does not affect normal recording settings)';
+
+  @override
+  String get translateTargetLanguage => 'Target Language';
+
+  @override
+  String get translateHotkey => 'Translate Hotkey';
+
+  @override
+  String get translateNoLlm =>
+      'Quick Translate requires an LLM service. Please add one in Cloud Accounts.';
 }

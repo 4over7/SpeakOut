@@ -147,6 +147,26 @@ class ConfigService {
   }
   Future<void> setOrganizePrompt(String v) async => await _prefs?.setString('organize_prompt', v);
 
+  // --- 即时翻译 (Quick Translate) ---
+  bool get translateEnabled => _prefs?.getBool('translate_enabled') ?? false;
+  int get translateKeyCode => _prefs?.getInt('translate_key_code') ?? 0;
+  int get translateModifiers => _prefs?.getInt('translate_modifiers') ?? 0;
+  String get translateKeyName => _prefs?.getString('translate_key_name') ?? '';
+  String get translateTargetLanguage => _prefs?.getString('translate_target_language') ?? 'en';
+
+  Future<void> setTranslateEnabled(bool v) async => await _prefs?.setBool('translate_enabled', v);
+  Future<void> setTranslateKey(int code, String name, {int modifiers = 0}) async {
+    await _prefs?.setInt('translate_key_code', code);
+    await _prefs?.setString('translate_key_name', name);
+    await _prefs?.setInt('translate_modifiers', modifiers);
+  }
+  Future<void> clearTranslateKey() async {
+    await _prefs?.remove('translate_key_code');
+    await _prefs?.remove('translate_key_name');
+    await _prefs?.remove('translate_modifiers');
+  }
+  Future<void> setTranslateTargetLanguage(String lang) async => await _prefs?.setString('translate_target_language', lang);
+
   // --- Model ---
 
   String get activeModelId => _prefs?.getString(AppConstants.kKeyActiveModelId) ?? AppConstants.kDefaultModelId;

@@ -1549,6 +1549,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition.'**
   String get cloudAsrLangUnsupported;
+
+  /// No description provided for @quickTranslate.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Translate'**
+  String get quickTranslate;
+
+  /// No description provided for @quickTranslateDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Press hotkey to record, result auto-translates to target language (does not affect normal recording settings)'**
+  String get quickTranslateDesc;
+
+  /// No description provided for @translateTargetLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Target Language'**
+  String get translateTargetLanguage;
+
+  /// No description provided for @translateHotkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate Hotkey'**
+  String get translateHotkey;
+
+  /// No description provided for @translateNoLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Translate requires an LLM service. Please add one in Cloud Accounts.'**
+  String get translateNoLlm;
 }
 
 class _AppLocalizationsDelegate

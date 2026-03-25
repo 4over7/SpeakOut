@@ -760,4 +760,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cloudAsrLangUnsupported => '当前云端 ASR 服务仅支持中文和英文，已选语言将回退到中文识别。';
+
+  @override
+  String get quickTranslate => '即时翻译';
+
+  @override
+  String get quickTranslateDesc => '按下快捷键录音，结果自动翻译为目标语言（不影响正常录音设置）';
+
+  @override
+  String get translateTargetLanguage => '翻译目标语言';
+
+  @override
+  String get translateHotkey => '翻译快捷键';
+
+  @override
+  String get translateNoLlm => '即时翻译需要配置 LLM 服务。请在「云服务账户」中添加 LLM 服务商。';
 }
