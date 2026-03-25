@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import '../config/app_constants.dart';
 import '../config/app_log.dart';
+import '../config/distribution.dart';
 
 enum UpdateState { idle, checking, downloading, readyToInstall, installing, failed }
 
@@ -52,6 +53,7 @@ class UpdateService {
 
   /// 启动时调用，fire-and-forget，不阻塞 UI
   Future<void> checkForUpdate() async {
+    if (!Distribution.supportsUpdateCheck) return;
     if (_hasChecked) return;
     _hasChecked = true;
 
@@ -269,7 +271,7 @@ open "$installDir/$appName"
   bool get isReadyToInstall => _state == UpdateState.readyToInstall && File(_dmgPath).existsSync();
 
   /// Whether we can do in-app update (have a direct DMG URL)
-  bool get canAutoUpdate => _dmgAssetUrl != null;
+  bool get canAutoUpdate => Distribution.supportsAutoUpdate && _dmgAssetUrl != null;
 
   /// 语义化版本比较: remote > local 返回 true
   static bool isNewer(String remote, String local) {

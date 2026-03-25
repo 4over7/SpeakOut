@@ -12,6 +12,7 @@ import 'ui/settings_page.dart';
 import 'services/app_service.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
+import 'config/distribution.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -822,7 +823,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                               color: MacosColors.tertiaryLabelColor.resolveFrom(context),
                             ),
                           ),
-                          if (UpdateService().hasUpdate && UpdateService().latestVersion != null) ...[
+                          if (Distribution.supportsUpdateCheck && UpdateService().hasUpdate && UpdateService().latestVersion != null) ...[
                             const SizedBox(width: 10),
                             _buildUpdateBadge(),
                           ],
