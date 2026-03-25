@@ -237,15 +237,17 @@ class _SettingsPageState extends State<SettingsPage> {
        final allKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode, config.organizeKeyCode].where((k) => k != 0);
        if (allKeys.contains(keyCode)) {
          _stopKeyCapture();
+         _showGenericHotkeyConflict(displayName);
          return;
        }
        await config.setTranslateKey(keyCode, displayName, modifiers: requiredMods);
        setState(() => _isCapturingTranslateKey = false);
     } else if (_isCapturingOrganizeKey) {
-       // AI 梳理快捷键与所有录音键冲突检测
+       // AI 梳理快捷键与所有录音键、翻译键冲突检测
        final allRecordingKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode, config.translateKeyCode].where((k) => k != 0);
        if (allRecordingKeys.contains(keyCode)) {
          _stopKeyCapture();
+         _showGenericHotkeyConflict(displayName);
          return;
        }
        await config.setOrganizeKey(keyCode, displayName, modifiers: requiredMods);
@@ -298,6 +300,22 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
   
+  void _showGenericHotkeyConflict(String keyName) {
+    showMacosAlertDialog(
+      context: context,
+      builder: (_) => MacosAlertDialog(
+        appIcon: const Icon(CupertinoIcons.exclamationmark_triangle, size: 48, color: Colors.orange),
+        title: Text('$keyName 已被其他功能使用', style: const TextStyle(fontWeight: FontWeight.bold)),
+        message: const Text('该按键已被占用，请选择其他按键。'),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          child: const Text('好的'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
+
   // --- Key Capture Logic ---
   void _startKeyCapture([String target = 'ptt']) {
     setState(() {
