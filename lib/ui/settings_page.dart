@@ -312,6 +312,58 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
   
+  /// Collect all active hotkeys (from enabled features only) as {keyCode: featureName}
+  Map<int, String> _getActiveHotkeys({String? excludeFeature}) {
+    final config = ConfigService();
+    final loc = AppLocalizations.of(context)!;
+    final map = <int, String>{};
+    // PTT 始终启用
+    if (config.pttKeyCode != 0 && excludeFeature != 'ptt') {
+      map[config.pttKeyCode] = loc.pttMode;
+    }
+    if (config.toggleInputEnabled && config.toggleInputKeyCode != 0 && excludeFeature != 'toggleInput') {
+      map[config.toggleInputKeyCode] = loc.toggleModeTip;
+    }
+    if (config.diaryEnabled && config.diaryKeyCode != 0 && excludeFeature != 'diary') {
+      map[config.diaryKeyCode] = loc.diaryMode;
+    }
+    if (config.toggleDiaryEnabled && config.toggleDiaryKeyCode != 0 && excludeFeature != 'toggleDiary') {
+      map[config.toggleDiaryKeyCode] = loc.diaryMode;
+    }
+    if (config.organizeEnabled && config.organizeKeyCode != 0 && excludeFeature != 'organize') {
+      map[config.organizeKeyCode] = loc.organizeEnabled;
+    }
+    if (config.translateEnabled && config.translateKeyCode != 0 && excludeFeature != 'translate') {
+      map[config.translateKeyCode] = loc.quickTranslate;
+    }
+    return map;
+  }
+
+  /// On feature re-enable: check if its hotkey conflicts with active keys, auto-clear if so
+  Future<void> _checkConflictOnEnable(String feature, int keyCode, String keyName, Future<void> Function() clearKey) async {
+    if (keyCode == 0) return; // no key set
+    final activeKeys = _getActiveHotkeys(excludeFeature: feature);
+    if (activeKeys.containsKey(keyCode)) {
+      final conflictWith = activeKeys[keyCode]!;
+      await clearKey();
+      if (mounted) {
+        showMacosAlertDialog(
+          context: context,
+          builder: (_) => MacosAlertDialog(
+            appIcon: const Icon(CupertinoIcons.exclamationmark_triangle, size: 48, color: Colors.orange),
+            title: Text('$keyName 已被「$conflictWith」占用', style: const TextStyle(fontWeight: FontWeight.bold)),
+            message: const Text('快捷键已自动清除，请重新设置。'),
+            primaryButton: PushButton(
+              controlSize: ControlSize.large,
+              child: const Text('好的'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   void _showGenericHotkeyConflict(String keyName) {
     showMacosAlertDialog(
       context: context,
@@ -2257,6 +2309,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   value: config.organizeEnabled,
                   onChanged: (v) async {
                     await config.setOrganizeEnabled(v);
+                    if (v) {
+                      await _checkConflictOnEnable('organize', config.organizeKeyCode, config.organizeKeyName, config.clearOrganizeKey);
+                    }
                     setState(() {});
                   },
                 ),
@@ -2388,7 +2443,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: ConfigService().diaryEnabled,
                 onChanged: (v) async {
                   await ConfigService().setDiaryEnabled(v);
-                  if (v) await _validateDiaryDirectory();
+                  if (v) {
+                    await _checkConflictOnEnable('diary', ConfigService().diaryKeyCode, ConfigService().diaryKeyName, () async {
+                      await ConfigService().setDiaryKey(0, '');
+                    });
+                    await _validateDiaryDirectory();
+                  }
                   setState((){});
                 },
               ),
@@ -2631,6 +2691,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: ConfigService().translateEnabled,
                 onChanged: (v) async {
                   await ConfigService().setTranslateEnabled(v);
+                  if (v) {
+                    await _checkConflictOnEnable('translate', ConfigService().translateKeyCode, ConfigService().translateKeyName, ConfigService().clearTranslateKey);
+                  }
                   setState(() {});
                 },
               ),
@@ -2691,6 +2754,68 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ],
         ),
+
+        const SizedBox(height: 24),
+
+        // 4. Hotkey overview (read-only, shows all hotkeys across tabs)
+        _buildHotkeyOverview(loc),
+      ],
+    );
+  }
+
+  Widget _buildHotkeyOverview(AppLocalizations loc) {
+    final config = ConfigService();
+    final entries = <(String, String, bool)>[
+      (loc.pttMode, config.pttKeyName, true),
+      (loc.toggleModeTip, config.toggleInputKeyName, config.toggleInputEnabled),
+      (loc.diaryMode, config.diaryKeyName, config.diaryEnabled),
+      ('${loc.diaryMode}（Toggle）', config.toggleDiaryKeyName, config.toggleDiaryEnabled),
+      (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
+      ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
+    ];
+
+    return SettingsGroup(
+      title: '全部快捷键一览',
+      children: [
+        for (var i = 0; i < entries.length; i++) ...[
+          if (i > 0) const SettingsDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 140,
+                  child: Text(
+                    entries[i].$1,
+                    style: AppTheme.body(context).copyWith(
+                      color: entries[i].$3 ? null : MacosColors.systemGrayColor,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: MacosColors.systemGrayColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    entries[i].$2.isEmpty ? '未设置' : entries[i].$2,
+                    style: AppTheme.mono(context).copyWith(
+                      fontSize: 12,
+                      color: entries[i].$2.isEmpty
+                          ? MacosColors.systemGrayColor
+                          : (entries[i].$3 ? null : MacosColors.systemGrayColor),
+                    ),
+                  ),
+                ),
+                if (!entries[i].$3) ...[
+                  const SizedBox(width: 6),
+                  Text('已关闭', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+                ],
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
