@@ -217,15 +217,18 @@ class _SettingsPageState extends State<SettingsPage> {
     final requiredMods = _stripOwnModifier(keyCode, modifierFlags);
     final displayName = requiredMods != 0 ? _comboKeyName(keyCode, requiredMods) : keyName;
 
-    // Cross-group conflict check: input keys vs diary keys (skip disabled keys = 0)
-    if (isInputGroup) {
-      final diaryKeys = [config.diaryKeyCode, config.toggleDiaryKeyCode].where((k) => k != 0);
+    // Cross-group conflict check: input keys vs diary keys (only check enabled features)
+    if (isInputGroup && config.diaryEnabled) {
+      final diaryKeys = <int>[
+        config.diaryKeyCode,
+        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
+      ].where((k) => k != 0);
       if (diaryKeys.contains(keyCode)) {
         _showHotkeyConflict(displayName, true);
         return;
       }
     } else if (isDiaryGroup) {
-      final inputKeys = [config.pttKeyCode, config.toggleInputKeyCode].where((k) => k != 0);
+      final inputKeys = [config.pttKeyCode, if (config.toggleInputEnabled) config.toggleInputKeyCode].where((k) => k != 0);
       if (inputKeys.contains(keyCode)) {
         _showHotkeyConflict(displayName, false);
         return;
