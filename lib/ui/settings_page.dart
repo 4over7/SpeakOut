@@ -19,6 +19,7 @@ import '../services/audio_device_service.dart';
 import 'package:speakout/config/app_log.dart';
 import 'vocab_settings_page.dart';
 import '../services/update_service.dart';
+import '../config/distribution.dart';
 import '../services/llm_service.dart';
 import '../services/cloud_account_service.dart';
 import '../config/cloud_providers.dart';
@@ -3087,88 +3088,90 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: _isCheckingUpdate ? null : () async {
-                  setState(() { _isCheckingUpdate = true; _updateResult = null; });
-                  try {
-                    final info = await PackageInfo.fromPlatform();
-                    // Reset so it can check again
-                    UpdateService().resetCheck();
-                    await UpdateService().checkForUpdate();
-                    final latest = UpdateService().latestVersion;
-                    if (latest != null && UpdateService.isNewer(latest, info.version)) {
-                      setState(() => _updateResult = loc.updateAvailable(latest));
-                    } else {
+              if (Distribution.supportsUpdateCheck) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _isCheckingUpdate ? null : () async {
+                    setState(() { _isCheckingUpdate = true; _updateResult = null; });
+                    try {
+                      final info = await PackageInfo.fromPlatform();
+                      UpdateService().resetCheck();
+                      await UpdateService().checkForUpdate();
+                      final latest = UpdateService().latestVersion;
+                      if (latest != null && UpdateService.isNewer(latest, info.version)) {
+                        setState(() => _updateResult = loc.updateAvailable(latest));
+                      } else {
+                        setState(() => _updateResult = loc.updateUpToDate);
+                      }
+                    } catch (_) {
                       setState(() => _updateResult = loc.updateUpToDate);
                     }
-                  } catch (_) {
-                    setState(() => _updateResult = loc.updateUpToDate);
-                  }
-                  setState(() => _isCheckingUpdate = false);
-                },
-                child: Tooltip(
-                  message: loc.updateAction,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: MacosColors.systemGrayColor.withValues(alpha:0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
+                    setState(() => _isCheckingUpdate = false);
+                  },
+                  child: Tooltip(
+                    message: loc.updateAction,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: MacosColors.systemGrayColor.withValues(alpha:0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha:0.2)),
+                      ),
+                      child: _isCheckingUpdate
+                        ? const SizedBox(width: 14, height: 14, child: CupertinoActivityIndicator())
+                        : const MacosIcon(CupertinoIcons.arrow_clockwise, size: 14, color: MacosColors.secondaryLabelColor),
                     ),
-                    child: _isCheckingUpdate
-                      ? const SizedBox(width: 14, height: 14, child: CupertinoActivityIndicator())
-                      : const MacosIcon(CupertinoIcons.arrow_clockwise, size: 14, color: MacosColors.secondaryLabelColor),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
-          SizedBox(
-            height: 40,
-            child: _updateResult != null
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: _updateResult == loc.updateUpToDate
-                      ? Text(
-                          _updateResult!,
-                          style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
-                        )
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _updateResult!,
-                              style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemOrangeColor),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                final svc = UpdateService();
-                                if (svc.canAutoUpdate) {
-                                  svc.downloadUpdate();
-                                } else {
-                                  final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
-                                  launchUrl(Uri.parse(url));
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  UpdateService().canAutoUpdate ? '下载更新' : loc.updateAction,
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+          if (Distribution.supportsUpdateCheck)
+            SizedBox(
+              height: 40,
+              child: _updateResult != null
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _updateResult == loc.updateUpToDate
+                        ? Text(
+                            _updateResult!,
+                            style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _updateResult!,
+                                style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemOrangeColor),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  final svc = UpdateService();
+                                  if (svc.canAutoUpdate) {
+                                    svc.downloadUpdate();
+                                  } else {
+                                    final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+                                    launchUrl(Uri.parse(url));
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    UpdateService().canAutoUpdate ? '下载更新' : loc.updateAction,
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                  )
-                : null,
-          ),
+                            ],
+                          ),
+                    )
+                  : null,
+            ),
           Text(
             loc.aboutTagline,
             style: AppTheme.body(context).copyWith(
