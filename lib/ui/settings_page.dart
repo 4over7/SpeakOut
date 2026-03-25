@@ -233,9 +233,15 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     if (_isCapturingTranslateKey) {
-       // 即时翻译快捷键与所有录音键、梳理键冲突检测
-       final allKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode, config.organizeKeyCode].where((k) => k != 0);
-       if (allKeys.contains(keyCode)) {
+       // 即时翻译快捷键：只与已启用功能的键冲突
+       final activeKeys = <int>[
+         config.pttKeyCode, // PTT 始终启用
+         if (config.toggleInputEnabled) config.toggleInputKeyCode,
+         if (config.diaryEnabled) config.diaryKeyCode,
+         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
+         if (config.organizeEnabled) config.organizeKeyCode,
+       ].where((k) => k != 0);
+       if (activeKeys.contains(keyCode)) {
          _stopKeyCapture();
          _showGenericHotkeyConflict(displayName);
          return;
@@ -243,9 +249,15 @@ class _SettingsPageState extends State<SettingsPage> {
        await config.setTranslateKey(keyCode, displayName, modifiers: requiredMods);
        setState(() => _isCapturingTranslateKey = false);
     } else if (_isCapturingOrganizeKey) {
-       // AI 梳理快捷键与所有录音键、翻译键冲突检测
-       final allRecordingKeys = [config.pttKeyCode, config.diaryKeyCode, config.toggleInputKeyCode, config.toggleDiaryKeyCode, config.translateKeyCode].where((k) => k != 0);
-       if (allRecordingKeys.contains(keyCode)) {
+       // AI 梳理快捷键：只与已启用功能的键冲突
+       final activeKeys = <int>[
+         config.pttKeyCode,
+         if (config.toggleInputEnabled) config.toggleInputKeyCode,
+         if (config.diaryEnabled) config.diaryKeyCode,
+         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
+         if (config.translateEnabled) config.translateKeyCode,
+       ].where((k) => k != 0);
+       if (activeKeys.contains(keyCode)) {
          _stopKeyCapture();
          _showGenericHotkeyConflict(displayName);
          return;
