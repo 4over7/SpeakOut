@@ -567,7 +567,7 @@ class CoreEngine {
       _handleToggleKey(RecordingMode.ptt);
       return;
     }
-    if (isDown && toggleDiaryCode != 0 && matchKey(toggleDiaryCode, config.toggleDiaryModifiers)) {
+    if (isDown && config.diaryEnabled && toggleDiaryCode != 0 && matchKey(toggleDiaryCode, config.toggleDiaryModifiers)) {
       _handleToggleKey(RecordingMode.diary);
       return;
     }
