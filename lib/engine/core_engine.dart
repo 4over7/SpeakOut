@@ -544,6 +544,11 @@ class CoreEngine {
       return;
     }
 
+    // 2.5 Translate toggle stop: translate recording active, same key pressed again
+    if (isDown && _translateKeyHeld && _recordingState == RecordingState.recording) {
+      _log("[Translate] Key re-pressed during recording → ignore (hold to record)");
+    }
+
     // 3. Shared key: toggle key == PTT/diary key → use time-threshold logic
     final bool isSharedPtt = toggleInputCode != 0 && toggleInputCode == pttKeyCode && keyCode == pttKeyCode;
     final bool isSharedDiary = toggleDiaryCode != 0 && config.diaryEnabled && toggleDiaryCode == config.diaryKeyCode && keyCode == config.diaryKeyCode;
@@ -794,9 +799,11 @@ class CoreEngine {
       await _asrProvider!.start();
       _log("ASR Provider Started.");
 
-      // 4. WATCHDOG (PTT only — diary has reliable key-up, toggle doesn't need it)
+      // 4. WATCHDOG (PTT only — diary/toggle/translate have reliable key-up)
+      // Skip watchdog for translate: modifier keys (Shift/Option/etc) don't report
+      // reliably via CGEventSourceKeyState, causing false "key up" detection.
       _watchdogTimer?.cancel();
-      if (mode == RecordingMode.ptt && !_isToggleMode) {
+      if (mode == RecordingMode.ptt && !_isToggleMode && _translateOverride == null) {
         final watchKeyCode = _activeHotkeyCode ?? pttKeyCode;
         _watchdogTimer = Timer.periodic(Duration(milliseconds: AppConstants.kKeyWatchdogIntervalMs), (timer) {
           if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
