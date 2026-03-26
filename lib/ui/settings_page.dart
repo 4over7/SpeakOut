@@ -2548,6 +2548,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 isCapturing: _isCapturingDiaryKey,
                 keyName: _diaryKeyName,
                 onEdit: () => _startKeyCapture('diary'),
+                onClear: _diaryKeyName.isNotEmpty ? () async {
+                  await ConfigService().clearDiaryKey();
+                  setState(() => _diaryKeyName = "");
+                } : null,
               ),
               const SettingsDivider(),
               _buildKeyCaptureTile(
@@ -2661,6 +2665,11 @@ class _SettingsPageState extends State<SettingsPage> {
               isCapturing: _isCapturingKey,
               keyName: _currentKeyName,
               onEdit: _startKeyCapture,
+              onClear: _currentKeyName.isNotEmpty ? () async {
+                await ConfigService().clearPttKey();
+                _engine.pttKeyCode = 0;
+                setState(() { _currentKeyCode = 0; _currentKeyName = ""; });
+              } : null,
             ),
             const SettingsDivider(),
             _buildKeyCaptureTile(

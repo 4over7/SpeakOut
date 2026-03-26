@@ -76,6 +76,11 @@ class ConfigService {
     await _prefs?.setString(AppConstants.kKeyPttKeyName, name);
     await _prefs?.setInt('ptt_modifiers', modifiers);
   }
+  Future<void> clearPttKey() async {
+    await _prefs?.setInt(AppConstants.kKeyPttKeyCode, 0);
+    await _prefs?.setString(AppConstants.kKeyPttKeyName, '');
+    await _prefs?.remove('ptt_modifiers');
+  }
 
   // --- Diary (Flash Note) ---
   bool get diaryEnabled => _prefs?.getBool('diary_enabled') ?? false;
@@ -89,6 +94,11 @@ class ConfigService {
     await _prefs?.setInt('diary_key_code', code);
     await _prefs?.setString('diary_key_name', name);
     await _prefs?.setInt('diary_modifiers', modifiers);
+  }
+  Future<void> clearDiaryKey() async {
+    await _prefs?.setInt('diary_key_code', 0);
+    await _prefs?.setString('diary_key_name', '');
+    await _prefs?.remove('diary_modifiers');
   }
   Future<void> setDiaryDirectory(String path) async => await _prefs?.setString('diary_directory', path);
 
