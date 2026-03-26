@@ -2285,12 +2285,52 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
 
         const SizedBox(height: 24),
+
+        // 2. System Permissions
+        SettingsGroup(
+          title: '系统权限',
+          children: [
+            _buildPermissionTile(
+              '辅助功能',
+              '快捷键监听和文本注入',
+              CupertinoIcons.hand_raised,
+              'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+            ),
+            const SettingsDivider(),
+            _buildPermissionTile(
+              '输入监控',
+              '键盘快捷键触发录音',
+              CupertinoIcons.keyboard,
+              'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent',
+            ),
+            const SettingsDivider(),
+            _buildPermissionTile(
+              '麦克风',
+              '语音采集',
+              CupertinoIcons.mic,
+              'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
       ],
     );
   }
 
-
-
+  Widget _buildPermissionTile(String label, String subtitle, IconData icon, String settingsUrl) {
+    return SettingsTile(
+      label: label,
+      subtitle: subtitle,
+      icon: icon,
+      child: PushButton(
+        controlSize: ControlSize.regular,
+        secondary: true,
+        onPressed: () => launchUrl(Uri.parse(settingsUrl)),
+        child: const Text('打开设置'),
+      ),
+    );
+  }
 
 
   // --- View: AI 梳理 (Organize) ---
