@@ -3172,6 +3172,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     )
                   : null,
             ),
+          const SizedBox(height: 16),
           Text(
             loc.aboutTagline,
             style: AppTheme.body(context).copyWith(
@@ -3179,12 +3180,12 @@ class _SettingsPageState extends State<SettingsPage> {
               color: AppTheme.getAccent(context)
             )
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             loc.aboutSubTagline,
             style: AppTheme.caption(context).copyWith(fontSize: 13),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 36),
           Column(
             children: [
               Text(loc.aboutPoweredBy, style: AppTheme.caption(context).copyWith(fontSize: 11)),
