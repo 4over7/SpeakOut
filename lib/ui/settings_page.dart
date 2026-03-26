@@ -2290,6 +2290,32 @@ class _SettingsPageState extends State<SettingsPage> {
         SettingsGroup(
           title: '系统权限',
           children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemOrangeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const MacosIcon(CupertinoIcons.exclamationmark_triangle, color: MacosColors.systemOrangeColor, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '从 v1.5.22 起更换了签名证书。如果更新后快捷键失效，请在下方逐项点击「打开设置」，'
+                        '将 SpeakOut 从权限列表中删除（按 - 号），再重新添加（按 + 号）。',
+                        style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemOrangeColor),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SettingsDivider(),
             _buildPermissionTile(
               '辅助功能',
               '快捷键监听和文本注入',
