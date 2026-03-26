@@ -26,7 +26,7 @@ app.options('*', (c) => c.body(null, 204));
 app.get('/version', (c) => {
     return c.json({
         version: '1.5.23',
-        build: 163,
+        build: 164,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
         dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.5.23/SpeakOut.dmg',
         release_notes: '',
@@ -424,7 +424,7 @@ async function alipayPrecreate(env, order) {
         charset: 'utf-8',
         sign_type: 'RSA2',
         timestamp: formatAlipayTime(new Date()),
-        version: '1.5.22',
+        version: '1.5.23',
         notify_url: notifyUrl,
         biz_content: bizContent,
     };
