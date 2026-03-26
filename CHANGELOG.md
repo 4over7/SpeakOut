@@ -1,5 +1,28 @@
 # SpeakOut Version History
 
+## [1.5.23] - 2026-03-26
+
+### App Store 适配
+- **双渠道编译** — `--dart-define=DISTRIBUTION=appstore` 控制 App Store / GitHub 版本差异
+- App Store 版本自动禁用更新检查和自动更新功能
+- 新增 `AppStore.entitlements`（沙盒模式）+ `build_appstore.sh` 打包脚本
+- 新增 `NSAccessibilityUsageDescription` 隐私描述
+- 关于页新增隐私政策链接
+
+### 快捷键修复
+- 翻译快捷键优先级提升，不再被 PTT/shared key 拦截
+- 翻译录音跳过 watchdog（修饰键 CGEventSourceKeyState 不可靠）
+- 闪念笔记关闭时 toggle 快捷键不再拦截按键
+- 交叉冲突检测只检查已启用功能，已关闭功能不阻止设置
+- 冲突弹窗提示，不再静默拒绝
+
+### 自动更新修复
+- DMG 下载 URL 改从 Gateway 获取（私有仓库 GitHub API 不返回 assets）
+
+### UI 优化
+- 通用设置新增「系统权限」快捷入口（辅助功能/输入监控/麦克风）
+- 关于页版本号与 tagline 间距调整
+
 ## [1.5.22] - 2026-03-25
 
 > ⚠️ 本版本更换了代码签名证书，更新后需在「系统设置 → 隐私与安全性」中重新授权「输入监控」和「辅助功能」。
