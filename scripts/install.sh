@@ -5,7 +5,7 @@ APP_NAME="SpeakOut"
 SOURCE_APP="build/macos/Build/Products/Release/${APP_NAME}.app"
 DEST_DIR="/Applications"
 DEST_APP="${DEST_DIR}/${APP_NAME}.app"
-SIGN_IDENTITY="Apple Development: Lindan Wang (GQ2A45YPF3)"
+SIGN_IDENTITY="Developer ID Application: Lindan Wang (UB9D55S724)"
 
 # Auto-increment build number
 CURRENT_BUILD=$(grep 'version:' pubspec.yaml | sed 's/.*+//')

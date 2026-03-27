@@ -27,7 +27,7 @@ DMG_NAME="SpeakOut.dmg"
 DMG_TEMP="SpeakOut_temp.dmg"
 VOLUME_NAME="SpeakOut"
 STAGING_DIR="build/dmg_staging"
-SIGN_IDENTITY="Apple Development: Lindan Wang (GQ2A45YPF3)"
+SIGN_IDENTITY="Developer ID Application: Lindan Wang (UB9D55S724)"
 
 PWD=$(pwd)
 DMG_TEMP_PATH="${PWD}/${DMG_TEMP}"
@@ -110,6 +110,19 @@ hdiutil detach "/Volumes/${VOLUME_NAME}" -force
 echo "Finalizing..."
 hdiutil convert "${DMG_TEMP_PATH}" -format UDZO -o "${DMG_FINAL_PATH}"
 rm -f "${DMG_TEMP_PATH}"
+
+# 5.5. Notarize (requires Apple ID with app-specific password in keychain)
+# 存储凭证: xcrun notarytool store-credentials "notarytool-profile" --apple-id YOUR_ID --team-id UB9D55S724
+if xcrun notarytool store-credentials --help >/dev/null 2>&1; then
+    echo "🔏 Submitting for notarization..."
+    if xcrun notarytool submit "${DMG_FINAL_PATH}" --keychain-profile "notarytool-profile" --wait; then
+        echo "✅ Notarization succeeded, stapling..."
+        xcrun stapler staple "${DMG_FINAL_PATH}"
+    else
+        echo "⚠️  Notarization failed — DMG is signed but not notarized"
+        echo "   Users will see Gatekeeper warning on first launch"
+    fi
+fi
 
 # 6. Close old Finder windows, eject all SpeakOut volumes, then mount new DMG
 echo "Ejecting old DMG..."
