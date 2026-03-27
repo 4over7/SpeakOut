@@ -21,8 +21,10 @@ import 'providers/aliyun_provider.dart';
 import 'providers/asr_provider_factory.dart';
 import '../config/cloud_providers.dart';
 import '../services/cloud_account_service.dart';
+import '../models/cloud_account.dart';
 import '../services/diary_service.dart';
 import '../services/chat_service.dart';
+import '../services/correction_service.dart';
 import '../services/audio_device_service.dart';
 import '../services/overlay_controller.dart';
 import 'package:speakout/config/app_log.dart';
@@ -32,6 +34,52 @@ enum RecordingState { idle, starting, recording, stopping, processing }
 
 /// Recording mode: PTT (push-to-talk) or diary (flash note)
 enum RecordingMode { ptt, diary }
+
+/// 最后一次录音的完整 pipeline trace（供纠错反馈使用）
+class LastRecordingTrace {
+  final String workMode;        // 'offline' | 'smart' | 'cloud'
+  final String asrEngine;       // 'sherpa' | 'dashscope' 等
+  final String asrModelName;    // 具体模型名
+  final String asrRawText;      // ASR 原始输出
+  final bool llmApplied;        // 是否经过 LLM
+  final String? llmProvider;    // LLM 服务商
+  final String? llmModel;       // LLM 模型名
+  final String? llmPolishedText; // LLM 润色后
+  final String finalText;       // 最终输出文本
+  final String? audioFilePath;  // 录音文件路径
+  final double? audioDurationSec;
+  final DateTime timestamp;
+
+  LastRecordingTrace({
+    required this.workMode,
+    required this.asrEngine,
+    required this.asrModelName,
+    required this.asrRawText,
+    required this.llmApplied,
+    this.llmProvider,
+    this.llmModel,
+    this.llmPolishedText,
+    required this.finalText,
+    this.audioFilePath,
+    this.audioDurationSec,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'workMode': workMode,
+    'asrEngine': asrEngine,
+    'asrModelName': asrModelName,
+    'asrRawText': asrRawText,
+    'llmApplied': llmApplied,
+    'llmProvider': llmProvider,
+    'llmModel': llmModel,
+    'llmPolishedText': llmPolishedText,
+    'finalText': finalText,
+    'audioFilePath': audioFilePath,
+    'audioDurationSec': audioDurationSec,
+    'timestamp': timestamp.toIso8601String(),
+  };
+}
 
 class CoreEngine {
   static final CoreEngine _instance = CoreEngine._internal();
@@ -82,10 +130,13 @@ class CoreEngine {
   bool _typewriterInjected = false;
   DateTime? _recordingStartTime;
   bool _isOrganizing = false;
+  bool _isCorrecting = false;
   /// 最近一次 ASR 原文（供 UI 做对比展示）
   String? lastAsrOriginal;
   /// 最近一次 LLM 润色是否成功（null=未调用，true=成功，false=失败）
   bool? lastLlmSuccess;
+  /// 最近一次录音的完整 pipeline trace（供纠错反馈使用）
+  LastRecordingTrace? lastTrace;
 
   // Configuration
   int pttKeyCode = 58; 
@@ -580,6 +631,14 @@ class CoreEngine {
       return;
     }
 
+    // 5.5 纠错反馈快捷键（仅 keyDown，不涉及录音状态机）
+    final correctionCode = config.correctionKeyCode;
+    if (isDown && config.correctionEnabled && correctionCode != 0 &&
+        matchKey(correctionCode, config.correctionModifiers)) {
+      _handleCorrection();
+      return;
+    }
+
     // 6. Pure PTT / diary keys (existing logic)
     // Guard: if toggle mode is active, ignore keyUp from PTT/diary keys
     // to prevent the keyUp from a toggle-start tap from stopping recording.
@@ -754,6 +813,88 @@ class CoreEngine {
           _deferredStop = true;
         }
       }
+    }
+  }
+
+  /// 纠错反馈：选中修正后的文字 → Cmd+C → 对比最近录音 → 提取差异 → 追加词汇表
+  Future<void> _handleCorrection() async {
+    if (_isCorrecting || _recordingState != RecordingState.idle) return;
+    final ni = _nativeInput;
+    if (ni == null) return;
+    _isCorrecting = true;
+    _log("[Correction] 开始纠错反馈");
+
+    final overlay = OverlayController();
+
+    try {
+      // 1. 检查是否有最近的录音 trace
+      if (lastTrace == null) {
+        _log("[Correction] 没有最近的录音记录");
+        overlay.recordingMode = "organize";
+        overlay.updateText("没有最近的录音记录");
+        await overlay.show();
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
+
+      // 检查 trace 是否太旧（>5分钟）
+      if (DateTime.now().difference(lastTrace!.timestamp).inMinutes > 5) {
+        _log("[Correction] 最近录音超过5分钟");
+        overlay.recordingMode = "organize";
+        overlay.updateText("最近录音已超过5分钟");
+        await overlay.show();
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
+
+      // 2. 复制选中文字
+      ni.injectClipboardBegin();
+      ni.copySelection();
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      final clipData = await Clipboard.getData('text/plain');
+      final userText = clipData?.text?.trim() ?? '';
+      ni.injectClipboardEnd();
+
+      if (userText.isEmpty) {
+        _log("[Correction] 未检测到选中文字");
+        overlay.recordingMode = "organize";
+        overlay.updateText("未检测到选中文字");
+        await overlay.show();
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
+      _log("[Correction] 用户校正: ${userText.length}字");
+
+      // 3. 显示悬浮窗
+      overlay.recordingMode = "organize";
+      overlay.updateText("学习中...");
+      await overlay.show();
+
+      // 4. 调用 CorrectionService
+      final result = await CorrectionService().submitCorrection(userText, lastTrace!)
+          .timeout(const Duration(seconds: 15));
+
+      if (result.vocabAdded > 0) {
+        overlay.updateText("✓ 已学习 ${result.vocabAdded} 个词");
+        _log("[Correction] 完成: 学习 ${result.vocabAdded} 个词");
+      } else {
+        overlay.updateText("✓ 未发现新的识别错误");
+        _log("[Correction] 完成: 无新纠错");
+      }
+      await Future.delayed(const Duration(seconds: 2));
+      await overlay.hide();
+    } catch (e) {
+      _log("[Correction] 错误: $e");
+      try { ni.injectClipboardEnd(); } catch (_) {}
+      overlay.updateText("纠错失败");
+      await Future.delayed(const Duration(seconds: 2));
+      await overlay.hide();
+    } finally {
+      _isCorrecting = false;
     }
   }
 
@@ -964,9 +1105,11 @@ class CoreEngine {
   }
 
   /// Save recording WAV for debugging. Keeps last 10 files, rotating.
-  void _saveDebugRecording() {
+  String? _lastRecordingPath;
+
+  String? _saveDebugRecording() {
     final ni = _nativeInput;
-    if (ni == null) return;
+    if (ni == null) return null;
     final dir = Directory('${Platform.environment['HOME']}/Library/Application Support/com.speakout.speakout/recordings');
     if (!dir.existsSync()) dir.createSync(recursive: true);
 
@@ -981,7 +1124,10 @@ class CoreEngine {
     final path = '${dir.path}/rec_$timestamp.wav';
     if (ni.saveRecordingWav(path)) {
       _log("Debug recording saved: $path");
+      _lastRecordingPath = path;
+      return path;
     }
+    return null;
   }
 
   Future<void> _stopAudioSafely() async {
@@ -1195,6 +1341,35 @@ class CoreEngine {
 
       // 保存 ASR 原文供主界面对比（仅当 LLM 有改动时）
       lastAsrOriginal = (originalAsrText != finalText) ? originalAsrText : null;
+
+      // 构建完整 pipeline trace（供纠错反馈使用）
+      final config = ConfigService();
+      final llmDidRun = shouldCallLlm && lastLlmSuccess != null;
+      String? llmProv, llmMod;
+      if (llmDidRun) {
+        final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+        final savedId = config.selectedLlmAccountId ?? '';
+        final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : (llmAccounts.isNotEmpty ? llmAccounts.first.id : '');
+        final account = effectiveId.isNotEmpty ? CloudAccountService().getAccountById(effectiveId) : null;
+        llmProv = account?.providerId ?? config.llmProviderType;
+        llmMod = config.llmModelOverride ?? account?.credentials['model'] ?? config.llmModel;
+      }
+      final duration = _recordingStartTime != null ? DateTime.now().difference(_recordingStartTime!).inMilliseconds / 1000.0 : null;
+      lastTrace = LastRecordingTrace(
+        workMode: config.workMode,
+        asrEngine: config.asrEngineType,
+        asrModelName: config.activeModelId,
+        asrRawText: originalAsrText,
+        llmApplied: llmDidRun,
+        llmProvider: llmProv,
+        llmModel: llmMod,
+        llmPolishedText: llmDidRun ? finalText : null,
+        finalText: finalText,
+        audioFilePath: _lastRecordingPath,
+        audioDurationSec: duration,
+        timestamp: DateTime.now(),
+      );
+
       _resultController.add(finalText);
 
       if (finalText.isNotEmpty) {

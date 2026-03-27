@@ -78,6 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _isCapturingToggleDiaryKey = false;
   bool _isCapturingOrganizeKey = false;
   bool _isCapturingTranslateKey = false;
+  bool _isCapturingCorrectionKey = false;
   bool _isCheckingUpdate = false;
   bool _versionCopied = false;
   String? _updateResult;
@@ -236,14 +237,30 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
 
-    if (_isCapturingTranslateKey) {
-       // 即时翻译快捷键：只与已启用功能的键冲突
+    if (_isCapturingCorrectionKey) {
        final activeKeys = <int>[
-         config.pttKeyCode, // PTT 始终启用
+         config.pttKeyCode,
          if (config.toggleInputEnabled) config.toggleInputKeyCode,
          if (config.diaryEnabled) config.diaryKeyCode,
          if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
          if (config.organizeEnabled) config.organizeKeyCode,
+         if (config.translateEnabled) config.translateKeyCode,
+       ].where((k) => k != 0);
+       if (activeKeys.contains(keyCode)) {
+         _stopKeyCapture();
+         _showGenericHotkeyConflict(displayName);
+         return;
+       }
+       await config.setCorrectionKey(keyCode, displayName, modifiers: requiredMods);
+       setState(() => _isCapturingCorrectionKey = false);
+    } else if (_isCapturingTranslateKey) {
+       final activeKeys = <int>[
+         config.pttKeyCode,
+         if (config.toggleInputEnabled) config.toggleInputKeyCode,
+         if (config.diaryEnabled) config.diaryKeyCode,
+         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
+         if (config.organizeEnabled) config.organizeKeyCode,
+         if (config.correctionEnabled) config.correctionKeyCode,
        ].where((k) => k != 0);
        if (activeKeys.contains(keyCode)) {
          _stopKeyCapture();
@@ -260,6 +277,7 @@ class _SettingsPageState extends State<SettingsPage> {
          if (config.diaryEnabled) config.diaryKeyCode,
          if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
          if (config.translateEnabled) config.translateKeyCode,
+         if (config.correctionEnabled) config.correctionKeyCode,
        ].where((k) => k != 0);
        if (activeKeys.contains(keyCode)) {
          _stopKeyCapture();
@@ -340,6 +358,9 @@ class _SettingsPageState extends State<SettingsPage> {
     if (config.translateEnabled && config.translateKeyCode != 0 && excludeFeature != 'translate') {
       map[config.translateKeyCode] = loc.quickTranslate;
     }
+    if (config.correctionEnabled && config.correctionKeyCode != 0 && excludeFeature != 'correction') {
+      map[config.correctionKeyCode] = '纠错反馈';
+    }
     return map;
   }
 
@@ -393,6 +414,7 @@ class _SettingsPageState extends State<SettingsPage> {
          case 'diary': _isCapturingDiaryKey = true;
          case 'organize': _isCapturingOrganizeKey = true;
          case 'translate': _isCapturingTranslateKey = true;
+         case 'correction': _isCapturingCorrectionKey = true;
          default: _isCapturingKey = true;
        }
     });
@@ -405,7 +427,7 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     // Timeout
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey || _isCapturingOrganizeKey || _isCapturingTranslateKey)) {
+      if (mounted && (_isCapturingKey || _isCapturingDiaryKey || _isCapturingToggleInputKey || _isCapturingToggleDiaryKey || _isCapturingOrganizeKey || _isCapturingTranslateKey || _isCapturingCorrectionKey)) {
         _stopKeyCapture();
       }
     });
@@ -440,6 +462,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _isCapturingToggleDiaryKey = false;
         _isCapturingOrganizeKey = false;
         _isCapturingTranslateKey = false;
+        _isCapturingCorrectionKey = false;
       });
     }
   }
@@ -2836,7 +2859,44 @@ class _SettingsPageState extends State<SettingsPage> {
 
         const SizedBox(height: 24),
 
-        // 4. Hotkey overview (read-only, shows all hotkeys across tabs)
+        // 4. Correction Feedback group
+        SettingsGroup(
+          title: '纠错反馈',
+          children: [
+            SettingsTile(
+              label: '纠错反馈',
+              subtitle: '选中修正后的文字，按快捷键提交。系统自动学习纠正，追加到词汇表。',
+              icon: CupertinoIcons.checkmark_seal,
+              child: MacosSwitch(
+                value: ConfigService().correctionEnabled,
+                onChanged: (v) async {
+                  await ConfigService().setCorrectionEnabled(v);
+                  if (v) {
+                    await _checkConflictOnEnable('correction', ConfigService().correctionKeyCode, ConfigService().correctionKeyName, ConfigService().clearCorrectionKey);
+                  }
+                  setState(() {});
+                },
+              ),
+            ),
+            if (ConfigService().correctionEnabled) ...[
+              const SettingsDivider(),
+              _buildKeyCaptureTile(
+                '纠错快捷键', CupertinoIcons.keyboard,
+                isCapturing: _isCapturingCorrectionKey,
+                keyName: ConfigService().correctionKeyName,
+                onEdit: () => _startKeyCapture('correction'),
+                onClear: () async {
+                  await ConfigService().clearCorrectionKey();
+                  setState(() {});
+                },
+              ),
+            ],
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // 5. Hotkey overview (read-only, shows all hotkeys across tabs)
         _buildHotkeyOverview(loc),
       ],
     );
@@ -2851,6 +2911,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ('${loc.diaryMode}（Toggle）', config.toggleDiaryKeyName, config.toggleDiaryEnabled),
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
       ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
+      ('纠错反馈', config.correctionKeyName, config.correctionEnabled),
     ];
 
     return SettingsGroup(

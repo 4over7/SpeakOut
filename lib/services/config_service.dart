@@ -157,6 +157,24 @@ class ConfigService {
   }
   Future<void> setOrganizePrompt(String v) async => await _prefs?.setString('organize_prompt', v);
 
+  // --- 纠错反馈 (Correction Feedback) ---
+  bool get correctionEnabled => _prefs?.getBool('correction_enabled') ?? false;
+  int get correctionKeyCode => _prefs?.getInt('correction_key_code') ?? 0;
+  int get correctionModifiers => _prefs?.getInt('correction_modifiers') ?? 0;
+  String get correctionKeyName => _prefs?.getString('correction_key_name') ?? '';
+
+  Future<void> setCorrectionEnabled(bool v) async => await _prefs?.setBool('correction_enabled', v);
+  Future<void> setCorrectionKey(int code, String name, {int modifiers = 0}) async {
+    await _prefs?.setInt('correction_key_code', code);
+    await _prefs?.setString('correction_key_name', name);
+    await _prefs?.setInt('correction_modifiers', modifiers);
+  }
+  Future<void> clearCorrectionKey() async {
+    await _prefs?.remove('correction_key_code');
+    await _prefs?.remove('correction_key_name');
+    await _prefs?.remove('correction_modifiers');
+  }
+
   // --- 即时翻译 (Quick Translate) ---
   bool get translateEnabled => _prefs?.getBool('translate_enabled') ?? false;
   int get translateKeyCode => _prefs?.getInt('translate_key_code') ?? 0;
