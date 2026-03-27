@@ -788,13 +788,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                     style: TextStyle(fontSize: 10, color: Color(0xFFE67E22), fontWeight: FontWeight.w500),
                                   )
                                 else if (_asrOriginalText != null)
-                                  Text(
-                                    () {
-                                      final diff = _asrOriginalText!.length - _recognizedText.length;
-                                      final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
-                                      return '✨ AI 润色 · $label';
-                                    }(),
-                                    style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
+                                  GestureDetector(
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (_) => const ChatPage()),
+                                    ),
+                                    child: Text(
+                                      () {
+                                        final diff = _asrOriginalText!.length - _recognizedText.length;
+                                        final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
+                                        return '✨ AI 润色 · $label  ▸';
+                                      }(),
+                                      style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
+                                    ),
                                   )
                                 else
                                   Text(

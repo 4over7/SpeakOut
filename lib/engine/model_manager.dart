@@ -787,7 +787,6 @@ class ModelManager {
 Future<void> _extractModelTask(List<String> args) async {
   final tarPath = args[0];
   final destDir = args[1];
-  final file = File(tarPath);
   
   // 1. Try Native Tar (MacOS/Linux) - Much faster and memory efficient
   // 1. Try Native Tar (MacOS/Linux) - Much faster and memory efficient
@@ -811,25 +810,8 @@ Future<void> _extractModelTask(List<String> args) async {
      }
   }
 
-  // 2. Fallback: Dart Archive Logic (Memory Intensive!)
-  // Note: Loading full file into RAM. For 500MB file this is risky but standard extraction
-  // logic usually requires RandomAccess validation or big buffers.
-  // We use standard Archive logic.
-  final bytes = file.readAsBytesSync();
-  
-  // Decide based on extension
-  Archive archive;
-  if (tarPath.endsWith('.tar.bz2') || tarPath.endsWith('.tbz2')) {
-    archive = TarDecoder().decodeBytes(BZip2Decoder().decodeBytes(bytes));
-  } else if (tarPath.endsWith('.tar.gz') || tarPath.endsWith('.tgz')) {
-    archive = TarDecoder().decodeBytes(GZipDecoder().decodeBytes(bytes));
-  } else if (tarPath.endsWith('.zip')) {
-    archive = ZipDecoder().decodeBytes(bytes);
-  } else {
-    // Default fallback
-    archive = TarDecoder().decodeBytes(bytes);
-  }
-  
-  // Use extractArchiveToDisk helper which handles paths/symlinks correctly
-  extractArchiveToDisk(archive, destDir);
+  // 2. Fallback: Dart Streaming Archive (memory efficient)
+  // extractFileToDisk uses InputFileStream internally — no full file load into RAM
+  await Directory(destDir).create(recursive: true);
+  extractFileToDisk(tarPath, destDir);
 }
