@@ -849,19 +849,24 @@ class CoreEngine {
         return;
       }
 
-      // 2. 复制选中文字
+      // 2. Cmd+A 全选当前输入框 → Cmd+C 复制
       ni.injectClipboardBegin();
-      ni.copySelection();
+      ni.pressKey(0, 0x100000); // Cmd+A (keyCode 0 = 'a', kCGEventFlagMaskCommand)
+      await Future.delayed(const Duration(milliseconds: 100));
+      ni.copySelection(); // Cmd+C
       await Future.delayed(const Duration(milliseconds: 150));
 
       final clipData = await Clipboard.getData('text/plain');
       final userText = clipData?.text?.trim() ?? '';
       ni.injectClipboardEnd();
 
+      // 取消选区，恢复光标到末尾
+      ni.pressKey(124, 0); // → 键
+
       if (userText.isEmpty) {
-        _log("[Correction] 未检测到选中文字");
+        _log("[Correction] 输入框无文字");
         overlay.recordingMode = "organize";
-        overlay.updateText("未检测到选中文字");
+        overlay.updateText("输入框无文字");
         await overlay.show();
         await Future.delayed(const Duration(seconds: 2));
         await overlay.hide();

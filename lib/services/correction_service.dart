@@ -119,4 +119,83 @@ class CorrectionService {
       _log('Save record failed: $e');
     }
   }
+
+  /// 纠错数据文件路径
+  Future<String> get _dataFilePath async {
+    final dir = await getApplicationSupportDirectory();
+    return '${dir.path}/corrections/corrections.jsonl';
+  }
+
+  /// 获取纠错记录数量
+  Future<int> getRecordCount() async {
+    try {
+      final file = File(await _dataFilePath);
+      if (!file.existsSync()) return 0;
+      return file.readAsLinesSync().where((l) => l.trim().isNotEmpty).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// 导出纠错数据到指定路径
+  Future<bool> exportData(String destPath) async {
+    try {
+      final srcPath = await _dataFilePath;
+      final srcFile = File(srcPath);
+      if (!srcFile.existsSync()) {
+        _log('Export: no data file');
+        return false;
+      }
+      await srcFile.copy(destPath);
+      _log('Exported to $destPath');
+      return true;
+    } catch (e) {
+      _log('Export failed: $e');
+      return false;
+    }
+  }
+
+  /// 导入纠错数据（追加到现有数据）
+  Future<int> importData(String srcPath) async {
+    try {
+      final srcFile = File(srcPath);
+      if (!srcFile.existsSync()) return 0;
+
+      final lines = srcFile.readAsLinesSync().where((l) => l.trim().isNotEmpty);
+      int imported = 0;
+
+      final destFile = File(await _dataFilePath);
+      final destDir = destFile.parent;
+      if (!destDir.existsSync()) destDir.createSync(recursive: true);
+
+      final sink = destFile.openWrite(mode: FileMode.append);
+      for (final line in lines) {
+        try {
+          // 验证 JSON 合法性
+          final json = jsonDecode(line) as Map<String, dynamic>;
+          sink.writeln(jsonEncode(json));
+          imported++;
+
+          // 同时导入词汇对到 VocabService
+          final corrections = json['corrections'] as List<dynamic>? ?? [];
+          for (final c in corrections) {
+            final pair = CorrectionPair.fromJson(c as Map<String, dynamic>);
+            if (pair.wrong.isNotEmpty && pair.correct.isNotEmpty && pair.wrong != pair.correct) {
+              await VocabService().addUserEntry(VocabEntry(wrong: pair.wrong, correct: pair.correct));
+            }
+          }
+        } catch (_) {
+          // 跳过无效行
+        }
+      }
+      await sink.flush();
+      await sink.close();
+
+      _log('Imported $imported records from $srcPath');
+      return imported;
+    } catch (e) {
+      _log('Import failed: $e');
+      return 0;
+    }
+  }
 }

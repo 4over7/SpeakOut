@@ -20,6 +20,7 @@ import 'package:speakout/config/app_log.dart';
 import 'vocab_settings_page.dart';
 import '../services/update_service.dart';
 import '../config/distribution.dart';
+import '../services/correction_service.dart';
 import '../services/llm_service.dart';
 import '../services/cloud_account_service.dart';
 import '../config/cloud_providers.dart';
@@ -2889,6 +2890,50 @@ class _SettingsPageState extends State<SettingsPage> {
                   await ConfigService().clearCorrectionKey();
                   setState(() {});
                 },
+              ),
+              const SettingsDivider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    PushButton(
+                      controlSize: ControlSize.regular,
+                      secondary: true,
+                      onPressed: () async {
+                        final result = await FilePicker.platform.saveFile(
+                          dialogTitle: '导出纠错数据',
+                          fileName: 'speakout_corrections.jsonl',
+                        );
+                        if (result != null) {
+                          final ok = await CorrectionService().exportData(result);
+                          if (mounted) {
+                            _showInfoSnackBar(ok ? '导出成功' : '导出失败：无数据');
+                          }
+                        }
+                      },
+                      child: const Text('导出'),
+                    ),
+                    const SizedBox(width: 8),
+                    PushButton(
+                      controlSize: ControlSize.regular,
+                      secondary: true,
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          dialogTitle: '导入纠错数据',
+                          type: FileType.custom,
+                          allowedExtensions: ['jsonl', 'json'],
+                        );
+                        if (result != null && result.files.single.path != null) {
+                          final count = await CorrectionService().importData(result.files.single.path!);
+                          if (mounted) {
+                            _showInfoSnackBar('导入 $count 条记录（词汇已同步）');
+                          }
+                        }
+                      },
+                      child: const Text('导入'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
