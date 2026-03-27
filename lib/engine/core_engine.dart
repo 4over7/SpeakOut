@@ -805,17 +805,22 @@ class CoreEngine {
       _watchdogTimer?.cancel();
       if (mode == RecordingMode.ptt && !_isToggleMode && _translateOverride == null) {
         final watchKeyCode = _activeHotkeyCode ?? pttKeyCode;
-        // 延迟 500ms 再开始检测：修饰键的 HID 状态更新有延迟，
-        // 立即检测会误判为"没按住"导致录音被秒杀
-        int skipCount = 2; // 跳过前 2 次（400ms），第 3 次开始检测
+        // 连续多次确认：CGEventSourceKeyState 对修饰键偶尔误报，
+        // 要求连续 3 次检测到没按住才 stop，单次误判不触发
+        int missCount = 0;
+        const missThreshold = 3;
         _watchdogTimer = Timer.periodic(Duration(milliseconds: AppConstants.kKeyWatchdogIntervalMs), (timer) {
           if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
-          if (skipCount > 0) { skipCount--; return; }
           final isPhysicallyDown = _nativeInput.isKeyPressed(watchKeyCode);
           if (!isPhysicallyDown) {
-            _log("Watchdog: Key $watchKeyCode UP physically, forcing stop.");
-            timer.cancel();
-            stopRecording();
+            missCount++;
+            if (missCount >= missThreshold) {
+              _log("Watchdog: Key $watchKeyCode UP confirmed ($missCount consecutive misses), forcing stop.");
+              timer.cancel();
+              stopRecording();
+            }
+          } else {
+            missCount = 0; // 重置
           }
         });
       }
