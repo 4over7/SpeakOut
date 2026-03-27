@@ -810,8 +810,9 @@ Future<void> _extractModelTask(List<String> args) async {
      }
   }
 
-  // 2. Fallback: Dart Streaming Archive (memory efficient)
-  // extractFileToDisk uses InputFileStream internally — no full file load into RAM
+  // 2. Fallback: Dart Archive — 全流式，不将整个文件加载到内存
+  // extractFileToDisk 内部: InputFileStream → BZip2/GZip decodeStream → temp.tar
+  //   → TarDecoder.decodeStream → OutputFileStream 逐文件写入 → 清理 temp
   await Directory(destDir).create(recursive: true);
-  extractFileToDisk(tarPath, destDir);
+  await extractFileToDisk(tarPath, destDir);
 }
