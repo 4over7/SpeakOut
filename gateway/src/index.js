@@ -25,10 +25,10 @@ app.options('*', (c) => c.body(null, 204));
 // ═══════════════════════════════════════════════════════════
 app.get('/version', (c) => {
     return c.json({
-        version: '1.5.23',
+        version: '1.5.24',
         build: 175,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
-        dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.5.23/SpeakOut.dmg',
+        dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.5.24/SpeakOut.dmg',
         release_notes: '',
     });
 });

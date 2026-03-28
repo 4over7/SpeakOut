@@ -1,5 +1,33 @@
 # SpeakOut Version History
 
+## [1.5.24] - 2026-03-29
+
+### 语音纠错反馈
+- **一键纠错** — 修改识别错误后按纠错快捷键，自动对比并学习词汇（Cmd+A 全选 → Cmd+C → LLM 提取差异）
+- 纠错数据导出/导入（JSONL 格式）
+
+### 云服务账户导入/导出
+- 云服务账户页面新增"导入"和"导出"按钮
+- 支持跨设备迁移账户配置（含凭证）
+
+### 内存泄漏修复
+- 修复 6 处资源泄漏：CoreEngine Timer、ChatService/NotificationService/UpdateService StreamController、AppLog Timer
+- 新增 AppService.dispose() 统一资源清理
+
+### 模型解压优化
+- Dart 回退路径改用 `extractFileToDisk()` 全流式解压，大模型不再需要整个文件加载到内存
+
+### 签名与公证
+- DMG 签名改用 Developer ID Application 证书
+- 新增 Apple Notarization（公证），用户下载后双击即可打开，无 Gatekeeper 警告
+- 所有 Frameworks/dylib 递归签名 + hardened runtime + 安全时间戳
+
+### UI 优化
+- 主界面 AI 润色标签可点击，跳转聊天页查看 ASR vs LLM 对比详情
+- 所有快捷键允许清空（包括 PTT 和闪念笔记 PTT）
+- 系统权限区新增签名变更提示横幅
+- Watchdog 改为连续 3 次确认，减少修饰键误判
+
 ## [1.5.23] - 2026-03-26
 
 ### App Store 适配
