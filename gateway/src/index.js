@@ -23,7 +23,21 @@ app.options('*', (c) => c.body(null, 204));
 // ═══════════════════════════════════════════════════════════
 // 0. 版本检查
 // ═══════════════════════════════════════════════════════════
-app.get('/version', (c) => {
+app.get('/version', async (c) => {
+    // 记录客户端版本统计（fire-and-forget）
+    const clientVersion = c.req.query('v') || 'unknown';
+    const clientBuild = c.req.query('b') || '0';
+    try {
+        const key = `stats:version:${clientVersion}`;
+        const current = parseInt(await c.env.SPEAKOUT_DB.get(key) || '0');
+        await c.env.SPEAKOUT_DB.put(key, String(current + 1));
+        // 记录最近活跃（按天）
+        const today = new Date().toISOString().split('T')[0];
+        const dailyKey = `stats:daily:${today}`;
+        const daily = parseInt(await c.env.SPEAKOUT_DB.get(dailyKey) || '0');
+        await c.env.SPEAKOUT_DB.put(dailyKey, String(daily + 1), { expirationTtl: 90 * 86400 });
+    } catch (_) {}
+
     return c.json({
         version: '1.5.24',
         build: 175,
@@ -31,6 +45,25 @@ app.get('/version', (c) => {
         dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.5.24/SpeakOut.dmg',
         release_notes: '',
     });
+});
+
+// ═══════════════════════════════════════════════════════════
+// 0.5 版本统计查询
+// ═══════════════════════════════════════════════════════════
+app.get('/stats', async (c) => {
+    const versions = {};
+    const list = await c.env.SPEAKOUT_DB.list({ prefix: 'stats:version:' });
+    for (const key of list.keys) {
+        const v = key.name.replace('stats:version:', '');
+        versions[v] = parseInt(await c.env.SPEAKOUT_DB.get(key.name) || '0');
+    }
+    const daily = {};
+    const dList = await c.env.SPEAKOUT_DB.list({ prefix: 'stats:daily:' });
+    for (const key of dList.keys) {
+        const d = key.name.replace('stats:daily:', '');
+        daily[d] = parseInt(await c.env.SPEAKOUT_DB.get(key.name) || '0');
+    }
+    return c.json({ versions, daily });
 });
 
 // ═══════════════════════════════════════════════════════════
