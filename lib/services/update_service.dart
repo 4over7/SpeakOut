@@ -165,12 +165,16 @@ class UpdateService {
     _progressController.add(0);
 
     try {
+      // GitHub releases URL 返回 302 重定向，必须 followRedirects
       final client = http.Client();
       final request = http.Request('GET', Uri.parse(_dmgAssetUrl!));
+      request.followRedirects = true;
+      request.maxRedirects = 5;
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
         errorMessage = 'Download failed: HTTP ${response.statusCode}';
+        AppLog.d('UpdateService: download failed: HTTP ${response.statusCode} from $downloadUrl');
         _setState(UpdateState.failed);
         client.close();
         return false;
