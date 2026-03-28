@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../services/cloud_account_service.dart';
 import '../services/llm_service.dart';
@@ -74,22 +75,106 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
 
           const SizedBox(height: 16),
 
-          // 添加按钮
+          // 添加按钮 + 导入/导出
           Center(
-            child: PushButton(
-              controlSize: ControlSize.regular,
-              onPressed: () => _showAddEditDialog(context, loc),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const MacosIcon(CupertinoIcons.plus_circle, size: 16),
-                  const SizedBox(width: 6),
-                  Text(loc.cloudAccountAdd),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  onPressed: () => _showAddEditDialog(context, loc),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const MacosIcon(CupertinoIcons.plus_circle, size: 16),
+                      const SizedBox(width: 6),
+                      Text(loc.cloudAccountAdd),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                PushButton(
+                  controlSize: ControlSize.regular,
+                  secondary: true,
+                  onPressed: () => _importAccounts(context),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MacosIcon(CupertinoIcons.arrow_down_doc, size: 14),
+                      SizedBox(width: 4),
+                      Text('导入'),
+                    ],
+                  ),
+                ),
+                if (_accounts.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  PushButton(
+                    controlSize: ControlSize.regular,
+                    secondary: true,
+                    onPressed: () => _exportAccounts(context),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MacosIcon(CupertinoIcons.arrow_up_doc, size: 14),
+                        SizedBox(width: 4),
+                        Text('导出'),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _importAccounts(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (result == null || result.files.single.path == null) return;
+    final count = await CloudAccountService().importFromFile(result.files.single.path!);
+    if (!mounted) return;
+    _refreshAccounts();
+    await showMacosAlertDialog(
+      context: context,
+      builder: (_) => MacosAlertDialog(
+        appIcon: const MacosIcon(CupertinoIcons.cloud_download, size: 48),
+        title: const Text('导入完成'),
+        message: Text(count > 0 ? '成功导入 $count 个云服务账户' : '没有新账户需要导入（已存在的服务商会跳过）'),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('确定'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportAccounts(BuildContext context) async {
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: '导出云服务账户',
+      fileName: 'speakout_cloud_accounts.json',
+      allowedExtensions: ['json'],
+      type: FileType.custom,
+    );
+    if (path == null) return;
+    final ok = await CloudAccountService().exportToFile(path);
+    if (!mounted) return;
+    await showMacosAlertDialog(
+      context: context,
+      builder: (_) => MacosAlertDialog(
+        appIcon: MacosIcon(ok ? CupertinoIcons.checkmark_circle : CupertinoIcons.xmark_circle, size: 48),
+        title: Text(ok ? '导出成功' : '导出失败'),
+        message: Text(ok ? '已导出 ${_accounts.length} 个云服务账户\n注意：文件含明文凭证，请妥善保管' : '写入文件失败'),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('确定'),
+        ),
       ),
     );
   }

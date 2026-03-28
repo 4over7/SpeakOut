@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/cloud_account.dart';
@@ -135,6 +136,69 @@ class CloudAccountService {
   Future<void> _clearCredentials(String accountId, Iterable<String> keys) async {
     for (final key in keys) {
       await _prefs?.remove('cloud_cred_${accountId}_$key');
+    }
+  }
+
+  // ── 导出/导入 ──
+
+  /// 导出所有云账户（含凭证）到 JSON 文件
+  Future<bool> exportToFile(String filePath) async {
+    try {
+      final data = _accounts.map((a) => {
+        'providerId': a.providerId,
+        'displayName': a.displayName,
+        'isEnabled': a.isEnabled,
+        'credentials': Map<String, String>.from(a.credentials),
+      }).toList();
+      final json = const JsonEncoder.withIndent('  ').convert({
+        'app': 'SpeakOut',
+        'type': 'cloud_accounts',
+        'version': 1,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'accounts': data,
+      });
+      await File(filePath).writeAsString(json);
+      AppLog.d('CloudAccountService: exported ${data.length} accounts to $filePath');
+      return true;
+    } catch (e) {
+      AppLog.d('CloudAccountService: export failed: $e');
+      return false;
+    }
+  }
+
+  /// 从 JSON 文件导入云账户（跳过已存在的服务商）
+  Future<int> importFromFile(String filePath) async {
+    try {
+      final content = await File(filePath).readAsString();
+      final map = jsonDecode(content) as Map<String, dynamic>;
+      if (map['type'] != 'cloud_accounts') {
+        AppLog.d('CloudAccountService: invalid file type');
+        return 0;
+      }
+      final list = (map['accounts'] as List?) ?? [];
+      int imported = 0;
+      for (final item in list) {
+        final providerId = item['providerId'] as String? ?? '';
+        if (providerId.isEmpty) continue;
+        // 跳过已存在的服务商
+        if (getAccountByProviderId(providerId) != null) continue;
+        final creds = (item['credentials'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, v.toString())) ?? {};
+        final account = CloudAccount(
+          id: const Uuid().v4(),
+          providerId: providerId,
+          displayName: item['displayName'] as String? ?? providerId,
+          isEnabled: item['isEnabled'] as bool? ?? true,
+          credentials: creds,
+        );
+        await addAccount(account);
+        imported++;
+      }
+      AppLog.d('CloudAccountService: imported $imported accounts from $filePath');
+      return imported;
+    } catch (e) {
+      AppLog.d('CloudAccountService: import failed: $e');
+      return 0;
     }
   }
 
