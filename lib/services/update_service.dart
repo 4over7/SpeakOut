@@ -132,9 +132,9 @@ class UpdateService {
   Future<_RemoteVersion?> _checkGateway() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      final url = '${AppConstants.kGatewayVersionUrl}?v=${info.version}&b=${info.buildNumber}';
+      final checkUrl = '${AppConstants.kGatewayVersionUrl}?v=${info.version}&b=${info.buildNumber}';
       final resp = await http.get(
-        Uri.parse(url),
+        Uri.parse(checkUrl),
       ).timeout(AppConstants.kUpdateCheckTimeout);
 
       if (resp.statusCode != 200) return null;

@@ -15,8 +15,9 @@ echo "📦 Build number: ${CURRENT_BUILD} → ${NEW_BUILD}"
 
 # Sync version to Gateway
 VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-sed -i '' "s/version: '.*'/version: '${VERSION}'/" gateway/src/index.js
+sed -i '' "0,/version: '.*'/s/version: '.*'/version: '${VERSION}'/" gateway/src/index.js
 sed -i '' "s/build: [0-9]*/build: ${NEW_BUILD}/" gateway/src/index.js
+sed -i '' "s|download/v[0-9.]*/SpeakOut.dmg|download/v${VERSION}/SpeakOut.dmg|" gateway/src/index.js
 
 # Build
 echo "🔨 Building ${APP_NAME} (Release)..."
