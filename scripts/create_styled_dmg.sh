@@ -52,12 +52,39 @@ cp "native_lib/libnative_input.dylib" "${STAGING_DIR}/${APP_NAME}.app/Contents/M
 
 ln -s /Applications "${STAGING_DIR}/Applications"
 
-# 2.5. Code Sign
+# 2.5. Code Sign (Developer ID + Hardened Runtime + Timestamp for notarization)
 ENTITLEMENTS="macos/Runner/Release.entitlements"
+
+sign_binary() {
+    codesign --force --sign "$SIGN_IDENTITY" --timestamp --options runtime "$@"
+}
+
 if security find-identity -v -p codesigning | grep -q "$SIGN_IDENTITY"; then
     echo "Signing with: $SIGN_IDENTITY"
-    codesign -f -s "$SIGN_IDENTITY" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/libnative_input.dylib"
-    codesign -f -s "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "${STAGING_DIR}/${APP_NAME}.app"
+    APP_BUNDLE="${STAGING_DIR}/${APP_NAME}.app"
+
+    # Step 1: Sign all loose dylibs in Frameworks/ (not inside .framework bundles)
+    find "$APP_BUNDLE/Contents/Frameworks" -maxdepth 1 -name "*.dylib" 2>/dev/null | while read -r lib; do
+        sign_binary "$lib"
+    done
+
+    # Step 2: Sign embedded dylibs inside App.framework (flutter_assets/native_lib)
+    find "$APP_BUNDLE/Contents/Frameworks/App.framework" -name "*.dylib" 2>/dev/null | while read -r lib; do
+        sign_binary "$lib"
+    done
+
+    # Step 3: Sign all .framework bundles (they contain the executables already)
+    find "$APP_BUNDLE/Contents/Frameworks" -maxdepth 1 -name "*.framework" -type d 2>/dev/null | while read -r fw; do
+        sign_binary "$fw"
+    done
+
+    # Step 4: Sign native_input dylib in MacOS/
+    sign_binary "$APP_BUNDLE/Contents/MacOS/native_lib/libnative_input.dylib"
+
+    # Step 5: Sign the main app bundle last (with entitlements + hardened runtime)
+    sign_binary --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
+
+    echo "✅ All binaries signed with Developer ID + hardened runtime + timestamp"
 else
     echo "⚠️  Signing identity not found, using ad-hoc signing"
     codesign -f -s "-" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/libnative_input.dylib"
@@ -111,17 +138,18 @@ echo "Finalizing..."
 hdiutil convert "${DMG_TEMP_PATH}" -format UDZO -o "${DMG_FINAL_PATH}"
 rm -f "${DMG_TEMP_PATH}"
 
-# 5.5. Notarize (requires Apple ID with app-specific password in keychain)
-# 存储凭证: xcrun notarytool store-credentials "notarytool-profile" --apple-id YOUR_ID --team-id UB9D55S724
-if xcrun notarytool store-credentials --help >/dev/null 2>&1; then
-    echo "🔏 Submitting for notarization..."
-    if xcrun notarytool submit "${DMG_FINAL_PATH}" --keychain-profile "notarytool-profile" --wait; then
-        echo "✅ Notarization succeeded, stapling..."
-        xcrun stapler staple "${DMG_FINAL_PATH}"
-    else
-        echo "⚠️  Notarization failed — DMG is signed but not notarized"
-        echo "   Users will see Gatekeeper warning on first launch"
-    fi
+# 5.5. Notarize (requires keychain profile: xcrun notarytool store-credentials "notarytool-profile")
+echo "🔏 Submitting for notarization..."
+NOTARIZE_OUTPUT=$(xcrun notarytool submit "${DMG_FINAL_PATH}" --keychain-profile "notarytool-profile" --wait 2>&1)
+echo "$NOTARIZE_OUTPUT"
+
+if echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
+    echo "✅ Notarization accepted, stapling ticket..."
+    xcrun stapler staple "${DMG_FINAL_PATH}"
+else
+    echo "⚠️  Notarization not accepted — check log with:"
+    SUBMISSION_ID=$(echo "$NOTARIZE_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+    echo "   xcrun notarytool log $SUBMISSION_ID --keychain-profile notarytool-profile"
 fi
 
 # 6. Close old Finder windows, eject all SpeakOut volumes, then mount new DMG
