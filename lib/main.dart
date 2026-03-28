@@ -346,6 +346,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     _partialSub?.cancel();
     _updateStateSub?.cancel();
     _updateProgressSub?.cancel();
+    _appService.dispose();
     super.dispose();
   }
   

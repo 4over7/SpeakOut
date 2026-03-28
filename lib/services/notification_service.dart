@@ -31,6 +31,10 @@ class NotificationService {
   final _ctrl = StreamController<AppNotification>.broadcast();
   Stream<AppNotification> get stream => _ctrl.stream;
 
+  void dispose() {
+    _ctrl.close();
+  }
+
   void notify(String message, {NotificationType type = NotificationType.info}) {
     _ctrl.add(AppNotification(message: message, type: type));
   }

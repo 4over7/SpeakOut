@@ -15,9 +15,13 @@ class ChatService {
 
   final List<ChatMessage> _messages = [];
   final StreamController<List<ChatMessage>> _streamController = StreamController.broadcast();
-  
+
   Stream<List<ChatMessage>> get messageStream => _streamController.stream;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
+
+  void dispose() {
+    _streamController.close();
+  }
 
   bool _isInit = false;
   Future<void>? _pendingSave; // Serialize writes to prevent concurrent file I/O

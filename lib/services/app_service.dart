@@ -3,6 +3,7 @@ import '../engine/core_engine.dart';
 import 'config_service.dart';
 import 'chat_service.dart';
 import 'cloud_account_service.dart';
+import 'notification_service.dart';
 import 'update_service.dart';
 import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
@@ -17,8 +18,17 @@ class AppService {
 
   final CoreEngine engine = CoreEngine();
   final ModelManager modelManager = ModelManager();
-  
+
   bool _isPunctuationInitialized = false;
+
+  /// 释放所有资源，应用退出时调用
+  Future<void> dispose() async {
+    engine.dispose();
+    ChatService().dispose();
+    NotificationService().dispose();
+    UpdateService().dispose();
+    await AppLog.dispose();
+  }
 
   /// Apply verbose logging + log directory to AppLog and native C layer.
   /// Call this after ConfigService.init() and whenever settings change.

@@ -190,6 +190,7 @@ class CoreEngine {
     _nativeCallable?.close();
     _watchdogTimer?.cancel();
     _toggleMaxTimer?.cancel();
+    _silenceCheckTimer?.cancel();
     _stopAudioPolling();
     if (_pollBuffer != null) {
       pkg_ffi.calloc.free(_pollBuffer!);

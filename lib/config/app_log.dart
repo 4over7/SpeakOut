@@ -83,6 +83,16 @@ class AppLog {
     });
   }
 
+  static Future<void> dispose() async {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    if (_sink != null) {
+      try { await _sink!.flush(); _sink!.close(); } catch (_) {}
+      _sink = null;
+    }
+    _initAttempted = false;
+  }
+
   static void d(String message) {
     if (!enabled) return;
     try {

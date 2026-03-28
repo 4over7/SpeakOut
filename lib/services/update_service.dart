@@ -38,6 +38,11 @@ class UpdateService {
   static String get _dmgPath => '${Directory.systemTemp.path}/SpeakOut-update.dmg';
   static String get _helperPath => '${Directory.systemTemp.path}/speakout_update.sh';
 
+  void dispose() {
+    _progressController.close();
+    _stateController.close();
+  }
+
   void _setState(UpdateState s) {
     _state = s;
     _stateController.add(s);
