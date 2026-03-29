@@ -103,10 +103,10 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
           title: 'SpeakOut',
           // Auto-adapt to system light/dark mode
           theme: MacosThemeData.light().copyWith(
-            primaryColor: AppTheme.accentColor,
+            primaryColor: AppTheme.lightAccent,
           ),
           darkTheme: MacosThemeData.dark().copyWith(
-             primaryColor: AppTheme.accentColor,
+             primaryColor: AppTheme.darkAccent,
           ),
           themeMode: ThemeMode.system,
           debugShowCheckedModeBanner: false,
@@ -456,15 +456,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   Future<void> _initWindow() async {
       // windowManager initialized in main now
       WindowOptions windowOptions = const WindowOptions(
-        size: Size(800, 600),
+        size: Size(960, 720),
         center: true,
         backgroundColor: Colors.transparent,
         skipTaskbar: false,
         titleBarStyle: TitleBarStyle.hidden,
       );
-      
+
       await windowManager.waitUntilReadyToShow(windowOptions, () async {
-        await windowManager.setSize(const Size(800, 600));
+        await windowManager.setSize(const Size(960, 720));
         await windowManager.center();
         await windowManager.setPreventClose(true); // Intercept close → hide to tray
         await windowManager.show();
@@ -660,7 +660,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                   height: 120,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: _ready ? AppTheme.accentColor : MacosColors.systemGrayColor,
+                                    color: _ready ? AppTheme.getAccent(context) : MacosColors.systemGrayColor,
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withValues(alpha:0.15),
@@ -717,7 +717,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                     if (_isRecording) {
                                       return Text(
                                         loc.recording,
-                                        style: AppTheme.body(context).copyWith(color: AppTheme.accentColor),
+                                        style: AppTheme.body(context).copyWith(color: AppTheme.getAccent(context)),
                                       );
                                     }
                                     
@@ -768,9 +768,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           constraints: const BoxConstraints(maxWidth: 500),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha:0.1),
+                            color: AppTheme.getAccent(context).withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.accentColor.withValues(alpha:0.3)),
+                            border: Border.all(color: AppTheme.getAccent(context).withValues(alpha:0.3)),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -799,13 +799,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                         final label = diff > 0 ? '精简 $diff 字' : (diff < 0 ? '扩展 ${-diff} 字' : '等长');
                                         return '✨ AI 润色 · $label  ▸';
                                       }(),
-                                      style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
+                                      style: TextStyle(fontSize: 10, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500),
                                     ),
                                   )
                                 else
                                   Text(
                                     '✨ AI 润色 · 无修改',
-                                    style: TextStyle(fontSize: 10, color: AppTheme.accentColor.withValues(alpha: 0.6), fontWeight: FontWeight.w500),
+                                    style: TextStyle(fontSize: 10, color: AppTheme.getAccent(context).withValues(alpha: 0.6), fontWeight: FontWeight.w500),
                                   ),
                               ],
                             ],
