@@ -17,7 +17,12 @@ class OfflineSherpaProvider implements ASRProvider {
 
   // Accumulate audio chunks during recording
   final List<Float32List> _audioChunks = [];
-  int _totalAccumulatedSamples = 0;
+
+
+  // Pre-segmented recognition: decode during pauses to reduce final wait time
+  final List<String> _segmentResults = [];
+  int _lastVoiceChunkIndex = -1;
+  bool _isSegmentDecoding = false;
 
   StreamController<String> _textController = StreamController<String>.broadcast();
 
@@ -202,7 +207,10 @@ class OfflineSherpaProvider implements ASRProvider {
   Future<void> start() async {
     if (!_isInit || _recognizer == null) throw Exception("Offline Sherpa not initialized");
     _audioChunks.clear();
-    _totalAccumulatedSamples = 0;
+
+    _segmentResults.clear();
+    _lastVoiceChunkIndex = -1;
+    _isSegmentDecoding = false;
   }
 
   @override
@@ -210,7 +218,72 @@ class OfflineSherpaProvider implements ASRProvider {
     if (_recognizer == null) return;
     // Accumulate audio — no real-time decoding
     _audioChunks.add(Float32List.fromList(samples));
-    _totalAccumulatedSamples += samples.length;
+
+  }
+
+  /// Mark current latest chunk as "has voice" (called by CoreEngine silence check)
+  void markLastVoiceChunk() {
+    if (_audioChunks.isNotEmpty) {
+      _lastVoiceChunkIndex = _audioChunks.length - 1;
+    }
+  }
+
+  /// Pre-segment: decode accumulated audio up to the last voice chunk.
+  /// Called when a pause (e.g. 3s silence) is detected during recording.
+  /// The cut point is at the pause START (last voice chunk), not the detection moment,
+  /// so we never clip into newly resumed speech.
+  Future<void> flushSegment() async {
+    if (_audioChunks.isEmpty || _isSegmentDecoding || _recognizer == null) return;
+    if (_lastVoiceChunkIndex < 0) return;
+
+    _isSegmentDecoding = true;
+    try {
+      final cutPoint = _lastVoiceChunkIndex + 1;
+      if (cutPoint > _audioChunks.length) return;
+
+      // Split: [0..cutPoint) → decode now, [cutPoint..] → keep for next segment
+      final segmentChunks = _audioChunks.sublist(0, cutPoint);
+      final remainingChunks = _audioChunks.sublist(cutPoint);
+
+      _audioChunks.clear();
+      _audioChunks.addAll(remainingChunks);
+      _lastVoiceChunkIndex = -1;
+
+      int totalSamples = 0;
+      for (final chunk in segmentChunks) {
+        totalSamples += chunk.length;
+      }
+
+      if (totalSamples == 0) return;
+
+      final merged = Float32List(totalSamples);
+      int offset = 0;
+      for (final chunk in segmentChunks) {
+        merged.setAll(offset, chunk);
+        offset += chunk.length;
+      }
+
+      final durationSec = (totalSamples / 16000.0).toStringAsFixed(1);
+      AppLog.d("[OfflineSherpaProvider] PreSegment #${_segmentResults.length + 1}: "
+          "decoding $totalSamples samples (${durationSec}s)...");
+
+      final stream = _recognizer!.createStream();
+      stream.acceptWaveform(samples: merged, sampleRate: 16000);
+      _recognizer!.decode(stream);
+      final result = _recognizer!.getResult(stream);
+      final text = result.text.trim();
+      stream.free();
+
+      if (text.isNotEmpty) {
+        _segmentResults.add(text);
+        AppLog.d("[OfflineSherpaProvider] PreSegment #${_segmentResults.length}: "
+            "(${text.length}字, ${durationSec}s): '$text'");
+      }
+    } catch (e) {
+      AppLog.d("[OfflineSherpaProvider] PreSegment error: $e");
+    } finally {
+      _isSegmentDecoding = false;
+    }
   }
 
   @override
@@ -218,59 +291,76 @@ class OfflineSherpaProvider implements ASRProvider {
     if (_recognizer == null) return ASRResult.textOnly("");
 
     try {
-      // Merge all audio chunks into a single buffer
+      // Wait for any in-progress segment decoding to finish
+      while (_isSegmentDecoding) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+
+      // Decode remaining audio (the last segment since the last flush)
       int totalSamples = 0;
       for (final chunk in _audioChunks) {
         totalSamples += chunk.length;
       }
 
-      if (totalSamples == 0) {
+      String lastSegmentText = '';
+      if (totalSamples > 0) {
+        final durationSec = (totalSamples / 16000.0).toStringAsFixed(1);
+        AppLog.d("[OfflineSherpaProvider] Decoding final segment [$_activeModelInfo]: "
+            "${_audioChunks.length} chunks, $totalSamples samples (${durationSec}s)");
+
+        final merged = Float32List(totalSamples);
+        int offset = 0;
+        for (final chunk in _audioChunks) {
+          merged.setAll(offset, chunk);
+          offset += chunk.length;
+        }
+        _audioChunks.clear();
+
+        final stream = _recognizer!.createStream();
+        stream.acceptWaveform(samples: merged, sampleRate: 16000);
+        _recognizer!.decode(stream);
+        final result = _recognizer!.getResult(stream);
+        lastSegmentText = result.text.trim();
+        stream.free();
+
+        final fullDurationSec = durationSec;
+        AppLog.d("[OfflineSherpaProvider] Final segment (${lastSegmentText.length}字, ${fullDurationSec}s): '$lastSegmentText'");
+      } else {
+        _audioChunks.clear();
+      }
+
+      // Concatenate all pre-decoded segments + final segment
+      final hasPreSegments = _segmentResults.isNotEmpty;
+      if (lastSegmentText.isNotEmpty) {
+        _segmentResults.add(lastSegmentText);
+      }
+      final fullText = _segmentResults.join('');
+      final segmentCount = _segmentResults.length;
+      _segmentResults.clear();
+
+      if (hasPreSegments) {
+        AppLog.d("[OfflineSherpaProvider] Merged $segmentCount segments → (${fullText.length}字): '$fullText'");
+      } else if (fullText.isNotEmpty) {
+        AppLog.d("[OfflineSherpaProvider] Result (${fullText.length}字): '$fullText'");
+      } else {
         AppLog.d("[OfflineSherpaProvider] No audio accumulated (0 chunks)");
-        return ASRResult.textOnly("");
       }
-
-      final durationSec = (totalSamples / 16000.0).toStringAsFixed(1);
-      final accMatch = totalSamples == _totalAccumulatedSamples ? 'OK' : 'MISMATCH(acc=$_totalAccumulatedSamples)';
-      AppLog.d("[OfflineSherpaProvider] Decoding [$_activeModelInfo]: ${_audioChunks.length} chunks, $totalSamples samples (${durationSec}s), check=$accMatch");
-
-      final merged = Float32List(totalSamples);
-      int offset = 0;
-      for (final chunk in _audioChunks) {
-        merged.setAll(offset, chunk);
-        offset += chunk.length;
-      }
-      _audioChunks.clear();
-
-      // Create offline stream, feed audio, decode
-      final stream = _recognizer!.createStream();
-      stream.acceptWaveform(samples: merged, sampleRate: 16000);
-
-      _recognizer!.decode(stream);
-
-      final result = _recognizer!.getResult(stream);
-      final text = result.text.trim();
-      AppLog.d("[OfflineSherpaProvider] Result (${text.length}字, ${durationSec}s audio): '$text'");
-
-      stream.free();
 
       // Emit final result on textStream
-      if (text.isNotEmpty && !_textController.isClosed) {
-        _textController.add(text);
+      if (fullText.isNotEmpty && !_textController.isClosed) {
+        _textController.add(fullText);
       }
 
-      // 未来：当 modelArch == transducerOffline 时，可从 C API 读取 ys_log_probs
-      // if (_currentModelArch == ModelArch.transducerOffline) {
-      //   confidence = extractConfidenceFromJson(stream);
-      // }
       return ASRResult(
-        text: text,
-        tokens: result.tokens,
-        timestamps: result.timestamps.map((t) => t.toDouble()).toList(),
-        tokenConfidence: null, // 当前所有离线模型均无置信度
+        text: fullText,
+        tokens: [],
+        timestamps: [],
+        tokenConfidence: null,
       );
     } catch (e) {
       AppLog.d("[OfflineSherpaProvider] stop error: $e");
       _audioChunks.clear();
+      _segmentResults.clear();
       return ASRResult.textOnly("");
     }
   }
@@ -345,6 +435,9 @@ class OfflineSherpaProvider implements ASRProvider {
   @override
   Future<void> dispose() async {
     _audioChunks.clear();
+    _segmentResults.clear();
+    _lastVoiceChunkIndex = -1;
+    _isSegmentDecoding = false;
     _recognizer?.free();
     _recognizer = null;
     _isInit = false;

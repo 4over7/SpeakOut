@@ -118,6 +118,7 @@ class CoreEngine {
   Timer? _silenceCheckTimer;
   int _silencePollCount = 0;
   DateTime? _lastSilenceNotify;
+  int _pauseSegmentPollCount = 0; // Pre-segment: consecutive silence polls
 
   // Recording state machine (replaces _isRecording, _isStopping, _audioStarted, _isDiaryMode)
   RecordingState _recordingState = RecordingState.idle;
@@ -989,18 +990,25 @@ class CoreEngine {
       // 7. SILENCE DETECTION — soft reminder if mic captures nothing for 2s
       _silenceCheckTimer?.cancel();
       _silencePollCount = 0;
+      _pauseSegmentPollCount = 0;
       _lastSilenceNotify = null;
       _silenceCheckTimer = Timer.periodic(Duration(milliseconds: AppConstants.kSilenceCheckIntervalMs), (timer) {
         if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
         final level = _nativeInput.getAudioLevel();
         if (level < 0.01) {
           _silencePollCount++;
+          _pauseSegmentPollCount++;
         } else {
           if (_silencePollCount >= AppConstants.kSilenceThresholdCount) {
             // Was silent, now got audio — hide hint
             _overlay.hideSilenceHint();
           }
           _silencePollCount = 0;
+          _pauseSegmentPollCount = 0;
+          // Mark "last voice chunk" for pre-segment cut point
+          if (_asrProvider is OfflineSherpaProvider) {
+            (_asrProvider as OfflineSherpaProvider).markLastVoiceChunk();
+          }
         }
         // 8. OFFLINE DURATION WARNING — toggle mode + offline model + exceeds threshold
         if (_isToggleMode && _isOfflineASR && _recordingStartTime != null) {
@@ -1021,6 +1029,13 @@ class CoreEngine {
             _overlay.showSilenceHint();
             NotificationService().notify('未检测到声音，请检查麦克风是否可用');
           }
+        }
+
+        // Pre-segment: 3s pause triggers background ASR decode (offline models only)
+        if (_pauseSegmentPollCount >= AppConstants.kPauseSegmentThresholdCount
+            && _asrProvider is OfflineSherpaProvider) {
+          _pauseSegmentPollCount = 0; // Reset, wait for next pause
+          (_asrProvider as OfflineSherpaProvider).flushSegment();
         }
       });
 
@@ -1100,6 +1115,7 @@ class CoreEngine {
      _audioStarted = false;
      _deferredStop = false;
      _isToggleMode = false;
+     _pauseSegmentPollCount = 0;
      _activeHotkeyCode = null;
      _toggleMaxTimer?.cancel();
      _toggleMaxTimer = null;
