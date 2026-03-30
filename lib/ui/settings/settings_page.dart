@@ -8,8 +8,9 @@ import 'tabs/mode_tab.dart';
 import 'tabs/trigger_tab.dart';
 import 'tabs/service_tab.dart';
 import 'tabs/general_tab.dart';
+import 'tabs/about_tab.dart';
 
-/// Settings page — 4 horizontal tabs: Mode | Trigger | Service | General
+/// Settings page — 5 horizontal tabs: Mode | Trigger | Service | General | About
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -90,6 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         SettingsTabItem(icon: CupertinoIcons.hand_draw, label: loc.tabTrigger),
                         SettingsTabItem(icon: CupertinoIcons.cloud, label: loc.tabCloudAccounts),
                         SettingsTabItem(icon: CupertinoIcons.settings, label: loc.tabGeneral),
+                        SettingsTabItem(icon: CupertinoIcons.info_circle, label: loc.tabAbout),
                       ],
                     ),
                     // Tab content
@@ -126,6 +128,8 @@ class _SettingsPageState extends State<SettingsPage> {
         return GeneralTab(
           onNavigateToTab: (i) => _onTabChanged(i),
         );
+      case 4:
+        return const AboutTab();
       default:
         return const SizedBox.shrink();
     }
