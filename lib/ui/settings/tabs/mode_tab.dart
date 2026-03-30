@@ -286,6 +286,37 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
+  Widget _buildHotkeyCard(AppLocalizations loc) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(children: [
+          const Text('⌨️', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text('快捷键与录音', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+        ]),
+        const SizedBox(height: 10),
+        _compactRow('长按说话 (PTT)', _hotkeyBadge(_currentKeyName, isCapturing: _isCapturingKey, onTap: () => _startKeyCapture())),
+        const SizedBox(height: 6),
+        _compactRow('单击切换 (Toggle)', _hotkeyBadge(_toggleInputKeyName, isCapturing: _isCapturingToggleInputKey, onTap: () => _startKeyCapture('toggleInput'))),
+        _compactDivider(),
+        _compactRow(loc.toggleMaxDuration, MacosPopupButton<int>(
+          value: _toggleMaxDuration,
+          items: [
+            MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone, style: const TextStyle(fontSize: 12))),
+            MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1), style: const TextStyle(fontSize: 12))),
+            MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3), style: const TextStyle(fontSize: 12))),
+            MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5), style: const TextStyle(fontSize: 12))),
+            MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10), style: const TextStyle(fontSize: 12))),
+          ],
+          onChanged: (v) async {
+            if (v != null) { await ConfigService().setToggleMaxDuration(v); setState(() => _toggleMaxDuration = v); }
+          },
+        )),
+      ],
+    );
+  }
+
   Future<void> _refresh() async {
     for (var m in ModelManager.allModels) {
       _downloadedStatus[m.id] = await _modelManager.isModelDownloaded(m.id);
@@ -805,83 +836,50 @@ class ModeTabState extends State<ModeTab> {
 
               const SizedBox(height: 12),
 
-              // 快捷键与录音保护
-              SettingsCard(
-                padding: const EdgeInsets.all(14),
-                children: [
-                  Row(
+              // 快捷键 + 模式配置 (双列 with 动画)
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: KeyedSubtree(
+                  key: ValueKey('mode_config_$currentMode'),
+                  child: SettingsCardGrid(
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      const Text('⌨️', style: TextStyle(fontSize: 14)),
-                      const SizedBox(width: 6),
-                      Text('快捷键与录音',
-                          style: AppTheme.body(context).copyWith(
-                              fontWeight: FontWeight.w600, fontSize: 13)),
+                      // 快捷键与录音保护 (always visible)
+                      _buildHotkeyCard(loc),
+                      // Mode-specific config card
+                      if (currentMode == 'smart')
+                        _buildSmartModeConfig(loc)
+                      else if (currentMode == 'cloud')
+                        _buildCloudModeConfig(loc)
+                      else
+                        // Offline: privacy info
+                        SettingsCard(
+                          padding: const EdgeInsets.all(14),
+                          children: [
+                            Row(children: [
+                              const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
+                              const SizedBox(width: 6),
+                              Expanded(child: Text(
+                                loc.workModeOfflineIcon,
+                                style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
+                              )),
+                            ]),
+                          ],
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  _compactRow(
-                    '长按说话 (PTT)',
-                    _hotkeyBadge(
-                      _currentKeyName,
-                      isCapturing: _isCapturingKey,
-                      onTap: () => _startKeyCapture(),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _compactRow(
-                    '单击切换 (Toggle)',
-                    _hotkeyBadge(
-                      _toggleInputKeyName,
-                      isCapturing: _isCapturingToggleInputKey,
-                      onTap: () => _startKeyCapture('toggleInput'),
-                    ),
-                  ),
-                  _compactDivider(),
-                  _compactRow(
-                    loc.toggleMaxDuration,
-                    MacosPopupButton<int>(
-                      value: _toggleMaxDuration,
-                      items: [
-                        MacosPopupMenuItem(
-                            value: 0,
-                            child: Text(loc.toggleMaxNone,
-                                style: const TextStyle(fontSize: 12))),
-                        MacosPopupMenuItem(
-                            value: 60,
-                            child: Text(loc.toggleMaxMin(1),
-                                style: const TextStyle(fontSize: 12))),
-                        MacosPopupMenuItem(
-                            value: 180,
-                            child: Text(loc.toggleMaxMin(3),
-                                style: const TextStyle(fontSize: 12))),
-                        MacosPopupMenuItem(
-                            value: 300,
-                            child: Text(loc.toggleMaxMin(5),
-                                style: const TextStyle(fontSize: 12))),
-                        MacosPopupMenuItem(
-                            value: 600,
-                            child: Text(loc.toggleMaxMin(10),
-                                style: const TextStyle(fontSize: 12))),
-                      ],
-                      onChanged: (v) async {
-                        if (v != null) {
-                          await ConfigService().setToggleMaxDuration(v);
-                          setState(() => _toggleMaxDuration = v);
-                        }
-                      },
-                    ),
-                  ),
-                ],
+                ),
               ),
 
-              const SizedBox(height: 12),
-
-              // Mode-specific config (smart mode warning + detailed config)
+              // Smart mode warning banner (full-width, outside grid)
               if (currentMode == 'smart') ...[
-                // Warning banner
+                const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -890,29 +888,15 @@ class ModeTabState extends State<ModeTab> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
-                      ),
+                      const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 14, color: MacosColors.systemOrangeColor),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          loc.aiPolishWarning,
-                          style: AppTheme.caption(context).copyWith(
-                            color: MacosColors.systemOrangeColor,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
+                      Expanded(child: Text(
+                        loc.aiPolishWarning,
+                        style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
+                      )),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _buildSmartModeConfig(loc),
-              ],
-
-              if (currentMode == 'cloud') ...[
-                _buildCloudModeConfig(loc),
               ],
 
               const SizedBox(height: 12),
