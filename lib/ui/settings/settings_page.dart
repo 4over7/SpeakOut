@@ -4,13 +4,13 @@ import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../theme.dart';
 import '../widgets/settings_widgets.dart';
-import 'tabs/mode_tab.dart';
-import 'tabs/trigger_tab.dart';
-import 'tabs/service_tab.dart';
 import 'tabs/general_tab.dart';
+import 'tabs/mode_tab.dart';
+import 'tabs/superpower_tab.dart';
+import 'tabs/service_tab.dart';
 import 'tabs/about_tab.dart';
 
-/// Settings page — 5 horizontal tabs: Mode | Trigger | Service | General | About
+/// Settings page — 5 tabs: 通用 | 语音输入 | 超能力 | 云账户 | 关于
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -23,12 +23,12 @@ class _SettingsPageState extends State<SettingsPage> {
   final GlobalKey<ModeTabState> _modeTabKey = GlobalKey<ModeTabState>();
 
   Future<void> _onTabChanged(int newIndex) async {
-    // Guard: warn if leaving Mode tab with unsaved LLM changes
-    if (_selectedIndex == 0 && newIndex != 0) {
+    // Guard: warn if leaving 语音输入 tab (index 1) with unsaved LLM changes
+    if (_selectedIndex == 1 && newIndex != 1) {
       final modeState = _modeTabKey.currentState;
       if (modeState != null && modeState.hasUnsavedChanges) {
         final action = await _showUnsavedChangesDialog();
-        if (action == null) return; // cancelled
+        if (action == null) return;
         if (action) {
           await modeState.saveChanges();
         } else {
@@ -39,7 +39,6 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _selectedIndex = newIndex);
   }
 
-  /// Returns true=save, false=discard, null=cancel
   Future<bool?> _showUnsavedChangesDialog() {
     return showMacosAlertDialog<bool>(
       context: context,
@@ -82,19 +81,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 color: AppTheme.getBackground(context),
                 child: Column(
                   children: [
-                    // Horizontal tab bar
                     SettingsHorizontalTabs(
                       selectedIndex: _selectedIndex,
                       onTabChanged: (i) => _onTabChanged(i),
                       tabs: [
-                        SettingsTabItem(icon: CupertinoIcons.waveform_circle_fill, label: loc.tabWorkMode),
-                        SettingsTabItem(icon: CupertinoIcons.hand_draw, label: loc.tabTrigger),
-                        SettingsTabItem(icon: CupertinoIcons.cloud, label: loc.tabCloudAccounts),
                         SettingsTabItem(icon: CupertinoIcons.settings, label: loc.tabGeneral),
+                        SettingsTabItem(icon: CupertinoIcons.waveform_circle_fill, label: '语音输入'),
+                        SettingsTabItem(icon: CupertinoIcons.bolt_fill, label: '超能力'),
+                        SettingsTabItem(icon: CupertinoIcons.cloud, label: loc.tabCloudAccounts),
                         SettingsTabItem(icon: CupertinoIcons.info_circle, label: loc.tabAbout),
                       ],
                     ),
-                    // Tab content
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
@@ -114,20 +111,13 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildTabContent() {
     switch (_selectedIndex) {
       case 0:
-        return ModeTab(
-          key: _modeTabKey,
-          onNavigateToTab: (i) => _onTabChanged(i),
-        );
+        return GeneralTab(onNavigateToTab: (i) => _onTabChanged(i));
       case 1:
-        return TriggerTab(
-          onNavigateToTab: (i) => _onTabChanged(i),
-        );
+        return ModeTab(key: _modeTabKey, onNavigateToTab: (i) => _onTabChanged(i));
       case 2:
-        return const ServiceTab();
+        return SuperpowerTab(onNavigateToTab: (i) => _onTabChanged(i));
       case 3:
-        return GeneralTab(
-          onNavigateToTab: (i) => _onTabChanged(i),
-        );
+        return const ServiceTab();
       case 4:
         return const AboutTab();
       default:

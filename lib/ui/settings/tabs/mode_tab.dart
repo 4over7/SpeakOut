@@ -55,6 +55,15 @@ class ModeTabState extends State<ModeTab> {
   final TextEditingController _llmCustomModelController = TextEditingController();
   bool _llmModelCustom = false;
 
+  // Hotkey capture state
+  int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
+  String _currentKeyName = AppConstants.kDefaultPttKeyName;
+  bool _isCapturingKey = false;
+  String _toggleInputKeyName = '';
+  bool _isCapturingToggleInputKey = false;
+  int _toggleMaxDuration = 0;
+  StreamSubscription<(int, int)>? _keySubscription;
+
   // Misc
   bool _isTestingLlm = false;
   (bool, String)? _llmTestResult;
@@ -88,10 +97,12 @@ class ModeTabState extends State<ModeTab> {
     _refresh();
     _loadActiveModel();
     _loadAliyunConfig();
+    _loadHotkeyConfig();
   }
 
   @override
   void dispose() {
+    _keySubscription?.cancel();
     _akIdController.dispose();
     _akSecretController.dispose();
     _appKeyController.dispose();
@@ -117,6 +128,162 @@ class ModeTabState extends State<ModeTab> {
       _akSecretController.text = s.aliyunAccessKeySecret;
       _appKeyController.text = s.aliyunAppKey;
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hotkey config
+  // ---------------------------------------------------------------------------
+
+  void _loadHotkeyConfig() {
+    final service = ConfigService();
+    setState(() {
+      _currentKeyCode = service.pttKeyCode;
+      _currentKeyName = service.pttKeyName;
+      _toggleInputKeyName = service.toggleInputKeyName;
+      _toggleMaxDuration = service.toggleMaxDuration;
+    });
+    CoreEngine().pttKeyCode = _currentKeyCode;
+  }
+
+  void _startKeyCapture([String target = 'ptt']) {
+    setState(() {
+      switch (target) {
+        case 'toggleInput':
+          _isCapturingToggleInputKey = true;
+        default:
+          _isCapturingKey = true;
+      }
+    });
+
+    _keySubscription = _engine.rawKeyEventStream.listen((event) {
+      final (keyCode, modifierFlags) = event;
+      final keyName = mapKeyCodeToString(keyCode);
+      _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
+      _stopKeyCapture();
+    });
+
+    // Timeout after 15 seconds
+    Future.delayed(const Duration(seconds: 15), () {
+      if (mounted && (_isCapturingKey || _isCapturingToggleInputKey)) {
+        _stopKeyCapture();
+      }
+    });
+  }
+
+  void _stopKeyCapture() {
+    _keySubscription?.cancel();
+    _keySubscription = null;
+    if (mounted) {
+      setState(() {
+        _isCapturingKey = false;
+        _isCapturingToggleInputKey = false;
+      });
+    }
+  }
+
+  Future<void> _saveHotkeyConfig(int keyCode, String keyName,
+      {int modifierFlags = 0}) async {
+    final config = ConfigService();
+    final requiredMods = stripOwnModifier(keyCode, modifierFlags);
+    final displayName =
+        requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
+
+    // Conflict check
+    final excludeFeature = _isCapturingKey ? 'ptt' : 'toggleInput';
+    final activeKeys = getActiveHotkeys(context, excludeFeature: excludeFeature);
+    if (activeKeys.containsKey(keyCode)) {
+      final conflictWith = activeKeys[keyCode]!;
+      _stopKeyCapture();
+      if (mounted) {
+        showMacosAlertDialog(
+          context: context,
+          builder: (_) => MacosAlertDialog(
+            appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
+                size: 48, color: Colors.orange),
+            title: Text('$displayName 已被「$conflictWith」使用',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            message: const Text('该按键已被占用，请选择其他按键。'),
+            primaryButton: PushButton(
+              controlSize: ControlSize.large,
+              child: const Text('好的'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (_isCapturingToggleInputKey) {
+      await config.setToggleInputKey(keyCode, displayName,
+          modifiers: requiredMods);
+      setState(() {
+        _toggleInputKeyName = displayName;
+        _isCapturingToggleInputKey = false;
+      });
+    } else {
+      // PTT key
+      await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
+      CoreEngine().pttKeyCode = keyCode;
+      setState(() {
+        _currentKeyCode = keyCode;
+        _currentKeyName = displayName;
+        _isCapturingKey = false;
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Compact UI helpers (hotkey section)
+  // ---------------------------------------------------------------------------
+
+  Widget _compactRow(String label, Widget trailing) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTheme.body(context).copyWith(fontSize: 12)),
+          trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _hotkeyBadge(String keyName,
+      {bool isCapturing = false, VoidCallback? onTap}) {
+    final loc = AppLocalizations.of(context)!;
+    final display = isCapturing
+        ? loc.pressAnyKey
+        : (keyName.isEmpty ? loc.notSet : keyName);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isCapturing
+              ? AppTheme.getAccent(context)
+              : MacosColors.systemGrayColor.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          display,
+          style: AppTheme.mono(context).copyWith(
+            fontSize: 11,
+            color: isCapturing
+                ? Colors.white
+                : (keyName.isEmpty ? MacosColors.systemGrayColor : null),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _compactDivider() {
+    return Divider(
+      height: 12,
+      color: MacosColors.separatorColor.withValues(alpha: 0.3),
+    );
   }
 
   Future<void> _refresh() async {
@@ -633,6 +800,77 @@ class ModeTabState extends State<ModeTab> {
                     _buildModelInfoCard(loc),
                   if (currentMode != 'cloud')
                     _buildVocabCard(loc),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // 快捷键与录音保护
+              SettingsCard(
+                padding: const EdgeInsets.all(14),
+                children: [
+                  Row(
+                    children: [
+                      const Text('⌨️', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Text('快捷键与录音',
+                          style: AppTheme.body(context).copyWith(
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _compactRow(
+                    '长按说话 (PTT)',
+                    _hotkeyBadge(
+                      _currentKeyName,
+                      isCapturing: _isCapturingKey,
+                      onTap: () => _startKeyCapture(),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _compactRow(
+                    '单击切换 (Toggle)',
+                    _hotkeyBadge(
+                      _toggleInputKeyName,
+                      isCapturing: _isCapturingToggleInputKey,
+                      onTap: () => _startKeyCapture('toggleInput'),
+                    ),
+                  ),
+                  _compactDivider(),
+                  _compactRow(
+                    loc.toggleMaxDuration,
+                    MacosPopupButton<int>(
+                      value: _toggleMaxDuration,
+                      items: [
+                        MacosPopupMenuItem(
+                            value: 0,
+                            child: Text(loc.toggleMaxNone,
+                                style: const TextStyle(fontSize: 12))),
+                        MacosPopupMenuItem(
+                            value: 60,
+                            child: Text(loc.toggleMaxMin(1),
+                                style: const TextStyle(fontSize: 12))),
+                        MacosPopupMenuItem(
+                            value: 180,
+                            child: Text(loc.toggleMaxMin(3),
+                                style: const TextStyle(fontSize: 12))),
+                        MacosPopupMenuItem(
+                            value: 300,
+                            child: Text(loc.toggleMaxMin(5),
+                                style: const TextStyle(fontSize: 12))),
+                        MacosPopupMenuItem(
+                            value: 600,
+                            child: Text(loc.toggleMaxMin(10),
+                                style: const TextStyle(fontSize: 12))),
+                      ],
+                      onChanged: (v) async {
+                        if (v != null) {
+                          await ConfigService().setToggleMaxDuration(v);
+                          setState(() => _toggleMaxDuration = v);
+                        }
+                      },
+                    ),
+                  ),
                 ],
               ),
 

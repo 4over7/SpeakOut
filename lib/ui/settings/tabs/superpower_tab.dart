@@ -15,41 +15,47 @@ import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
 
-class TriggerTab extends StatefulWidget {
+/// "超能力" tab — 4 independent features as a dual-column card grid:
+/// 闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈
+class SuperpowerTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
 
-  const TriggerTab({super.key, required this.onNavigateToTab});
+  const SuperpowerTab({super.key, required this.onNavigateToTab});
 
   @override
-  State<TriggerTab> createState() => _TriggerTabState();
+  State<SuperpowerTab> createState() => _SuperpowerTabState();
 }
 
-class _TriggerTabState extends State<TriggerTab> {
-  // Hotkey capture state
-  int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
-  String _currentKeyName = AppConstants.kDefaultPttKeyName;
-  bool _isCapturingKey = false;
-  String _diaryKeyName = 'Right Option';
-  bool _isCapturingDiaryKey = false;
-  String _toggleInputKeyName = '';
-  String _toggleDiaryKeyName = '';
-  bool _isCapturingToggleInputKey = false;
-  bool _isCapturingToggleDiaryKey = false;
-  bool _isCapturingOrganizeKey = false;
-  bool _isCapturingTranslateKey = false;
-  bool _isCapturingCorrectionKey = false;
-  int _toggleMaxDuration = 0;
+class _SuperpowerTabState extends State<SuperpowerTab> {
+  // ---------------------------------------------------------------------------
+  // State variables
+  // ---------------------------------------------------------------------------
 
-  // Diary state
+  // Diary
+  bool _isCapturingDiaryKey = false;
+  String _diaryKeyName = 'Right Option';
+  bool _isCapturingToggleDiaryKey = false;
+  String _toggleDiaryKeyName = '';
   String? _diaryDirError;
 
-  // Organize prompt
+  // Organize
+  bool _isCapturingOrganizeKey = false;
   late final TextEditingController _organizePromptController;
   bool _showOrganizePrompt = false;
+
+  // Translate
+  bool _isCapturingTranslateKey = false;
+
+  // Correction
+  bool _isCapturingCorrectionKey = false;
 
   // Key capture infrastructure
   StreamSubscription<(int, int)>? _keySubscription;
   final CoreEngine _engine = CoreEngine();
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
 
   @override
   void initState() {
@@ -78,37 +84,28 @@ class _TriggerTabState extends State<TriggerTab> {
   void _loadHotkeyConfig() {
     final config = ConfigService();
     setState(() {
-      _currentKeyCode = config.pttKeyCode;
-      _currentKeyName = config.pttKeyName;
       _diaryKeyName = config.diaryKeyName;
-      _toggleInputKeyName = config.toggleInputKeyName;
       _toggleDiaryKeyName = config.toggleDiaryKeyName;
-      _toggleMaxDuration = config.toggleMaxDuration;
     });
-    _engine.pttKeyCode = _currentKeyCode;
   }
 
   // ---------------------------------------------------------------------------
   // Key capture
   // ---------------------------------------------------------------------------
 
-  void _startKeyCapture([String target = 'ptt']) {
+  void _startKeyCapture(String target) {
     setState(() {
       switch (target) {
-        case 'toggleInput':
-          _isCapturingToggleInputKey = true;
-        case 'toggleDiary':
-          _isCapturingToggleDiaryKey = true;
         case 'diary':
           _isCapturingDiaryKey = true;
+        case 'toggleDiary':
+          _isCapturingToggleDiaryKey = true;
         case 'organize':
           _isCapturingOrganizeKey = true;
         case 'translate':
           _isCapturingTranslateKey = true;
         case 'correction':
           _isCapturingCorrectionKey = true;
-        default:
-          _isCapturingKey = true;
       }
     });
 
@@ -122,9 +119,7 @@ class _TriggerTabState extends State<TriggerTab> {
     // Timeout after 15 seconds
     Future.delayed(const Duration(seconds: 15), () {
       if (mounted &&
-          (_isCapturingKey ||
-              _isCapturingDiaryKey ||
-              _isCapturingToggleInputKey ||
+          (_isCapturingDiaryKey ||
               _isCapturingToggleDiaryKey ||
               _isCapturingOrganizeKey ||
               _isCapturingTranslateKey ||
@@ -139,9 +134,7 @@ class _TriggerTabState extends State<TriggerTab> {
     _keySubscription = null;
     if (mounted) {
       setState(() {
-        _isCapturingKey = false;
         _isCapturingDiaryKey = false;
-        _isCapturingToggleInputKey = false;
         _isCapturingToggleDiaryKey = false;
         _isCapturingOrganizeKey = false;
         _isCapturingTranslateKey = false;
@@ -157,24 +150,14 @@ class _TriggerTabState extends State<TriggerTab> {
   Future<void> _saveHotkeyConfig(int keyCode, String keyName,
       {int modifierFlags = 0}) async {
     final config = ConfigService();
-    final isInputGroup = _isCapturingKey || _isCapturingToggleInputKey;
     final isDiaryGroup = _isCapturingDiaryKey || _isCapturingToggleDiaryKey;
 
     final requiredMods = stripOwnModifier(keyCode, modifierFlags);
     final displayName =
         requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
 
-    // Cross-group conflict: input keys vs diary keys
-    if (isInputGroup && config.diaryEnabled) {
-      final diaryKeys = <int>[
-        config.diaryKeyCode,
-        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
-      ].where((k) => k != 0);
-      if (diaryKeys.contains(keyCode)) {
-        _showHotkeyConflict(displayName, true);
-        return;
-      }
-    } else if (isDiaryGroup) {
+    // Cross-group conflict: diary keys vs input keys
+    if (isDiaryGroup) {
       final inputKeys = [
         config.pttKeyCode,
         if (config.toggleInputEnabled) config.toggleInputKeyCode,
@@ -237,13 +220,6 @@ class _TriggerTabState extends State<TriggerTab> {
       await config.setOrganizeKey(keyCode, displayName,
           modifiers: requiredMods);
       setState(() => _isCapturingOrganizeKey = false);
-    } else if (_isCapturingToggleInputKey) {
-      await config.setToggleInputKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() {
-        _toggleInputKeyName = displayName;
-        _isCapturingToggleInputKey = false;
-      });
     } else if (_isCapturingToggleDiaryKey) {
       await config.setToggleDiaryKey(keyCode, displayName,
           modifiers: requiredMods);
@@ -256,15 +232,6 @@ class _TriggerTabState extends State<TriggerTab> {
       setState(() {
         _diaryKeyName = displayName;
         _isCapturingDiaryKey = false;
-      });
-    } else {
-      // PTT key
-      await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
-      _engine.pttKeyCode = keyCode;
-      setState(() {
-        _currentKeyCode = keyCode;
-        _currentKeyName = displayName;
-        _isCapturingKey = false;
       });
     }
   }
@@ -433,98 +400,35 @@ class _TriggerTabState extends State<TriggerTab> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final config = ConfigService();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(4),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Card grid: 2 columns on wide, 1 column on narrow
           SettingsCardGrid(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              // 1. 语音输入 (with max duration merged)
-              _buildVoiceInputCard(loc, config),
-
-              // 2. 闪念笔记
-              _buildDiaryCard(loc, config),
-
-              // 3. AI 梳理
-              _buildOrganizeCard(loc, config),
-
-              // 4. 快捷翻译
-              _buildQuickTranslateCard(loc, config),
-
-              // 5. 纠错反馈
-              _buildCorrectionCard(loc, config),
+              _buildDiaryCard(loc),
+              _buildOrganizeCard(loc),
+              _buildTranslateCard(loc),
+              _buildCorrectionCard(loc),
             ],
           ),
           const SizedBox(height: 12),
-
-          // Full-width hotkey overview at bottom
-          _buildHotkeyOverview(loc, config),
+          // Hotkey overview at bottom (full width)
+          _buildHotkeyOverview(loc),
         ],
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 1. 语音输入 (merged with recording protection)
+  // 1. 闪念笔记
   // ---------------------------------------------------------------------------
 
-  Widget _buildVoiceInputCard(AppLocalizations loc, ConfigService config) {
-    return SettingsCard(
-      title: loc.textInjection,
-      titleIcon: CupertinoIcons.mic_fill,
-      accentColor: AppTheme.triggerVoice,
-      padding: const EdgeInsets.all(12),
-      children: [
-        _compactRow(
-          loc.pttMode,
-          _hotkeyBadge(
-            _currentKeyName,
-            isCapturing: _isCapturingKey,
-            onTap: _startKeyCapture,
-          ),
-        ),
-        const SizedBox(height: 6),
-        _compactRow(
-          loc.toggleModeTip,
-          _hotkeyBadge(
-            _toggleInputKeyName,
-            isCapturing: _isCapturingToggleInputKey,
-            onTap: () => _startKeyCapture('toggleInput'),
-          ),
-        ),
-        _compactDivider(),
-        _compactRow(
-          loc.toggleMaxDuration,
-          MacosPopupButton<int>(
-            value: _toggleMaxDuration,
-            items: [
-              MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone, style: const TextStyle(fontSize: 12))),
-              MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1), style: const TextStyle(fontSize: 12))),
-              MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3), style: const TextStyle(fontSize: 12))),
-              MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5), style: const TextStyle(fontSize: 12))),
-              MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10), style: const TextStyle(fontSize: 12))),
-            ],
-            onChanged: (v) async {
-              if (v != null) {
-                await config.setToggleMaxDuration(v);
-                setState(() => _toggleMaxDuration = v);
-              }
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 2. 闪念笔记
-  // ---------------------------------------------------------------------------
-
-  Widget _buildDiaryCard(AppLocalizations loc, ConfigService config) {
+  Widget _buildDiaryCard(AppLocalizations loc) {
+    final config = ConfigService();
     return SettingsCard(
       title: loc.diaryMode,
       titleIcon: CupertinoIcons.book,
@@ -652,10 +556,11 @@ class _TriggerTabState extends State<TriggerTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. AI 梳理
+  // 2. AI 梳理
   // ---------------------------------------------------------------------------
 
-  Widget _buildOrganizeCard(AppLocalizations loc, ConfigService config) {
+  Widget _buildOrganizeCard(AppLocalizations loc) {
+    final config = ConfigService();
     return SettingsCard(
       title: loc.organizeEnabled,
       titleIcon: CupertinoIcons.text_alignleft,
@@ -760,7 +665,7 @@ class _TriggerTabState extends State<TriggerTab> {
                 ),
                 const SizedBox(width: 4),
                 GestureDetector(
-                  onTap: () => widget.onNavigateToTab(0),
+                  onTap: () => widget.onNavigateToTab(1),
                   child: Text(
                     loc.organizeGoConfig,
                     style: AppTheme.caption(context).copyWith(
@@ -782,11 +687,11 @@ class _TriggerTabState extends State<TriggerTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 4. 快捷翻译
+  // 3. 即时翻译
   // ---------------------------------------------------------------------------
 
-  Widget _buildQuickTranslateCard(
-      AppLocalizations loc, ConfigService config) {
+  Widget _buildTranslateCard(AppLocalizations loc) {
+    final config = ConfigService();
     return SettingsCard(
       title: loc.quickTranslate,
       titleIcon: CupertinoIcons.globe,
@@ -870,10 +775,11 @@ class _TriggerTabState extends State<TriggerTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. 纠错反馈
+  // 4. 纠错反馈
   // ---------------------------------------------------------------------------
 
-  Widget _buildCorrectionCard(AppLocalizations loc, ConfigService config) {
+  Widget _buildCorrectionCard(AppLocalizations loc) {
+    final config = ConfigService();
     return SettingsCard(
       title: '纠错反馈',
       titleIcon: CupertinoIcons.checkmark_seal,
@@ -959,11 +865,10 @@ class _TriggerTabState extends State<TriggerTab> {
   // Hotkey overview (full-width, below grid)
   // ---------------------------------------------------------------------------
 
-  Widget _buildHotkeyOverview(AppLocalizations loc, ConfigService config) {
+  Widget _buildHotkeyOverview(AppLocalizations loc) {
+    final config = ConfigService();
     final entries = <(String, String, bool)>[
-      (loc.pttMode, config.pttKeyName, true),
-      (loc.toggleModeTip, config.toggleInputKeyName, config.toggleInputEnabled),
-      (loc.diaryMode, config.diaryKeyName, config.diaryEnabled),
+      ('${loc.diaryMode}（PTT）', config.diaryKeyName, config.diaryEnabled),
       ('${loc.diaryMode}（Toggle）', config.toggleDiaryKeyName,
           config.toggleDiaryEnabled),
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
