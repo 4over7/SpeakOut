@@ -96,12 +96,11 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
               ),
             )
           else
-            ...List.generate(_accounts.length, (i) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: i < _accounts.length - 1 ? 8 : 0),
-                child: _buildAccountCard(_accounts[i], loc),
-              );
-            }),
+            SettingsCardGrid(
+              spacing: 8,
+              runSpacing: 8,
+              children: _accounts.map((a) => _buildAccountCard(a, loc)).toList(),
+            ),
         ],
       ),
     );
@@ -168,67 +167,68 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
 
     final canEnable = provider != null && provider.hasAnyValidCredentials(account.credentials);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.getCardBackground(context),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.getBorder(context)),
-      ),
-      child: Row(
-        children: [
-          // 名称 + 标签
-          Expanded(
-            child: Row(
-              children: [
-                Text(
-                  account.displayName,
-                  style: AppTheme.body(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: account.isEnabled ? null : MacosColors.systemGrayColor,
-                  ),
+    return SettingsCard(
+      padding: const EdgeInsets.all(12),
+      children: [
+        // Row 1: name + toggle
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                account.displayName,
+                style: AppTheme.body(context).copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: account.isEnabled ? null : MacosColors.systemGrayColor,
                 ),
-                const SizedBox(width: 8),
-                ...capabilities.map((c) => Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      color: AppTheme.getAccent(context).withValues(alpha: 0.1),
-                    ),
-                    child: Text(c, style: TextStyle(fontSize: 9, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
-                  ),
-                )),
-                if (provider?.warning != null)
-                  const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 11, color: MacosColors.systemOrangeColor),
-              ],
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-          // 操作区
-          MacosSwitch(
-            value: account.isEnabled,
-            onChanged: canEnable ? (v) async {
-              final updated = CloudAccount(
-                id: account.id, providerId: account.providerId,
-                displayName: account.displayName, credentials: account.credentials,
-                isEnabled: v, createdAt: account.createdAt,
-              );
-              await CloudAccountService().updateAccount(updated);
-              _refreshAccounts();
-            } : null,
-          ),
-          const SizedBox(width: 4),
-          MacosIconButton(
-            icon: const MacosIcon(CupertinoIcons.pencil, size: 14),
-            onPressed: () => _showAddEditDialog(context, loc, existingAccount: account),
-          ),
-          MacosIconButton(
-            icon: const MacosIcon(CupertinoIcons.trash, size: 14, color: MacosColors.systemRedColor),
-            onPressed: () => _confirmDelete(context, account, loc),
-          ),
-        ],
-      ),
+            MacosSwitch(
+              value: account.isEnabled,
+              onChanged: canEnable ? (v) async {
+                final updated = CloudAccount(
+                  id: account.id, providerId: account.providerId,
+                  displayName: account.displayName, credentials: account.credentials,
+                  isEnabled: v, createdAt: account.createdAt,
+                );
+                await CloudAccountService().updateAccount(updated);
+                _refreshAccounts();
+              } : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // Row 2: tags + actions
+        Row(
+          children: [
+            ...capabilities.map((c) => Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: AppTheme.getAccent(context).withValues(alpha: 0.1),
+                ),
+                child: Text(c, style: TextStyle(fontSize: 9, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
+              ),
+            )),
+            if (provider?.warning != null)
+              const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 11, color: MacosColors.systemOrangeColor),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => _showAddEditDialog(context, loc, existingAccount: account),
+              child: Text('编辑', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: () => _confirmDelete(context, account, loc),
+              child: const Text('删除', style: TextStyle(fontSize: 11, color: MacosColors.systemRedColor)),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
