@@ -188,8 +188,10 @@ class AppConstants {
   static const int kSilenceCheckIntervalMs = 200;
   /// 连续静音多少次算"无声音"（次数 × 间隔 = 总时长，10 × 200ms = 2s）
   static const int kSilenceThresholdCount = 10;
-  /// 预分段：连续静音多少次触发后台分段识别（15 × 200ms = 3s）
+  /// 预分段：连续静音多少次算"长停顿"（15 × 200ms = 3s）
   static const int kPauseSegmentThresholdCount = 15;
+  /// 预分段：累计音频至少多少秒才允许分段（避免过短分段降低识别质量）
+  static const double kPreSegmentMinDurationSec = 30.0;
   /// 录音停止后等待 ASR 处理最后数据的延迟 (ms)
   static const int kEngineShutdownDelayMs = 200;
   /// 离线模型录音时长提醒阈值 (秒)，超过后提示用户效果可能下降

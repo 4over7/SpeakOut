@@ -1031,11 +1031,16 @@ class CoreEngine {
           }
         }
 
-        // Pre-segment: 3s pause triggers background ASR decode (offline models only)
+        // Pre-segment: 3s pause + accumulated audio >= 30s → background ASR decode
+        // Only split when enough audio has accumulated, avoiding short fragments
+        // that hurt recognition quality. Each segment stays in the model's optimal range.
         if (_pauseSegmentPollCount >= AppConstants.kPauseSegmentThresholdCount
             && _asrProvider is OfflineSherpaProvider) {
-          _pauseSegmentPollCount = 0; // Reset, wait for next pause
-          (_asrProvider as OfflineSherpaProvider).flushSegment();
+          _pauseSegmentPollCount = 0;
+          final provider = _asrProvider as OfflineSherpaProvider;
+          if (provider.accumulatedDurationSec >= AppConstants.kPreSegmentMinDurationSec) {
+            provider.flushSegment();
+          }
         }
       });
 

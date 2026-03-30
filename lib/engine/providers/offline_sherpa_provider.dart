@@ -221,6 +221,15 @@ class OfflineSherpaProvider implements ASRProvider {
 
   }
 
+  /// Accumulated audio duration in seconds (for pre-segment threshold check)
+  double get accumulatedDurationSec {
+    int totalSamples = 0;
+    for (final chunk in _audioChunks) {
+      totalSamples += chunk.length;
+    }
+    return totalSamples / 16000.0;
+  }
+
   /// Mark current latest chunk as "has voice" (called by CoreEngine silence check)
   void markLastVoiceChunk() {
     if (_audioChunks.isNotEmpty) {
