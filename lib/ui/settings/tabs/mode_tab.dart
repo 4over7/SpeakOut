@@ -826,10 +826,7 @@ class ModeTabState extends State<ModeTab> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Left: AI config card (takes full height)
-                            Expanded(child: _buildAiConfigCard(loc)),
-                            const SizedBox(width: 10),
-                            // Right: 3 stacked cards
+                            // Left: stacked cards
                             Expanded(
                               child: Column(
                                 children: [
@@ -843,6 +840,9 @@ class ModeTabState extends State<ModeTab> {
                                 ],
                               ),
                             ),
+                            const SizedBox(width: 10),
+                            // Right: AI config card (takes full height)
+                            Expanded(child: _buildAiConfigCard(loc)),
                           ],
                         ),
                       ),
