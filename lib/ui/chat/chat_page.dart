@@ -55,9 +55,30 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  /// Group messages by date for timeline display
+  Map<String, List<ChatMessage>> _groupByDate(List<ChatMessage> msgs) {
+    final groups = <String, List<ChatMessage>>{};
+    for (final msg in msgs) {
+      final key = DateFormat('yyyy-MM-dd').format(msg.timestamp);
+      groups.putIfAbsent(key, () => []).add(msg);
+    }
+    return groups;
+  }
+
+  String _dateLabel(String dateKey) {
+    final date = DateFormat('yyyy-MM-dd').parse(dateKey);
+    final now = DateTime.now();
+    final diff = DateTime(now.year, now.month, now.day).difference(DateTime(date.year, date.month, date.day)).inDays;
+    if (diff == 0) return '今天';
+    if (diff == 1) return '昨天';
+    if (diff < 7) return DateFormat('EEEE', 'zh').format(date);
+    return DateFormat('M月d日').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MacosScaffold(
+      backgroundColor: AppTheme.getBackground(context),
       toolBar: ToolBar(
         title: const Text("Chat History"),
         titleWidth: 150.0,
@@ -79,154 +100,241 @@ class _ChatPageState extends State<ChatPage> {
       children: [
         ContentArea(
           builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: CupertinoSlidingSegmentedControl<int>(
-                      children: const {
-                        0: Text("All History"),
-                        1: Text("Agent Chat"),
-                        2: Text("Dictation Log"),
-                      },
-                      groupValue: _selectedFilterIndex,
-                      onValueChanged: (v) {
-                        setState(() => _selectedFilterIndex = v ?? 0);
-                      },
-                      backgroundColor: MacosColors.systemGrayColor.withValues(alpha:0.2),
-                      thumbColor: MacosTheme.of(context).brightness == Brightness.dark 
-                          ? const Color(0xFF636366) 
-                          : Colors.white,
+            return Container(
+              color: AppTheme.getBackground(context),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: CupertinoSlidingSegmentedControl<int>(
+                        children: const {
+                          0: Text("全部"),
+                          1: Text("Agent"),
+                          2: Text("语音记录"),
+                        },
+                        groupValue: _selectedFilterIndex,
+                        onValueChanged: (v) {
+                          setState(() => _selectedFilterIndex = v ?? 0);
+                        },
+                        backgroundColor: AppTheme.getBorder(context),
+                        thumbColor: MacosTheme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: StreamBuilder<List<ChatMessage>>(
-                    stream: ChatService().messageStream,
-                    initialData: ChatService().messages,
-                    builder: (context, snapshot) {
-                      final allMsgs = snapshot.data ?? [];
-                      final msgs = _filterMessages(allMsgs);
-                      
-                      if (msgs.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _selectedFilterIndex == 2 ? CupertinoIcons.keyboard : CupertinoIcons.bubble_left,
-                                color: MacosColors.systemGrayColor.withValues(alpha:0.3),
-                                size: 48
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _selectedFilterIndex == 2 ? "No dictation logs yet." : "No interaction history.", 
-                                style: AppTheme.caption(context)
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      
-                      // Auto-scroll on new message ONLY if showing All or relevant tab
-                      // And only if at bottom? For simplicity, we keep auto-scroll behavior.
-                      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+                  Expanded(
+                    child: StreamBuilder<List<ChatMessage>>(
+                      stream: ChatService().messageStream,
+                      initialData: ChatService().messages,
+                      builder: (context, snapshot) {
+                        final allMsgs = snapshot.data ?? [];
+                        final msgs = _filterMessages(allMsgs);
 
-                      return ListView.builder(
-                        controller: _scrollCtrl,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced top padding
-                        itemCount: msgs.length,
-                        itemBuilder: (context, index) {
-                          final msg = msgs[index];
-                          return _buildMessageBubble(msg);
-                        },
-                      );
-                    },
+                        if (msgs.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _selectedFilterIndex == 2 ? CupertinoIcons.keyboard : CupertinoIcons.bubble_left,
+                                  color: AppTheme.getTextSecondary(context).withValues(alpha: 0.3),
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _selectedFilterIndex == 2 ? "暂无语音记录" : "暂无历史记录",
+                                  style: AppTheme.caption(context),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+                        // Group by date for timeline
+                        final groups = _groupByDate(msgs);
+                        final dateKeys = groups.keys.toList();
+
+                        return ListView.builder(
+                          controller: _scrollCtrl,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          itemCount: dateKeys.length,
+                          itemBuilder: (context, groupIndex) {
+                            final dateKey = dateKeys[groupIndex];
+                            final groupMsgs = groups[dateKey]!;
+                            return _buildDateGroup(dateKey, groupMsgs);
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-                _buildInputArea(),
-              ],
+                  _buildInputArea(),
+                ],
+              ),
             );
           },
         ),
       ],
     );
   }
-  
-  Widget _buildMessageBubble(ChatMessage msg) {
-    final isUser = msg.role == ChatRole.user;
-    final isTool = msg.role == ChatRole.tool;
-    // Formatting
-    final timeStr = DateFormat('HH:mm').format(msg.timestamp);
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isUser) ...[
-            _buildAvatar(msg.role),
-            const SizedBox(width: 8),
-          ],
-          
-          Flexible(
-            child: GestureDetector(
-               onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition, msg),
-               child: Container(
-                padding: const EdgeInsets.all(12),
+
+  /// Build a date group with header and timeline entries
+  Widget _buildDateGroup(String dateKey, List<ChatMessage> msgs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Date header
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12, top: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getBubbleColor(msg.role),
+                  color: AppTheme.getAccent(context).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: isTool ? Border.all(color: AppTheme.getAccent(context), width: 1.5) : null,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isTool)
-                      Text("🔧 Tool Result", style: TextStyle(
-                        fontSize: 10, 
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.getAccent(context)
-                      )),
-                      
-                    if (msg.role == ChatRole.dictation)
-                      Text("⌨️ Dictation Log", style: TextStyle(
-                        fontSize: 10, 
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueGrey
-                      )),
-                      
-                    SelectableText(
-                      msg.text,
-                      style: TextStyle(
-                        color: isUser ? Colors.white : MacosTheme.of(context).typography.body.color,
-                        fontSize: 13,
-                      ),
-                    ),
-                    // ASR vs LLM 对比（仅 dictation 且有差异时显示）
-                    if (msg.role == ChatRole.dictation && msg.metadata?["asrOriginal"] != null)
-                      _buildAsrComparison(msg),
-                    const SizedBox(height: 4),
-                    Text(timeStr, style: TextStyle(
-                      fontSize: 10,
-                      color: isUser ? Colors.white70 : MacosColors.secondaryLabelColor.resolveFrom(context),
-                    )),
-                  ],
+                child: Text(
+                  _dateLabel(dateKey),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.getAccent(context),
+                  ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  height: 1,
+                  color: AppTheme.getBorder(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Timeline entries
+        for (int i = 0; i < msgs.length; i++)
+          _buildTimelineEntry(msgs[i], isLast: i == msgs.length - 1),
+      ],
+    );
+  }
+
+  /// Build a single timeline entry: time on left, vertical line, content card on right
+  Widget _buildTimelineEntry(ChatMessage msg, {bool isLast = false}) {
+    final timeStr = DateFormat('HH:mm').format(msg.timestamp);
+    final roleColor = _getRoleColor(msg.role);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left: time + dot + line
+          SizedBox(
+            width: 52,
+            child: Column(
+              children: [
+                Text(timeStr, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+                const SizedBox(height: 4),
+                Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: roleColor,
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 1,
+                      color: AppTheme.getBorder(context),
+                    ),
+                  ),
+              ],
             ),
           ),
-          
-          if (isUser) ...[
-             const SizedBox(width: 8),
-             _buildAvatar(msg.role),
-          ],
+          const SizedBox(width: 12),
+          // Right: content card
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildMessageCard(msg),
+            ),
+          ),
         ],
       ),
     );
+  }
+  
+  /// Build a content card for a message (timeline style)
+  Widget _buildMessageCard(ChatMessage msg) {
+    final isTool = msg.role == ChatRole.tool;
+    final roleColor = _getRoleColor(msg.role);
+    final roleLabel = _getRoleLabel(msg.role);
+
+    return GestureDetector(
+      onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition, msg),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.getCardBackground(context),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isTool ? AppTheme.getAccent(context) : AppTheme.getBorder(context),
+            width: isTool ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Role label row
+            Row(
+              children: [
+                _buildAvatar(msg.role),
+                const SizedBox(width: 8),
+                Text(
+                  roleLabel,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: roleColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Content
+            SelectableText(
+              msg.text,
+              style: AppTheme.body(context).copyWith(height: 1.5),
+            ),
+            // ASR vs LLM comparison
+            if (msg.role == ChatRole.dictation && msg.metadata?["asrOriginal"] != null)
+              _buildAsrComparison(msg),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getRoleLabel(ChatRole role) {
+    return switch (role) {
+      ChatRole.user => '用户',
+      ChatRole.ai => 'AI',
+      ChatRole.tool => '工具',
+      ChatRole.dictation => '语音输入',
+      ChatRole.system => '系统',
+    };
+  }
+
+  Color _getRoleColor(ChatRole role) {
+    return switch (role) {
+      ChatRole.user => AppTheme.accentColor,
+      ChatRole.ai => const Color(0xFF9B59B6),
+      ChatRole.tool => const Color(0xFFE67E22),
+      ChatRole.dictation => const Color(0xFF3498DB),
+      ChatRole.system => MacosColors.systemGrayColor,
+    };
   }
   
   /// ASR 原文 vs LLM 润色对比（可折叠）
@@ -249,12 +357,12 @@ class _ChatPageState extends State<ChatPage> {
                   Icon(
                     (_expandedComparisons[msg.id] ?? false) ? CupertinoIcons.chevron_down : CupertinoIcons.chevron_right,
                     size: 10,
-                    color: AppTheme.accentColor,
+                    color: AppTheme.getAccent(context),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'AI 润色 · $diffLabel',
-                    style: TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 10, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -324,52 +432,20 @@ class _ChatPageState extends State<ChatPage> {
     // Show toast ideally
   }
   
-  Color _getBubbleColor(ChatRole role) {
-    switch (role) {
-      case ChatRole.user:
-        return AppTheme.accentColor;
-      case ChatRole.tool:
-        return const Color(0xFF2C3E50); // Dark Blue
-      case ChatRole.dictation:
-        return Colors.blueGrey.withValues(alpha:0.15); // Light distinct style
-      case ChatRole.ai:
-        return MacosColors.systemGrayColor.withValues(alpha:0.2);
-      case ChatRole.system:
-        return Colors.transparent; // Special handling maybe?
-    }
-  }
-  
   Widget _buildAvatar(ChatRole role) {
-    IconData icon;
-    Color color;
-    
-    switch (role) {
-      case ChatRole.user:
-        icon = CupertinoIcons.person_fill;
-        color = AppTheme.accentColor;
-        break;
-      case ChatRole.ai:
-        icon = CupertinoIcons.sparkles;
-        color = Colors.purple;
-        break;
-      case ChatRole.tool:
-        icon = CupertinoIcons.hammer_fill;
-        color = Colors.orange;
-        break;
-      case ChatRole.dictation:
-        icon = CupertinoIcons.keyboard;
-        color = Colors.blueGrey;
-        break;
-      case ChatRole.system:
-        icon = CupertinoIcons.info;
-        color = Colors.grey;
-        break;
-    }
-    
+    final icon = switch (role) {
+      ChatRole.user => CupertinoIcons.person_fill,
+      ChatRole.ai => CupertinoIcons.sparkles,
+      ChatRole.tool => CupertinoIcons.hammer_fill,
+      ChatRole.dictation => CupertinoIcons.keyboard,
+      ChatRole.system => CupertinoIcons.info,
+    };
+    final color = _getRoleColor(role);
+
     return CircleAvatar(
-      radius: 12,
-      backgroundColor: color.withValues(alpha:0.2),
-      child: Icon(icon, size: 14, color: color),
+      radius: 10,
+      backgroundColor: color.withValues(alpha: 0.15),
+      child: Icon(icon, size: 11, color: color),
     );
   }
 
@@ -385,7 +461,7 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: MacosTextField(
               controller: _textCtrl,
-              placeholder: "Type a detailed message...",
+              placeholder: "输入消息...",
               maxLines: null,
               onSubmitted: (_) => _sendMessage(),
             ),
