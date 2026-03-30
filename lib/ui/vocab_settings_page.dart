@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 import '../services/config_service.dart';
 import '../services/vocab_service.dart';
@@ -197,163 +198,148 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Main switch
-        SettingsGroup(
-          title: loc.vocabEnhancement,
+        SettingsCard(
+          padding: const EdgeInsets.all(12),
           children: [
-            SettingsTile(
-              label: loc.vocabEnabled,
-              icon: CupertinoIcons.textformat_abc_dottedunderline,
-              child: MacosSwitch(
-                value: _vocabEnabled,
-                onChanged: (v) async {
-                  await ConfigService().setVocabEnabled(v);
-                  setState(() => _vocabEnabled = v);
-                },
-              ),
-            ),
-            if (_vocabEnabled) ...[
-              Padding(
-                padding: const EdgeInsets.only(left: 40, bottom: 8),
-                child: Text(
-                  loc.vocabEnabledNote,
-                  style: AppTheme.caption(context).copyWith(
-                    color: MacosColors.systemGrayColor,
-                  ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('📚', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
+                  Text(loc.vocabEnhancement, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                ]),
+                MacosSwitch(
+                  value: _vocabEnabled,
+                  onChanged: (v) async {
+                    await ConfigService().setVocabEnabled(v);
+                    setState(() => _vocabEnabled = v);
+                  },
                 ),
+              ],
+            ),
+            if (_vocabEnabled)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(loc.vocabEnabledNote, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
               ),
-            ],
           ],
         ),
 
         if (_vocabEnabled) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 10),
 
-          // Industry presets
-          SettingsGroup(
-            title: loc.vocabIndustryPresets,
+          // Dual column: Industry presets (left) | Custom vocab + info (right)
+          SettingsCardGrid(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              _buildPackTile('tech', loc.vocabTech, CupertinoIcons.desktopcomputer),
-              const SettingsDivider(),
-              _buildPackTile('medical', loc.vocabMedical, CupertinoIcons.heart),
-              const SettingsDivider(),
-              _buildPackTile('legal', loc.vocabLegal, CupertinoIcons.book),
-              const SettingsDivider(),
-              _buildPackTile('finance', loc.vocabFinance, CupertinoIcons.chart_bar),
-              const SettingsDivider(),
-              _buildPackTile('education', loc.vocabEducation, CupertinoIcons.book_circle),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Custom entries
-          SettingsGroup(
-            title: loc.vocabCustomVocab,
-            children: [
-              SettingsTile(
-                label: loc.vocabCustomEnabled,
-                icon: CupertinoIcons.person_crop_square,
-                child: MacosSwitch(
-                  value: _userEnabled,
-                  onChanged: (v) async {
-                    await ConfigService().setVocabUserEnabled(v);
-                    setState(() => _userEnabled = v);
-                  },
-                ),
+              // Left: Industry presets
+              SettingsCard(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  Text(loc.vocabIndustryPresets, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  _buildCompactPackRow('tech', loc.vocabTech, CupertinoIcons.desktopcomputer),
+                  _buildCompactPackRow('medical', loc.vocabMedical, CupertinoIcons.heart),
+                  _buildCompactPackRow('legal', loc.vocabLegal, CupertinoIcons.book),
+                  _buildCompactPackRow('finance', loc.vocabFinance, CupertinoIcons.chart_bar),
+                  _buildCompactPackRow('education', loc.vocabEducation, CupertinoIcons.book_circle),
+                ],
               ),
-              if (_userEnabled) ...[
-                const SettingsDivider(),
-                if (_userEntries.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      '尚无自定义词条',
-                      style: AppTheme.caption(context).copyWith(
-                        color: MacosColors.systemGrayColor,
-                      ),
-                    ),
-                  )
-                else
-                  ..._userEntries.asMap().entries.map((e) {
-                    final idx = e.key;
-                    final entry = e.value;
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: entry.wrong.isNotEmpty
-                                    ? Text('${entry.wrong} → ${entry.correct}', style: AppTheme.body(context))
-                                    : Text(entry.correct, style: AppTheme.body(context)),
-                              ),
-                              MacosIconButton(
-                                icon: const MacosIcon(CupertinoIcons.trash, color: MacosColors.systemRedColor, size: 16),
-                                backgroundColor: MacosColors.transparent,
-                                onPressed: () => _deleteEntry(idx),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (idx < _userEntries.length - 1) const SettingsDivider(),
-                      ],
-                    );
-                  }),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
+
+              // Right: Custom vocab + matrix info
+              SettingsCard(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  // Custom vocab header + toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      PushButton(
-                        controlSize: ControlSize.regular,
-                        onPressed: _showAddEntryDialog,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const MacosIcon(CupertinoIcons.plus, size: 14),
-                            const SizedBox(width: 6),
-                            Text(loc.vocabAddEntry),
-                          ],
-                        ),
+                      Text(loc.vocabCustomVocab, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
+                      MacosSwitch(
+                        value: _userEnabled,
+                        onChanged: (v) async {
+                          await ConfigService().setVocabUserEnabled(v);
+                          setState(() => _userEnabled = v);
+                        },
                       ),
-                      const SizedBox(width: 8),
-                      PushButton(
-                        controlSize: ControlSize.regular,
-                        secondary: true,
-                        onPressed: _importTsv,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const MacosIcon(CupertinoIcons.arrow_down_doc, size: 14),
-                            const SizedBox(width: 6),
-                            Text(loc.vocabImportTsv),
-                          ],
-                        ),
-                      ),
-                      if (_userEntries.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        PushButton(
-                          controlSize: ControlSize.regular,
-                          secondary: true,
-                          onPressed: _exportTsv,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const MacosIcon(CupertinoIcons.arrow_up_doc, size: 14),
-                              const SizedBox(width: 6),
-                              Text(loc.vocabExportTsv),
-                            ],
-                          ),
-                        ),
-                      ],
                     ],
                   ),
-                ),
-              ],
+                  if (_userEnabled) ...[
+                    const SizedBox(height: 6),
+                    if (_userEntries.isEmpty)
+                      Text('尚无自定义词条', style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor, fontSize: 11))
+                    else
+                      ...List.generate(_userEntries.length, (idx) {
+                        final entry = _userEntries[idx];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Row(children: [
+                            Expanded(child: Text(
+                              entry.wrong.isNotEmpty ? '${entry.wrong} → ${entry.correct}' : entry.correct,
+                              style: AppTheme.body(context).copyWith(fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            )),
+                            GestureDetector(
+                              onTap: () => _deleteEntry(idx),
+                              child: const MacosIcon(CupertinoIcons.xmark_circle, color: MacosColors.systemRedColor, size: 14),
+                            ),
+                          ]),
+                        );
+                      }),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      GestureDetector(
+                        onTap: _showAddEntryDialog,
+                        child: Text(loc.vocabAddEntry, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _importTsv,
+                        child: Text(loc.vocabImportTsv, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+                      ),
+                      if (_userEntries.isNotEmpty) ...[
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: _exportTsv,
+                          child: Text(loc.vocabExportTsv, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+                        ),
+                      ],
+                    ]),
+                  ],
+                  // Matrix info
+                  Divider(height: 16, color: AppTheme.getBorder(context)),
+                  Text(
+                    'AI 润色 ✓ + 词典 ✓ → 术语注入 LLM\n'
+                    'AI 润色 ✓ + 词典 ✗ → 纯 LLM 润色\n'
+                    'AI 润色 ✗ + 词典 ✓ → 精确替换（离线）\n'
+                    'AI 润色 ✗ + 词典 ✗ → 原始 ASR 输出',
+                    style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor, height: 1.5),
+                  ),
+                ],
+              ),
             ],
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildCompactPackRow(String id, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          MacosIcon(icon, size: 14, color: MacosColors.systemGrayColor),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label, style: AppTheme.body(context).copyWith(fontSize: 12))),
+          MacosSwitch(
+            value: _packEnabled[id] ?? false,
+            onChanged: (v) => _setPackEnabled(id, v),
+          ),
+        ],
+      ),
     );
   }
 
