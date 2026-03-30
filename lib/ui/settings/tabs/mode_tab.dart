@@ -7,6 +7,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
 import '../../../services/llm_service.dart';
 import '../../../services/cloud_account_service.dart';
+import '../../../services/vocab_service.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/cloud_providers.dart';
 import '../../../models/cloud_account.dart';
@@ -602,162 +603,89 @@ class ModeTabState extends State<ModeTab> {
 
     return Column(
       children: [
-        Expanded(child: SingleChildScrollView(child: Column(
-          children: [
-            // Language settings
-            SettingsGroup(
-              title: loc.languageSettings,
-              children: [
-                // Input Language
-                SettingsTile(
-                  label: loc.inputLanguage,
-                  subtitle: loc.inputLanguageDesc,
-                  icon: CupertinoIcons.mic,
-                  child: buildDropdown(context,
-                    value: ConfigService().inputLanguage,
-                    items: _buildInputLanguageItems(loc),
-                    onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState(() {}); },
+        Expanded(child: SingleChildScrollView(
+          padding: const EdgeInsets.all(4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Mode selector — 3 compact cards
+              _buildModeSelector(loc, currentMode, isTranslation),
+
+              // Language hints (between mode selector and card grid)
+              ..._buildLanguageHints(loc),
+
+              const SizedBox(height: 12),
+
+              // 2. Card grid — 2 columns
+              SettingsCardGrid(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _buildLanguageCard(loc),
+                  if (currentMode == 'smart')
+                    _buildAiPolishCard(loc)
+                  else if (currentMode == 'cloud')
+                    _buildCloudAsrCard(loc)
+                  else
+                    // Offline mode: privacy notice card
+                    _buildOfflineInfoCard(loc),
+                  if (currentMode != 'cloud')
+                    _buildModelInfoCard(loc),
+                  if (currentMode != 'cloud')
+                    _buildVocabCard(loc),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Mode-specific config (smart mode warning + detailed config)
+              if (currentMode == 'smart') ...[
+                // Warning banner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
                   ),
-                ),
-                const SettingsDivider(),
-                // Output Language
-                SettingsTile(
-                  label: loc.outputLanguage,
-                  subtitle: loc.outputLanguageDesc,
-                  icon: CupertinoIcons.textformat,
-                  child: buildDropdown(context,
-                    value: ConfigService().outputLanguage,
-                    items: {
-                      'auto': loc.langFollowInput,
-                      'zh-Hans': loc.langZhHans,
-                      'zh-Hant': loc.langZhHant,
-                      'en': loc.langEn,
-                      'ja': loc.langJa,
-                      'ko': loc.langKo,
-                      'es': loc.langEs,
-                      'fr': loc.langFr,
-                      'de': loc.langDe,
-                      'ru': loc.langRu,
-                      'pt': loc.langPt,
-                    },
-                    onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState(() {}); },
-                  ),
-                ),
-                // Language hints
-                ..._buildLanguageHints(loc),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Mode selector
-            SettingsGroup(
-              title: loc.tabWorkMode,
-              children: [
-                _buildModeRadio(
-                  value: 'offline',
-                  groupValue: currentMode,
-                  icon: CupertinoIcons.lock_shield,
-                  label: loc.workModeOffline,
-                  description: loc.workModeOfflineDesc,
-                  enabled: !isTranslation,
-                  disabledReason: isTranslation ? loc.translationDisabledReason : null,
-                ),
-                const SettingsDivider(),
-                _buildModeRadio(
-                  value: 'smart',
-                  groupValue: currentMode,
-                  icon: CupertinoIcons.sparkles,
-                  label: loc.workModeSmart,
-                  description: loc.workModeSmartDesc,
-                  badge: loc.recommended,
-                ),
-                const SettingsDivider(),
-                _buildModeRadio(
-                  value: 'cloud',
-                  groupValue: currentMode,
-                  icon: CupertinoIcons.cloud,
-                  label: loc.workModeCloud,
-                  description: loc.workModeCloudDesc,
-                  enabled: !isTranslation,
-                  disabledReason: isTranslation ? loc.translationDisabledReason : null,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Mode-specific config
-            if (currentMode == 'smart') ...[
-              // Warning banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        loc.aiPolishWarning,
-                        style: AppTheme.caption(context).copyWith(
-                          color: MacosColors.systemOrangeColor,
-                          height: 1.4,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loc.aiPolishWarning,
+                          style: AppTheme.caption(context).copyWith(
+                            color: MacosColors.systemOrangeColor,
+                            height: 1.4,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildSmartModeConfig(loc),
+                const SizedBox(height: 12),
+                _buildSmartModeConfig(loc),
+              ],
+
+              if (currentMode == 'cloud') ...[
+                _buildCloudModeConfig(loc),
+              ],
+
+              const SizedBox(height: 12),
+
+              // Advanced settings (collapsible)
+              _buildWorkModeAdvanced(loc, currentMode),
+
+              const SizedBox(height: 24),
             ],
-
-            if (currentMode == 'cloud') ...[
-              _buildCloudModeConfig(loc),
-            ],
-
-            if (currentMode == 'offline') ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: MacosColors.systemGreenColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: MacosColors.systemGreenColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        loc.workModeOfflineIcon,
-                        style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 16),
-
-            // Advanced settings (collapsible)
-            _buildWorkModeAdvanced(loc, currentMode),
-
-            const SizedBox(height: 24),
-          ],
-        ))),
+          ),
+        )),
 
         // Fixed bottom save bar (smart mode + cloud LLM only)
         if (currentMode == 'smart' && ConfigService().llmProviderType == 'cloud')
@@ -868,77 +796,518 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
-  // --- Mode radio ---
+  // --- Mode selector (3 horizontal cards) ---
 
-  Widget _buildModeRadio({
+  Widget _buildModeSelector(AppLocalizations loc, String currentMode, bool isTranslation) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(child: _buildModeCard(
+            value: 'offline',
+            groupValue: currentMode,
+            emoji: '🔒',
+            label: loc.workModeOffline,
+            subtitle: loc.workModeOfflineDesc,
+            enabled: !isTranslation,
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: _buildModeCard(
+            value: 'smart',
+            groupValue: currentMode,
+            emoji: '✦',
+            label: loc.workModeSmart,
+            subtitle: loc.workModeSmartDesc,
+            enabled: true,
+            badge: loc.recommended,
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: _buildModeCard(
+            value: 'cloud',
+            groupValue: currentMode,
+            emoji: '☁️',
+            label: loc.workModeCloud,
+            subtitle: loc.workModeCloudDesc,
+            enabled: !isTranslation,
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeCard({
     required String value,
     required String groupValue,
-    required IconData icon,
+    required String emoji,
     required String label,
-    required String description,
-    String? badge,
+    required String subtitle,
     bool enabled = true,
-    String? disabledReason,
+    String? badge,
   }) {
     final isSelected = value == groupValue;
     final color = _modeColor(value);
-    final disabledColor = MacosColors.systemGrayColor.withValues(alpha: 0.5);
+    final accent = AppTheme.getAccent(context);
 
     return GestureDetector(
       onTap: enabled ? () => _switchWorkMode(value) : null,
       child: Opacity(
         opacity: enabled ? 1.0 : 0.5,
-        child: Container(
-          decoration: isSelected ? BoxDecoration(
-            color: color.withValues(alpha: 0.06),
-            border: Border(left: BorderSide(color: color, width: 3)),
-          ) : null,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? color.withValues(alpha: 0.08)
+                : AppTheme.getCardBackground(context),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? color.withValues(alpha: 0.5) : AppTheme.getBorder(context),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              MacosIcon(icon, size: 20, color: isSelected ? color : MacosColors.systemGrayColor),
-              const SizedBox(width: 12),
+              Text(emoji, style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: AppTheme.body(context).copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? color : null,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected ? color.withValues(alpha: 0.8) : AppTheme.getTextSecondary(context),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (badge != null) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(badge, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accent)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Language card ---
+
+  Widget _buildLanguageCard(AppLocalizations loc) {
+    final inputItems = _buildInputLanguageItems(loc);
+    final inputValue = ConfigService().inputLanguage;
+    final inputLabel = inputItems[inputValue] ?? inputValue;
+
+    final outputItems = {
+      'auto': loc.langFollowInput,
+      'zh-Hans': loc.langZhHans,
+      'zh-Hant': loc.langZhHant,
+      'en': loc.langEn,
+      'ja': loc.langJa,
+      'ko': loc.langKo,
+      'es': loc.langEs,
+      'fr': loc.langFr,
+      'de': loc.langDe,
+      'ru': loc.langRu,
+      'pt': loc.langPt,
+    };
+    final outputValue = ConfigService().outputLanguage;
+    final outputLabel = outputItems[outputValue] ?? outputValue;
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        // Title row
+        Row(
+          children: [
+            const Text('🌐', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(loc.languageSettings, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Input language
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(loc.inputLanguage, style: AppTheme.caption(context)),
+            _buildCompactDropdown(
+              value: inputValue,
+              items: inputItems,
+              onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState(() {}); },
+              label: inputLabel,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // Output language
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(loc.outputLanguage, style: AppTheme.caption(context)),
+            _buildCompactDropdown(
+              value: outputValue,
+              items: outputItems,
+              onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState(() {}); },
+              label: outputLabel,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- AI polish card (smart mode) ---
+
+  Widget _buildAiPolishCard(AppLocalizations loc) {
+    final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+    final savedId = ConfigService().selectedLlmAccountId ?? '';
+    final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : (llmAccounts.isNotEmpty ? llmAccounts.first.id : '');
+    final selectedAccount = effectiveId.isNotEmpty ? CloudAccountService().getAccountById(effectiveId) : null;
+    final selectedProvider = selectedAccount != null ? CloudProviders.getById(selectedAccount.providerId) : null;
+
+    final providerLabel = selectedAccount?.displayName.isNotEmpty == true
+        ? selectedAccount!.displayName
+        : (selectedProvider?.name ?? '未配置');
+
+    final currentModel = ConfigService().llmModelOverride ?? selectedProvider?.llmDefaultModel ?? '';
+    // Find display name from presets
+    final presets = selectedProvider?.llmModels ?? [];
+    final modelPreset = presets.where((m) => m.id == currentModel).firstOrNull;
+    final modelLabel = modelPreset?.name ?? (currentModel.isNotEmpty ? currentModel : '未配置');
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        // Title row with toggle
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('✨', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(loc.tabAiPolish, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
+            ),
+            MacosSwitch(
+              value: ConfigService().aiCorrectionEnabled,
+              onChanged: (v) async {
+                await ConfigService().setAiCorrectionEnabled(v);
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Provider
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(loc.llmProvider, style: AppTheme.caption(context)),
+            SettingsPill(
+              label: providerLabel,
+              onTap: llmAccounts.isEmpty ? null : () {
+                // Scroll down to smart mode config for detailed settings
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // Model
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('模型', style: AppTheme.caption(context)),
+            SettingsPill(label: modelLabel),
+          ],
+        ),
+        if (llmAccounts.isEmpty) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => widget.onNavigateToTab(2),
+            child: Text(
+              loc.cloudAccountGoConfig,
+              style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // --- Cloud ASR card (cloud mode) ---
+
+  Widget _buildCloudAsrCard(AppLocalizations loc) {
+    final asrAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.asrStreaming)
+      + CloudAccountService().getAccountsWithCapability(CloudCapability.asrBatch);
+    final seen = <String>{};
+    final uniqueAsrAccounts = asrAccounts.where((a) => seen.add(a.id)).toList();
+
+    String providerLabel = '未配置';
+    if (uniqueAsrAccounts.isNotEmpty) {
+      final selectedAsrId = ConfigService().selectedAsrAccountId;
+      final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
+          ? selectedAsrId!
+          : uniqueAsrAccounts.first.id;
+      final asrAccount = uniqueAsrAccounts.firstWhere((a) => a.id == effectiveAsrId);
+      final asrProvider = CloudProviders.getById(asrAccount.providerId);
+      providerLabel = asrAccount.displayName.isNotEmpty ? asrAccount.displayName : (asrProvider?.name ?? asrAccount.providerId);
+    }
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(
+          children: [
+            const Text('☁️', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(loc.workModeCloud, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(loc.cloudAccountSelectAsr, style: AppTheme.caption(context)),
+            SettingsPill(label: providerLabel),
+          ],
+        ),
+        if (uniqueAsrAccounts.isEmpty) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => widget.onNavigateToTab(2),
+            child: Text(
+              loc.cloudAccountGoConfig,
+              style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // --- Offline info card ---
+
+  Widget _buildOfflineInfoCard(AppLocalizations loc) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(
+          children: [
+            const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                loc.workModeOfflineIcon,
+                style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- Model info card ---
+
+  Widget _buildModelInfoCard(AppLocalizations loc) {
+    final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+    final modelName = activeModel != null ? _localizedModelName(activeModel, loc) : loc.notSet;
+
+    // Build language tags
+    final langTags = activeModel?.supportedLanguages ?? [];
+    final langLabels = langTags.map((l) => _langDisplayName(l, loc)).toList();
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(
+          children: [
+            const Text('🎙️', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(loc.offlineModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (activeModel != null) ...[
+          // Active model info
+          Row(
+            children: [
+              const Text('🏆', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: AppTheme.body(context).copyWith(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? color : null,
-                    )),
-                    const SizedBox(height: 2),
-                    Text(description, style: AppTheme.caption(context).copyWith(
-                      color: MacosColors.secondaryLabelColor.resolveFrom(context),
-                    )),
-                    if (!enabled && disabledReason != null) ...[
-                      const SizedBox(height: 4),
-                      Text(disabledReason, style: TextStyle(
-                        fontSize: 11,
-                        color: disabledColor,
-                      )),
-                    ],
+                    Text(modelName, style: AppTheme.body(context).copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
+                    if (langLabels.isNotEmpty)
+                      Text(
+                        langLabels.join(' · '),
+                        style: AppTheme.caption(context).copyWith(fontSize: 10),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
               ),
-              if (badge != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.white)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                const SizedBox(width: 8),
-              ],
-              MacosRadioButton<String>(
-                groupValue: groupValue,
-                value: value,
-                onChanged: enabled ? (v) => _switchWorkMode(v) : null,
+                child: const Text('✓', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.successColor)),
               ),
             ],
           ),
+        ] else ...[
+          Text(loc.notSet, style: AppTheme.caption(context)),
+        ],
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => setState(() => _workModeAdvancedExpanded = true),
+          child: Text(
+            '管理模型 ▸',
+            style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
+          ),
         ),
+      ],
+    );
+  }
+
+  // --- Vocab card ---
+
+  Widget _buildVocabCard(AppLocalizations loc) {
+    final vocabEnabled = ConfigService().vocabEnabled;
+    final packLabels = <String, String>{
+      'tech': 'IT 科技',
+      'medical': '医疗',
+      'legal': '法律',
+      'finance': '金融',
+      'education': '教育',
+    };
+    final enabledPacks = <String>[];
+    final disabledPacks = <String>[];
+    for (final entry in packLabels.entries) {
+      final isOn = switch (entry.key) {
+        'tech' => ConfigService().vocabTechEnabled,
+        'medical' => ConfigService().vocabMedicalEnabled,
+        'legal' => ConfigService().vocabLegalEnabled,
+        'finance' => ConfigService().vocabFinanceEnabled,
+        'education' => ConfigService().vocabEducationEnabled,
+        _ => false,
+      };
+      if (isOn) {
+        enabledPacks.add(entry.value);
+      } else {
+        disabledPacks.add(entry.value);
+      }
+    }
+
+    final userCount = VocabService().userEntries.length;
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        // Title with toggle
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('📚', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(loc.vocabEnhancement, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
+            ),
+            MacosSwitch(
+              value: vocabEnabled,
+              onChanged: (v) async {
+                await ConfigService().setVocabEnabled(v);
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Pack tags
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            ...enabledPacks.map((name) => SettingsPill(label: name)),
+            ...disabledPacks.map((name) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: MacosColors.systemGrayColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.getTextSecondary(context))),
+            )),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // User vocab count + edit link
+        Row(
+          children: [
+            Text(
+              '个人词库 $userCount 个',
+              style: AppTheme.caption(context).copyWith(fontSize: 11),
+            ),
+            const SizedBox(width: 4),
+            const Text('·', style: TextStyle(fontSize: 11, color: MacosColors.systemGrayColor)),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => setState(() => _workModeAdvancedExpanded = true),
+              child: Text(
+                '编辑 ▸',
+                style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- Compact dropdown (pill-style wrapper around MacosPopupButton) ---
+
+  Widget _buildCompactDropdown({
+    required String value,
+    required Map<String, String> items,
+    required Function(String?) onChanged,
+    required String label,
+  }) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.getAccent(context).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: MacosPopupButton<String>(
+        value: value,
+        items: items.entries.map((e) => MacosPopupMenuItem(value: e.key, child: Text(e.value))).toList(),
+        onChanged: onChanged,
       ),
     );
   }
