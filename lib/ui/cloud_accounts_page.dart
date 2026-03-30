@@ -33,7 +33,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   void _refreshAccounts() {
     _ensureAllProvidersExist();
     setState(() {
-      _accounts = CloudAccountService().accounts;
+      _accounts = List.of(CloudAccountService().accounts);
       // 启用的排前面，禁用的排后面
       _accounts.sort((a, b) {
         if (a.isEnabled && !b.isEnabled) return -1;
