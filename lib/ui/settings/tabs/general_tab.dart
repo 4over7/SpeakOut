@@ -274,7 +274,7 @@ class _GeneralTabState extends State<GeneralTab> {
                     onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState(() {}); },
                   )),
                   const SizedBox(height: 8),
-                  _compactRow(loc.audioInput, MacosPopupButton<String>(
+                  _compactRow(loc.audioInput, SizedBox(width: 200, child: MacosPopupButton<String>(
                     value: () {
                       if (_useSystemDefaultAudio) return 'system';
                       final savedId = ConfigService().audioInputDeviceId;
@@ -305,7 +305,7 @@ class _GeneralTabState extends State<GeneralTab> {
                       }
                       _loadAudioDevices();
                     },
-                  )),
+                  ))),
                   if (_useSystemDefaultAudio && _currentAudioDevice != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
