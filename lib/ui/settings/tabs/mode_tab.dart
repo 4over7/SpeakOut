@@ -187,9 +187,11 @@ class ModeTabState extends State<ModeTab> {
     final displayName =
         requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
 
-    // Conflict check
-    final excludeFeature = _isCapturingKey ? 'ptt' : 'toggleInput';
-    final activeKeys = getActiveHotkeys(context, excludeFeature: excludeFeature);
+    // Conflict check — PTT 和 Toggle 允许共键（短按=toggle，长按=PTT）
+    final activeKeys = getActiveHotkeys(context, excludeFeature: _isCapturingKey ? 'ptt' : 'toggleInput');
+    // 额外排除 PTT↔Toggle 互相（它们可以相同）
+    if (_isCapturingKey) activeKeys.remove(ConfigService().toggleInputKeyCode);
+    if (_isCapturingToggleInputKey) activeKeys.remove(ConfigService().pttKeyCode);
     if (activeKeys.containsKey(keyCode)) {
       final conflictWith = activeKeys[keyCode]!;
       _stopKeyCapture();

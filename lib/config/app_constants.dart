@@ -10,8 +10,8 @@ class AppConstants {
   static const String kKeyActiveModelId = 'active_model_id';
   
   // Defaults
-  static const int kDefaultPttKeyCode = 58; // Left Option
-  static const String kDefaultPttKeyName = "Left Option";
+  static const int kDefaultPttKeyCode = 61; // Right Option
+  static const String kDefaultPttKeyName = "Right Option";
   static const String kDefaultModelId = 'sensevoice_zh_en_int8';
   
   // Aliyun Defaults (Loaded from assets/aliyun_config.json)
