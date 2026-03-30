@@ -7,7 +7,6 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
 import '../../../services/llm_service.dart';
 import '../../../services/cloud_account_service.dart';
-import '../../../services/vocab_service.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/cloud_providers.dart';
 import '../../../models/cloud_account.dart';
@@ -814,97 +813,74 @@ class ModeTabState extends State<ModeTab> {
 
               const SizedBox(height: 12),
 
-              // 2. Card grid — 2 columns
-              SettingsCardGrid(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _buildLanguageCard(loc),
-                  if (currentMode == 'smart')
-                    _buildAiPolishCard(loc)
-                  else if (currentMode == 'cloud')
-                    _buildCloudAsrCard(loc)
-                  else
-                    // Offline mode: privacy notice card
-                    _buildOfflineInfoCard(loc),
-                  if (currentMode != 'cloud')
-                    _buildModelInfoCard(loc),
-                  if (currentMode != 'cloud')
-                    _buildVocabCard(loc),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // 快捷键 + 模式配置 (双列 with 动画)
+              // Animated content below mode selector
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 switchInCurve: Curves.easeOut,
                 switchOutCurve: Curves.easeIn,
                 child: KeyedSubtree(
-                  key: ValueKey('mode_config_$currentMode'),
-                  child: SettingsCardGrid(
-                    spacing: 10,
-                    runSpacing: 10,
+                  key: ValueKey('mode_content_$currentMode'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 快捷键与录音保护 (always visible)
-                      _buildHotkeyCard(loc),
-                      // Mode-specific config card
-                      if (currentMode == 'smart')
-                        _buildSmartModeConfig(loc)
-                      else if (currentMode == 'cloud')
-                        _buildCloudModeConfig(loc)
-                      else
-                        // Offline: privacy info
-                        SettingsCard(
-                          padding: const EdgeInsets.all(14),
-                          children: [
-                            Row(children: [
-                              const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
-                              const SizedBox(width: 6),
+                      // Row 1: Language + AI Config
+                      SettingsCardGrid(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _buildLanguageCard(loc),
+                          _buildAiConfigCard(loc),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Row 2: Hotkey + Model Info (non-cloud only)
+                      SettingsCardGrid(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _buildHotkeyCard(loc),
+                          if (currentMode != 'cloud')
+                            _buildModelInfoCard(loc),
+                        ],
+                      ),
+
+                      // Smart mode warning banner (full-width below row 2)
+                      if (currentMode == 'smart') ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 14, color: MacosColors.systemOrangeColor),
+                              const SizedBox(width: 8),
                               Expanded(child: Text(
-                                loc.workModeOfflineIcon,
-                                style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
+                                loc.aiPolishWarning,
+                                style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
                               )),
-                            ]),
-                          ],
+                            ],
+                          ),
                         ),
+                      ],
+
+                      const SizedBox(height: 12),
+
+                      // Advanced settings (collapsible)
+                      _buildWorkModeAdvanced(loc, currentMode),
+
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
-
-              // Smart mode warning banner (full-width, outside grid)
-              if (currentMode == 'smart') ...[
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 14, color: MacosColors.systemOrangeColor),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(
-                        loc.aiPolishWarning,
-                        style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
-                      )),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 12),
-
-              // Advanced settings (collapsible)
-              _buildWorkModeAdvanced(loc, currentMode),
-
-              const SizedBox(height: 24),
             ],
           ),
         )),
@@ -1195,25 +1171,167 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
-  // --- AI polish card (smart mode) ---
+  // --- AI config card (mode-dependent) ---
 
-  Widget _buildAiPolishCard(AppLocalizations loc) {
-    final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
-    final savedId = ConfigService().selectedLlmAccountId ?? '';
-    final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : (llmAccounts.isNotEmpty ? llmAccounts.first.id : '');
-    final selectedAccount = effectiveId.isNotEmpty ? CloudAccountService().getAccountById(effectiveId) : null;
-    final selectedProvider = selectedAccount != null ? CloudProviders.getById(selectedAccount.providerId) : null;
+  Widget _buildAiConfigCard(AppLocalizations loc) {
+    final currentMode = ConfigService().workMode;
+    switch (currentMode) {
+      case 'smart':
+        return _buildAiConfigCardSmart(loc);
+      case 'cloud':
+        return _buildAiConfigCardCloud(loc);
+      default:
+        return _buildAiConfigCardOffline(loc);
+    }
+  }
 
-    final providerLabel = selectedAccount?.displayName.isNotEmpty == true
-        ? selectedAccount!.displayName
-        : (selectedProvider?.name ?? '未配置');
+  Widget _buildAiConfigCardOffline(AppLocalizations loc) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(
+          children: [
+            const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                loc.workModeOfflineIcon,
+                style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13, color: MacosColors.systemGreenColor),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '所有数据在本地处理，不上传任何信息',
+          style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
+        ),
+      ],
+    );
+  }
 
-    final currentModel = ConfigService().llmModelOverride ?? selectedProvider?.llmDefaultModel ?? '';
-    // Find display name from presets
-    final presets = selectedProvider?.llmModels ?? [];
-    final modelPreset = presets.where((m) => m.id == currentModel).firstOrNull;
-    final modelLabel = modelPreset?.name ?? (currentModel.isNotEmpty ? currentModel : '未配置');
+  Widget _buildAiConfigCardCloud(AppLocalizations loc) {
+    final asrAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.asrStreaming)
+      + CloudAccountService().getAccountsWithCapability(CloudCapability.asrBatch);
+    final seen = <String>{};
+    final uniqueAsrAccounts = asrAccounts.where((a) => seen.add(a.id)).toList();
 
+    final selectedAsrId = ConfigService().selectedAsrAccountId;
+
+    if (uniqueAsrAccounts.isEmpty) {
+      return SettingsCard(
+        padding: const EdgeInsets.all(14),
+        children: [
+          Row(children: [
+            const Text('☁️', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(loc.aliyunConfig, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ]),
+          const SizedBox(height: 8),
+          Text(loc.aliyunConfigDesc, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => widget.onNavigateToTab(3),
+            child: Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
+          ),
+          const SizedBox(height: 10),
+          MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
+          const SizedBox(height: 6),
+          MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
+          const SizedBox(height: 6),
+          MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: PushButton(
+              controlSize: ControlSize.regular,
+              onPressed: () async {
+                await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("已保存"), duration: Duration(seconds: 2)),
+                  );
+                }
+              },
+              child: Text(loc.saveApply),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
+        ? selectedAsrId!
+        : uniqueAsrAccounts.first.id;
+
+    final selectedAsrAccount = uniqueAsrAccounts.firstWhere((a) => a.id == effectiveAsrId);
+    final selectedAsrProvider = CloudProviders.getById(selectedAsrAccount.providerId);
+    final asrModels = selectedAsrProvider?.asrModels ?? [];
+    final selectedAsrModelId = ConfigService().selectedAsrModelId;
+    final effectiveAsrModelId = asrModels.any((m) => m.id == selectedAsrModelId)
+        ? selectedAsrModelId!
+        : (asrModels.isNotEmpty ? asrModels.first.id : '');
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(children: [
+          const Text('☁️', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text(loc.workModeCloud, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+        ]),
+        const SizedBox(height: 10),
+        _compactRow(loc.cloudAccountSelectAsr, MacosPopupButton<String>(
+          value: effectiveAsrId,
+          items: uniqueAsrAccounts.map((a) {
+            final provider = CloudProviders.getById(a.providerId);
+            return MacosPopupMenuItem(
+              value: a.id,
+              child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
+            );
+          }).toList(),
+          onChanged: (v) async {
+            if (v == null) return;
+            final acc = uniqueAsrAccounts.firstWhere((a) => a.id == v);
+            final prov = CloudProviders.getById(acc.providerId);
+            final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
+            await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
+            await _engine.initASR('', modelType: 'aliyun');
+            setState(() {});
+          },
+        )),
+        if (asrModels.length > 1) ...[
+          const SizedBox(height: 6),
+          _compactRow('识别模型', MacosPopupButton<String>(
+            value: effectiveAsrModelId,
+            items: asrModels.map((m) => MacosPopupMenuItem(
+              value: m.id,
+              child: Row(children: [
+                Text(m.name),
+                if (m.priceHint != null) ...[
+                  const SizedBox(width: 6),
+                  Text(m.priceHint!, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor)),
+                ],
+              ]),
+            )).toList(),
+            onChanged: (v) async {
+              if (v == null) return;
+              await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
+              await _engine.initASR('', modelType: 'aliyun');
+              setState(() {});
+            },
+          )),
+        ],
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => widget.onNavigateToTab(3),
+          child: Text('管理云服务账户 ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAiConfigCardSmart(AppLocalizations loc) {
     return SettingsCard(
       padding: const EdgeInsets.all(14),
       children: [
@@ -1239,111 +1357,79 @@ class ModeTabState extends State<ModeTab> {
           ],
         ),
         const SizedBox(height: 8),
-        // Provider
+        // LLM Provider type
+        _compactRow(loc.llmProvider, MacosPopupButton<String>(
+          value: ConfigService().llmProviderType,
+          items: [
+            MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+            MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+          ],
+          onChanged: (v) async {
+            if (v != null) {
+              await ConfigService().setLlmProviderType(v);
+              setState(() {});
+            }
+          },
+        )),
+        const SizedBox(height: 6),
+        // Typewriter effect
+        _compactRow('打字机效果', Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
+              ),
+              child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
+            ),
+            const SizedBox(width: 8),
+            MacosSwitch(
+              value: ConfigService().typewriterEnabled,
+              onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
+            ),
+          ],
+        )),
+        Divider(height: 16, color: AppTheme.getBorder(context)),
+        // System Prompt
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(loc.llmProvider, style: AppTheme.caption(context)),
-            SettingsPill(
-              label: providerLabel,
-              onTap: llmAccounts.isEmpty ? null : () {
-                // Scroll down to smart mode config for detailed settings
+            Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
+            GestureDetector(
+              onTap: () async {
+                await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+                setState(() {});
               },
+              child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
             ),
           ],
         ),
         const SizedBox(height: 6),
-        // Model
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('模型', style: AppTheme.caption(context)),
-            SettingsPill(label: modelLabel),
-          ],
-        ),
-        if (llmAccounts.isEmpty) ...[
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => widget.onNavigateToTab(2),
-            child: Text(
-              loc.cloudAccountGoConfig,
-              style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
-            ),
+        MacosTextField(
+          maxLines: 4,
+          placeholder: "Enter instructions for AI...",
+          controller: _aiPromptController,
+          decoration: BoxDecoration(
+            color: AppTheme.getInputBackground(context),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.getBorder(context)),
           ),
-        ],
-      ],
-    );
-  }
-
-  // --- Cloud ASR card (cloud mode) ---
-
-  Widget _buildCloudAsrCard(AppLocalizations loc) {
-    final asrAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.asrStreaming)
-      + CloudAccountService().getAccountsWithCapability(CloudCapability.asrBatch);
-    final seen = <String>{};
-    final uniqueAsrAccounts = asrAccounts.where((a) => seen.add(a.id)).toList();
-
-    String providerLabel = '未配置';
-    if (uniqueAsrAccounts.isNotEmpty) {
-      final selectedAsrId = ConfigService().selectedAsrAccountId;
-      final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
-          ? selectedAsrId!
-          : uniqueAsrAccounts.first.id;
-      final asrAccount = uniqueAsrAccounts.firstWhere((a) => a.id == effectiveAsrId);
-      final asrProvider = CloudProviders.getById(asrAccount.providerId);
-      providerLabel = asrAccount.displayName.isNotEmpty ? asrAccount.displayName : (asrProvider?.name ?? asrAccount.providerId);
-    }
-
-    return SettingsCard(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Row(
-          children: [
-            const Text('☁️', style: TextStyle(fontSize: 14)),
-            const SizedBox(width: 6),
-            Text(loc.workModeCloud, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-          ],
+          onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(loc.cloudAccountSelectAsr, style: AppTheme.caption(context)),
-            SettingsPill(label: providerLabel),
-          ],
-        ),
-        if (uniqueAsrAccounts.isEmpty) ...[
+        Divider(height: 16, color: AppTheme.getBorder(context)),
+        // LLM config (cloud or ollama)
+        if (ConfigService().llmProviderType == 'cloud')
+          _buildCloudLlmAccountSelector(loc)
+        else ...[
+          Text('确保 Ollama 已启动（ollama serve）', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => widget.onNavigateToTab(2),
-            child: Text(
-              loc.cloudAccountGoConfig,
-              style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
-            ),
-          ),
+          buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
+          const SizedBox(height: 6),
+          buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
         ],
-      ],
-    );
-  }
-
-  // --- Offline info card ---
-
-  Widget _buildOfflineInfoCard(AppLocalizations loc) {
-    return SettingsCard(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Row(
-          children: [
-            const MacosIcon(CupertinoIcons.lock_shield_fill, size: 16, color: MacosColors.systemGreenColor),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                loc.workModeOfflineIcon,
-                style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -1415,102 +1501,6 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
-  // --- Vocab card ---
-
-  Widget _buildVocabCard(AppLocalizations loc) {
-    final vocabEnabled = ConfigService().vocabEnabled;
-    final packLabels = <String, String>{
-      'tech': 'IT 科技',
-      'medical': '医疗',
-      'legal': '法律',
-      'finance': '金融',
-      'education': '教育',
-    };
-    final enabledPacks = <String>[];
-    final disabledPacks = <String>[];
-    for (final entry in packLabels.entries) {
-      final isOn = switch (entry.key) {
-        'tech' => ConfigService().vocabTechEnabled,
-        'medical' => ConfigService().vocabMedicalEnabled,
-        'legal' => ConfigService().vocabLegalEnabled,
-        'finance' => ConfigService().vocabFinanceEnabled,
-        'education' => ConfigService().vocabEducationEnabled,
-        _ => false,
-      };
-      if (isOn) {
-        enabledPacks.add(entry.value);
-      } else {
-        disabledPacks.add(entry.value);
-      }
-    }
-
-    final userCount = VocabService().userEntries.length;
-
-    return SettingsCard(
-      padding: const EdgeInsets.all(14),
-      children: [
-        // Title with toggle
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('📚', style: TextStyle(fontSize: 14)),
-                const SizedBox(width: 6),
-                Text(loc.vocabEnhancement, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-              ],
-            ),
-            MacosSwitch(
-              value: vocabEnabled,
-              onChanged: (v) async {
-                await ConfigService().setVocabEnabled(v);
-                setState(() {});
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Pack tags
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: [
-            ...enabledPacks.map((name) => SettingsPill(label: name)),
-            ...disabledPacks.map((name) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: MacosColors.systemGrayColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.getTextSecondary(context))),
-            )),
-          ],
-        ),
-        const SizedBox(height: 6),
-        // User vocab count + edit link
-        Row(
-          children: [
-            Text(
-              '个人词库 $userCount 个',
-              style: AppTheme.caption(context).copyWith(fontSize: 11),
-            ),
-            const SizedBox(width: 4),
-            const Text('·', style: TextStyle(fontSize: 11, color: MacosColors.systemGrayColor)),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () => setState(() => _workModeAdvancedExpanded = true),
-              child: Text(
-                '编辑 ▸',
-                style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   // --- Compact dropdown (pill-style wrapper around MacosPopupButton) ---
 
   Widget _buildCompactDropdown({
@@ -1531,98 +1521,6 @@ class ModeTabState extends State<ModeTab> {
         items: items.entries.map((e) => MacosPopupMenuItem(value: e.key, child: Text(e.value))).toList(),
         onChanged: onChanged,
       ),
-    );
-  }
-
-  // --- Smart mode config ---
-
-  Widget _buildSmartModeConfig(AppLocalizations loc) {
-    return SettingsCard(
-      padding: const EdgeInsets.all(14),
-      children: [
-        // Title
-        Row(
-          children: [
-            const Text('⚙️', style: TextStyle(fontSize: 14)),
-            const SizedBox(width: 6),
-            Text(loc.workModeSmartConfig, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // Typewriter effect
-        _compactRow('打字机效果', Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
-              ),
-              child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
-            ),
-            const SizedBox(width: 8),
-            MacosSwitch(
-              value: ConfigService().typewriterEnabled,
-              onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
-            ),
-          ],
-        )),
-        const SizedBox(height: 6),
-        // LLM Provider
-        _compactRow(loc.llmProvider, MacosPopupButton<String>(
-          value: ConfigService().llmProviderType,
-          items: [
-            MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
-            MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
-          ],
-          onChanged: (v) async {
-            if (v != null) {
-              await ConfigService().setLlmProviderType(v);
-              setState(() {});
-            }
-          },
-        )),
-        Divider(height: 16, color: AppTheme.getBorder(context)),
-        // System Prompt
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
-            GestureDetector(
-              onTap: () async {
-                await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
-                _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
-                setState(() {});
-              },
-              child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        MacosTextField(
-          maxLines: 4,
-          placeholder: "Enter instructions for AI...",
-          controller: _aiPromptController,
-          decoration: BoxDecoration(
-            color: AppTheme.getInputBackground(context),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.getBorder(context)),
-          ),
-          onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
-        ),
-        const SizedBox(height: 12),
-        // LLM config (cloud or ollama)
-        if (ConfigService().llmProviderType == 'cloud')
-          _buildCloudLlmAccountSelector(loc)
-        else ...[
-          Text('确保 Ollama 已启动（ollama serve）', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
-          const SizedBox(height: 8),
-          buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
-          const SizedBox(height: 6),
-          buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
-        ],
-      ],
     );
   }
 
@@ -1868,130 +1766,6 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
-  // --- Cloud mode config ---
-
-  Widget _buildCloudModeConfig(AppLocalizations loc) {
-    final asrAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.asrStreaming)
-      + CloudAccountService().getAccountsWithCapability(CloudCapability.asrBatch);
-    // Deduplicate by account id
-    final seen = <String>{};
-    final uniqueAsrAccounts = asrAccounts.where((a) => seen.add(a.id)).toList();
-
-    final selectedAsrId = ConfigService().selectedAsrAccountId;
-
-    if (uniqueAsrAccounts.isEmpty) {
-      return SettingsCard(
-        padding: const EdgeInsets.all(14),
-        children: [
-          Row(children: [
-            const Text('☁️', style: TextStyle(fontSize: 14)),
-            const SizedBox(width: 6),
-            Text(loc.aliyunConfig, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-          ]),
-          const SizedBox(height: 8),
-          Text(loc.aliyunConfigDesc, style: AppTheme.caption(context).copyWith(fontSize: 11)),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => widget.onNavigateToTab(3),
-            child: Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
-          ),
-          const SizedBox(height: 10),
-          MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
-          const SizedBox(height: 6),
-          MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
-          const SizedBox(height: 6),
-          MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: PushButton(
-              controlSize: ControlSize.regular,
-              onPressed: () async {
-                await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("已保存"), duration: Duration(seconds: 2)),
-                  );
-                }
-              },
-              child: Text(loc.saveApply),
-            ),
-          ),
-        ],
-      );
-    }
-
-    final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
-        ? selectedAsrId!
-        : uniqueAsrAccounts.first.id;
-
-    final selectedAsrAccount = uniqueAsrAccounts.firstWhere((a) => a.id == effectiveAsrId);
-    final selectedAsrProvider = CloudProviders.getById(selectedAsrAccount.providerId);
-    final asrModels = selectedAsrProvider?.asrModels ?? [];
-    final selectedAsrModelId = ConfigService().selectedAsrModelId;
-    final effectiveAsrModelId = asrModels.any((m) => m.id == selectedAsrModelId)
-        ? selectedAsrModelId!
-        : (asrModels.isNotEmpty ? asrModels.first.id : '');
-
-    return SettingsCard(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Row(children: [
-          const Text('☁️', style: TextStyle(fontSize: 14)),
-          const SizedBox(width: 6),
-          Text(loc.cloudAccountSelectAsr, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-        ]),
-        const SizedBox(height: 10),
-        _compactRow(loc.cloudAccountSelectAsr, MacosPopupButton<String>(
-          value: effectiveAsrId,
-          items: uniqueAsrAccounts.map((a) {
-            final provider = CloudProviders.getById(a.providerId);
-            return MacosPopupMenuItem(
-              value: a.id,
-              child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
-            );
-          }).toList(),
-          onChanged: (v) async {
-            if (v == null) return;
-            final acc = uniqueAsrAccounts.firstWhere((a) => a.id == v);
-            final prov = CloudProviders.getById(acc.providerId);
-            final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
-            await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
-            await _engine.initASR('', modelType: 'aliyun');
-            setState(() {});
-          },
-        )),
-        if (asrModels.length > 1) ...[
-          const SizedBox(height: 6),
-          _compactRow('识别模型', MacosPopupButton<String>(
-            value: effectiveAsrModelId,
-            items: asrModels.map((m) => MacosPopupMenuItem(
-              value: m.id,
-              child: Row(children: [
-                Text(m.name),
-                if (m.priceHint != null) ...[
-                  const SizedBox(width: 6),
-                  Text(m.priceHint!, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor)),
-                ],
-              ]),
-            )).toList(),
-            onChanged: (v) async {
-              if (v == null) return;
-              await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
-              await _engine.initASR('', modelType: 'aliyun');
-              setState(() {});
-            },
-          )),
-        ],
-        const SizedBox(height: 6),
-        GestureDetector(
-          onTap: () => widget.onNavigateToTab(3),
-          child: Text('管理云服务账户 ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
-        ),
-      ],
-    );
-  }
-
   // --- Advanced settings ---
 
   Widget _buildWorkModeAdvanced(AppLocalizations loc, String currentMode) {
@@ -2025,92 +1799,20 @@ class ModeTabState extends State<ModeTab> {
         if (_workModeAdvancedExpanded) ...[
           const SizedBox(height: 10),
 
-          // Punctuation + Models in dual column
+          // Row 1: Offline models (left) | Streaming + Punctuation (right)
           SettingsCardGrid(
             spacing: 10,
             runSpacing: 10,
             children: [
-              // Punctuation model card
-              Builder(builder: (_) {
-                final activeModel = _modelManager.getModelById(_activeModelId ?? '');
-                final modelHasPunct = activeModel?.hasPunctuation ?? false;
-                return SettingsCard(
-                  padding: const EdgeInsets.all(12),
-                  children: [
-                    Row(children: [
-                      const Text('📝', style: TextStyle(fontSize: 14)),
-                      const SizedBox(width: 6),
-                      Expanded(child: Text(loc.punctuationModel, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12))),
-                    ]),
-                    const SizedBox(height: 6),
-                    if (modelHasPunct)
-                      Text(loc.builtInPunctuation, style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGreenColor))
-                    else
-                      Row(children: [
-                        Text(loc.punctuationModelDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
-                        const Spacer(),
-                        buildActionBtn(context,
-                          isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
-                          isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
-                          progress: _downloadProgressMap[ModelManager.punctuationModelId],
-                          statusText: _downloadStatusMap[ModelManager.punctuationModelId],
-                          isActive: true, onDownload: _downloadPunctuation,
-                          onDelete: _deletePunctuation, onActivate: () {},
-                        ),
-                      ]),
-                  ],
-                );
-              }),
-              // Vocab card
-              const VocabSettingsView(),
+              _buildOfflineModelListCard(loc),
+              _buildStreamingAndPunctCard(loc),
             ],
           ),
 
           const SizedBox(height: 10),
 
-          // Offline models card
-          Builder(builder: (_) {
-            final inputLang = ConfigService().inputLanguage;
-            final filteredOffline = ModelManager.offlineModels
-                .where((m) => m.supportsLanguage(inputLang)).toList();
-            return SettingsCard(
-              padding: const EdgeInsets.all(12),
-              children: [
-                Row(children: [
-                  const Text('🎙️', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(loc.offlineModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
-                  const Spacer(),
-                  Text(loc.offlineModelsDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
-                ]),
-                const SizedBox(height: 8),
-                ...filteredOffline.map((m) => _buildModelRow(m, loc, isOffline: true)),
-              ],
-            );
-          }),
-
-          const SizedBox(height: 10),
-
-          // Streaming models card
-          Builder(builder: (_) {
-            final inputLang = ConfigService().inputLanguage;
-            final filteredStreaming = ModelManager.availableModels
-                .where((m) => m.supportsLanguage(inputLang)).toList();
-            return SettingsCard(
-              padding: const EdgeInsets.all(12),
-              children: [
-                Row(children: [
-                  const Text('📡', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(loc.streamingModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
-                  const Spacer(),
-                  Text(loc.streamingModelsDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
-                ]),
-                const SizedBox(height: 8),
-                ...filteredStreaming.map((m) => _buildModelRow(m, loc, isOffline: false)),
-              ],
-            );
-          }),
+          // Full-width: Vocab settings
+          const VocabSettingsView(),
 
           // AI polish matrix info
           if (currentMode == 'smart' || currentMode == 'offline') ...[
@@ -2129,6 +1831,78 @@ class ModeTabState extends State<ModeTab> {
             ),
           ],
         ],
+      ],
+    );
+  }
+
+  // --- Offline model list card (advanced) ---
+
+  Widget _buildOfflineModelListCard(AppLocalizations loc) {
+    final inputLang = ConfigService().inputLanguage;
+    final filteredOffline = ModelManager.offlineModels
+        .where((m) => m.supportsLanguage(inputLang)).toList();
+    return SettingsCard(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Row(children: [
+          const Text('🎙️', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text(loc.offlineModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
+          const Spacer(),
+          Text(loc.offlineModelsDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
+        ]),
+        const SizedBox(height: 8),
+        ...filteredOffline.map((m) => _buildModelRow(m, loc, isOffline: true)),
+      ],
+    );
+  }
+
+  // --- Streaming + Punctuation card (advanced) ---
+
+  Widget _buildStreamingAndPunctCard(AppLocalizations loc) {
+    final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+    final modelHasPunct = activeModel?.hasPunctuation ?? false;
+    final inputLang = ConfigService().inputLanguage;
+    final filteredStreaming = ModelManager.availableModels
+        .where((m) => m.supportsLanguage(inputLang)).toList();
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(12),
+      children: [
+        // Punctuation model section
+        Row(children: [
+          const Text('📝', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(loc.punctuationModel, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12))),
+        ]),
+        const SizedBox(height: 6),
+        if (modelHasPunct)
+          Text(loc.builtInPunctuation, style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGreenColor))
+        else
+          Row(children: [
+            Text(loc.punctuationModelDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
+            const Spacer(),
+            buildActionBtn(context,
+              isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
+              isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
+              progress: _downloadProgressMap[ModelManager.punctuationModelId],
+              statusText: _downloadStatusMap[ModelManager.punctuationModelId],
+              isActive: true, onDownload: _downloadPunctuation,
+              onDelete: _deletePunctuation, onActivate: () {},
+            ),
+          ]),
+        // Divider
+        Divider(height: 16, color: AppTheme.getBorder(context)),
+        // Streaming models section
+        Row(children: [
+          const Text('📡', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text(loc.streamingModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
+          const Spacer(),
+          Text(loc.streamingModelsDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
+        ]),
+        const SizedBox(height: 8),
+        ...filteredStreaming.map((m) => _buildModelRow(m, loc, isOffline: false)),
       ],
     );
   }
