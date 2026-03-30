@@ -1553,113 +1553,91 @@ class ModeTabState extends State<ModeTab> {
   // --- Smart mode config ---
 
   Widget _buildSmartModeConfig(AppLocalizations loc) {
-    return SettingsGroup(
-      title: loc.workModeSmartConfig,
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
       children: [
-        SettingsTile(
-          label: '打字机效果（Alpha）',
-          subtitle: '流式逐步注入文字到光标处，会临时占用剪贴板。',
-          icon: CupertinoIcons.text_cursor,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(3),
-                  border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
-                ),
-                child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
-              ),
-              const SizedBox(width: 8),
-              MacosSwitch(
-                value: ConfigService().typewriterEnabled,
-                onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
-              ),
-            ],
-          ),
+        // Title
+        Row(
+          children: [
+            const Text('⚙️', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(loc.workModeSmartConfig, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
         ),
-        const SettingsDivider(),
-        SettingsTile(
-          label: loc.llmProvider,
-          icon: CupertinoIcons.arrow_right_arrow_left,
-          child: MacosPopupButton<String>(
-            value: ConfigService().llmProviderType,
-            items: [
-              MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
-              MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
-            ],
-            onChanged: (v) async {
-              if (v != null) {
-                await ConfigService().setLlmProviderType(v);
+        const SizedBox(height: 10),
+        // Typewriter effect
+        _compactRow('打字机效果', Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
+              ),
+              child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
+            ),
+            const SizedBox(width: 8),
+            MacosSwitch(
+              value: ConfigService().typewriterEnabled,
+              onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
+            ),
+          ],
+        )),
+        const SizedBox(height: 6),
+        // LLM Provider
+        _compactRow(loc.llmProvider, MacosPopupButton<String>(
+          value: ConfigService().llmProviderType,
+          items: [
+            MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+            MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+          ],
+          onChanged: (v) async {
+            if (v != null) {
+              await ConfigService().setLlmProviderType(v);
+              setState(() {});
+            }
+          },
+        )),
+        Divider(height: 16, color: AppTheme.getBorder(context)),
+        // System Prompt
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
+            GestureDetector(
+              onTap: () async {
+                await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
                 setState(() {});
-              }
-            },
-          ),
+              },
+              child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+            ),
+          ],
         ),
-        const SettingsDivider(),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // System Prompt
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(loc.systemPrompt, style: AppTheme.body(context)),
-                  GestureDetector(
-                    onTap: () async {
-                      await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
-                      _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
-                      setState(() {});
-                    },
-                    child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), fontSize: 11)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              MacosTextField(
-                maxLines: 5,
-                placeholder: "Enter instructions for AI...",
-                controller: _aiPromptController,
-                decoration: BoxDecoration(
-                  color: AppTheme.getInputBackground(context),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppTheme.getBorder(context)),
-                ),
-                onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
-              ),
-              const SizedBox(height: 16),
-
-              // LLM config
-              if (ConfigService().llmProviderType == 'cloud') ...[
-                _buildCloudLlmAccountSelector(loc),
-              ] else ...[
-                // Ollama
-                Text(loc.ollamaUrl, style: AppTheme.body(context)),
-                const SizedBox(height: 4),
-                Text("确保 Ollama 已启动（ollama serve）", style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGrayColor)),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
-                      const SizedBox(height: 8),
-                      buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+        const SizedBox(height: 6),
+        MacosTextField(
+          maxLines: 4,
+          placeholder: "Enter instructions for AI...",
+          controller: _aiPromptController,
+          decoration: BoxDecoration(
+            color: AppTheme.getInputBackground(context),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.getBorder(context)),
           ),
+          onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
         ),
+        const SizedBox(height: 12),
+        // LLM config (cloud or ollama)
+        if (ConfigService().llmProviderType == 'cloud')
+          _buildCloudLlmAccountSelector(loc)
+        else ...[
+          Text('确保 Ollama 已启动（ollama serve）', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+          const SizedBox(height: 8),
+          buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
+          const SizedBox(height: 6),
+          buildApiItem(context, loc.ollamaModel, CupertinoIcons.cube_box, ConfigService().ollamaModel, (v) => ConfigService().setOllamaModel(v), placeholder: "qwen3:0.6b"),
+        ],
       ],
     );
   }
@@ -1918,58 +1896,47 @@ class ModeTabState extends State<ModeTab> {
     final selectedAsrId = ConfigService().selectedAsrAccountId;
 
     if (uniqueAsrAccounts.isEmpty) {
-      // No ASR accounts configured: keep legacy Aliyun direct input
-      return SettingsGroup(
-        title: loc.aliyunConfig,
+      return SettingsCard(
+        padding: const EdgeInsets.all(14),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-            child: Text(loc.aliyunConfigDesc, style: AppTheme.caption(context)),
+          Row(children: [
+            const Text('☁️', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(loc.aliyunConfig, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ]),
+          const SizedBox(height: 8),
+          Text(loc.aliyunConfigDesc, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => widget.onNavigateToTab(3),
+            child: Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
           ),
-          // Hint to go to accounts center
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: GestureDetector(
-              onTap: () => widget.onNavigateToTab(2), // Cloud Accounts tab
-              child: Row(
-                children: [
-                  MacosIcon(CupertinoIcons.arrow_right_circle, size: 14, color: AppTheme.getAccent(context)),
-                  const SizedBox(width: 6),
-                  Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
-                const SizedBox(height: 8),
-                MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
-                const SizedBox(height: 8),
-                MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
-                const SizedBox(height: 12),
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  onPressed: () async {
-                    await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Saved Cloud Config!"), duration: Duration(seconds: 2)),
-                      );
-                    }
-                  },
-                  child: Text(loc.saveApply),
-                ),
-              ],
+          const SizedBox(height: 10),
+          MacosTextField(controller: _akIdController, placeholder: "AccessKey ID"),
+          const SizedBox(height: 6),
+          MacosTextField(controller: _akSecretController, placeholder: "AccessKey Secret", obscureText: true),
+          const SizedBox(height: 6),
+          MacosTextField(controller: _appKeyController, placeholder: "AppKey"),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: PushButton(
+              controlSize: ControlSize.regular,
+              onPressed: () async {
+                await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("已保存"), duration: Duration(seconds: 2)),
+                  );
+                }
+              },
+              child: Text(loc.saveApply),
             ),
           ),
         ],
       );
     }
 
-    // Has ASR accounts: show dropdown
     final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
         ? selectedAsrId!
         : uniqueAsrAccounts.first.id;
@@ -1982,72 +1949,60 @@ class ModeTabState extends State<ModeTab> {
         ? selectedAsrModelId!
         : (asrModels.isNotEmpty ? asrModels.first.id : '');
 
-    return SettingsGroup(
-      title: loc.cloudAccountSelectAsr,
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
       children: [
-        SettingsTile(
-          label: loc.cloudAccountSelectAsr,
-          icon: CupertinoIcons.cloud,
-          child: MacosPopupButton<String>(
-            value: effectiveAsrId,
-            items: uniqueAsrAccounts.map((a) {
-              final provider = CloudProviders.getById(a.providerId);
-              return MacosPopupMenuItem(
-                value: a.id,
-                child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
-              );
-            }).toList(),
+        Row(children: [
+          const Text('☁️', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text(loc.cloudAccountSelectAsr, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+        ]),
+        const SizedBox(height: 10),
+        _compactRow(loc.cloudAccountSelectAsr, MacosPopupButton<String>(
+          value: effectiveAsrId,
+          items: uniqueAsrAccounts.map((a) {
+            final provider = CloudProviders.getById(a.providerId);
+            return MacosPopupMenuItem(
+              value: a.id,
+              child: Text(a.displayName.isNotEmpty ? a.displayName : (provider?.name ?? a.providerId)),
+            );
+          }).toList(),
+          onChanged: (v) async {
+            if (v == null) return;
+            final acc = uniqueAsrAccounts.firstWhere((a) => a.id == v);
+            final prov = CloudProviders.getById(acc.providerId);
+            final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
+            await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
+            await _engine.initASR('', modelType: 'aliyun');
+            setState(() {});
+          },
+        )),
+        if (asrModels.length > 1) ...[
+          const SizedBox(height: 6),
+          _compactRow('识别模型', MacosPopupButton<String>(
+            value: effectiveAsrModelId,
+            items: asrModels.map((m) => MacosPopupMenuItem(
+              value: m.id,
+              child: Row(children: [
+                Text(m.name),
+                if (m.priceHint != null) ...[
+                  const SizedBox(width: 6),
+                  Text(m.priceHint!, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor)),
+                ],
+              ]),
+            )).toList(),
             onChanged: (v) async {
               if (v == null) return;
-              final acc = uniqueAsrAccounts.firstWhere((a) => a.id == v);
-              final prov = CloudProviders.getById(acc.providerId);
-              final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
-              await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
+              await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
               await _engine.initASR('', modelType: 'aliyun');
               setState(() {});
             },
-          ),
-        ),
-        // ASR model selector (show when multiple models)
-        if (asrModels.length > 1) ...[
-          const SettingsDivider(),
-          SettingsTile(
-            label: '识别模型',
-            icon: CupertinoIcons.waveform,
-            child: MacosPopupButton<String>(
-              value: effectiveAsrModelId,
-              items: asrModels.map((m) => MacosPopupMenuItem(
-                value: m.id,
-                child: Row(children: [
-                  Text(m.name),
-                  if (m.priceHint != null) ...[
-                    const SizedBox(width: 6),
-                    Text(m.priceHint!, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor)),
-                  ],
-                ]),
-              )).toList(),
-              onChanged: (v) async {
-                if (v == null) return;
-                await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
-                await _engine.initASR('', modelType: 'aliyun');
-                setState(() {});
-              },
-            ),
-          ),
+          )),
         ],
-        // Go to cloud accounts to add provider
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: GestureDetector(
-            onTap: () => widget.onNavigateToTab(2), // Cloud Accounts tab
-            child: Row(
-              children: [
-                MacosIcon(CupertinoIcons.plus_circle, size: 14, color: AppTheme.getAccent(context)),
-                const SizedBox(width: 6),
-                Text(loc.cloudAccountAdd, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
-              ],
-            ),
-          ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => widget.onNavigateToTab(3),
+          child: Text('管理云服务账户 ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
         ),
       ],
     );
