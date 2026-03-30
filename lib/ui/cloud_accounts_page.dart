@@ -40,91 +40,68 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标题
-          SettingsGroup(
-            title: loc.cloudAccountsTitle,
+          // 顶部操作栏
+          Row(
             children: [
-              if (_accounts.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        MacosIcon(
-                          CupertinoIcons.cloud,
-                          size: 48,
-                          color: MacosColors.systemGrayColor.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          loc.cloudAccountNone,
-                          style: AppTheme.caption(context),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ..._buildAccountList(loc),
+              Text(loc.cloudAccountsTitle, style: AppTheme.heading(context)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _importAccounts(context),
+                child: Text('导入', style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
+              ),
+              if (_accounts.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () => _exportAccounts(context),
+                  child: Text('导出', style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
+                ),
+              ],
+              const SizedBox(width: 12),
+              PushButton(
+                controlSize: ControlSize.regular,
+                onPressed: () => _showAddEditDialog(context, loc),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const MacosIcon(CupertinoIcons.plus, size: 14),
+                    const SizedBox(width: 4),
+                    Text(loc.cloudAccountAdd),
+                  ],
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 12),
 
-          const SizedBox(height: 16),
-
-          // 添加按钮 + 导入/导出
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  onPressed: () => _showAddEditDialog(context, loc),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const MacosIcon(CupertinoIcons.plus_circle, size: 16),
-                      const SizedBox(width: 6),
-                      Text(loc.cloudAccountAdd),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  secondary: true,
-                  onPressed: () => _importAccounts(context),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      MacosIcon(CupertinoIcons.arrow_down_doc, size: 14),
-                      SizedBox(width: 4),
-                      Text('导入'),
-                    ],
-                  ),
-                ),
-                if (_accounts.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  PushButton(
-                    controlSize: ControlSize.regular,
-                    secondary: true,
-                    onPressed: () => _exportAccounts(context),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        MacosIcon(CupertinoIcons.arrow_up_doc, size: 14),
-                        SizedBox(width: 4),
-                        Text('导出'),
-                      ],
-                    ),
-                  ),
+          // 账户列表
+          if (_accounts.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              decoration: BoxDecoration(
+                color: AppTheme.getCardBackground(context),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.getBorder(context)),
+              ),
+              child: Column(
+                children: [
+                  MacosIcon(CupertinoIcons.cloud, size: 40, color: MacosColors.systemGrayColor.withValues(alpha: 0.3)),
+                  const SizedBox(height: 8),
+                  Text(loc.cloudAccountNone, style: AppTheme.caption(context)),
                 ],
-              ],
-            ),
-          ),
+              ),
+            )
+          else
+            ...List.generate(_accounts.length, (i) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: i < _accounts.length - 1 ? 8 : 0),
+                child: _buildAccountCard(_accounts[i], loc),
+              );
+            }),
         ],
       ),
     );
@@ -179,18 +156,8 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     );
   }
 
-  List<Widget> _buildAccountList(AppLocalizations loc) {
-    final widgets = <Widget>[];
-    for (int i = 0; i < _accounts.length; i++) {
-      if (i > 0) widgets.add(const SettingsDivider());
-      widgets.add(_buildAccountCard(_accounts[i], loc));
-    }
-    return widgets;
-  }
-
   Widget _buildAccountCard(CloudAccount account, AppLocalizations loc) {
     final provider = CloudProviders.getById(account.providerId);
-    final providerName = provider?.name ?? account.providerId;
 
     // 能力标签
     final capabilities = <String>[];
@@ -199,134 +166,66 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
       if (provider.hasLLM) capabilities.add(loc.cloudAccountCapabilityLlm);
     }
 
-    // 遮掩凭证
-    final maskedCred = account.credentials.entries.map((e) {
-      final v = e.value;
-      if (v.length <= 8) return '${e.key}: ****';
-      return '${e.key}: ${v.substring(0, 4)}...${v.substring(v.length - 4)}';
-    }).join(', ');
+    final canEnable = provider != null && provider.hasAnyValidCredentials(account.credentials);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.getCardBackground(context),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.getBorder(context)),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 图标
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppTheme.getAccent(context).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: MacosIcon(CupertinoIcons.cloud_fill, size: 20, color: AppTheme.getAccent(context)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 信息
+          // 名称 + 标签
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        account.displayName,
-                        style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    if (!account.isEnabled)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          color: MacosColors.systemGrayColor.withValues(alpha: 0.15),
-                        ),
-                        child: Text(
-                          loc.disabled,
-                          style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor),
-                        ),
-                      ),
-                  ],
+                Text(
+                  account.displayName,
+                  style: AppTheme.body(context).copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: account.isEnabled ? null : MacosColors.systemGrayColor,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(providerName, style: AppTheme.caption(context)),
-                if (maskedCred.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    maskedCred,
-                    style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor),
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 8),
+                ...capabilities.map((c) => Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: AppTheme.getAccent(context).withValues(alpha: 0.1),
+                    ),
+                    child: Text(c, style: TextStyle(fontSize: 9, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
                   ),
-                ],
-                if (capabilities.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    children: capabilities.map((c) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: AppTheme.getAccent(context).withValues(alpha: 0.1),
-                      ),
-                      child: Text(c, style: TextStyle(fontSize: 10, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
-                    )).toList(),
-                  ),
-                ],
-                if (provider?.warning != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 11, color: MacosColors.systemOrangeColor),
-                      const SizedBox(width: 4),
-                      Expanded(child: Text('未验证', style: TextStyle(fontSize: 10, color: MacosColors.systemOrangeColor, fontWeight: FontWeight.w500))),
-                    ],
-                  ),
-                ],
+                )),
+                if (provider?.warning != null)
+                  const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 11, color: MacosColors.systemOrangeColor),
               ],
             ),
           ),
-          // 操作按钮
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Builder(builder: (_) {
-                final provider = CloudProviders.getById(account.providerId);
-                final canEnable = provider != null &&
-                    provider.hasAnyValidCredentials(account.credentials);
-                return MacosSwitch(
-                  value: account.isEnabled,
-                  onChanged: canEnable ? (v) async {
-                    final updated = CloudAccount(
-                      id: account.id,
-                      providerId: account.providerId,
-                      displayName: account.displayName,
-                      credentials: account.credentials,
-                      isEnabled: v,
-                      createdAt: account.createdAt,
-                    );
-                    await CloudAccountService().updateAccount(updated);
-                    _refreshAccounts();
-                  } : null,  // 凭证为空时禁用开关
-                );
-              }),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  MacosIconButton(
-                    icon: const MacosIcon(CupertinoIcons.pencil, size: 16),
-                    onPressed: () => _showAddEditDialog(context, AppLocalizations.of(context)!, existingAccount: account),
-                  ),
-                  MacosIconButton(
-                    icon: const MacosIcon(CupertinoIcons.trash, size: 16, color: MacosColors.systemRedColor),
-                    onPressed: () => _confirmDelete(context, account, AppLocalizations.of(context)!),
-                  ),
-                ],
-              ),
-            ],
+          // 操作区
+          MacosSwitch(
+            value: account.isEnabled,
+            onChanged: canEnable ? (v) async {
+              final updated = CloudAccount(
+                id: account.id, providerId: account.providerId,
+                displayName: account.displayName, credentials: account.credentials,
+                isEnabled: v, createdAt: account.createdAt,
+              );
+              await CloudAccountService().updateAccount(updated);
+              _refreshAccounts();
+            } : null,
+          ),
+          const SizedBox(width: 4),
+          MacosIconButton(
+            icon: const MacosIcon(CupertinoIcons.pencil, size: 14),
+            onPressed: () => _showAddEditDialog(context, loc, existingAccount: account),
+          ),
+          MacosIconButton(
+            icon: const MacosIcon(CupertinoIcons.trash, size: 14, color: MacosColors.systemRedColor),
+            onPressed: () => _confirmDelete(context, account, loc),
           ),
         ],
       ),
