@@ -292,7 +292,7 @@ class ModeTabState extends State<ModeTab> {
         Row(children: [
           const Text('⌨️', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
-          Text('快捷键与录音', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text('快捷键与时长', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
         ]),
         const SizedBox(height: 10),
         _compactRow('长按说话 (PTT)', _hotkeyBadge(_currentKeyName, isCapturing: _isCapturingKey, onTap: () => _startKeyCapture())),
@@ -794,8 +794,6 @@ class ModeTabState extends State<ModeTab> {
   Widget _buildWorkModeView() {
     final loc = AppLocalizations.of(context)!;
     final currentMode = ConfigService().workMode;
-    final currentPresetId = ConfigService().llmPresetId;
-    final provider = CloudProviders.getById(currentPresetId);
     final isTranslation = _isTranslationMode();
 
     return Column(
@@ -823,27 +821,30 @@ class ModeTabState extends State<ModeTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Row 1: Language + AI Config
-                      SettingsCardGrid(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _buildLanguageCard(loc),
-                          _buildAiConfigCard(loc),
-                        ],
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // Row 2: Hotkey + Model Info (non-cloud only)
-                      SettingsCardGrid(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _buildHotkeyCard(loc),
-                          if (currentMode != 'cloud')
-                            _buildModelInfoCard(loc),
-                        ],
+                      // Main content: AI config (left, tall) | stacked cards (right)
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Left: AI config card (takes full height)
+                            Expanded(child: _buildAiConfigCard(loc)),
+                            const SizedBox(width: 10),
+                            // Right: 3 stacked cards
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  _buildLanguageCard(loc),
+                                  const SizedBox(height: 10),
+                                  _buildHotkeyCard(loc),
+                                  if (currentMode != 'cloud') ...[
+                                    const SizedBox(height: 10),
+                                    _buildModelInfoCard(loc),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
 
                       // Smart mode warning banner (full-width below row 2)
@@ -885,111 +886,6 @@ class ModeTabState extends State<ModeTab> {
           ),
         )),
 
-        // Fixed bottom save bar (smart mode + cloud LLM only)
-        if (currentMode == 'smart' && ConfigService().llmProviderType == 'cloud')
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.getBackground(context),
-              border: Border(top: BorderSide(color: AppTheme.getBorder(context))),
-            ),
-            child: Row(
-              children: [
-                if (_llmConfigDirty)
-                  Row(children: [
-                    const MacosIcon(CupertinoIcons.circle_fill, size: 8, color: MacosColors.systemOrangeColor),
-                    const SizedBox(width: 6),
-                    Text("有未保存的修改", style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor, fontSize: 11)),
-                  ])
-                else
-                  Row(children: [
-                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14, color: MacosColors.systemGrayColor.resolveFrom(context)),
-                    const SizedBox(width: 6),
-                    Text(provider?.name ?? currentPresetId, style: AppTheme.caption(context).copyWith(fontSize: 11)),
-                  ]),
-                const Spacer(),
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  secondary: true,
-                  onPressed: _isTestingLlm ? null : () async {
-                    setState(() { _isTestingLlm = true; _llmTestResult = null; });
-                    try {
-                      final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
-                      final savedId = ConfigService().selectedLlmAccountId ?? '';
-                      final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : (llmAccounts.isNotEmpty ? llmAccounts.first.id : '');
-                      final testAccount = effectiveId.isNotEmpty ? CloudAccountService().getAccountById(effectiveId) : null;
-                      final testProvider = testAccount != null ? CloudProviders.getById(testAccount.providerId) : null;
-                      final testApiKey = testAccount?.credentials['api_key'] ?? _llmApiKeyController.text;
-                      final testBaseUrl = testProvider?.llmBaseUrl ?? _llmBaseUrlController.text;
-                      final savedModel = ConfigService().llmModelOverride;
-                      final testModel = (savedModel != null && savedModel.isNotEmpty)
-                          ? savedModel
-                          : (testProvider?.llmDefaultModel ?? _llmModelController.text);
-                      final (ok, msg) = await LLMService().testConnectionWith(
-                        apiKey: testApiKey,
-                        baseUrl: testBaseUrl,
-                        model: testModel,
-                        apiFormat: testProvider?.llmApiFormat ?? LlmApiFormat.openai,
-                      );
-                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (ok, msg); });
-                    } catch (e) {
-                      if (mounted) setState(() { _isTestingLlm = false; _llmTestResult = (false, e.toString()); });
-                    }
-                  },
-                  child: _isTestingLlm
-                    ? const SizedBox(width: 14, height: 14, child: ProgressCircle())
-                    : const Row(mainAxisSize: MainAxisSize.min, children: [
-                        MacosIcon(CupertinoIcons.antenna_radiowaves_left_right, size: 14),
-                        SizedBox(width: 4),
-                        Text("测试"),
-                      ]),
-                ),
-                const SizedBox(width: 8),
-                PushButton(
-                  controlSize: ControlSize.regular,
-                  onPressed: _llmConfigDirty ? () async {
-                    try {
-                      await _flushLlmControllers();
-                      await ConfigService().savePresetConfig(currentPresetId);
-                      if (mounted) setState(() { _llmConfigDirty = false; });
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("保存失败: $e"), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating),
-                        );
-                      }
-                    }
-                  } : null,
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    MacosIcon(CupertinoIcons.checkmark_circle, size: 14),
-                    SizedBox(width: 4),
-                    Text("保存"),
-                  ]),
-                ),
-              ],
-            ),
-          ),
-        // Test result (below save bar)
-        if (_llmTestResult != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.getBackground(context),
-            ),
-            child: Row(children: [
-              Icon(
-                _llmTestResult!.$1 ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.xmark_circle_fill,
-                size: 14,
-                color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor,
-              ),
-              const SizedBox(width: 6),
-              Expanded(child: Text(
-                _llmTestResult!.$2,
-                style: TextStyle(fontSize: 12, color: _llmTestResult!.$1 ? AppTheme.successColor : AppTheme.errorColor),
-                maxLines: 2, overflow: TextOverflow.ellipsis,
-              )),
-            ]),
-          ),
       ],
     );
   }
