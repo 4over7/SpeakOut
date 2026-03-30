@@ -216,11 +216,11 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppTheme.accentColor.withValues(alpha: 0.1),
+              color: AppTheme.getAccent(context).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Center(
-              child: MacosIcon(CupertinoIcons.cloud_fill, size: 20, color: AppTheme.accentColor),
+            child: Center(
+              child: MacosIcon(CupertinoIcons.cloud_fill, size: 20, color: AppTheme.getAccent(context)),
             ),
           ),
           const SizedBox(width: 12),
@@ -269,9 +269,9 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(4),
-                        color: AppTheme.accentColor.withValues(alpha: 0.1),
+                        color: AppTheme.getAccent(context).withValues(alpha: 0.1),
                       ),
-                      child: Text(c, style: const TextStyle(fontSize: 10, color: AppTheme.accentColor, fontWeight: FontWeight.w500)),
+                      child: Text(c, style: TextStyle(fontSize: 10, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
                     )).toList(),
                   ),
                 ],
@@ -505,11 +505,11 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                               },
                               child: Row(
                                 children: [
-                                  MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.accentColor),
+                                  MacosIcon(CupertinoIcons.question_circle, size: 14, color: AppTheme.getAccent(context)),
                                   const SizedBox(width: 4),
                                   Text(
                                     provider.helpUrl,
-                                    style: TextStyle(fontSize: 11, color: AppTheme.accentColor),
+                                    style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],

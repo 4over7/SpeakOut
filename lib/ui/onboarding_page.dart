@@ -307,7 +307,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: AppTheme.accentColor,
+            color: AppTheme.getAccent(context),
             shape: BoxShape.circle,
           ),
           child: const Icon(CupertinoIcons.mic_fill, size: 48, color: Colors.white),
@@ -573,12 +573,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: highlighted
-                ? AppTheme.accentColor.withValues(alpha: 0.08)
+                ? AppTheme.getAccent(context).withValues(alpha: 0.08)
                 : MacosColors.systemGrayColor.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: highlighted
-                  ? AppTheme.accentColor.withValues(alpha: 0.35)
+                  ? AppTheme.getAccent(context).withValues(alpha: 0.35)
                   : MacosColors.systemGrayColor.withValues(alpha: 0.15),
               width: 1.5,
             ),
@@ -589,7 +589,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: (highlighted ? AppTheme.accentColor : MacosColors.systemGrayColor)
+                  color: (highlighted ? AppTheme.getAccent(context) : MacosColors.systemGrayColor)
                       .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -614,14 +614,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppTheme.accentColor.withValues(alpha: 0.15),
+                              color: AppTheme.getAccent(context).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               badge,
                               style: TextStyle(
                                 fontSize: 10,
-                                color: AppTheme.accentColor,
+                                color: AppTheme.getAccent(context),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -659,12 +659,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppTheme.accentColor.withValues(alpha: 0.12)
+              ? AppTheme.getAccent(context).withValues(alpha: 0.12)
               : MacosColors.systemGrayColor.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
-                ? AppTheme.accentColor.withValues(alpha: 0.5)
+                ? AppTheme.getAccent(context).withValues(alpha: 0.5)
                 : Colors.transparent,
             width: 1.5,
           ),
@@ -677,7 +677,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? AppTheme.accentColor : MacosColors.systemGrayColor,
+                  color: isSelected ? AppTheme.getAccent(context) : MacosColors.systemGrayColor,
                   width: 2,
                 ),
               ),
@@ -688,7 +688,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         height: 10,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppTheme.accentColor,
+                          color: AppTheme.getAccent(context),
                         ),
                       ),
                     )
@@ -715,14 +715,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha: 0.15),
+                            color: AppTheme.getAccent(context).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             l10n.recommended,
                             style: TextStyle(
                               fontSize: 10,
-                              color: AppTheme.accentColor,
+                              color: AppTheme.getAccent(context),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -827,7 +827,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   minHeight: 12,
                   backgroundColor: MacosColors.systemGrayColor.withValues(alpha:0.2),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    _downloadError != null ? Colors.red : AppTheme.accentColor,
+                    _downloadError != null ? Colors.red : AppTheme.getAccent(context),
                   ),
                 ),
               ),
@@ -892,7 +892,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
                 child: Text(
                   _l10n.manualDownload,
-                  style: TextStyle(color: AppTheme.accentColor, fontSize: 12),
+                  style: TextStyle(color: AppTheme.getAccent(context), fontSize: 12),
                 ),
               ),
             ],
@@ -931,7 +931,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.accentColor.withValues(alpha:0.1),
+            color: AppTheme.getAccent(context).withValues(alpha:0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(

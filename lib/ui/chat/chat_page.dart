@@ -329,7 +329,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Color _getRoleColor(ChatRole role) {
     return switch (role) {
-      ChatRole.user => AppTheme.accentColor,
+      ChatRole.user => AppTheme.getAccent(context),
       ChatRole.ai => const Color(0xFF9B59B6),
       ChatRole.tool => const Color(0xFFE67E22),
       ChatRole.dictation => const Color(0xFF3498DB),

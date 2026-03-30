@@ -1007,7 +1007,7 @@ class ModeTabState extends State<ModeTab> {
                       _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
                       setState(() {});
                     },
-                    child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11)),
+                    child: Text(loc.resetDefault, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), fontSize: 11)),
                   ),
                 ],
               ),
@@ -1082,7 +1082,7 @@ class ModeTabState extends State<ModeTab> {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => widget.onNavigateToTab(2), // Navigate to Cloud Accounts tab
-              child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, decoration: TextDecoration.underline)),
+              child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), decoration: TextDecoration.underline)),
             ),
           ],
         ),
@@ -1138,18 +1138,18 @@ class ModeTabState extends State<ModeTab> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.accentColor.withValues(alpha: 0.06),
+        color: AppTheme.getAccent(context).withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+        border: Border.all(color: AppTheme.getAccent(context).withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              MacosIcon(CupertinoIcons.lightbulb, size: 14, color: AppTheme.accentColor),
+              MacosIcon(CupertinoIcons.lightbulb, size: 14, color: AppTheme.getAccent(context)),
               const SizedBox(width: 6),
-              Text('选型参考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
+              Text('选型参考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.getAccent(context))),
             ],
           ),
           const SizedBox(height: 8),
@@ -1173,9 +1173,9 @@ class ModeTabState extends State<ModeTab> {
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(3),
-            color: AppTheme.accentColor.withValues(alpha: 0.12),
+            color: AppTheme.getAccent(context).withValues(alpha: 0.12),
           ),
-          child: Text(tag, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
+          child: Text(tag, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppTheme.getAccent(context))),
         ),
         const SizedBox(width: 6),
         Text(model, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
@@ -1217,11 +1217,11 @@ class ModeTabState extends State<ModeTab> {
           // API Key source hint
           Row(
             children: [
-              const MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 14, color: AppTheme.accentColor),
+              MacosIcon(CupertinoIcons.checkmark_seal_fill, size: 14, color: AppTheme.getAccent(context)),
               const SizedBox(width: 6),
               Text(
                 account?.displayName ?? provider?.name ?? '',
-                style: AppTheme.caption(context).copyWith(color: AppTheme.accentColor, fontSize: 11),
+                style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), fontSize: 11),
               ),
             ],
           ),
@@ -1326,9 +1326,9 @@ class ModeTabState extends State<ModeTab> {
               onTap: () => widget.onNavigateToTab(2), // Cloud Accounts tab
               child: Row(
                 children: [
-                  MacosIcon(CupertinoIcons.arrow_right_circle, size: 14, color: AppTheme.accentColor),
+                  MacosIcon(CupertinoIcons.arrow_right_circle, size: 14, color: AppTheme.getAccent(context)),
                   const SizedBox(width: 6),
-                  Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.accentColor)),
+                  Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
                 ],
               ),
             ),
@@ -1435,9 +1435,9 @@ class ModeTabState extends State<ModeTab> {
             onTap: () => widget.onNavigateToTab(2), // Cloud Accounts tab
             child: Row(
               children: [
-                MacosIcon(CupertinoIcons.plus_circle, size: 14, color: AppTheme.accentColor),
+                MacosIcon(CupertinoIcons.plus_circle, size: 14, color: AppTheme.getAccent(context)),
                 const SizedBox(width: 6),
-                Text(loc.cloudAccountAdd, style: TextStyle(fontSize: 12, color: AppTheme.accentColor)),
+                Text(loc.cloudAccountAdd, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
               ],
             ),
           ),

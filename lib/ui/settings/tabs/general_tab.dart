@@ -561,7 +561,7 @@ class _GeneralTabState extends State<GeneralTab> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.accentColor,
+                                      color: AppTheme.getAccent(context),
                                       borderRadius:
                                           BorderRadius.circular(10),
                                     ),
@@ -654,7 +654,7 @@ class _GeneralTabState extends State<GeneralTab> {
             child: Text(
               '隐私政策',
               style: AppTheme.caption(context).copyWith(
-                color: AppTheme.accentColor,
+                color: AppTheme.getAccent(context),
                 decoration: TextDecoration.underline,
               ),
             ),
