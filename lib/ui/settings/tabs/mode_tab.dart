@@ -1995,7 +1995,6 @@ class ModeTabState extends State<ModeTab> {
   // --- Advanced settings ---
 
   Widget _buildWorkModeAdvanced(AppLocalizations loc, String currentMode) {
-    // Cloud mode: advanced settings not applicable
     if (currentMode == 'cloud') return const SizedBox.shrink();
     return Column(
       children: [
@@ -2004,196 +2003,186 @@ class ModeTabState extends State<ModeTab> {
           onTap: () => setState(() => _workModeAdvancedExpanded = !_workModeAdvancedExpanded),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
+              color: AppTheme.getCardBackground(context),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.15)),
+              border: Border.all(color: AppTheme.getBorder(context)),
             ),
             child: Row(
               children: [
                 MacosIcon(
                   _workModeAdvancedExpanded ? CupertinoIcons.chevron_down : CupertinoIcons.chevron_right,
-                  size: 14,
-                  color: MacosColors.systemGrayColor,
+                  size: 12, color: MacosColors.systemGrayColor,
                 ),
                 const SizedBox(width: 8),
-                Text(loc.workModeAdvanced, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w500)),
+                Text(loc.workModeAdvanced, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w500, fontSize: 13)),
               ],
             ),
           ),
         ),
 
         if (_workModeAdvancedExpanded) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Voice model management (offline/smart modes)
-          if (currentMode != 'cloud') ...[
-            // Punctuation model
-            Builder(builder: (_) {
-              final activeModel = _modelManager.getModelById(_activeModelId ?? '');
-              final modelHasPunct = activeModel?.hasPunctuation ?? false;
-              final punctLabel = modelHasPunct
-                  ? loc.punctuationModel
-                  : "${loc.punctuationModel} (${loc.required})";
-              final punctDesc = modelHasPunct
-                  ? loc.builtInPunctuation
-                  : loc.punctuationModelDesc;
-              return SettingsGroup(
-                title: punctLabel,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                    child: Text(punctDesc, style: AppTheme.caption(context)),
-                  ),
-                  if (!modelHasPunct)
-                    SettingsTile(
-                      label: loc.punctuationModel,
-                      child: buildActionBtn(context,
-                        isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
-                        isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
-                        progress: _downloadProgressMap[ModelManager.punctuationModelId],
-                        statusText: _downloadStatusMap[ModelManager.punctuationModelId],
-                        isActive: true,
-                        onDownload: _downloadPunctuation,
-                        onDelete: _deletePunctuation,
-                        onActivate: () {},
-                      ),
-                    ),
-                ],
-              );
-            }),
-
-            const SizedBox(height: 24),
-
-            // Offline models (filtered by input language)
-            Builder(builder: (_) {
-              final inputLang = ConfigService().inputLanguage;
-              final filteredOffline = ModelManager.offlineModels
-                  .where((m) => m.supportsLanguage(inputLang)).toList();
-              return SettingsGroup(
-                title: loc.offlineModels,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                    child: Text(loc.offlineModelsDesc, style: AppTheme.caption(context)),
-                  ),
-                  ...filteredOffline.map((m) {
-                    return Column(
-                      children: [
-                        SettingsTile(
-                          label: _localizedModelName(m, loc),
-                          subtitle: _localizedModelDesc(m, loc),
-                          child: buildActionBtn(context,
-                            isDownloaded: _downloadedStatus[m.id] ?? false,
-                            isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                            progress: _downloadProgressMap[m.id],
-                            statusText: _downloadStatusMap[m.id],
-                            isActive: _activeModelId == m.id,
-                            isOffline: true,
-                            onDownload: () => _download(m),
-                            onDelete: () => _delete(m),
-                            onActivate: () => _activate(m),
-                            modelUrl: m.url,
-                            onImport: () => _importModel(m),
-                          ),
+          // Punctuation + Models in dual column
+          SettingsCardGrid(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              // Punctuation model card
+              Builder(builder: (_) {
+                final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+                final modelHasPunct = activeModel?.hasPunctuation ?? false;
+                return SettingsCard(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    Row(children: [
+                      const Text('📝', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(loc.punctuationModel, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12))),
+                    ]),
+                    const SizedBox(height: 6),
+                    if (modelHasPunct)
+                      Text(loc.builtInPunctuation, style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemGreenColor))
+                    else
+                      Row(children: [
+                        Text(loc.punctuationModelDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
+                        const Spacer(),
+                        buildActionBtn(context,
+                          isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
+                          isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
+                          progress: _downloadProgressMap[ModelManager.punctuationModelId],
+                          statusText: _downloadStatusMap[ModelManager.punctuationModelId],
+                          isActive: true, onDownload: _downloadPunctuation,
+                          onDelete: _deletePunctuation, onActivate: () {},
                         ),
-                        if (m != filteredOffline.last) const SettingsDivider(),
-                      ],
-                    );
-                  }),
-                ],
-              );
-            }),
+                      ]),
+                  ],
+                );
+              }),
+              // Vocab card
+              const VocabSettingsView(),
+            ],
+          ),
 
-            const SizedBox(height: 24),
+          const SizedBox(height: 10),
 
-            // Streaming models (filtered by input language)
-            Builder(builder: (_) {
-              final inputLang = ConfigService().inputLanguage;
-              final filteredStreaming = ModelManager.availableModels
-                  .where((m) => m.supportsLanguage(inputLang)).toList();
-              return SettingsGroup(
-                title: loc.streamingModels,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                    child: Text(loc.streamingModelsDesc, style: AppTheme.caption(context)),
-                  ),
-                  ...filteredStreaming.map((m) {
-                    return Column(
-                      children: [
-                        SettingsTile(
-                          label: _localizedModelName(m, loc),
-                          subtitle: _localizedModelDesc(m, loc),
-                          child: buildActionBtn(context,
-                            isDownloaded: _downloadedStatus[m.id] ?? false,
-                            isLoading: _downloadingIds.contains(m.id) || _activatingId == m.id,
-                            progress: _downloadProgressMap[m.id],
-                            statusText: _downloadStatusMap[m.id],
-                            isActive: _activeModelId == m.id,
-                            isOffline: false,
-                            onDownload: () => _download(m),
-                            onDelete: () => _delete(m),
-                            onActivate: () => _activate(m),
-                            modelUrl: m.url,
-                            onImport: () => _importModel(m),
-                          ),
-                        ),
-                        if (m != filteredStreaming.last) const SettingsDivider(),
-                      ],
-                    );
-                  }),
-                ],
-              );
-            }),
+          // Offline models card
+          Builder(builder: (_) {
+            final inputLang = ConfigService().inputLanguage;
+            final filteredOffline = ModelManager.offlineModels
+                .where((m) => m.supportsLanguage(inputLang)).toList();
+            return SettingsCard(
+              padding: const EdgeInsets.all(12),
+              children: [
+                Row(children: [
+                  const Text('🎙️', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
+                  Text(loc.offlineModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const Spacer(),
+                  Text(loc.offlineModelsDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
+                ]),
+                const SizedBox(height: 8),
+                ...filteredOffline.map((m) => _buildModelRow(m, loc, isOffline: true)),
+              ],
+            );
+          }),
 
-            const SizedBox(height: 24),
-          ],
+          const SizedBox(height: 10),
 
-          // Vocab section (offline/smart modes)
-          if (currentMode != 'cloud') ...[
-            const VocabSettingsView(),
-            const SizedBox(height: 16),
-          ],
+          // Streaming models card
+          Builder(builder: (_) {
+            final inputLang = ConfigService().inputLanguage;
+            final filteredStreaming = ModelManager.availableModels
+                .where((m) => m.supportsLanguage(inputLang)).toList();
+            return SettingsCard(
+              padding: const EdgeInsets.all(12),
+              children: [
+                Row(children: [
+                  const Text('📡', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
+                  Text(loc.streamingModels, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const Spacer(),
+                  Text(loc.streamingModelsDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
+                ]),
+                const SizedBox(height: 8),
+                ...filteredStreaming.map((m) => _buildModelRow(m, loc, isOffline: false)),
+              ],
+            );
+          }),
 
-          // 2x2 matrix explanation
-          if (currentMode == 'smart' || currentMode == 'offline')
+          // AI polish matrix info
+          if (currentMode == 'smart' || currentMode == 'offline') ...[
+            const SizedBox(height: 10),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.15)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemGrayColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        loc.tabAiPolish,
-                        style: AppTheme.caption(context).copyWith(fontWeight: FontWeight.w600, color: MacosColors.systemGrayColor),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    loc.aiPolishMatrix,
-                    style: AppTheme.caption(context).copyWith(
-                      color: MacosColors.systemGrayColor,
-                      height: 1.6,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+              child: Text(
+                loc.aiPolishMatrix,
+                style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor, height: 1.5, fontSize: 10),
               ),
             ),
+          ],
         ],
       ],
+    );
+  }
+
+  /// Compact model row for advanced settings
+  Widget _buildModelRow(ModelInfo m, AppLocalizations loc, {required bool isOffline}) {
+    final isActive = _activeModelId == m.id;
+    final isDownloaded = _downloadedStatus[m.id] ?? false;
+    final isLoading = _downloadingIds.contains(m.id) || _activatingId == m.id;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppTheme.getBorder(context).withValues(alpha: 0.5))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _localizedModelName(m, loc),
+                  style: AppTheme.body(context).copyWith(
+                    fontSize: 12,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    color: isActive ? AppTheme.getAccent(context) : null,
+                  ),
+                ),
+                Text(
+                  _localizedModelDesc(m, loc),
+                  style: AppTheme.caption(context).copyWith(fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          buildActionBtn(context,
+            isDownloaded: isDownloaded,
+            isLoading: isLoading,
+            progress: _downloadProgressMap[m.id],
+            statusText: _downloadStatusMap[m.id],
+            isActive: isActive,
+            isOffline: isOffline,
+            onDownload: () => _download(m),
+            onDelete: () => _delete(m),
+            onActivate: () => _activate(m),
+            modelUrl: m.url,
+            onImport: () => _importModel(m),
+          ),
+        ],
+      ),
     );
   }
 }
