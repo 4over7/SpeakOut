@@ -125,13 +125,15 @@ class SettingsCardGrid extends StatelessWidget {
           final left = children[i];
           final right = (i + 1 < children.length) ? children[i + 1] : null;
           rows.add(
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: left),
-                SizedBox(width: spacing),
-                Expanded(child: right ?? const SizedBox.shrink()),
-              ],
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: left),
+                  SizedBox(width: spacing),
+                  Expanded(child: right ?? const SizedBox.shrink()),
+                ],
+              ),
             ),
           );
           if (i + 2 < children.length) {
