@@ -31,9 +31,33 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   }
 
   void _refreshAccounts() {
+    _ensureAllProvidersExist();
     setState(() {
       _accounts = CloudAccountService().accounts;
+      // 启用的排前面，禁用的排后面
+      _accounts.sort((a, b) {
+        if (a.isEnabled && !b.isEnabled) return -1;
+        if (!a.isEnabled && b.isEnabled) return 1;
+        return 0;
+      });
     });
+  }
+
+  /// 确保所有服务商都有对应的账户条目（新用户首次打开时自动创建）
+  void _ensureAllProvidersExist() {
+    final service = CloudAccountService();
+    final existingProviderIds = service.accounts.map((a) => a.providerId).toSet();
+    for (final provider in CloudProviders.all) {
+      if (!existingProviderIds.contains(provider.id)) {
+        service.addAccount(CloudAccount(
+          id: const Uuid().v4(),
+          providerId: provider.id,
+          displayName: provider.name,
+          credentials: {},
+          isEnabled: false,
+        ));
+      }
+    }
   }
 
   @override
@@ -77,30 +101,12 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           ),
           const SizedBox(height: 12),
 
-          // 账户列表
-          if (_accounts.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 48),
-              decoration: BoxDecoration(
-                color: AppTheme.getCardBackground(context),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.getBorder(context)),
-              ),
-              child: Column(
-                children: [
-                  MacosIcon(CupertinoIcons.cloud, size: 40, color: MacosColors.systemGrayColor.withValues(alpha: 0.3)),
-                  const SizedBox(height: 8),
-                  Text(loc.cloudAccountNone, style: AppTheme.caption(context)),
-                ],
-              ),
-            )
-          else
-            SettingsCardGrid(
-              spacing: 8,
-              runSpacing: 8,
-              children: _accounts.map((a) => _buildAccountCard(a, loc)).toList(),
-            ),
+          // 账户列表（所有服务商预置，填 key 才能启用）
+          SettingsCardGrid(
+            spacing: 8,
+            runSpacing: 8,
+            children: _accounts.map((a) => _buildAccountCard(a, loc)).toList(),
+          ),
         ],
       ),
     );
@@ -166,6 +172,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     }
 
     final canEnable = provider != null && provider.hasAnyValidCredentials(account.credentials);
+    final hasKeys = canEnable; // 是否已填写凭证
 
     return SettingsCard(
       padding: const EdgeInsets.all(12),
@@ -180,23 +187,37 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                 style: AppTheme.body(context).copyWith(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: account.isEnabled ? null : MacosColors.systemGrayColor,
+                  color: account.isEnabled ? null : AppTheme.getTextSecondary(context),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            MacosSwitch(
-              value: account.isEnabled,
-              onChanged: canEnable ? (v) async {
-                final updated = CloudAccount(
-                  id: account.id, providerId: account.providerId,
-                  displayName: account.displayName, credentials: account.credentials,
-                  isEnabled: v, createdAt: account.createdAt,
-                );
-                await CloudAccountService().updateAccount(updated);
-                _refreshAccounts();
-              } : null,
-            ),
+            if (hasKeys)
+              MacosSwitch(
+                value: account.isEnabled,
+                onChanged: (v) async {
+                  final updated = CloudAccount(
+                    id: account.id, providerId: account.providerId,
+                    displayName: account.displayName, credentials: account.credentials,
+                    isEnabled: v, createdAt: account.createdAt,
+                  );
+                  await CloudAccountService().updateAccount(updated);
+                  _refreshAccounts();
+                },
+              )
+            else
+              // 未配置凭证 → 显示"配置"按钮
+              GestureDetector(
+                onTap: () => _showAddEditDialog(context, loc, existingAccount: account),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.getAccent(context).withValues(alpha: 0.4)),
+                  ),
+                  child: Text('配置', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 6),
@@ -209,23 +230,24 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4),
-                  color: AppTheme.getAccent(context).withValues(alpha: 0.1),
+                  color: (account.isEnabled ? AppTheme.getAccent(context) : MacosColors.systemGrayColor).withValues(alpha: 0.1),
                 ),
-                child: Text(c, style: TextStyle(fontSize: 9, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
+                child: Text(c, style: TextStyle(
+                  fontSize: 9,
+                  color: account.isEnabled ? AppTheme.getAccent(context) : MacosColors.systemGrayColor,
+                  fontWeight: FontWeight.w500,
+                )),
               ),
             )),
             if (provider?.warning != null)
               const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 11, color: MacosColors.systemOrangeColor),
             const Spacer(),
-            GestureDetector(
-              onTap: () => _showAddEditDialog(context, loc, existingAccount: account),
-              child: Text('编辑', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
-            ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: () => _confirmDelete(context, account, loc),
-              child: const Text('删除', style: TextStyle(fontSize: 11, color: MacosColors.systemRedColor)),
-            ),
+            if (hasKeys) ...[
+              GestureDetector(
+                onTap: () => _showAddEditDialog(context, loc, existingAccount: account),
+                child: Text('编辑', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+              ),
+            ],
           ],
         ),
       ],
