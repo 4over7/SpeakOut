@@ -131,6 +131,12 @@ typedef InjectClipboardChunkDart = void Function(Pointer<Utf8> text);
 typedef InjectClipboardEndC = Void Function();
 typedef InjectClipboardEndDart = void Function();
 
+// AI 报告: activate app + get frontmost app info
+typedef ActivateAppC = Int32 Function(Pointer<Utf8> bundleId);
+typedef ActivateAppDart = int Function(Pointer<Utf8> bundleId);
+typedef GetFrontmostAppInfoC = Pointer<Utf8> Function();
+typedef GetFrontmostAppInfoDart = Pointer<Utf8> Function();
+
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
@@ -190,4 +196,8 @@ abstract class NativeInputBase {
 
   // Launch external updater script (for auto-update)
   void launchUpdater(String scriptPath);
+
+  // AI 报告: activate app by bundle ID, get frontmost app info
+  bool activateApp(String bundleId);
+  String getFrontmostAppInfo();
 }

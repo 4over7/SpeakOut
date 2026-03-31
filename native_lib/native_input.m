@@ -612,6 +612,40 @@ void press_key(int keyCode, int modifierFlags) {
   }
 }
 
+// --- AI 报告辅助函数 ---
+
+// 激活指定 bundleId 的 App（切换到前台）
+int activate_app(const char *bundleId) {
+  if (bundleId == NULL || bundleId[0] == '\0') return 0;
+  @autoreleasepool {
+    NSString *bid = [NSString stringWithUTF8String:bundleId];
+    NSArray<NSRunningApplication *> *apps =
+        [NSRunningApplication runningApplicationsWithBundleIdentifier:bid];
+    if (apps.count == 0) return 0;
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    BOOL ok = [apps[0] activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+    #pragma clang diagnostic pop
+    return ok ? 1 : 0;
+  }
+}
+
+// 获取当前前台 App 信息，返回 JSON: {"bundleId":"...","name":"..."}
+// 调用者需要 free() 返回的指针
+const char *get_frontmost_app_info(void) {
+  @autoreleasepool {
+    NSRunningApplication *frontApp =
+        [[NSWorkspace sharedWorkspace] frontmostApplication];
+    if (frontApp == nil) return strdup("{}");
+
+    NSString *bid = frontApp.bundleIdentifier ?: @"";
+    NSString *name = frontApp.localizedName ?: @"";
+
+    NSString *json = [NSString stringWithFormat:@"{\"bundleId\":\"%@\",\"name\":\"%@\"}", bid, name];
+    return strdup([json UTF8String]);
+  }
+}
+
 // Main entry: always use clipboard paste for reliability.
 // CGEvent keyboard injection drops characters in apps with heavy UI (WeChat, Slack, etc.)
 // due to async HID event queue. Clipboard paste is 100% reliable.

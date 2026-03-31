@@ -175,6 +175,35 @@ class ConfigService {
     await _prefs?.remove('correction_modifiers');
   }
 
+  // --- AI 报告 (AI Report) ---
+  bool get aiReportEnabled => _prefs?.getBool('ai_report_enabled') ?? false;
+  int get aiReportKeyCode => _prefs?.getInt('ai_report_key_code') ?? 0;
+  int get aiReportModifiers => _prefs?.getInt('ai_report_modifiers') ?? 0;
+  String get aiReportKeyName => _prefs?.getString('ai_report_key_name') ?? '';
+  String? get aiReportTargetBundleId => _prefs?.getString('ai_report_target_bundle_id');
+  String? get aiReportTargetAppName => _prefs?.getString('ai_report_target_app_name');
+
+  Future<void> setAiReportEnabled(bool v) async => await _prefs?.setBool('ai_report_enabled', v);
+  Future<void> setAiReportKey(int code, String name, {int modifiers = 0}) async {
+    await _prefs?.setInt('ai_report_key_code', code);
+    await _prefs?.setString('ai_report_key_name', name);
+    await _prefs?.setInt('ai_report_modifiers', modifiers);
+  }
+  Future<void> clearAiReportKey() async {
+    await _prefs?.remove('ai_report_key_code');
+    await _prefs?.remove('ai_report_key_name');
+    await _prefs?.remove('ai_report_modifiers');
+  }
+  Future<void> setAiReportTarget(String? bundleId, String? appName) async {
+    if (bundleId == null) {
+      await _prefs?.remove('ai_report_target_bundle_id');
+      await _prefs?.remove('ai_report_target_app_name');
+    } else {
+      await _prefs?.setString('ai_report_target_bundle_id', bundleId);
+      if (appName != null) await _prefs?.setString('ai_report_target_app_name', appName);
+    }
+  }
+
   // --- 即时翻译 (Quick Translate) ---
   bool get translateEnabled => _prefs?.getBool('translate_enabled') ?? false;
   int get translateKeyCode => _prefs?.getInt('translate_key_code') ?? 0;

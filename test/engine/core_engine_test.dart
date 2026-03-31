@@ -104,10 +104,11 @@ void main() {
   });
 
   group('RecordingMode enum', () {
-    test('包含 ptt 和 diary', () {
-      expect(RecordingMode.values.length, 2);
+    test('包含 ptt、diary 和 aiReport', () {
+      expect(RecordingMode.values.length, 3);
       expect(RecordingMode.values, contains(RecordingMode.ptt));
       expect(RecordingMode.values, contains(RecordingMode.diary));
+      expect(RecordingMode.values, contains(RecordingMode.aiReport));
     });
   });
 }

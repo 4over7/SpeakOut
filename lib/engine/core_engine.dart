@@ -32,8 +32,8 @@ import 'package:speakout/config/app_log.dart';
 /// Recording pipeline state machine
 enum RecordingState { idle, starting, recording, stopping, processing }
 
-/// Recording mode: PTT (push-to-talk) or diary (flash note)
-enum RecordingMode { ptt, diary }
+/// Recording mode: PTT (push-to-talk), diary (flash note), or aiReport
+enum RecordingMode { ptt, diary, aiReport }
 
 /// 最后一次录音的完整 pipeline trace（供纠错反馈使用）
 class LastRecordingTrace {
@@ -132,6 +132,9 @@ class CoreEngine {
   DateTime? _recordingStartTime;
   bool _isOrganizing = false;
   bool _isCorrecting = false;
+  // AI 报告状态
+  String? _aiReportScreenshotPath;
+  String? _aiReportFrontAppInfo; // JSON: {"bundleId":"...","name":"..."}
   /// 最近一次 ASR 原文（供 UI 做对比展示）
   String? lastAsrOriginal;
   /// 最近一次 LLM 润色是否成功（null=未调用，true=成功，false=失败）
@@ -554,6 +557,7 @@ class CoreEngine {
   bool _pttKeyHeld = false;
   bool _diaryKeyHeld = false;
   bool _translateKeyHeld = false;
+  bool _aiReportKeyHeld = false;
   bool _deferredStop = false;
   int? _activeHotkeyCode; // The key that started the current recording (for watchdog)
 
@@ -638,6 +642,14 @@ class CoreEngine {
     if (isDown && config.correctionEnabled && correctionCode != 0 &&
         matchKey(correctionCode, config.correctionModifiers)) {
       _handleCorrection();
+      return;
+    }
+
+    // 5.6 AI 报告快捷键（PTT 模式：按住说话，松开发送）
+    final aiReportCode = config.aiReportKeyCode;
+    if (config.aiReportEnabled && aiReportCode != 0 &&
+        matchKey(aiReportCode, config.aiReportModifiers)) {
+      _handleModeKey(isDown, RecordingMode.aiReport, _aiReportKeyHeld, (v) => _aiReportKeyHeld = v);
       return;
     }
 
@@ -928,11 +940,25 @@ class CoreEngine {
     _recordingController.add(true);
 
     // 2. UI FEEDBACK (fire-and-forget)
-    _overlay.recordingMode = mode == RecordingMode.diary ? "diary" : "ptt";
+    _overlay.recordingMode = mode == RecordingMode.diary ? "diary"
+        : mode == RecordingMode.aiReport ? "aiReport" : "ptt";
     if (mode == RecordingMode.diary) {
       _overlay.updateText("📝 Note...");
+    } else if (mode == RecordingMode.aiReport) {
+      _overlay.updateText("🎯 AI Report...");
     }
     _overlay.show();
+
+    // 2.5 AI 报告: 截屏 + 采集前台 App 信息（在录音开始前，保留"犯罪现场"）
+    if (mode == RecordingMode.aiReport) {
+      try {
+        _aiReportFrontAppInfo = _nativeInput?.getFrontmostAppInfo();
+        _aiReportScreenshotPath = await _captureScreenshot();
+        _log("[AIReport] Screenshot: $_aiReportScreenshotPath, FrontApp: $_aiReportFrontAppInfo");
+      } catch (e) {
+        _log("[AIReport] Screenshot/AppInfo error: $e");
+      }
+    }
 
     // 3. AUDIO INIT via Native FFI
     try {
@@ -1157,6 +1183,55 @@ class CoreEngine {
     return null;
   }
 
+  /// AI 报告: 截屏（静默，无快门音）
+  Future<String?> _captureScreenshot() async {
+    final home = Platform.environment['HOME'] ?? '/tmp';
+    final dir = Directory('$home/.speakout/screenshots');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final timestamp = DateTime.now().toIso8601String()
+        .replaceAll(':', '').replaceAll('-', '').split('.').first;
+    final path = '${dir.path}/$timestamp.png';
+    final result = await Process.run('screencapture', ['-x', path]);
+    if (result.exitCode == 0 && File(path).existsSync()) {
+      return path;
+    }
+    _log("[AIReport] screencapture failed: exitCode=${result.exitCode}, stderr=${result.stderr}");
+    return null;
+  }
+
+  /// AI 报告: 组装最终报告文本
+  String _assembleAiReport(String description) {
+    final buf = StringBuffer();
+
+    // 截图路径
+    if (_aiReportScreenshotPath != null) {
+      buf.writeln('请看截图 $_aiReportScreenshotPath');
+      buf.writeln();
+    }
+
+    // 语音描述
+    buf.writeln(description);
+    buf.writeln();
+
+    // 环境信息
+    String envInfo = '';
+    if (_aiReportFrontAppInfo != null) {
+      try {
+        // 简单解析 JSON（避免引入 dart:convert 依赖问题）
+        final info = _aiReportFrontAppInfo!;
+        final nameMatch = RegExp(r'"name":"([^"]*)"').firstMatch(info);
+        if (nameMatch != null) {
+          envInfo = nameMatch.group(1) ?? '';
+        }
+      } catch (_) {}
+    }
+    buf.write('[来源: SpeakOut AI 报告');
+    if (envInfo.isNotEmpty) buf.write(' | 前台: $envInfo');
+    buf.write(']');
+
+    return buf.toString();
+  }
+
   Future<void> _stopAudioSafely() async {
     _stopAudioPolling();  // Stop polling BEFORE stopping AudioQueue
     if (_audioStarted) {
@@ -1260,7 +1335,7 @@ class CoreEngine {
             _log("[PERF] vocab hints: ${vocabHints.length} terms");
           }
 
-          final useTypewriter = mode != RecordingMode.diary
+          final useTypewriter = mode == RecordingMode.ptt
               && ConfigService().typewriterEnabled;
           final llmTimeout = AppConstants.kLlmPolishTimeout;
 
@@ -1400,7 +1475,28 @@ class CoreEngine {
       _resultController.add(finalText);
 
       if (finalText.isNotEmpty) {
-        if (mode == RecordingMode.diary) {
+        if (mode == RecordingMode.aiReport) {
+          // AI 报告: 组装报告 → 切换到目标窗口 → 注入
+          final report = _assembleAiReport(finalText);
+          final targetBundleId = ConfigService().aiReportTargetBundleId;
+          if (targetBundleId != null && targetBundleId.isNotEmpty) {
+            // 短暂延迟让悬浮窗隐藏
+            await Future.delayed(const Duration(milliseconds: 100));
+            final activated = _nativeInput?.activateApp(targetBundleId) ?? false;
+            _log("[AIReport] Activate $targetBundleId → $activated");
+            if (activated) {
+              // 等待窗口切换完成
+              await Future.delayed(const Duration(milliseconds: 300));
+            }
+          }
+          _nativeInput?.inject(report);
+          ChatService().addDictation(report, asrOriginal: originalAsrText);
+          _statusController.add("Ready");
+          _overlay.showThenClear("✅ AI Report Sent", AppConstants.kSuccessDisplayDuration);
+          // 清理 AI 报告状态
+          _aiReportScreenshotPath = null;
+          _aiReportFrontAppInfo = null;
+        } else if (mode == RecordingMode.diary) {
           _statusController.add("Saving Note...");
           DiaryService().appendNote(finalText).then((err) {
             if (err == null) {

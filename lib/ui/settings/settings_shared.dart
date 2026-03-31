@@ -75,6 +75,9 @@ Map<int, String> getActiveHotkeys(BuildContext context, {String? excludeFeature}
   if (config.correctionEnabled && config.correctionKeyCode != 0 && excludeFeature != 'correction') {
     map[config.correctionKeyCode] = '纠错反馈';
   }
+  if (config.aiReportEnabled && config.aiReportKeyCode != 0 && excludeFeature != 'aiReport') {
+    map[config.aiReportKeyCode] = 'AI 报告';
+  }
   return map;
 }
 

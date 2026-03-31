@@ -594,6 +594,11 @@ class NativeInputFFI implements NativeInputBase {
     return _checkIsTerminalApp() == 1;
   }
 
+  // --- AI Report ---
+  bool _aiReportBound = false;
+  late ActivateAppDart _activateApp;
+  late GetFrontmostAppInfoDart _getFrontmostAppInfo;
+
   // --- Auto-Update ---
   late LaunchUpdaterDart _launchUpdater;
   bool _updaterBound = false;
@@ -614,5 +619,45 @@ class NativeInputFFI implements NativeInputBase {
     final ptr = scriptPath.toNativeUtf8();
     _launchUpdater(ptr);
     calloc.free(ptr);
+  }
+
+  // ============ AI REPORT ============
+
+  void _bindAiReportFunctions() {
+    if (_aiReportBound) return;
+    try {
+      _activateApp = _dylib
+          .lookup<NativeFunction<ActivateAppC>>('activate_app')
+          .asFunction();
+      _getFrontmostAppInfo = _dylib
+          .lookup<NativeFunction<GetFrontmostAppInfoC>>('get_frontmost_app_info')
+          .asFunction();
+      _aiReportBound = true;
+      _log("AI Report FFI bindings SUCCESS");
+    } catch (e) {
+      _log("AI Report FFI bindings FAILED: $e");
+    }
+  }
+
+  @override
+  bool activateApp(String bundleId) {
+    _bindAiReportFunctions();
+    if (!_aiReportBound) return false;
+    final ptr = bundleId.toNativeUtf8();
+    final result = _activateApp(ptr);
+    calloc.free(ptr);
+    return result == 1;
+  }
+
+  @override
+  String getFrontmostAppInfo() {
+    _bindAiReportFunctions();
+    if (!_aiReportBound) return '{}';
+    final ptr = _getFrontmostAppInfo();
+    if (ptr == nullptr) return '{}';
+    final result = ptr.toDartString();
+    // get_frontmost_app_info returns strdup'd memory, need to free
+    calloc.free(ptr);
+    return result;
   }
 }

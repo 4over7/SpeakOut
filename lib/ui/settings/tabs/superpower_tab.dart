@@ -49,6 +49,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Correction
   bool _isCapturingCorrectionKey = false;
 
+  // AI Report
+  bool _isCapturingAiReportKey = false;
+  bool _isBindingWindow = false;
+
   // Key capture infrastructure
   StreamSubscription<(int, int)>? _keySubscription;
   final CoreEngine _engine = CoreEngine();
@@ -106,6 +110,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           _isCapturingTranslateKey = true;
         case 'correction':
           _isCapturingCorrectionKey = true;
+        case 'aiReport':
+          _isCapturingAiReportKey = true;
       }
     });
 
@@ -123,7 +129,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               _isCapturingToggleDiaryKey ||
               _isCapturingOrganizeKey ||
               _isCapturingTranslateKey ||
-              _isCapturingCorrectionKey)) {
+              _isCapturingCorrectionKey ||
+              _isCapturingAiReportKey)) {
         _stopKeyCapture();
       }
     });
@@ -139,6 +146,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         _isCapturingOrganizeKey = false;
         _isCapturingTranslateKey = false;
         _isCapturingCorrectionKey = false;
+        _isCapturingAiReportKey = false;
       });
     }
   }
@@ -169,7 +177,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     }
 
     // Feature-specific saving
-    if (_isCapturingCorrectionKey) {
+    if (_isCapturingAiReportKey) {
       final activeKeys = <int>[
         config.pttKeyCode,
         if (config.toggleInputEnabled) config.toggleInputKeyCode,
@@ -177,6 +185,25 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
         if (config.organizeEnabled) config.organizeKeyCode,
         if (config.translateEnabled) config.translateKeyCode,
+        if (config.correctionEnabled) config.correctionKeyCode,
+      ].where((k) => k != 0);
+      if (activeKeys.contains(keyCode)) {
+        _stopKeyCapture();
+        _showGenericHotkeyConflict(displayName);
+        return;
+      }
+      await config.setAiReportKey(keyCode, displayName,
+          modifiers: requiredMods);
+      setState(() => _isCapturingAiReportKey = false);
+    } else if (_isCapturingCorrectionKey) {
+      final activeKeys = <int>[
+        config.pttKeyCode,
+        if (config.toggleInputEnabled) config.toggleInputKeyCode,
+        if (config.diaryEnabled) config.diaryKeyCode,
+        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
+        if (config.organizeEnabled) config.organizeKeyCode,
+        if (config.translateEnabled) config.translateKeyCode,
+        if (config.aiReportEnabled) config.aiReportKeyCode,
       ].where((k) => k != 0);
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
@@ -194,6 +221,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
         if (config.organizeEnabled) config.organizeKeyCode,
         if (config.correctionEnabled) config.correctionKeyCode,
+        if (config.aiReportEnabled) config.aiReportKeyCode,
       ].where((k) => k != 0);
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
@@ -211,6 +239,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
         if (config.translateEnabled) config.translateKeyCode,
         if (config.correctionEnabled) config.correctionKeyCode,
+        if (config.aiReportEnabled) config.aiReportKeyCode,
       ].where((k) => k != 0);
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
@@ -413,6 +442,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               _buildOrganizeCard(loc),
               _buildTranslateCard(loc),
               _buildCorrectionCard(loc),
+              _buildAiReportCard(loc),
             ],
           ),
           const SizedBox(height: 12),
@@ -862,6 +892,157 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   }
 
   // ---------------------------------------------------------------------------
+  // 5. AI 报告
+  // ---------------------------------------------------------------------------
+
+  Widget _buildAiReportCard(AppLocalizations loc) {
+    final config = ConfigService();
+    final targetApp = config.aiReportTargetAppName;
+    return SettingsCard(
+      title: 'AI 报告',
+      titleIcon: CupertinoIcons.camera_viewfinder,
+      accentColor: AppTheme.triggerAiReport,
+      trailing: MacosSwitch(
+        value: config.aiReportEnabled,
+        onChanged: (v) async {
+          await config.setAiReportEnabled(v);
+          if (v) {
+            await _checkConflictOnEnable('aiReport', config.aiReportKeyCode,
+                config.aiReportKeyName, config.clearAiReportKey);
+          }
+          setState(() {});
+        },
+      ),
+      padding: const EdgeInsets.all(12),
+      children: [
+        if (config.aiReportEnabled) ...[
+          _compactRow(
+            '快捷键',
+            _hotkeyBadge(
+              config.aiReportKeyName,
+              isCapturing: _isCapturingAiReportKey,
+              onTap: () => _startKeyCapture('aiReport'),
+            ),
+          ),
+          _compactDivider(),
+          _compactRow(
+            '绑定窗口',
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (targetApp != null && targetApp.isNotEmpty)
+                  Text(
+                    targetApp,
+                    style: AppTheme.caption(context).copyWith(fontSize: 11),
+                  )
+                else
+                  Text(
+                    '未绑定',
+                    style: AppTheme.caption(context).copyWith(
+                      color: MacosColors.systemGrayColor,
+                      fontSize: 11,
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                PushButton(
+                  controlSize: ControlSize.mini,
+                  secondary: true,
+                  onPressed: _isBindingWindow ? null : _bindTargetWindow,
+                  child: Text(
+                    _isBindingWindow ? '请点击目标窗口...' : (targetApp != null ? '重新绑定' : '绑定'),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              MacosIcon(CupertinoIcons.info_circle,
+                  size: 11, color: MacosColors.systemGrayColor),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '按住快捷键 → 截屏+说话 → 松开后发送到绑定窗口',
+                  style: AppTheme.caption(context).copyWith(fontSize: 10),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ] else
+          Text(
+            '截屏+语音描述，自动发送到 AI 编程工具窗口。',
+            style: AppTheme.caption(context),
+          ),
+      ],
+    );
+  }
+
+  /// 绑定目标 AI 窗口：提示用户 → 3秒倒计时 → 读取前台 App
+  Future<void> _bindTargetWindow() async {
+    setState(() => _isBindingWindow = true);
+
+    // 提示用户切换到目标窗口
+    showMacosAlertDialog(
+      context: context,
+      builder: (_) => MacosAlertDialog(
+        appIcon: const Icon(CupertinoIcons.camera_viewfinder,
+            size: 48, color: Color(0xFFE74C3C)),
+        title: const Text('绑定 AI 工具窗口',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        message: const Text('点击「开始」后，你有 3 秒时间切换到目标 AI 工具窗口（如 Claude Code、Cursor）。'),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          child: const Text('开始'),
+          onPressed: () {
+            Navigator.of(context).pop();
+            _doBindAfterDelay();
+          },
+        ),
+        secondaryButton: PushButton(
+          controlSize: ControlSize.large,
+          secondary: true,
+          child: const Text('取消'),
+          onPressed: () {
+            Navigator.of(context).pop();
+            setState(() => _isBindingWindow = false);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _doBindAfterDelay() async {
+    // 3秒倒计时让用户切换窗口
+    await Future.delayed(const Duration(seconds: 3));
+
+    // 读取前台 App
+    try {
+      final infoJson = _engine.nativeInput?.getFrontmostAppInfo() ?? '{}';
+      final bundleIdMatch = RegExp(r'"bundleId":"([^"]*)"').firstMatch(infoJson);
+      final nameMatch = RegExp(r'"name":"([^"]*)"').firstMatch(infoJson);
+      final bundleId = bundleIdMatch?.group(1) ?? '';
+      final name = nameMatch?.group(1) ?? '';
+
+      if (bundleId.isNotEmpty && bundleId != 'com.speakout.speakout') {
+        await ConfigService().setAiReportTarget(bundleId, name);
+        AppLog.d('[AIReport] Bound to: $name ($bundleId)');
+      } else {
+        AppLog.d('[AIReport] Bind failed: got SpeakOut itself or empty');
+      }
+    } catch (e) {
+      AppLog.d('[AIReport] Bind error: $e');
+    }
+
+    if (mounted) {
+      setState(() => _isBindingWindow = false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Hotkey overview (full-width, below grid)
   // ---------------------------------------------------------------------------
 
@@ -874,6 +1055,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
       ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
       ('纠错反馈', config.correctionKeyName, config.correctionEnabled),
+      ('AI 报告', config.aiReportKeyName, config.aiReportEnabled),
     ];
 
     return SettingsCard(

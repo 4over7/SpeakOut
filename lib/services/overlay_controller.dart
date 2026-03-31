@@ -19,7 +19,7 @@ class OverlayController {
   /// Whether the current ASR is offline (no real-time subtitles)
   bool isOfflineMode = false;
 
-  /// Current recording mode: "ptt" or "diary"
+  /// Current recording mode: "ptt", "diary", "organize", or "aiReport"
   String recordingMode = "ptt";
 
   /// Whether native overlay is available (macOS only)
@@ -30,6 +30,7 @@ class OverlayController {
     String mode = isOfflineMode ? "offline" : "streaming";
     if (recordingMode == "diary") mode = "diary";
     if (recordingMode == "organize") mode = "organize";
+    if (recordingMode == "aiReport") mode = "aiReport";
     _invoke('showRecording', {"mode": mode});
   }
 
