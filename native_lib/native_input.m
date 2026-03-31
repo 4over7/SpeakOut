@@ -33,7 +33,8 @@ void set_log_directory(const char *dir) {
 
 static char *get_log_path() {
   if (logFilePath[0] != 0) return logFilePath;
-  // Default: ~/Downloads/speakout_native.log
+  // Default: ~/Library/Application Support/com.speakout.speakout/speakout_native.log
+  // (与 Dart 层 AppLog 的 speakout.log 在同一目录)
   static char defaultPath[512] = {0};
   if (defaultPath[0] == 0) {
     const char *home = getenv("HOME");
@@ -41,7 +42,8 @@ static char *get_log_path() {
       struct passwd *pw = getpwuid(getuid());
       home = pw ? pw->pw_dir : "/tmp";
     }
-    snprintf(defaultPath, sizeof(defaultPath), "%s/Downloads/speakout_native.log", home);
+    snprintf(defaultPath, sizeof(defaultPath),
+             "%s/Library/Application Support/com.speakout.speakout/speakout_native.log", home);
   }
   return defaultPath;
 }
@@ -622,10 +624,32 @@ int activate_app(const char *bundleId) {
     NSArray<NSRunningApplication *> *apps =
         [NSRunningApplication runningApplicationsWithBundleIdentifier:bid];
     if (apps.count == 0) return 0;
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    BOOL ok = [apps[0] activateWithOptions:NSApplicationActivateIgnoringOtherApps];
-    #pragma clang diagnostic pop
+    NSRunningApplication *app = apps[0];
+    // 先取消隐藏
+    if (app.isHidden) [app unhide];
+    BOOL ok = NO;
+    // macOS 14+: 使用 activateFromApplication:options: (调用方作为发起者)
+    if (@available(macOS 14.0, *)) {
+      NSRunningApplication *selfApp = [NSRunningApplication currentApplication];
+      ok = [app activateFromApplication:selfApp options:0];
+    }
+    // 回退: 旧 API
+    if (!ok) {
+      #pragma clang diagnostic push
+      #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+      ok = [app activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+      #pragma clang diagnostic pop
+    }
+    // 兜底: 通过 NSWorkspace 打开 (总是能激活)
+    if (!ok) {
+      NSURL *url = [app bundleURL];
+      if (url) {
+        [[NSWorkspace sharedWorkspace] openApplicationAtURL:url
+                                             configuration:[NSWorkspaceOpenConfiguration configuration]
+                                         completionHandler:nil];
+        ok = YES;
+      }
+    }
     return ok ? 1 : 0;
   }
 }
