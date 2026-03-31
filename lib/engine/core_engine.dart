@@ -945,7 +945,7 @@ class CoreEngine {
     if (mode == RecordingMode.diary) {
       _overlay.updateText("📝 Note...");
     } else if (mode == RecordingMode.aiReport) {
-      _overlay.updateText("🎯 AI Report...");
+      _overlay.updateText("🎯 调试中...");
     }
     _overlay.show();
 
@@ -1225,7 +1225,7 @@ class CoreEngine {
         }
       } catch (_) {}
     }
-    buf.write('[来源: SpeakOut AI 报告');
+    buf.write('[来源: SpeakOut AI 一键调试');
     if (envInfo.isNotEmpty) buf.write(' | 前台: $envInfo');
     buf.write(']');
 
@@ -1492,7 +1492,7 @@ class CoreEngine {
           _nativeInput?.inject(report);
           ChatService().addDictation(report, asrOriginal: originalAsrText);
           _statusController.add("Ready");
-          _overlay.showThenClear("✅ AI Report Sent", AppConstants.kSuccessDisplayDuration);
+          _overlay.showThenClear("✅ 已发送", AppConstants.kSuccessDisplayDuration);
           // 清理 AI 报告状态
           _aiReportScreenshotPath = null;
           _aiReportFrontAppInfo = null;

@@ -899,7 +899,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final config = ConfigService();
     final targetApp = config.aiReportTargetAppName;
     return SettingsCard(
-      title: 'AI 报告',
+      title: 'AI 一键调试',
       titleIcon: CupertinoIcons.camera_viewfinder,
       accentColor: AppTheme.triggerAiReport,
       trailing: MacosSwitch(
@@ -974,7 +974,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ),
         ] else
           Text(
-            '截屏+语音描述，自动发送到 AI 编程工具窗口。',
+            '截屏+语音描述 bug，一键发送到 AI 编程工具。',
             style: AppTheme.caption(context),
           ),
       ],
@@ -993,7 +993,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             size: 48, color: Color(0xFFE74C3C)),
         title: const Text('绑定 AI 工具窗口',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('点击「开始」后，你有 3 秒时间切换到目标 AI 工具窗口（如 Claude Code、Cursor）。'),
+        message: const Text('点击「开始」后，你有 3 秒时间切换到目标 AI 工具窗口（如 Claude Code / Cursor）。'),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           child: const Text('开始'),
@@ -1055,7 +1055,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
       ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
       ('纠错反馈', config.correctionKeyName, config.correctionEnabled),
-      ('AI 报告', config.aiReportKeyName, config.aiReportEnabled),
+      ('AI 一键调试', config.aiReportKeyName, config.aiReportEnabled),
     ];
 
     return SettingsCard(

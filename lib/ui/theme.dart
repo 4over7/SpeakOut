@@ -71,7 +71,7 @@ class AppTheme {
   static const Color triggerOrganize = Color(0xFF1ABC9C); // 梳理 — 青
   static const Color triggerTranslate = Color(0xFF3498DB);// 翻译 — 蓝
   static const Color triggerCorrect = Color(0xFFE67E22);  // 纠错 — 橙
-  static const Color triggerAiReport = Color(0xFFE74C3C); // AI报告 — 红
+  static const Color triggerAiReport = Color(0xFFE74C3C); // AI一键调试 — 红
 
   // === DYNAMIC GETTERS ===
 
