@@ -16,6 +16,7 @@ class SettingsCard extends StatelessWidget {
   final List<Widget> children;
   final Widget? trailing;          // Top-right widget (e.g. enable switch)
   final EdgeInsets padding;
+  final double? minHeight;         // 最小高度，保证卡片不会太扁
 
   const SettingsCard({
     super.key,
@@ -25,12 +26,14 @@ class SettingsCard extends StatelessWidget {
     required this.children,
     this.trailing,
     this.padding = const EdgeInsets.all(16),
+    this.minHeight,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
+      constraints: minHeight != null ? BoxConstraints(minHeight: minHeight!) : null,
       decoration: BoxDecoration(
         color: AppTheme.getCardBackground(context),
         borderRadius: BorderRadius.circular(10),

@@ -435,8 +435,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       child: Column(
         children: [
           SettingsCardGrid(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 12,
+            runSpacing: 12,
             children: [
               _buildDiaryCard(loc),
               _buildOrganizeCard(loc),
@@ -460,6 +460,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Widget _buildDiaryCard(AppLocalizations loc) {
     final config = ConfigService();
     return SettingsCard(
+      minHeight: 100,
       title: loc.diaryMode,
       titleIcon: CupertinoIcons.book,
       accentColor: AppTheme.triggerNote,
@@ -592,6 +593,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Widget _buildOrganizeCard(AppLocalizations loc) {
     final config = ConfigService();
     return SettingsCard(
+      minHeight: 100,
       title: loc.organizeEnabled,
       titleIcon: CupertinoIcons.text_alignleft,
       accentColor: AppTheme.triggerOrganize,
@@ -723,6 +725,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Widget _buildTranslateCard(AppLocalizations loc) {
     final config = ConfigService();
     return SettingsCard(
+      minHeight: 100,
       title: loc.quickTranslate,
       titleIcon: CupertinoIcons.globe,
       accentColor: AppTheme.triggerTranslate,
@@ -811,6 +814,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Widget _buildCorrectionCard(AppLocalizations loc) {
     final config = ConfigService();
     return SettingsCard(
+      minHeight: 100,
       title: '纠错反馈',
       titleIcon: CupertinoIcons.checkmark_seal,
       accentColor: AppTheme.triggerCorrect,
@@ -899,6 +903,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final config = ConfigService();
     final targetApp = config.aiReportTargetAppName;
     return SettingsCard(
+      minHeight: 100,
       title: 'AI 一键调试',
       titleIcon: CupertinoIcons.camera_viewfinder,
       accentColor: AppTheme.triggerAiReport,
