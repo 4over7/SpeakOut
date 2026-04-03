@@ -49,9 +49,9 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Correction
   bool _isCapturingCorrectionKey = false;
 
-  // AI Report
-  bool _isCapturingAiReportKey = false;
-  bool _isBindingWindow = false;
+  // AI Report (multi-slot)
+  int _capturingAiReportSlot = -1; // -1 = not capturing
+  int _bindingAiReportSlot = -1;   // -1 = not binding
 
   // Key capture infrastructure
   StreamSubscription<(int, int)>? _keySubscription;
@@ -110,8 +110,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           _isCapturingTranslateKey = true;
         case 'correction':
           _isCapturingCorrectionKey = true;
-        case 'aiReport':
-          _isCapturingAiReportKey = true;
+        // aiReport handled by _startSlotKeyCapture
       }
     });
 
@@ -130,7 +129,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               _isCapturingOrganizeKey ||
               _isCapturingTranslateKey ||
               _isCapturingCorrectionKey ||
-              _isCapturingAiReportKey)) {
+              _capturingAiReportSlot >= 0)) {
         _stopKeyCapture();
       }
     });
@@ -146,7 +145,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         _isCapturingOrganizeKey = false;
         _isCapturingTranslateKey = false;
         _isCapturingCorrectionKey = false;
-        _isCapturingAiReportKey = false;
+        _capturingAiReportSlot = -1;
       });
     }
   }
@@ -177,7 +176,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     }
 
     // Feature-specific saving
-    if (_isCapturingAiReportKey) {
+    if (_capturingAiReportSlot >= 0) {
       final activeKeys = <int>[
         config.pttKeyCode,
         if (config.toggleInputEnabled) config.toggleInputKeyCode,
@@ -186,15 +185,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.organizeEnabled) config.organizeKeyCode,
         if (config.translateEnabled) config.translateKeyCode,
         if (config.correctionEnabled) config.correctionKeyCode,
-      ].where((k) => k != 0);
+        // 其他 aiReport 槽位的快捷键也要排除冲突
+        ...config.aiReportAllKeyCodes,
+      ].where((k) => k != 0 && k != config.aiReportSlotKeyCode(_capturingAiReportSlot));
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
         _showGenericHotkeyConflict(displayName);
         return;
       }
-      await config.setAiReportKey(keyCode, displayName,
+      await config.setAiReportSlotKey(_capturingAiReportSlot, keyCode, displayName,
           modifiers: requiredMods);
-      setState(() => _isCapturingAiReportKey = false);
+      setState(() => _capturingAiReportSlot = -1);
     } else if (_isCapturingCorrectionKey) {
       final activeKeys = <int>[
         config.pttKeyCode,
@@ -203,7 +204,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
         if (config.organizeEnabled) config.organizeKeyCode,
         if (config.translateEnabled) config.translateKeyCode,
-        if (config.aiReportEnabled) config.aiReportKeyCode,
+        if (config.aiReportEnabled) ...config.aiReportAllKeyCodes,
       ].where((k) => k != 0);
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
@@ -221,7 +222,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
         if (config.organizeEnabled) config.organizeKeyCode,
         if (config.correctionEnabled) config.correctionKeyCode,
-        if (config.aiReportEnabled) config.aiReportKeyCode,
+        if (config.aiReportEnabled) ...config.aiReportAllKeyCodes,
       ].where((k) => k != 0);
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
@@ -239,7 +240,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
         if (config.translateEnabled) config.translateKeyCode,
         if (config.correctionEnabled) config.correctionKeyCode,
-        if (config.aiReportEnabled) config.aiReportKeyCode,
+        if (config.aiReportEnabled) ...config.aiReportAllKeyCodes,
       ].where((k) => k != 0);
       if (activeKeys.contains(keyCode)) {
         _stopKeyCapture();
@@ -901,7 +902,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildAiReportCard(AppLocalizations loc) {
     final config = ConfigService();
-    final targetApp = config.aiReportTargetAppName;
+    final slotCount = config.aiReportSlotCount;
     return SettingsCard(
       minHeight: 100,
       title: 'AI 一键调试',
@@ -911,59 +912,44 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         value: config.aiReportEnabled,
         onChanged: (v) async {
           await config.setAiReportEnabled(v);
-          if (v) {
-            await _checkConflictOnEnable('aiReport', config.aiReportKeyCode,
-                config.aiReportKeyName, config.clearAiReportKey);
-          }
           setState(() {});
         },
       ),
       padding: const EdgeInsets.all(12),
       children: [
         if (config.aiReportEnabled) ...[
-          _compactRow(
-            '快捷键',
-            _hotkeyBadge(
-              config.aiReportKeyName,
-              isCapturing: _isCapturingAiReportKey,
-              onTap: () => _startKeyCapture('aiReport'),
-            ),
-          ),
-          _compactDivider(),
-          _compactRow(
-            '绑定窗口',
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (targetApp != null && targetApp.isNotEmpty)
+          // 槽位列表
+          for (int i = 0; i < slotCount; i++) ...[
+            if (i > 0) _compactDivider(),
+            _buildAiReportSlotRow(i),
+          ],
+          // 添加槽位按钮
+          if (slotCount < ConfigService.kMaxAiReportSlots) ...[
+            if (slotCount > 0) const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () async {
+                await config.setAiReportSlotCount(slotCount + 1);
+                setState(() {});
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  MacosIcon(CupertinoIcons.plus_circle, size: 13, color: AppTheme.triggerAiReport),
+                  const SizedBox(width: 4),
                   Text(
-                    targetApp,
-                    style: AppTheme.caption(context).copyWith(fontSize: 11),
-                  )
-                else
-                  Text(
-                    '未绑定',
+                    slotCount == 0 ? '添加第一个窗口' : '添加窗口',
                     style: AppTheme.caption(context).copyWith(
-                      color: MacosColors.systemGrayColor,
+                      color: AppTheme.triggerAiReport,
                       fontSize: 11,
                     ),
                   ),
-                const SizedBox(width: 6),
-                PushButton(
-                  controlSize: ControlSize.mini,
-                  secondary: true,
-                  onPressed: _isBindingWindow ? null : _bindTargetWindow,
-                  child: Text(
-                    _isBindingWindow ? '请点击目标窗口...' : (targetApp != null ? '重新绑定' : '绑定'),
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 6),
           Text(
-            '为 AI Coding 而生 — 按住说话，截屏+语音自动发送到绑定窗口',
+            '为 AI Coding 而生 — 按住快捷键说话，截屏+语音自动发送',
             style: AppTheme.caption(context).copyWith(fontSize: 10),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -977,11 +963,81 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     );
   }
 
-  /// 绑定目标 AI 窗口：提示用户 → 3秒倒计时 → 读取前台 App
-  Future<void> _bindTargetWindow() async {
-    setState(() => _isBindingWindow = true);
+  /// 单个槽位行：[快捷键] → [目标 App] [绑定] [删除]
+  Widget _buildAiReportSlotRow(int index) {
+    final config = ConfigService();
+    final keyName = config.aiReportSlotKeyName(index);
+    final appName = config.aiReportSlotAppName(index);
+    final isCapturing = _capturingAiReportSlot == index;
+    final isBinding = _bindingAiReportSlot == index;
 
-    // 提示用户切换到目标窗口
+    return Row(
+      children: [
+        // 快捷键
+        _hotkeyBadge(
+          keyName,
+          isCapturing: isCapturing,
+          onTap: () => _startSlotKeyCapture(index),
+        ),
+        const SizedBox(width: 8),
+        MacosIcon(CupertinoIcons.arrow_right, size: 10, color: MacosColors.systemGrayColor),
+        const SizedBox(width: 8),
+        // 目标 App
+        Expanded(
+          child: Text(
+            isBinding ? '请切换到目标窗口...'
+                : (appName != null && appName.isNotEmpty ? appName : '未绑定'),
+            style: AppTheme.caption(context).copyWith(
+              fontSize: 11,
+              color: (appName == null || appName.isEmpty) && !isBinding
+                  ? MacosColors.systemGrayColor : null,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 4),
+        // 绑定按钮
+        GestureDetector(
+          onTap: isBinding ? null : () => _bindSlotTargetWindow(index),
+          child: MacosIcon(
+            CupertinoIcons.scope,
+            size: 14,
+            color: isBinding ? MacosColors.systemGrayColor : AppTheme.triggerAiReport,
+          ),
+        ),
+        const SizedBox(width: 8),
+        // 删除按钮
+        GestureDetector(
+          onTap: () async {
+            await config.removeAiReportSlot(index);
+            setState(() {});
+          },
+          child: MacosIcon(CupertinoIcons.minus_circle, size: 14, color: MacosColors.systemGrayColor),
+        ),
+      ],
+    );
+  }
+
+  /// 启动槽位快捷键捕获
+  void _startSlotKeyCapture(int slotIndex) {
+    setState(() => _capturingAiReportSlot = slotIndex);
+
+    _keySubscription = _engine.rawKeyEventStream.listen((event) {
+      final (keyCode, modifierFlags) = event;
+      final keyName = mapKeyCodeToString(keyCode);
+      _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
+      _stopKeyCapture();
+    });
+
+    Future.delayed(const Duration(seconds: 15), () {
+      if (mounted && _capturingAiReportSlot >= 0) _stopKeyCapture();
+    });
+  }
+
+  /// 绑定槽位目标窗口：3秒倒计时 → 读取前台 App
+  Future<void> _bindSlotTargetWindow(int slotIndex) async {
+    setState(() => _bindingAiReportSlot = slotIndex);
+
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
@@ -989,13 +1045,13 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             size: 48, color: Color(0xFFE74C3C)),
         title: const Text('绑定 AI 工具窗口',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('点击「开始」后，你有 3 秒时间切换到目标 AI 工具窗口（如 Claude Code / Cursor）。'),
+        message: const Text('点击「开始」后，你有 3 秒时间切换到目标窗口。'),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           child: const Text('开始'),
           onPressed: () {
             Navigator.of(context).pop();
-            _doBindAfterDelay();
+            _doSlotBind(slotIndex);
           },
         ),
         secondaryButton: PushButton(
@@ -1004,38 +1060,29 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           child: const Text('取消'),
           onPressed: () {
             Navigator.of(context).pop();
-            setState(() => _isBindingWindow = false);
+            setState(() => _bindingAiReportSlot = -1);
           },
         ),
       ),
     );
   }
 
-  Future<void> _doBindAfterDelay() async {
-    // 3秒倒计时让用户切换窗口
+  Future<void> _doSlotBind(int slotIndex) async {
     await Future.delayed(const Duration(seconds: 3));
-
-    // 读取前台 App
     try {
       final infoJson = _engine.nativeInput?.getFrontmostAppInfo() ?? '{}';
       final bundleIdMatch = RegExp(r'"bundleId":"([^"]*)"').firstMatch(infoJson);
       final nameMatch = RegExp(r'"name":"([^"]*)"').firstMatch(infoJson);
       final bundleId = bundleIdMatch?.group(1) ?? '';
       final name = nameMatch?.group(1) ?? '';
-
       if (bundleId.isNotEmpty && bundleId != 'com.speakout.speakout') {
-        await ConfigService().setAiReportTarget(bundleId, name);
-        AppLog.d('[AIReport] Bound to: $name ($bundleId)');
-      } else {
-        AppLog.d('[AIReport] Bind failed: got SpeakOut itself or empty');
+        await ConfigService().setAiReportSlotTarget(slotIndex, bundleId, name);
+        AppLog.d('[AIReport] Slot $slotIndex bound to: $name ($bundleId)');
       }
     } catch (e) {
       AppLog.d('[AIReport] Bind error: $e');
     }
-
-    if (mounted) {
-      setState(() => _isBindingWindow = false);
-    }
+    if (mounted) setState(() => _bindingAiReportSlot = -1);
   }
 
   // ---------------------------------------------------------------------------
@@ -1081,7 +1128,9 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
       ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
       ('纠错反馈', config.correctionKeyName, config.correctionEnabled),
-      ('AI 一键调试', config.aiReportKeyName, config.aiReportEnabled),
+      // AI 一键调试多槽位
+      for (int i = 0; i < config.aiReportSlotCount; i++)
+        ('调试 → ${config.aiReportSlotAppName(i) ?? '?'}', config.aiReportSlotKeyName(i), config.aiReportEnabled),
     ];
 
     final activeEntries = entries.where((e) => e.$3 && e.$2.isNotEmpty).toList();

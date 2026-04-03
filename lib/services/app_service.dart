@@ -51,6 +51,7 @@ class AppService {
     // 1. Config
     await ConfigService().init();
     await ConfigService().migrateToWorkMode();
+    await ConfigService().migrateAiReportSlots();
     await applyVerboseLogging(); // Apply debug logging as early as possible
 
     // 1.5 Other Services

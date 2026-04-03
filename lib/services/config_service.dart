@@ -175,33 +175,89 @@ class ConfigService {
     await _prefs?.remove('correction_modifiers');
   }
 
-  // --- AI 报告 (AI Report) ---
-  bool get aiReportEnabled => _prefs?.getBool('ai_report_enabled') ?? false;
-  int get aiReportKeyCode => _prefs?.getInt('ai_report_key_code') ?? 0;
-  int get aiReportModifiers => _prefs?.getInt('ai_report_modifiers') ?? 0;
-  String get aiReportKeyName => _prefs?.getString('ai_report_key_name') ?? '';
-  String? get aiReportTargetBundleId => _prefs?.getString('ai_report_target_bundle_id');
-  String? get aiReportTargetAppName => _prefs?.getString('ai_report_target_app_name');
+  // --- AI 一键调试 (AI Debug) — 多槽位 ---
+  static const int kMaxAiReportSlots = 5;
 
+  bool get aiReportEnabled => _prefs?.getBool('ai_report_enabled') ?? false;
   Future<void> setAiReportEnabled(bool v) async => await _prefs?.setBool('ai_report_enabled', v);
-  Future<void> setAiReportKey(int code, String name, {int modifiers = 0}) async {
-    await _prefs?.setInt('ai_report_key_code', code);
-    await _prefs?.setString('ai_report_key_name', name);
-    await _prefs?.setInt('ai_report_modifiers', modifiers);
+
+  int get aiReportSlotCount => _prefs?.getInt('ai_report_slot_count') ?? 0;
+  Future<void> setAiReportSlotCount(int n) async => await _prefs?.setInt('ai_report_slot_count', n);
+
+  // --- 单槽位存取 ---
+  int aiReportSlotKeyCode(int i) => _prefs?.getInt('ai_report_s${i}_key_code') ?? 0;
+  int aiReportSlotModifiers(int i) => _prefs?.getInt('ai_report_s${i}_modifiers') ?? 0;
+  String aiReportSlotKeyName(int i) => _prefs?.getString('ai_report_s${i}_key_name') ?? '';
+  String? aiReportSlotBundleId(int i) => _prefs?.getString('ai_report_s${i}_bundle_id');
+  String? aiReportSlotAppName(int i) => _prefs?.getString('ai_report_s${i}_app_name');
+
+  Future<void> setAiReportSlotKey(int i, int code, String name, {int modifiers = 0}) async {
+    await _prefs?.setInt('ai_report_s${i}_key_code', code);
+    await _prefs?.setString('ai_report_s${i}_key_name', name);
+    await _prefs?.setInt('ai_report_s${i}_modifiers', modifiers);
   }
-  Future<void> clearAiReportKey() async {
+  Future<void> clearAiReportSlotKey(int i) async {
+    await _prefs?.remove('ai_report_s${i}_key_code');
+    await _prefs?.remove('ai_report_s${i}_key_name');
+    await _prefs?.remove('ai_report_s${i}_modifiers');
+  }
+  Future<void> setAiReportSlotTarget(int i, String? bundleId, String? appName) async {
+    if (bundleId == null) {
+      await _prefs?.remove('ai_report_s${i}_bundle_id');
+      await _prefs?.remove('ai_report_s${i}_app_name');
+    } else {
+      await _prefs?.setString('ai_report_s${i}_bundle_id', bundleId);
+      if (appName != null) await _prefs?.setString('ai_report_s${i}_app_name', appName);
+    }
+  }
+  Future<void> removeAiReportSlot(int index) async {
+    final count = aiReportSlotCount;
+    // 把后面的往前移
+    for (int i = index; i < count - 1; i++) {
+      final nextCode = aiReportSlotKeyCode(i + 1);
+      final nextName = aiReportSlotKeyName(i + 1);
+      final nextMods = aiReportSlotModifiers(i + 1);
+      final nextBid = aiReportSlotBundleId(i + 1);
+      final nextApp = aiReportSlotAppName(i + 1);
+      await setAiReportSlotKey(i, nextCode, nextName, modifiers: nextMods);
+      await setAiReportSlotTarget(i, nextBid, nextApp);
+    }
+    // 清除最后一个
+    final last = count - 1;
+    await clearAiReportSlotKey(last);
+    await setAiReportSlotTarget(last, null, null);
+    await setAiReportSlotCount(count - 1);
+  }
+
+  /// 旧单槽配置迁移到槽位 0
+  Future<void> migrateAiReportSlots() async {
+    if (aiReportSlotCount > 0) return; // 已迁移
+    final oldCode = _prefs?.getInt('ai_report_key_code') ?? 0;
+    if (oldCode == 0) return; // 没有旧配置
+    final oldName = _prefs?.getString('ai_report_key_name') ?? '';
+    final oldMods = _prefs?.getInt('ai_report_modifiers') ?? 0;
+    final oldBid = _prefs?.getString('ai_report_target_bundle_id');
+    final oldApp = _prefs?.getString('ai_report_target_app_name');
+    await setAiReportSlotKey(0, oldCode, oldName, modifiers: oldMods);
+    await setAiReportSlotTarget(0, oldBid, oldApp);
+    await setAiReportSlotCount(1);
+    // 清除旧键
     await _prefs?.remove('ai_report_key_code');
     await _prefs?.remove('ai_report_key_name');
     await _prefs?.remove('ai_report_modifiers');
+    await _prefs?.remove('ai_report_target_bundle_id');
+    await _prefs?.remove('ai_report_target_app_name');
   }
-  Future<void> setAiReportTarget(String? bundleId, String? appName) async {
-    if (bundleId == null) {
-      await _prefs?.remove('ai_report_target_bundle_id');
-      await _prefs?.remove('ai_report_target_app_name');
-    } else {
-      await _prefs?.setString('ai_report_target_bundle_id', bundleId);
-      if (appName != null) await _prefs?.setString('ai_report_target_app_name', appName);
+
+  // --- 兼容性 getter（供冲突检测等使用）---
+  /// 所有已配置的 AI 一键调试快捷键 code 列表
+  List<int> get aiReportAllKeyCodes {
+    final codes = <int>[];
+    for (int i = 0; i < aiReportSlotCount; i++) {
+      final c = aiReportSlotKeyCode(i);
+      if (c != 0) codes.add(c);
     }
+    return codes;
   }
 
   // --- 即时翻译 (Quick Translate) ---

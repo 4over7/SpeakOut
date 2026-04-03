@@ -135,6 +135,7 @@ class CoreEngine {
   // AI 报告状态
   String? _aiReportScreenshotPath;
   String? _aiReportFrontAppInfo; // JSON: {"bundleId":"...","name":"..."}
+  int _aiReportActiveSlot = -1; // 触发录音的槽位索引
   /// 最近一次 ASR 原文（供 UI 做对比展示）
   String? lastAsrOriginal;
   /// 最近一次 LLM 润色是否成功（null=未调用，true=成功，false=失败）
@@ -645,12 +646,18 @@ class CoreEngine {
       return;
     }
 
-    // 5.6 AI 报告快捷键（PTT 模式：按住说话，松开发送）
-    final aiReportCode = config.aiReportKeyCode;
-    if (config.aiReportEnabled && aiReportCode != 0 &&
-        matchKey(aiReportCode, config.aiReportModifiers)) {
-      _handleModeKey(isDown, RecordingMode.aiReport, _aiReportKeyHeld, (v) => _aiReportKeyHeld = v);
-      return;
+    // 5.6 AI 一键调试快捷键（多槽位，PTT 模式）
+    if (config.aiReportEnabled) {
+      for (int si = 0; si < config.aiReportSlotCount; si++) {
+        final slotCode = config.aiReportSlotKeyCode(si);
+        if (slotCode != 0 && matchKey(slotCode, config.aiReportSlotModifiers(si))) {
+          if (isDown && _recordingState == RecordingState.idle) {
+            _aiReportActiveSlot = si;
+          }
+          _handleModeKey(isDown, RecordingMode.aiReport, _aiReportKeyHeld, (v) => _aiReportKeyHeld = v);
+          return;
+        }
+      }
     }
 
     // 6. Pure PTT / diary keys (existing logic)
@@ -1476,9 +1483,10 @@ class CoreEngine {
 
       if (finalText.isNotEmpty) {
         if (mode == RecordingMode.aiReport) {
-          // AI 报告: 组装报告 → 切换到目标窗口 → 注入
+          // AI 一键调试: 组装报告 → 切换到目标窗口 → 注入
           final report = _assembleAiReport(finalText);
-          final targetBundleId = ConfigService().aiReportTargetBundleId;
+          final slotIdx = _aiReportActiveSlot;
+          final targetBundleId = slotIdx >= 0 ? ConfigService().aiReportSlotBundleId(slotIdx) : null;
           if (targetBundleId != null && targetBundleId.isNotEmpty) {
             // 短暂延迟让悬浮窗隐藏
             await Future.delayed(const Duration(milliseconds: 100));
@@ -1493,9 +1501,10 @@ class CoreEngine {
           ChatService().addDictation(report, asrOriginal: originalAsrText);
           _statusController.add("Ready");
           _overlay.showThenClear("✅ 已发送", AppConstants.kSuccessDisplayDuration);
-          // 清理 AI 报告状态
+          // 清理 AI 一键调试状态
           _aiReportScreenshotPath = null;
           _aiReportFrontAppInfo = null;
+          _aiReportActiveSlot = -1;
         } else if (mode == RecordingMode.diary) {
           _statusController.add("Saving Note...");
           DiaryService().appendNote(finalText).then((err) {
