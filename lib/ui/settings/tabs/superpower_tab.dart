@@ -974,7 +974,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ),
         ] else
           Text(
-            '截屏+语音描述 bug，一键发送到 AI 编程工具。',
+            '为 AI Coding 而生 — 截屏+语音描述，一键发送到 Claude Code / Cursor。',
             style: AppTheme.caption(context),
           ),
       ],
@@ -1058,57 +1058,46 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ('AI 一键调试', config.aiReportKeyName, config.aiReportEnabled),
     ];
 
-    return SettingsCard(
-      title: '全部快捷键一览',
-      titleIcon: CupertinoIcons.keyboard,
-      padding: const EdgeInsets.all(12),
-      children: [
-        for (var i = 0; i < entries.length; i++) ...[
-          if (i > 0) const SizedBox(height: 2),
-          Row(
-            children: [
-              SizedBox(
-                width: 130,
-                child: Text(
-                  entries[i].$1,
-                  style: AppTheme.body(context).copyWith(
-                    fontSize: 12,
-                    color: entries[i].$3
-                        ? null
-                        : MacosColors.systemGrayColor,
+    // 只显示已启用的快捷键，关闭的不占空间
+    final activeEntries = entries.where((e) => e.$3 && e.$2.isNotEmpty).toList();
+    if (activeEntries.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          MacosIcon(CupertinoIcons.keyboard, size: 12, color: MacosColors.systemGrayColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              children: activeEntries.map((e) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(e.$1, style: AppTheme.caption(context).copyWith(fontSize: 11)),
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: MacosColors.systemGrayColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(
+                      e.$2,
+                      style: AppTheme.mono(context).copyWith(fontSize: 10),
+                    ),
                   ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color:
-                      MacosColors.systemGrayColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  entries[i].$2.isEmpty ? '未设置' : entries[i].$2,
-                  style: AppTheme.mono(context).copyWith(
-                    fontSize: 11,
-                    color: entries[i].$2.isEmpty
-                        ? MacosColors.systemGrayColor
-                        : (entries[i].$3
-                            ? null
-                            : MacosColors.systemGrayColor),
-                  ),
-                ),
-              ),
-              if (!entries[i].$3) ...[
-                const SizedBox(width: 6),
-                Text('已关闭',
-                    style: AppTheme.caption(context)
-                        .copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
-              ],
-            ],
+                ],
+              )).toList(),
+            ),
           ),
         ],
-      ],
+      ),
     );
   }
 }
