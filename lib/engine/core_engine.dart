@@ -132,10 +132,12 @@ class CoreEngine {
   DateTime? _recordingStartTime;
   bool _isOrganizing = false;
   bool _isCorrecting = false;
-  // AI 报告状态
+  // AI 一键调试状态
   String? _aiReportScreenshotPath;
-  String? _aiReportFrontAppInfo; // JSON: {"bundleId":"...","name":"..."}
+  String? _aiReportFrontAppInfo;
   int _aiReportActiveSlot = -1; // 触发录音的槽位索引
+  bool _aiReportBaseDown = false; // 基础按键是否按下
+  Timer? _aiReportSlotTimer; // 等待数字键的定时器
   /// 最近一次 ASR 原文（供 UI 做对比展示）
   String? lastAsrOriginal;
   /// 最近一次 LLM 润色是否成功（null=未调用，true=成功，false=失败）
@@ -196,6 +198,7 @@ class CoreEngine {
     _watchdogTimer?.cancel();
     _toggleMaxTimer?.cancel();
     _silenceCheckTimer?.cancel();
+    _aiReportSlotTimer?.cancel();
     _stopAudioPolling();
     if (_pollBuffer != null) {
       pkg_ffi.calloc.free(_pollBuffer!);
@@ -646,17 +649,54 @@ class CoreEngine {
       return;
     }
 
-    // 5.6 AI 一键调试快捷键（多槽位，PTT 模式）
-    if (config.aiReportEnabled) {
-      for (int si = 0; si < config.aiReportSlotCount; si++) {
-        final slotCode = config.aiReportSlotKeyCode(si);
-        if (slotCode != 0 && matchKey(slotCode, config.aiReportSlotModifiers(si))) {
-          if (isDown && _recordingState == RecordingState.idle) {
-            _aiReportActiveSlot = si;
-          }
-          _handleModeKey(isDown, RecordingMode.aiReport, _aiReportKeyHeld, (v) => _aiReportKeyHeld = v);
+    // 5.6 AI 一键调试（基础按键 + 数字选槽）
+    final aiBaseCode = config.aiReportBaseKeyCode;
+    if (config.aiReportEnabled && aiBaseCode != 0) {
+      final slotCount = config.aiReportSlotCount;
+      // 基础按键按下
+      if (isDown && keyCode == aiBaseCode && _recordingState == RecordingState.idle && !_aiReportBaseDown) {
+        _aiReportBaseDown = true;
+        _aiReportKeyHeld = true;
+        if (slotCount <= 1) {
+          // 单槽位: 直接启动
+          _aiReportActiveSlot = 0;
+          startRecording(mode: RecordingMode.aiReport);
+        } else {
+          // 多槽位: 等 300ms 看有没有数字键
+          _aiReportActiveSlot = 0;
+          _aiReportSlotTimer?.cancel();
+          _aiReportSlotTimer = Timer(const Duration(milliseconds: 300), () {
+            if (_recordingState == RecordingState.idle && _aiReportBaseDown) {
+              startRecording(mode: RecordingMode.aiReport);
+            }
+          });
+        }
+        return;
+      }
+      // 数字键按下（基础按键已按住，还没开始录音）
+      if (isDown && _aiReportBaseDown && _recordingState == RecordingState.idle) {
+        final numIdx = ConfigService.kNumberKeyCodes.indexOf(keyCode);
+        if (numIdx >= 0 && numIdx < slotCount) {
+          _aiReportSlotTimer?.cancel();
+          _aiReportActiveSlot = numIdx;
+          _log("[AIReport] Slot $numIdx selected via number key");
+          startRecording(mode: RecordingMode.aiReport);
           return;
         }
+      }
+      // 基础按键松开 → 停止录音
+      if (!isDown && keyCode == aiBaseCode) {
+        _aiReportBaseDown = false;
+        _aiReportSlotTimer?.cancel();
+        if (_recordingState == RecordingState.recording && _recordingMode == RecordingMode.aiReport) {
+          _aiReportKeyHeld = false;
+          stopRecording();
+        } else if (_recordingState == RecordingState.starting && _recordingMode == RecordingMode.aiReport) {
+          _aiReportKeyHeld = false;
+          _deferredStop = true;
+          _log("[aiReport] FALLING EDGE during starting → deferred stop");
+        }
+        return;
       }
     }
 

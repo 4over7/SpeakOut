@@ -654,7 +654,7 @@ int activate_app(const char *bundleId) {
   }
 }
 
-// 获取当前前台 App 信息，返回 JSON: {"bundleId":"...","name":"..."}
+// 获取当前前台 App 信息，返回 JSON: {"bundleId":"...","name":"...","windowTitle":"..."}
 // 调用者需要 free() 返回的指针
 const char *get_frontmost_app_info(void) {
   @autoreleasepool {
@@ -665,7 +665,33 @@ const char *get_frontmost_app_info(void) {
     NSString *bid = frontApp.bundleIdentifier ?: @"";
     NSString *name = frontApp.localizedName ?: @"";
 
-    NSString *json = [NSString stringWithFormat:@"{\"bundleId\":\"%@\",\"name\":\"%@\"}", bid, name];
+    // 获取前台窗口标题 (CGWindowList)
+    NSString *windowTitle = @"";
+    pid_t pid = frontApp.processIdentifier;
+    CFArrayRef windowList = CGWindowListCopyWindowInfo(
+        kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
+        kCGNullWindowID);
+    if (windowList) {
+      for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++) {
+        NSDictionary *info = (__bridge NSDictionary *)CFArrayGetValueAtIndex(windowList, i);
+        NSNumber *ownerPID = info[(__bridge NSString *)kCGWindowOwnerPID];
+        if (ownerPID && [ownerPID intValue] == pid) {
+          NSString *title = info[(__bridge NSString *)kCGWindowName];
+          if (title && title.length > 0) {
+            windowTitle = title;
+            break; // 取第一个有标题的窗口
+          }
+        }
+      }
+      CFRelease(windowList);
+    }
+
+    // 转义 JSON 中的引号和反斜杠
+    windowTitle = [windowTitle stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+    windowTitle = [windowTitle stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+    name = [name stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+
+    NSString *json = [NSString stringWithFormat:@"{\"bundleId\":\"%@\",\"name\":\"%@\",\"windowTitle\":\"%@\"}", bid, name, windowTitle];
     return strdup([json UTF8String]);
   }
 }

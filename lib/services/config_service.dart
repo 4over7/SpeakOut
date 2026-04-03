@@ -175,89 +175,89 @@ class ConfigService {
     await _prefs?.remove('correction_modifiers');
   }
 
-  // --- AI 一键调试 (AI Debug) — 多槽位 ---
+  // --- AI 一键调试 (AI Debug) — 基础按键 + 数字组合 ---
   static const int kMaxAiReportSlots = 5;
+  /// 数字键 keyCode: 1=18, 2=19, 3=20, 4=21, 5=23
+  static const List<int> kNumberKeyCodes = [18, 19, 20, 21, 23];
 
   bool get aiReportEnabled => _prefs?.getBool('ai_report_enabled') ?? false;
   Future<void> setAiReportEnabled(bool v) async => await _prefs?.setBool('ai_report_enabled', v);
 
+  // 基础按键（用户只设这一个，按住它 + 数字选槽位）
+  int get aiReportBaseKeyCode => _prefs?.getInt('ai_report_base_key_code') ?? 0;
+  String get aiReportBaseKeyName => _prefs?.getString('ai_report_base_key_name') ?? '';
+  Future<void> setAiReportBaseKey(int code, String name) async {
+    await _prefs?.setInt('ai_report_base_key_code', code);
+    await _prefs?.setString('ai_report_base_key_name', name);
+  }
+  Future<void> clearAiReportBaseKey() async {
+    await _prefs?.remove('ai_report_base_key_code');
+    await _prefs?.remove('ai_report_base_key_name');
+  }
+
+  // 槽位数量和目标
   int get aiReportSlotCount => _prefs?.getInt('ai_report_slot_count') ?? 0;
   Future<void> setAiReportSlotCount(int n) async => await _prefs?.setInt('ai_report_slot_count', n);
 
-  // --- 单槽位存取 ---
-  int aiReportSlotKeyCode(int i) => _prefs?.getInt('ai_report_s${i}_key_code') ?? 0;
-  int aiReportSlotModifiers(int i) => _prefs?.getInt('ai_report_s${i}_modifiers') ?? 0;
-  String aiReportSlotKeyName(int i) => _prefs?.getString('ai_report_s${i}_key_name') ?? '';
   String? aiReportSlotBundleId(int i) => _prefs?.getString('ai_report_s${i}_bundle_id');
   String? aiReportSlotAppName(int i) => _prefs?.getString('ai_report_s${i}_app_name');
+  String? aiReportSlotWindowTitle(int i) => _prefs?.getString('ai_report_s${i}_window_title');
 
-  Future<void> setAiReportSlotKey(int i, int code, String name, {int modifiers = 0}) async {
-    await _prefs?.setInt('ai_report_s${i}_key_code', code);
-    await _prefs?.setString('ai_report_s${i}_key_name', name);
-    await _prefs?.setInt('ai_report_s${i}_modifiers', modifiers);
-  }
-  Future<void> clearAiReportSlotKey(int i) async {
-    await _prefs?.remove('ai_report_s${i}_key_code');
-    await _prefs?.remove('ai_report_s${i}_key_name');
-    await _prefs?.remove('ai_report_s${i}_modifiers');
-  }
-  Future<void> setAiReportSlotTarget(int i, String? bundleId, String? appName) async {
+  Future<void> setAiReportSlotTarget(int i, String? bundleId, String? appName, {String? windowTitle}) async {
     if (bundleId == null) {
       await _prefs?.remove('ai_report_s${i}_bundle_id');
       await _prefs?.remove('ai_report_s${i}_app_name');
+      await _prefs?.remove('ai_report_s${i}_window_title');
     } else {
       await _prefs?.setString('ai_report_s${i}_bundle_id', bundleId);
       if (appName != null) await _prefs?.setString('ai_report_s${i}_app_name', appName);
+      if (windowTitle != null) await _prefs?.setString('ai_report_s${i}_window_title', windowTitle);
     }
   }
+
   Future<void> removeAiReportSlot(int index) async {
     final count = aiReportSlotCount;
-    // 把后面的往前移
     for (int i = index; i < count - 1; i++) {
-      final nextCode = aiReportSlotKeyCode(i + 1);
-      final nextName = aiReportSlotKeyName(i + 1);
-      final nextMods = aiReportSlotModifiers(i + 1);
       final nextBid = aiReportSlotBundleId(i + 1);
       final nextApp = aiReportSlotAppName(i + 1);
-      await setAiReportSlotKey(i, nextCode, nextName, modifiers: nextMods);
-      await setAiReportSlotTarget(i, nextBid, nextApp);
+      final nextTitle = aiReportSlotWindowTitle(i + 1);
+      await setAiReportSlotTarget(i, nextBid, nextApp, windowTitle: nextTitle);
     }
-    // 清除最后一个
-    final last = count - 1;
-    await clearAiReportSlotKey(last);
-    await setAiReportSlotTarget(last, null, null);
+    await setAiReportSlotTarget(count - 1, null, null);
     await setAiReportSlotCount(count - 1);
   }
 
-  /// 旧单槽配置迁移到槽位 0
+  /// 迁移旧配置到新的基础按键+槽位模型
   Future<void> migrateAiReportSlots() async {
-    if (aiReportSlotCount > 0) return; // 已迁移
+    // 已有 base key → 已迁移
+    if ((_prefs?.getInt('ai_report_base_key_code') ?? 0) != 0) return;
+    // 从 slot 0 key 迁移（上一版多槽位格式）
+    final s0Code = _prefs?.getInt('ai_report_s0_key_code') ?? 0;
+    if (s0Code != 0) {
+      await setAiReportBaseKey(s0Code, _prefs?.getString('ai_report_s0_key_name') ?? '');
+      // 清理旧的 per-slot key 数据
+      for (int i = 0; i < kMaxAiReportSlots; i++) {
+        await _prefs?.remove('ai_report_s${i}_key_code');
+        await _prefs?.remove('ai_report_s${i}_key_name');
+        await _prefs?.remove('ai_report_s${i}_modifiers');
+      }
+      return;
+    }
+    // 从最初的单键格式迁移
     final oldCode = _prefs?.getInt('ai_report_key_code') ?? 0;
-    if (oldCode == 0) return; // 没有旧配置
-    final oldName = _prefs?.getString('ai_report_key_name') ?? '';
-    final oldMods = _prefs?.getInt('ai_report_modifiers') ?? 0;
+    if (oldCode == 0) return;
+    await setAiReportBaseKey(oldCode, _prefs?.getString('ai_report_key_name') ?? '');
     final oldBid = _prefs?.getString('ai_report_target_bundle_id');
     final oldApp = _prefs?.getString('ai_report_target_app_name');
-    await setAiReportSlotKey(0, oldCode, oldName, modifiers: oldMods);
-    await setAiReportSlotTarget(0, oldBid, oldApp);
-    await setAiReportSlotCount(1);
-    // 清除旧键
+    if (oldBid != null) {
+      await setAiReportSlotTarget(0, oldBid, oldApp);
+      await setAiReportSlotCount(1);
+    }
     await _prefs?.remove('ai_report_key_code');
     await _prefs?.remove('ai_report_key_name');
     await _prefs?.remove('ai_report_modifiers');
     await _prefs?.remove('ai_report_target_bundle_id');
     await _prefs?.remove('ai_report_target_app_name');
-  }
-
-  // --- 兼容性 getter（供冲突检测等使用）---
-  /// 所有已配置的 AI 一键调试快捷键 code 列表
-  List<int> get aiReportAllKeyCodes {
-    final codes = <int>[];
-    for (int i = 0; i < aiReportSlotCount; i++) {
-      final c = aiReportSlotKeyCode(i);
-      if (c != 0) codes.add(c);
-    }
-    return codes;
   }
 
   // --- 即时翻译 (Quick Translate) ---
