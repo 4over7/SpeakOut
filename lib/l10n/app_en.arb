@@ -78,7 +78,7 @@
   "modelParaformerDesc": "High accuracy Zh/En streaming model with lookahead. ~1GB",
   "change": "Change",
   "tabOrganize": "AI Organize",
-  "organizeEnabled": "Enable AI Organize",
+  "organizeEnabled": "AI Organize",
   "organizeHotkey": "Organize Hotkey",
   "organizeHotkeyHint": "Select text then press this hotkey",
   "organizePrompt": "Organize Instructions",

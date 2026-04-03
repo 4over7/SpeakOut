@@ -231,7 +231,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabOrganize => 'AI Organize';
 
   @override
-  String get organizeEnabled => 'Enable AI Organize';
+  String get organizeEnabled => 'AI Organize';
 
   @override
   String get organizeHotkey => 'Organize Hotkey';

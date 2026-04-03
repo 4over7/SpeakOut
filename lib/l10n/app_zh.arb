@@ -68,7 +68,7 @@
   "modelParaformerDesc": "高精度前瞻流式模型 (中英). ~1GB",
   "change": "更改",
   "tabOrganize": "AI 梳理",
-  "organizeEnabled": "启用 AI 梳理",
+  "organizeEnabled": "AI 梳理",
   "organizeHotkey": "梳理快捷键",
   "organizeHotkeyHint": "选中文字后按此快捷键触发",
   "organizePrompt": "梳理指令",

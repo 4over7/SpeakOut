@@ -515,7 +515,7 @@ abstract class AppLocalizations {
   /// No description provided for @organizeEnabled.
   ///
   /// In en, this message translates to:
-  /// **'Enable AI Organize'**
+  /// **'AI Organize'**
   String get organizeEnabled;
 
   /// No description provided for @organizeHotkey.

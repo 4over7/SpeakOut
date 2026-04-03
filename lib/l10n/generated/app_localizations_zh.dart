@@ -223,7 +223,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabOrganize => 'AI 梳理';
 
   @override
-  String get organizeEnabled => '启用 AI 梳理';
+  String get organizeEnabled => 'AI 梳理';
 
   @override
   String get organizeHotkey => '梳理快捷键';

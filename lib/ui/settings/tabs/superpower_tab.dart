@@ -578,7 +578,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ),
         ] else
           Text(
-            '语音记录闪念灵感，自动保存到指定目录。',
+            '随时随地语音记录灵感，自动保存为 Markdown 日记。',
             style: AppTheme.caption(context),
           ),
       ],
@@ -884,7 +884,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ),
         ] else
           Text(
-            '选中修正后的文字，按快捷键提交。自动学习纠正。',
+            '选中修正后的文字，一键提交纠错。ASR 自动学习你的用词习惯。',
             style: AppTheme.caption(context),
           ),
       ],
@@ -957,20 +957,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             ),
           ),
           const SizedBox(height: 6),
-          Row(
-            children: [
-              MacosIcon(CupertinoIcons.info_circle,
-                  size: 11, color: MacosColors.systemGrayColor),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  '按住快捷键 → 截屏+说话 → 松开后发送到绑定窗口',
-                  style: AppTheme.caption(context).copyWith(fontSize: 10),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+          Text(
+            '为 AI Coding 而生 — 按住说话，截屏+语音自动发送到绑定窗口',
+            style: AppTheme.caption(context).copyWith(fontSize: 10),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ] else
           Text(
@@ -1043,6 +1034,36 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   }
 
   // ---------------------------------------------------------------------------
+  // Hotkey overview helpers
+  // ---------------------------------------------------------------------------
+
+  Widget _hotkeyOverviewItem((String, String, bool) entry) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            entry.$1,
+            style: AppTheme.caption(context).copyWith(fontSize: 11),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: MacosColors.systemGrayColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Text(
+            entry.$2,
+            style: AppTheme.mono(context).copyWith(fontSize: 10),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Hotkey overview (full-width, below grid)
   // ---------------------------------------------------------------------------
 
@@ -1058,44 +1079,43 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ('AI 一键调试', config.aiReportKeyName, config.aiReportEnabled),
     ];
 
-    // 只显示已启用的快捷键，关闭的不占空间
     final activeEntries = entries.where((e) => e.$3 && e.$2.isNotEmpty).toList();
     if (activeEntries.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: MacosColors.systemGrayColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: MacosColors.systemGrayColor.withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MacosIcon(CupertinoIcons.keyboard, size: 12, color: MacosColors.systemGrayColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              children: activeEntries.map((e) => Row(
-                mainAxisSize: MainAxisSize.min,
+          Row(
+            children: [
+              MacosIcon(CupertinoIcons.keyboard, size: 11, color: MacosColors.systemGrayColor),
+              const SizedBox(width: 6),
+              Text('已启用的快捷键', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // 双列网格
+          for (var i = 0; i < activeEntries.length; i += 2)
+            Padding(
+              padding: EdgeInsets.only(top: i > 0 ? 4 : 0),
+              child: Row(
                 children: [
-                  Text(e.$1, style: AppTheme.caption(context).copyWith(fontSize: 11)),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: MacosColors.systemGrayColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Text(
-                      e.$2,
-                      style: AppTheme.mono(context).copyWith(fontSize: 10),
-                    ),
+                  Expanded(child: _hotkeyOverviewItem(activeEntries[i])),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: i + 1 < activeEntries.length
+                        ? _hotkeyOverviewItem(activeEntries[i + 1])
+                        : const SizedBox.shrink(),
                   ),
                 ],
-              )).toList(),
+              ),
             ),
-          ),
         ],
       ),
     );
