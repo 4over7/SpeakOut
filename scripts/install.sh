@@ -41,11 +41,11 @@ if ! security find-identity -v -p codesigning | grep -q "$SIGN_IDENTITY"; then
     SIGN_IDENTITY="-"
 fi
 
-# Check if running and kill
+# 热替换：不杀进程，直接替换文件
+# Unix 特性：运行中的进程持有 vnode 引用，rm 只删除目录项，旧进程不受影响
+# 用户关闭后下次打开就是新版本
 if pgrep -x "$APP_NAME" > /dev/null; then
-    echo "⚠️  $APP_NAME is running. Quitting it now..."
-    killall "$APP_NAME" || true
-    sleep 2 # Wait for it to close
+    echo "ℹ️  $APP_NAME 正在运行，热替换中（不中断当前使用）..."
 fi
 
 # Inject Native Lib (Fix White Screen Crash)
