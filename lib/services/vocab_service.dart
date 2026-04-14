@@ -107,7 +107,13 @@ class VocabService {
 
   Future<void> addUserEntry(VocabEntry entry) async {
     final current = userEntries;
-    current.add(entry);
+    // Dedup: if an entry with the same 'wrong' text exists, update it
+    final existingIdx = current.indexWhere((e) => e.wrong == entry.wrong);
+    if (existingIdx >= 0) {
+      current[existingIdx] = entry;
+    } else {
+      current.add(entry);
+    }
     await _saveUserEntries(current);
   }
 

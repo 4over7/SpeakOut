@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
@@ -9,8 +10,99 @@ import '../../engine/core_engine.dart';
 import '../theme.dart';
 import '../widgets/settings_widgets.dart';
 
+/// 捕获一个热键按键（支持组合键）
+///
+/// 核心策略：由于按组合键时用户总是先按修饰键再按主键，
+/// 直接捕获第一个 keyDown 事件会错把修饰键单独记成热键。
+///
+/// 解决：
+/// - 第一个事件是**非修饰键**（例如 K、F1、Space）→ 立即提交（可能带 modifier flag）
+/// - 第一个事件是**修饰键**（Cmd/Option/Shift/Ctrl）→ 延迟 400ms；
+///   - 400ms 内有后续非修饰键 → 提交后者（组合键）
+///   - 400ms 内无后续 → 提交这个裸修饰键
+///
+/// Fn（keyCode 63）不在 `ownModifierMask` 中，视为普通键立即提交。
+class HotkeyCapturer {
+  final Stream<(int, int)> keyStream;
+  final void Function(int keyCode, int modifierFlags) onCaptured;
+  final VoidCallback onTimeout;
+  final Duration timeout;
+  final Duration modifierDebounce;
+
+  StreamSubscription<(int, int)>? _sub;
+  Timer? _debounceTimer;
+  Timer? _timeoutTimer;
+  (int, int)? _pendingModifier;
+  bool _completed = false;
+
+  HotkeyCapturer({
+    required this.keyStream,
+    required this.onCaptured,
+    required this.onTimeout,
+    this.timeout = const Duration(seconds: 15),
+    this.modifierDebounce = const Duration(milliseconds: 400),
+  });
+
+  void start() {
+    _sub = keyStream.listen(_handle);
+    _timeoutTimer = Timer(timeout, () {
+      if (!_completed) {
+        _completed = true;
+        _cleanup();
+        onTimeout();
+      }
+    });
+  }
+
+  void _handle((int, int) event) {
+    if (_completed) return;
+    final (keyCode, mods) = event;
+    final isModifier = CoreEngine.ownModifierMask(keyCode) != 0;
+
+    if (!isModifier) {
+      // 非修饰键 → 立即提交（即使之前有 pending modifier，非修饰键的事件已经包含正确的 modifier flags）
+      _complete(keyCode, mods);
+      return;
+    }
+
+    // 修饰键 → 暂存，等待后续非修饰键
+    _pendingModifier = (keyCode, mods);
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(modifierDebounce, () {
+      if (!_completed && _pendingModifier != null) {
+        final (kc, mf) = _pendingModifier!;
+        _complete(kc, mf);
+      }
+    });
+  }
+
+  void _complete(int keyCode, int mods) {
+    _completed = true;
+    _cleanup();
+    onCaptured(keyCode, mods);
+  }
+
+  void _cleanup() {
+    _sub?.cancel();
+    _sub = null;
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _timeoutTimer?.cancel();
+    _timeoutTimer = null;
+    _pendingModifier = null;
+  }
+
+  /// 外部主动取消（例如用户点了别处）
+  void cancel() {
+    if (_completed) return;
+    _completed = true;
+    _cleanup();
+  }
+}
+
 /// Shared key code → display name mapping
 String mapKeyCodeToString(int keyCode) {
+  // Modifier keys
   if (keyCode == 63) return "FN";
   if (keyCode == 58) return "Left Option";
   if (keyCode == 61) return "Right Option";
@@ -20,11 +112,50 @@ String mapKeyCodeToString(int keyCode) {
   if (keyCode == 60) return "Right Shift";
   if (keyCode == 59) return "Left Control";
   if (keyCode == 62) return "Right Control";
+  // Whitespace / control
   if (keyCode == 49) return "Space";
   if (keyCode == 36) return "Return";
   if (keyCode == 48) return "Tab";
   if (keyCode == 51) return "Delete";
   if (keyCode == 53) return "Escape";
+  if (keyCode == 117) return "Forward Delete";
+  // Arrow keys
+  if (keyCode == 123) return "←";
+  if (keyCode == 124) return "→";
+  if (keyCode == 125) return "↓";
+  if (keyCode == 126) return "↑";
+  // Navigation
+  if (keyCode == 114) return "Help";
+  if (keyCode == 115) return "Home";
+  if (keyCode == 116) return "Page Up";
+  if (keyCode == 119) return "End";
+  if (keyCode == 121) return "Page Down";
+  // Function keys F1-F20
+  const fnKeys = {122:'F1', 120:'F2', 99:'F3', 118:'F4', 96:'F5', 97:'F6',
+    98:'F7', 100:'F8', 101:'F9', 109:'F10', 103:'F11', 111:'F12',
+    105:'F13', 107:'F14', 113:'F15', 106:'F16', 64:'F17', 79:'F18',
+    80:'F19', 90:'F20'};
+  if (fnKeys.containsKey(keyCode)) return fnKeys[keyCode]!;
+  // Letters (US QWERTY layout)
+  const letters = {0:'A', 11:'B', 8:'C', 2:'D', 14:'E', 3:'F', 5:'G', 4:'H',
+    34:'I', 38:'J', 40:'K', 37:'L', 46:'M', 45:'N', 31:'O', 35:'P',
+    12:'Q', 15:'R', 1:'S', 17:'T', 32:'U', 9:'V', 13:'W', 7:'X', 16:'Y', 6:'Z'};
+  if (letters.containsKey(keyCode)) return letters[keyCode]!;
+  // Digits (top row, not numpad)
+  const digits = {29:'0', 18:'1', 19:'2', 20:'3', 21:'4', 23:'5',
+    22:'6', 26:'7', 28:'8', 25:'9'};
+  if (digits.containsKey(keyCode)) return digits[keyCode]!;
+  // Numpad
+  const numpad = {82:'Keypad 0', 83:'Keypad 1', 84:'Keypad 2', 85:'Keypad 3',
+    86:'Keypad 4', 87:'Keypad 5', 88:'Keypad 6', 89:'Keypad 7',
+    91:'Keypad 8', 92:'Keypad 9', 65:'Keypad .', 67:'Keypad *',
+    69:'Keypad +', 71:'Keypad Clear', 75:'Keypad /', 76:'Keypad Enter',
+    78:'Keypad -', 81:'Keypad ='};
+  if (numpad.containsKey(keyCode)) return numpad[keyCode]!;
+  // Punctuation
+  const punct = {27:'-', 24:'=', 33:'[', 30:']', 41:';', 39:'\'',
+    43:',', 47:'.', 44:'/', 42:'\\', 50:'`'};
+  if (punct.containsKey(keyCode)) return punct[keyCode]!;
   return "Key $keyCode";
 }
 
@@ -49,34 +180,120 @@ int stripOwnModifier(int keyCode, int flags) {
   return flags & ~(ownMasks[keyCode] ?? 0);
 }
 
-/// Collect all active hotkeys (from enabled features only) as {keyCode: featureName}
-Map<int, String> getActiveHotkeys(BuildContext context, {String? excludeFeature}) {
+/// 统一的热键徽章：点击进入捕获态，未设置/已捕获时无删除按钮，
+/// 已设置时旁边带一个小 × 按钮可清除当前键
+///
+/// 用户场景：忘记自己设的是什么键；某个功能暂时不想用某个热键
+Widget hotkeyBadge(
+  BuildContext context,
+  String keyName, {
+  bool isCapturing = false,
+  VoidCallback? onTap,
+  VoidCallback? onClear,
+}) {
+  final loc = AppLocalizations.of(context)!;
+  final display = isCapturing
+      ? loc.pressAnyKey
+      : (keyName.isEmpty ? loc.notSet : keyName);
+  final badge = GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isCapturing
+            ? AppTheme.getAccent(context)
+            : MacosColors.systemGrayColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        display,
+        style: AppTheme.mono(context).copyWith(
+          fontSize: 11,
+          color: isCapturing
+              ? Colors.white
+              : (keyName.isEmpty ? MacosColors.systemGrayColor : null),
+        ),
+      ),
+    ),
+  );
+  // 只在已设置且提供了 onClear 时显示删除按钮
+  if (onClear != null && keyName.isNotEmpty && !isCapturing) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        badge,
+        const SizedBox(width: 4),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: onClear,
+            child: Tooltip(
+              message: '清除快捷键',
+              child: Icon(CupertinoIcons.clear_circled,
+                  size: 14, color: MacosColors.systemGrayColor),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  return badge;
+}
+
+/// Hotkey identity: (keyCode, modifiers)
+typedef HotkeyId = (int keyCode, int modifiers);
+
+/// Check if a new hotkey conflicts with any active hotkey.
+/// Returns the conflicting feature name, or null if no conflict.
+///
+/// Mirrors runtime `_modifiersMatch` semantics (exact match for non-zero modifiers):
+/// - requiredFlags == 0 (bare key) matches ANY modifier combo at runtime,
+///   so bare keys conflict with everything on the same keyCode.
+/// - requiredFlags != 0 requires EXACT modifier match at runtime,
+///   so Cmd+K and Option+K are independent; Cmd+K and Cmd+Shift+K are also independent.
+String? findHotkeyConflict(Map<HotkeyId, String> activeKeys, HotkeyId candidate) {
+  for (final entry in activeKeys.entries) {
+    final (existingKey, existingMods) = entry.key;
+    final (candidateKey, candidateMods) = candidate;
+    if (existingKey != candidateKey) continue;
+    // Same keyCode — check modifier overlap per runtime semantics:
+    // Bare key (0) overlaps with everything; non-zero only conflicts on exact match.
+    if (existingMods == candidateMods || existingMods == 0 || candidateMods == 0) {
+      return entry.value;
+    }
+  }
+  return null;
+}
+
+/// Collect all active hotkeys as {(keyCode, modifiers): featureName}
+Map<HotkeyId, String> getActiveHotkeys(BuildContext context, {String? excludeFeature}) {
   final config = ConfigService();
   final loc = AppLocalizations.of(context)!;
-  final map = <int, String>{};
+  final map = <HotkeyId, String>{};
   if (config.pttKeyCode != 0 && excludeFeature != 'ptt') {
-    map[config.pttKeyCode] = loc.pttMode;
+    map[(config.pttKeyCode, config.pttModifiers)] = loc.pttMode;
   }
   if (config.toggleInputEnabled && config.toggleInputKeyCode != 0 && excludeFeature != 'toggleInput') {
-    map[config.toggleInputKeyCode] = loc.toggleModeTip;
+    map[(config.toggleInputKeyCode, config.toggleInputModifiers)] = loc.toggleModeTip;
   }
   if (config.diaryEnabled && config.diaryKeyCode != 0 && excludeFeature != 'diary') {
-    map[config.diaryKeyCode] = loc.diaryMode;
+    map[(config.diaryKeyCode, config.diaryModifiers)] = loc.diaryMode;
   }
-  if (config.toggleDiaryEnabled && config.toggleDiaryKeyCode != 0 && excludeFeature != 'toggleDiary') {
-    map[config.toggleDiaryKeyCode] = loc.diaryMode;
+  // toggleDiary 仅在整个闪念笔记功能启用时才生效（与运行时 core_engine 逻辑对齐）
+  if (config.diaryEnabled && config.toggleDiaryEnabled && config.toggleDiaryKeyCode != 0 && excludeFeature != 'toggleDiary') {
+    map[(config.toggleDiaryKeyCode, config.toggleDiaryModifiers)] = loc.diaryMode;
   }
   if (config.organizeEnabled && config.organizeKeyCode != 0 && excludeFeature != 'organize') {
-    map[config.organizeKeyCode] = loc.organizeEnabled;
+    map[(config.organizeKeyCode, config.organizeModifiers)] = loc.organizeEnabled;
   }
   if (config.translateEnabled && config.translateKeyCode != 0 && excludeFeature != 'translate') {
-    map[config.translateKeyCode] = loc.quickTranslate;
+    map[(config.translateKeyCode, config.translateModifiers)] = loc.quickTranslate;
   }
   if (config.correctionEnabled && config.correctionKeyCode != 0 && excludeFeature != 'correction') {
-    map[config.correctionKeyCode] = '纠错反馈';
+    map[(config.correctionKeyCode, config.correctionModifiers)] = '纠错反馈';
   }
   if (config.aiReportEnabled && config.aiReportBaseKeyCode != 0 && excludeFeature != 'aiReport') {
-    map[config.aiReportBaseKeyCode] = 'AI 一键调试';
+    map[(config.aiReportBaseKeyCode, 0)] = 'AI 一键调试';
   }
   return map;
 }

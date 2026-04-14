@@ -341,7 +341,7 @@ class _AboutTabState extends State<AboutTab> {
                       );
                       if (path != null) {
                         final result = await ConfigBackupService.exportToFile(path);
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(result.success ? '已导出：${result.message}' : '导出失败：${result.error}'),
                             behavior: SnackBarBehavior.floating,
@@ -368,7 +368,7 @@ class _AboutTabState extends State<AboutTab> {
                       );
                       if (result != null && result.files.single.path != null) {
                         final importResult = await ConfigBackupService.importFromFile(result.files.single.path!);
-                        if (mounted) {
+                        if (context.mounted) {
                           setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(importResult.success ? '${importResult.message}，配置已生效' : '导入失败：${importResult.error}'),

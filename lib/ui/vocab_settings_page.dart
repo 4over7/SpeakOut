@@ -343,14 +343,4 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
     );
   }
 
-  Widget _buildPackTile(String id, String label, IconData icon) {
-    return SettingsTile(
-      label: label,
-      icon: icon,
-      child: MacosSwitch(
-        value: _packEnabled[id] ?? false,
-        onChanged: (v) => _setPackEnabled(id, v),
-      ),
-    );
-  }
 }

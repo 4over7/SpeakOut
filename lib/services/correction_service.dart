@@ -155,7 +155,7 @@ class CorrectionService {
     }
   }
 
-  /// 导入纠错数据（追加到现有数据）
+  /// 导入纠错数据（追加到现有数据，跳过已存在的记录）
   Future<int> importData(String srcPath) async {
     try {
       final srcFile = File(srcPath);
@@ -168,12 +168,28 @@ class CorrectionService {
       final destDir = destFile.parent;
       if (!destDir.existsSync()) destDir.createSync(recursive: true);
 
+      // Load existing timestamps to dedup
+      final existingTimestamps = <String>{};
+      if (destFile.existsSync()) {
+        for (final existingLine in destFile.readAsLinesSync()) {
+          try {
+            final ej = jsonDecode(existingLine) as Map<String, dynamic>;
+            final ts = ej['timestamp'] as String?;
+            if (ts != null) existingTimestamps.add(ts);
+          } catch (_) {}
+        }
+      }
+
       final sink = destFile.openWrite(mode: FileMode.append);
       for (final line in lines) {
         try {
           // 验证 JSON 合法性
           final json = jsonDecode(line) as Map<String, dynamic>;
+          // Skip if record with same timestamp already exists
+          final ts = json['timestamp'] as String?;
+          if (ts != null && existingTimestamps.contains(ts)) continue;
           sink.writeln(jsonEncode(json));
+          if (ts != null) existingTimestamps.add(ts);
           imported++;
 
           // 同时导入词汇对到 VocabService

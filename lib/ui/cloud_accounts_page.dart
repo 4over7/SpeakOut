@@ -74,13 +74,13 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
               Text(loc.cloudAccountsTitle, style: AppTheme.heading(context)),
               const Spacer(),
               GestureDetector(
-                onTap: () => _importAccounts(context),
+                onTap: () => _importAccounts(),
                 child: Text('导入', style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
               ),
               if (_accounts.isNotEmpty) ...[
                 const SizedBox(width: 12),
                 GestureDetector(
-                  onTap: () => _exportAccounts(context),
+                  onTap: () => _exportAccounts(),
                   child: Text('导出', style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
                 ),
               ],
@@ -112,7 +112,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     );
   }
 
-  Future<void> _importAccounts(BuildContext context) async {
+  Future<void> _importAccounts() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -136,7 +136,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     );
   }
 
-  Future<void> _exportAccounts(BuildContext context) async {
+  Future<void> _exportAccounts() async {
     final path = await FilePicker.platform.saveFile(
       dialogTitle: '导出云服务账户',
       fileName: 'speakout_cloud_accounts.json',
@@ -254,32 +254,6 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     );
   }
 
-  void _confirmDelete(BuildContext context, CloudAccount account, AppLocalizations loc) {
-    showMacosAlertDialog(
-      context: context,
-      builder: (_) => MacosAlertDialog(
-        appIcon: const MacosIcon(CupertinoIcons.trash, size: 48, color: MacosColors.systemRedColor),
-        title: Text(loc.cloudAccountDeleteConfirm),
-        message: Text(account.displayName),
-        primaryButton: PushButton(
-          controlSize: ControlSize.large,
-          color: MacosColors.systemRedColor,
-          onPressed: () async {
-            Navigator.of(context).pop();
-            await CloudAccountService().removeAccount(account.id);
-            _refreshAccounts();
-          },
-          child: Text(loc.cloudAccountDelete),
-        ),
-        secondaryButton: PushButton(
-          controlSize: ControlSize.large,
-          secondary: true,
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(loc.cancel),
-        ),
-      ),
-    );
-  }
 
   void _showAddEditDialog(BuildContext context, AppLocalizations loc, {CloudAccount? existingAccount}) {
     final isEdit = existingAccount != null;

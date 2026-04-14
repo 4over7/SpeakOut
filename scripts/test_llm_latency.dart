@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print, dangling_library_doc_comments, prefer_conditional_assignment
+
 /// LLM 延迟测试脚本
 ///
 /// 对所有已配置的 LLM 服务商发送相同的短文本纠错请求，

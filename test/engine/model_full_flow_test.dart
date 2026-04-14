@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -56,12 +58,10 @@ void main() {
         expect(downloaded, isFalse, reason: '初始应为未下载');
 
         // 2. 下载 + 解压
-        String? lastStatus;
         double lastProgress = 0;
         final modelPath = await manager.downloadAndExtractModel(
           model.id,
           onStatus: (s) {
-            lastStatus = s;
             print('  状态: $s');
           },
           onProgress: (p) {
@@ -116,17 +116,15 @@ void main() {
       onProgress: (p) {},
     );
 
-    expect(path, isNotNull, reason: '标点模型应下载成功');
-    if (path != null) {
-      final dir = Directory(path);
-      expect(dir.existsSync(), isTrue);
-      final onnxFiles = dir.listSync(recursive: true)
-          .where((f) => f.path.endsWith('.onnx'))
-          .toList();
-      expect(onnxFiles, isNotEmpty, reason: '标点模型应包含 .onnx 文件');
-      print('  ✅ 通过 (onnx文件: ${onnxFiles.length})');
-      dir.deleteSync(recursive: true);
-    }
+    expect(path, isNotEmpty, reason: '标点模型应下载成功');
+    final dir = Directory(path);
+    expect(dir.existsSync(), isTrue);
+    final onnxFiles = dir.listSync(recursive: true)
+        .where((f) => f.path.endsWith('.onnx'))
+        .toList();
+    expect(onnxFiles, isNotEmpty, reason: '标点模型应包含 .onnx 文件');
+    print('  ✅ 通过 (onnx文件: ${onnxFiles.length})');
+    dir.deleteSync(recursive: true);
   }, timeout: const Timeout(Duration(minutes: 10)));
 }
 

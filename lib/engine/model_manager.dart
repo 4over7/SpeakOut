@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:speakout/config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
-import 'package:speakout/config/distribution.dart';
 
 /// 模型架构分类，用于确定 Phase 2 置信度支持能力
 enum ModelArch {

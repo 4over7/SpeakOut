@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,7 +18,7 @@ void main() {
   });
 
   /// 用 Dart archive 包创建归档文件
-  File _createArchive(String format, Map<String, List<int>> files) {
+  File createArchive(String format, Map<String, List<int>> files) {
     final archive = Archive();
     for (final entry in files.entries) {
       archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
@@ -41,10 +40,10 @@ void main() {
   }
 
   /// 快捷方式: 文本内容 → bytes Map
-  Map<String, List<int>> _textFiles(Map<String, String> files) =>
+  Map<String, List<int>> textFiles(Map<String, String> files) =>
       files.map((k, v) => MapEntry(k, v.codeUnits));
 
-  void _verifyExtracted(String destDir, Map<String, String> expected) {
+  void verifyExtracted(String destDir, Map<String, String> expected) {
     for (final entry in expected.entries) {
       final f = File('$destDir/${entry.key}');
       expect(f.existsSync(), isTrue, reason: '${entry.key} 应存在');
@@ -60,11 +59,11 @@ void main() {
         'model/vocab.txt': 'hello\nworld\ntest\n',
       };
 
-      final archive = _createArchive('.tar.bz2', _textFiles(testFiles));
+      final archive = createArchive('.tar.bz2', textFiles(testFiles));
       final destDir = '${tmpDir.path}/out_bz2';
 
       await extractFileToDisk(archive.path, destDir);
-      _verifyExtracted(destDir, testFiles);
+      verifyExtracted(destDir, testFiles);
     });
 
     test('.tar.gz 解压嵌套目录', () async {
@@ -73,11 +72,11 @@ void main() {
         'data/sub/nested.txt': 'Nested content.',
       };
 
-      final archive = _createArchive('.tar.gz', _textFiles(testFiles));
+      final archive = createArchive('.tar.gz', textFiles(testFiles));
       final destDir = '${tmpDir.path}/out_gz';
 
       await extractFileToDisk(archive.path, destDir);
-      _verifyExtracted(destDir, testFiles);
+      verifyExtracted(destDir, testFiles);
     });
 
     test('.zip 解压', () async {
@@ -86,16 +85,16 @@ void main() {
         'dir/file_b.txt': 'content_b',
       };
 
-      final archive = _createArchive('.zip', _textFiles(testFiles));
+      final archive = createArchive('.zip', textFiles(testFiles));
       final destDir = '${tmpDir.path}/out_zip';
 
       await extractFileToDisk(archive.path, destDir);
-      _verifyExtracted(destDir, testFiles);
+      verifyExtracted(destDir, testFiles);
     });
 
     test('10MB tar.bz2 解压不崩溃', () async {
       final bigContent = 'A' * (10 * 1024 * 1024);
-      final archive = _createArchive('.tar.bz2', {
+      final archive = createArchive('.tar.bz2', {
         'large/weights.bin': bigContent.codeUnits,
       });
       final destDir = '${tmpDir.path}/out_large';

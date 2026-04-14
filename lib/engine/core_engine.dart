@@ -258,12 +258,21 @@ class CoreEngine {
       return;
     }
 
-    // 1. Check Native Perms
+    // 1. Check Native Perms — diagnose each permission separately
     _log("Checking permissions...");
-    bool trusted = _nativeInput?.checkPermission() ?? false;
-    _statusController.add("Accessibility Trusted: $trusted");
-    if (!trusted) {
-      _statusController.add("Error: Please grant Accessibility permissions in System Settings.");
+    final hasInputMonitoring = _nativeInput?.checkInputMonitoringPermission() ?? false;
+    final hasAccessibility = _nativeInput?.checkAccessibilityPermission() ?? false;
+    _log("Permissions: InputMonitoring=$hasInputMonitoring, Accessibility=$hasAccessibility");
+    if (!hasInputMonitoring) {
+      // Without Input Monitoring, CGEventTapCreate will fail. Don't attempt startup.
+      if (!hasAccessibility) {
+        _statusController.add("Error: 需要「输入监控」和「辅助功能」权限，请在系统设置中授权。");
+      } else {
+        _statusController.add("Error: 需要「输入监控」权限（用于监听快捷键），请在系统设置 → 隐私与安全性 → 输入监控中授权。");
+      }
+      _isListenerRunning = false;
+      _log("Init aborted: missing Input Monitoring permission.");
+      return;
     }
     
     // Warm up Audio Config
@@ -309,10 +318,23 @@ class CoreEngine {
           _isListenerRunning = true;
           _statusController.add("Keyboard Listener Started.");
           _log("Listener start success.");
-          if (_nativeInput.checkPermission()) _statusController.add("Accessibility Trusted: true");
+          // Listener running = Input Monitoring OK. Now verify Accessibility separately.
+          final ax = _nativeInput.checkAccessibilityPermission();
+          if (ax) {
+            _statusController.add("Accessibility Trusted: true");
+          } else {
+            _statusController.add("Warning: 键盘监听已启动，但缺少「辅助功能」权限 — 文本注入将不可用。");
+          }
         } else {
-           _statusController.add("Failed to start Keyboard Listener.");
-           _log("Listener start FAILED.");
+           // Listener failed — re-diagnose which permission is missing
+           final im = _nativeInput.checkInputMonitoringPermission();
+           final ax = _nativeInput.checkAccessibilityPermission();
+           _log("Listener start FAILED. InputMonitoring=$im, Accessibility=$ax");
+           if (!im) {
+             _statusController.add("Error: 键盘监听启动失败 — 缺少「输入监控」权限。");
+           } else {
+             _statusController.add("Error: 键盘监听启动失败 — 请检查系统权限设置。");
+           }
            _isListenerRunning = false;
         }
       } else {
@@ -526,8 +548,9 @@ class CoreEngine {
   static const int kModLCtrl = 0x0001;
   static const int kModRCtrl = 0x2000;
 
-  /// Mask for the trigger key itself (should be stripped before comparing required modifiers)
-  static int _ownModifierMask(int keyCode) {
+  /// Mask for the trigger key itself (should be stripped before comparing required modifiers).
+  /// Public for testing — no instance state.
+  static int ownModifierMask(int keyCode) {
     switch (keyCode) {
       case 58: return kModLAlt;
       case 61: return kModRAlt;
@@ -543,11 +566,20 @@ class CoreEngine {
 
   /// Check if the current modifier flags satisfy the required combo modifiers.
   /// Strips the trigger key's own modifier bit before comparison.
-  bool _modifiersMatch(int keyCode, int currentFlags, int requiredFlags) {
-    if (requiredFlags == 0) return true; // No combo required
-    final stripped = currentFlags & ~_ownModifierMask(keyCode);
-    return (stripped & requiredFlags) == requiredFlags;
+  /// Public static for testing — no instance state.
+  ///
+  /// Semantics (must match settings-side `findHotkeyConflict`):
+  /// - requiredFlags == 0 (bare key): matches any modifier combo
+  /// - requiredFlags != 0 (combo key): exact match required (Cmd+K does NOT fire on Cmd+Shift+K)
+  static bool modifiersMatch(int keyCode, int currentFlags, int requiredFlags) {
+    if (requiredFlags == 0) return true;
+    final stripped = currentFlags & ~ownModifierMask(keyCode);
+    return stripped == requiredFlags;
   }
+
+  // Instance wrapper for internal use
+  bool _modifiersMatch(int keyCode, int currentFlags, int requiredFlags) =>
+      modifiersMatch(keyCode, currentFlags, requiredFlags);
 
   // Quick translate override: non-null → this recording translates to the specified language
   String? _translateOverride;
@@ -561,7 +593,6 @@ class CoreEngine {
   bool _pttKeyHeld = false;
   bool _diaryKeyHeld = false;
   bool _translateKeyHeld = false;
-  bool _aiReportKeyHeld = false;
   bool _deferredStop = false;
   int? _activeHotkeyCode; // The key that started the current recording (for watchdog)
 
@@ -656,7 +687,6 @@ class CoreEngine {
       // 基础按键按下
       if (isDown && keyCode == aiBaseCode && _recordingState == RecordingState.idle && !_aiReportBaseDown) {
         _aiReportBaseDown = true;
-        _aiReportKeyHeld = true;
         if (slotCount <= 1) {
           // 单槽位: 直接启动
           _aiReportActiveSlot = 0;
@@ -689,10 +719,8 @@ class CoreEngine {
         _aiReportBaseDown = false;
         _aiReportSlotTimer?.cancel();
         if (_recordingState == RecordingState.recording && _recordingMode == RecordingMode.aiReport) {
-          _aiReportKeyHeld = false;
           stopRecording();
         } else if (_recordingState == RecordingState.starting && _recordingMode == RecordingMode.aiReport) {
-          _aiReportKeyHeld = false;
           _deferredStop = true;
           _log("[aiReport] FALLING EDGE during starting → deferred stop");
         }
@@ -999,7 +1027,7 @@ class CoreEngine {
     // 2.5 AI 报告: 截屏 + 采集前台 App 信息（在录音开始前，保留"犯罪现场"）
     if (mode == RecordingMode.aiReport) {
       try {
-        _aiReportFrontAppInfo = _nativeInput?.getFrontmostAppInfo();
+        _aiReportFrontAppInfo = _nativeInput.getFrontmostAppInfo();
         _aiReportScreenshotPath = await _captureScreenshot();
         _log("[AIReport] Screenshot: $_aiReportScreenshotPath, FrontApp: $_aiReportFrontAppInfo");
       } catch (e) {
@@ -1287,6 +1315,56 @@ class CoreEngine {
         _audioStarted = false;
       } catch (e) { _log("Stop Audio Error: $e"); }
     }
+  }
+
+  /// 用户主动取消录音：关闭音频硬件、丢弃 ASR 结果、不做注入或保存
+  ///
+  /// 与 stopRecording() 区别：stopRecording 会处理音频并注入文本；
+  /// cancelRecording 直接丢弃，适合用户在主页点"取消"按钮。
+  Future<void> cancelRecording() async {
+    if (_recordingState != RecordingState.recording &&
+        _recordingState != RecordingState.starting) {
+      return;
+    }
+    _log("[Cancel] User requested cancel (state=$_recordingState)");
+
+    // 立即 UI 切回
+    _isToggleMode = false;
+    _toggleMaxTimer?.cancel();
+    _toggleMaxTimer = null;
+    _recordingState = RecordingState.stopping;
+    _recordingController.add(false);
+    _overlay.hide();
+    _statusController.add("已取消");
+
+    // 关音频硬件
+    try {
+      await _stopAudioSafely();
+    } catch (e) {
+      _log("[Cancel] Audio stop error: $e");
+    }
+
+    // 停 ASR（丢弃结果）
+    if (_asrProvider != null) {
+      try {
+        await _asrProvider!.stop().timeout(AppConstants.kAsrStopTimeout,
+            onTimeout: () => ASRResult.textOnly(""));
+      } catch (e) {
+        _log("[Cancel] ASR stop error: $e");
+      }
+    }
+
+    // 复位状态
+    _recordingState = RecordingState.idle;
+    _activeHotkeyCode = null;
+    _deferredStop = false;
+    _pttKeyHeld = false;
+    _diaryKeyHeld = false;
+    _translateKeyHeld = false;
+    _aiReportBaseDown = false;
+    _aiReportSlotTimer?.cancel();
+    _translateOverride = null;
+    _log("[Cancel] Done, state → idle");
   }
 
   Future<void> stopRecording() async {

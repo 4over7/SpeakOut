@@ -224,10 +224,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
            if (msg.startsWith("Error")) {
              _lastError = msg;
              _ready = false;
+           } else if (msg.startsWith("Warning:")) {
+             // Partial success (e.g. listener running but missing Accessibility)
+             _lastError = msg;
+             _ready = true; // Listener works, but with degraded capability
+             _subscribeToPartialResults();
            } else if (msg.contains("Trusted: true") || msg.contains("Listener Started") || msg.contains("就绪") || msg.contains("Ready")) {
              _lastError = ""; // Clear error on successful start
              _ready = true;
-             // Subscribe to partial results AFTER ASR is ready
              _subscribeToPartialResults();
            }
           _status = msg;
@@ -312,22 +316,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // When app resumes from background (user returns from System Settings), re-check permissions
-    if (state == AppLifecycleState.resumed && _lastError.isNotEmpty) {
+    if (state == AppLifecycleState.resumed) {
       _recheckPermissions();
     }
   }
-  
+
   Future<void> _recheckPermissions() async {
-    // Check if both input monitoring and accessibility permissions were granted
+    // If listener is already running, nothing to recover
+    if (_appService.engine.isListenerRunning) return;
+    // Check real permission state
     final hasInputMonitoring = _appService.engine.checkInputMonitoringPermission();
     final hasAccessibility = _appService.engine.checkAccessibilityPermission();
-    if (hasInputMonitoring && hasAccessibility && _lastError.contains("Accessibility")) {
-      // Permissions granted - restart engine listener
+    if (hasInputMonitoring && hasAccessibility) {
+      // Both permissions granted — try to start the listener
       await _appService.engine.init();
       if (mounted) {
         setState(() {
-          _lastError = "";
-          _ready = _appService.engine.isListenerRunning;
+          if (_appService.engine.isListenerRunning) {
+            _lastError = "";
+            _ready = true;
+          }
         });
       }
     }
@@ -715,9 +723,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                     
                                     // 2. Recording / Processing
                                     if (_isRecording) {
-                                      return Text(
-                                        loc.recording,
-                                        style: AppTheme.body(context).copyWith(color: AppTheme.getAccent(context)),
+                                      return Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            loc.recording,
+                                            style: AppTheme.body(context).copyWith(color: AppTheme.getAccent(context)),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          PushButton(
+                                            controlSize: ControlSize.small,
+                                            secondary: true,
+                                            onPressed: () => _appService.engine.cancelRecording(),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: const [
+                                                Icon(CupertinoIcons.xmark_circle, size: 12),
+                                                SizedBox(width: 4),
+                                                Text('取消录音'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       );
                                     }
                                     

@@ -48,6 +48,12 @@ if pgrep -x "$APP_NAME" > /dev/null; then
     echo "ℹ️  $APP_NAME 正在运行，热替换中（不中断当前使用）..."
 fi
 
+# Fix App Icon: Flutter actool only generates 4 sizes, override with full icns
+FULL_ICNS="macos/Runner/Resources/AppIcon.icns"
+if [ -f "$FULL_ICNS" ]; then
+    cp "$FULL_ICNS" "$SOURCE_APP/Contents/Resources/AppIcon.icns"
+fi
+
 # Inject Native Lib (Fix White Screen Crash)
 NATIVE_LIB_SRC="native_lib/libnative_input.dylib"
 NATIVE_LIB_DEST="$SOURCE_APP/Contents/MacOS/native_lib"

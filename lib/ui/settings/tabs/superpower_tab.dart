@@ -54,7 +54,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   int _bindingAiReportSlot = -1; // -1 = not binding
 
   // Key capture infrastructure
-  StreamSubscription<(int, int)>? _keySubscription;
+  HotkeyCapturer? _keyCapturer;
   final CoreEngine _engine = CoreEngine();
 
   // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   @override
   void dispose() {
-    _keySubscription?.cancel();
+    _keyCapturer?.cancel();
     _organizePromptController.dispose();
     super.dispose();
   }
@@ -98,6 +98,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // ---------------------------------------------------------------------------
 
   void _startKeyCapture(String target) {
+    _keyCapturer?.cancel();
     setState(() {
       switch (target) {
         case 'diary':
@@ -110,33 +111,23 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           _isCapturingTranslateKey = true;
         case 'correction':
           _isCapturingCorrectionKey = true;
+        case 'aiReport':
+          _isCapturingAiReportBaseKey = true;
       }
     });
 
-    _keySubscription = _engine.rawKeyEventStream.listen((event) {
-      final (keyCode, modifierFlags) = event;
-      final keyName = mapKeyCodeToString(keyCode);
-      _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
-      _stopKeyCapture();
-    });
-
-    // Timeout after 15 seconds
-    Future.delayed(const Duration(seconds: 15), () {
-      if (mounted &&
-          (_isCapturingDiaryKey ||
-              _isCapturingToggleDiaryKey ||
-              _isCapturingOrganizeKey ||
-              _isCapturingTranslateKey ||
-              _isCapturingCorrectionKey ||
-              _isCapturingAiReportBaseKey)) {
-        _stopKeyCapture();
-      }
-    });
+    _keyCapturer = HotkeyCapturer(
+      keyStream: _engine.rawKeyEventStream,
+      onCaptured: (keyCode, modifierFlags) {
+        final keyName = mapKeyCodeToString(keyCode);
+        _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
+        _resetCaptureState();
+      },
+      onTimeout: _resetCaptureState,
+    )..start();
   }
 
-  void _stopKeyCapture() {
-    _keySubscription?.cancel();
-    _keySubscription = null;
+  void _resetCaptureState() {
     if (mounted) {
       setState(() {
         _isCapturingDiaryKey = false;
@@ -147,6 +138,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         _isCapturingAiReportBaseKey = false;
       });
     }
+  }
+
+  void _stopKeyCapture() {
+    _keyCapturer?.cancel();
+    _keyCapturer = null;
+    _resetCaptureState();
   }
 
   // ---------------------------------------------------------------------------
@@ -162,87 +159,58 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final displayName =
         requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
 
-    // Cross-group conflict: diary keys vs input keys
-    if (isDiaryGroup) {
-      final inputKeys = [
-        config.pttKeyCode,
-        if (config.toggleInputEnabled) config.toggleInputKeyCode,
-      ].where((k) => k != 0);
-      if (inputKeys.contains(keyCode)) {
-        _showHotkeyConflict(displayName, false);
+    // Determine which feature is being captured
+    final String currentFeature;
+    if (_isCapturingAiReportBaseKey) {
+      currentFeature = 'aiReport';
+    } else if (_isCapturingCorrectionKey) {
+      currentFeature = 'correction';
+    } else if (_isCapturingTranslateKey) {
+      currentFeature = 'translate';
+    } else if (_isCapturingOrganizeKey) {
+      currentFeature = 'organize';
+    } else if (_isCapturingToggleDiaryKey) {
+      currentFeature = 'toggleDiary';
+    } else if (_isCapturingDiaryKey) {
+      currentFeature = 'diary';
+    } else {
+      currentFeature = '';
+    }
+
+    // Unified conflict check using (keyCode, modifiers) tuple
+    if (currentFeature.isNotEmpty) {
+      final activeKeys = getActiveHotkeys(context, excludeFeature: currentFeature);
+      // Diary group: also exclude the other diary key (diary ↔ toggleDiary can share)
+      if (isDiaryGroup) {
+        if (_isCapturingDiaryKey) activeKeys.remove((config.toggleDiaryKeyCode, config.toggleDiaryModifiers));
+        if (_isCapturingToggleDiaryKey) activeKeys.remove((config.diaryKeyCode, config.diaryModifiers));
+      }
+      // AI Report base key stores and matches as bare key (modifiers=0),
+      // so conflict check must also use (keyCode, 0) to match what's actually stored.
+      final hotkeyId = _isCapturingAiReportBaseKey ? (keyCode, 0) : (keyCode, requiredMods);
+      final conflict = findHotkeyConflict(activeKeys, hotkeyId);
+      if (conflict != null) {
+        _stopKeyCapture();
+        _showHotkeyInUseDialog(displayName, conflict);
         return;
       }
     }
 
     // Feature-specific saving
     if (_isCapturingAiReportBaseKey) {
-      final activeKeys = <int>[
-        config.pttKeyCode,
-        if (config.toggleInputEnabled) config.toggleInputKeyCode,
-        if (config.diaryEnabled) config.diaryKeyCode,
-        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
-        if (config.organizeEnabled) config.organizeKeyCode,
-        if (config.translateEnabled) config.translateKeyCode,
-        if (config.correctionEnabled) config.correctionKeyCode,
-      ].where((k) => k != 0);
-      if (activeKeys.contains(keyCode)) {
-        _stopKeyCapture();
-        _showGenericHotkeyConflict(displayName);
-        return;
-      }
-      await config.setAiReportBaseKey(keyCode, displayName);
+      // AI Report base key is a hold-to-record trigger — modifiers are intentionally
+      // ignored (user needs free fingers for number keys). Save bare key name only.
+      await config.setAiReportBaseKey(keyCode, keyName);
       setState(() => _isCapturingAiReportBaseKey = false);
     } else if (_isCapturingCorrectionKey) {
-      final activeKeys = <int>[
-        config.pttKeyCode,
-        if (config.toggleInputEnabled) config.toggleInputKeyCode,
-        if (config.diaryEnabled) config.diaryKeyCode,
-        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
-        if (config.organizeEnabled) config.organizeKeyCode,
-        if (config.translateEnabled) config.translateKeyCode,
-        if (config.aiReportEnabled) config.aiReportBaseKeyCode,
-      ].where((k) => k != 0);
-      if (activeKeys.contains(keyCode)) {
-        _stopKeyCapture();
-        _showGenericHotkeyConflict(displayName);
-        return;
-      }
       await config.setCorrectionKey(keyCode, displayName,
           modifiers: requiredMods);
       setState(() => _isCapturingCorrectionKey = false);
     } else if (_isCapturingTranslateKey) {
-      final activeKeys = <int>[
-        config.pttKeyCode,
-        if (config.toggleInputEnabled) config.toggleInputKeyCode,
-        if (config.diaryEnabled) config.diaryKeyCode,
-        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
-        if (config.organizeEnabled) config.organizeKeyCode,
-        if (config.correctionEnabled) config.correctionKeyCode,
-        if (config.aiReportEnabled) config.aiReportBaseKeyCode,
-      ].where((k) => k != 0);
-      if (activeKeys.contains(keyCode)) {
-        _stopKeyCapture();
-        _showGenericHotkeyConflict(displayName);
-        return;
-      }
       await config.setTranslateKey(keyCode, displayName,
           modifiers: requiredMods);
       setState(() => _isCapturingTranslateKey = false);
     } else if (_isCapturingOrganizeKey) {
-      final activeKeys = <int>[
-        config.pttKeyCode,
-        if (config.toggleInputEnabled) config.toggleInputKeyCode,
-        if (config.diaryEnabled) config.diaryKeyCode,
-        if (config.toggleDiaryEnabled) config.toggleDiaryKeyCode,
-        if (config.translateEnabled) config.translateKeyCode,
-        if (config.correctionEnabled) config.correctionKeyCode,
-        if (config.aiReportEnabled) config.aiReportBaseKeyCode,
-      ].where((k) => k != 0);
-      if (activeKeys.contains(keyCode)) {
-        _stopKeyCapture();
-        _showGenericHotkeyConflict(displayName);
-        return;
-      }
       await config.setOrganizeKey(keyCode, displayName,
           modifiers: requiredMods);
       setState(() => _isCapturingOrganizeKey = false);
@@ -266,34 +234,14 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Conflict dialogs
   // ---------------------------------------------------------------------------
 
-  void _showHotkeyConflict(String keyName, bool conflictsWithDiary) {
-    final loc = AppLocalizations.of(context)!;
-    final target = conflictsWithDiary ? loc.diaryMode : loc.tabTrigger;
-    _stopKeyCapture();
+  /// 统一的冲突弹窗：标题和消息都基于真实冲突的功能名
+  void _showHotkeyInUseDialog(String keyName, String conflictFeature) {
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
             size: 48, color: Colors.orange),
-        title: Text('$keyName 已被 $target 使用',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('文本注入和闪念笔记不能使用相同的热键，请选择其他按键。'),
-        primaryButton: PushButton(
-          controlSize: ControlSize.large,
-          child: const Text('好的'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-    );
-  }
-
-  void _showGenericHotkeyConflict(String keyName) {
-    showMacosAlertDialog(
-      context: context,
-      builder: (_) => MacosAlertDialog(
-        appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
-            size: 48, color: Colors.orange),
-        title: Text('$keyName 已被其他功能使用',
+        title: Text('$keyName 已被「$conflictFeature」使用',
             style: const TextStyle(fontWeight: FontWeight.bold)),
         message: const Text('该按键已被占用，请选择其他按键。'),
         primaryButton: PushButton(
@@ -307,11 +255,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   /// On feature re-enable: check if its hotkey conflicts with active keys
   Future<void> _checkConflictOnEnable(String feature, int keyCode,
-      String keyName, Future<void> Function() clearKey) async {
+      String keyName, Future<void> Function() clearKey, {int modifiers = 0}) async {
     if (keyCode == 0) return;
     final activeKeys = getActiveHotkeys(context, excludeFeature: feature);
-    if (activeKeys.containsKey(keyCode)) {
-      final conflictWith = activeKeys[keyCode]!;
+    final hotkeyId = (keyCode, modifiers);
+    final conflictWith = findHotkeyConflict(activeKeys, hotkeyId);
+    if (conflictWith != null) {
       await clearKey();
       if (mounted) {
         showMacosAlertDialog(
@@ -386,31 +335,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     );
   }
 
-  Widget _hotkeyBadge(String keyName, {bool isCapturing = false, VoidCallback? onTap}) {
-    final loc = AppLocalizations.of(context)!;
-    final display = isCapturing ? loc.pressAnyKey : (keyName.isEmpty ? loc.notSet : keyName);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: isCapturing
-              ? AppTheme.getAccent(context)
-              : MacosColors.systemGrayColor.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          display,
-          style: AppTheme.mono(context).copyWith(
-            fontSize: 11,
-            color: isCapturing
-                ? Colors.white
-                : (keyName.isEmpty ? MacosColors.systemGrayColor : null),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _hotkeyBadge(String keyName,
+      {bool isCapturing = false,
+      VoidCallback? onTap,
+      VoidCallback? onClear}) =>
+      hotkeyBadge(context, keyName,
+          isCapturing: isCapturing, onTap: onTap, onClear: onClear);
 
   Widget _compactDivider() {
     return Divider(
@@ -470,7 +400,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 'diary',
                 config.diaryKeyCode,
                 config.diaryKeyName,
-                () async => config.setDiaryKey(0, ''));
+                () async => config.setDiaryKey(0, ''),
+                modifiers: config.diaryModifiers);
             await _validateDiaryDirectory();
           }
           setState(() {});
@@ -533,6 +464,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               _diaryKeyName,
               isCapturing: _isCapturingDiaryKey,
               onTap: () => _startKeyCapture('diary'),
+              onClear: _diaryKeyName.isEmpty ? null : () async {
+                await ConfigService().clearDiaryKey();
+                setState(() => _diaryKeyName = '');
+              },
             ),
           ),
           const SizedBox(height: 6),
@@ -542,6 +477,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               _toggleDiaryKeyName,
               isCapturing: _isCapturingToggleDiaryKey,
               onTap: () => _startKeyCapture('toggleDiary'),
+              onClear: _toggleDiaryKeyName.isEmpty ? null : () async {
+                await ConfigService().clearToggleDiaryKey();
+                setState(() => _toggleDiaryKeyName = '');
+              },
             ),
           ),
           _compactDivider(),
@@ -600,7 +539,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           await config.setOrganizeEnabled(v);
           if (v) {
             await _checkConflictOnEnable('organize', config.organizeKeyCode,
-                config.organizeKeyName, config.clearOrganizeKey);
+                config.organizeKeyName, config.clearOrganizeKey,
+                modifiers: config.organizeModifiers);
           }
           setState(() {});
         },
@@ -614,6 +554,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               config.organizeKeyName,
               isCapturing: _isCapturingOrganizeKey,
               onTap: () => _startKeyCapture('organize'),
+              onClear: config.organizeKeyName.isEmpty ? null : () async {
+                await config.clearOrganizeKey();
+                setState(() {});
+              },
             ),
           ),
           const SizedBox(height: 6),
@@ -732,7 +676,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           await config.setTranslateEnabled(v);
           if (v) {
             await _checkConflictOnEnable('translate', config.translateKeyCode,
-                config.translateKeyName, config.clearTranslateKey);
+                config.translateKeyName, config.clearTranslateKey,
+                modifiers: config.translateModifiers);
           }
           setState(() {});
         },
@@ -746,6 +691,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               config.translateKeyName,
               isCapturing: _isCapturingTranslateKey,
               onTap: () => _startKeyCapture('translate'),
+              onClear: config.translateKeyName.isEmpty ? null : () async {
+                await config.clearTranslateKey();
+                setState(() {});
+              },
             ),
           ),
           const SizedBox(height: 6),
@@ -824,7 +773,8 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 'correction',
                 config.correctionKeyCode,
                 config.correctionKeyName,
-                config.clearCorrectionKey);
+                config.clearCorrectionKey,
+                modifiers: config.correctionModifiers);
           }
           setState(() {});
         },
@@ -838,6 +788,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               config.correctionKeyName,
               isCapturing: _isCapturingCorrectionKey,
               onTap: () => _startKeyCapture('correction'),
+              onClear: config.correctionKeyName.isEmpty ? null : () async {
+                await config.clearCorrectionKey();
+                setState(() {});
+              },
             ),
           ),
           _compactDivider(),
@@ -921,16 +875,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             _hotkeyBadge(
               baseKeyName,
               isCapturing: _isCapturingAiReportBaseKey,
-              onTap: () {
-                setState(() => _isCapturingAiReportBaseKey = true);
-                _keySubscription = _engine.rawKeyEventStream.listen((event) {
-                  final (kc, mf) = event;
-                  _saveHotkeyConfig(kc, mapKeyCodeToString(kc), modifierFlags: mf);
-                  _stopKeyCapture();
-                });
-                Future.delayed(const Duration(seconds: 15), () {
-                  if (mounted && _isCapturingAiReportBaseKey) _stopKeyCapture();
-                });
+              onTap: () => _startKeyCapture('aiReport'),
+              onClear: baseKeyName.isEmpty ? null : () async {
+                await config.clearAiReportBaseKey();
+                setState(() {});
               },
             ),
           ),
@@ -1141,7 +1089,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final entries = <(String, String, bool)>[
       ('${loc.diaryMode}（PTT）', config.diaryKeyName, config.diaryEnabled),
       ('${loc.diaryMode}（Toggle）', config.toggleDiaryKeyName,
-          config.toggleDiaryEnabled),
+          config.diaryEnabled && config.toggleDiaryEnabled),
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
       ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
       ('纠错反馈', config.correctionKeyName, config.correctionEnabled),

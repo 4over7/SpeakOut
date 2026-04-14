@@ -61,11 +61,9 @@ class ModeTabState extends State<ModeTab> {
   String _toggleInputKeyName = '';
   bool _isCapturingToggleInputKey = false;
   int _toggleMaxDuration = 0;
-  StreamSubscription<(int, int)>? _keySubscription;
+  HotkeyCapturer? _keyCapturer;
 
   // Misc
-  bool _isTestingLlm = false;
-  (bool, String)? _llmTestResult;
   bool _llmConfigDirty = false;
   bool _workModeAdvancedExpanded = false;
 
@@ -101,7 +99,7 @@ class ModeTabState extends State<ModeTab> {
 
   @override
   void dispose() {
-    _keySubscription?.cancel();
+    _keyCapturer?.cancel();
     _akIdController.dispose();
     _akSecretController.dispose();
     _appKeyController.dispose();
@@ -145,6 +143,8 @@ class ModeTabState extends State<ModeTab> {
   }
 
   void _startKeyCapture([String target = 'ptt']) {
+    // 取消之前可能的捕获
+    _keyCapturer?.cancel();
     setState(() {
       switch (target) {
         case 'toggleInput':
@@ -154,30 +154,30 @@ class ModeTabState extends State<ModeTab> {
       }
     });
 
-    _keySubscription = _engine.rawKeyEventStream.listen((event) {
-      final (keyCode, modifierFlags) = event;
-      final keyName = mapKeyCodeToString(keyCode);
-      _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
-      _stopKeyCapture();
-    });
-
-    // Timeout after 15 seconds
-    Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && (_isCapturingKey || _isCapturingToggleInputKey)) {
-        _stopKeyCapture();
-      }
-    });
+    _keyCapturer = HotkeyCapturer(
+      keyStream: _engine.rawKeyEventStream,
+      onCaptured: (keyCode, modifierFlags) {
+        final keyName = mapKeyCodeToString(keyCode);
+        _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
+        _resetCaptureState();
+      },
+      onTimeout: _resetCaptureState,
+    )..start();
   }
 
-  void _stopKeyCapture() {
-    _keySubscription?.cancel();
-    _keySubscription = null;
+  void _resetCaptureState() {
     if (mounted) {
       setState(() {
         _isCapturingKey = false;
         _isCapturingToggleInputKey = false;
       });
     }
+  }
+
+  void _stopKeyCapture() {
+    _keyCapturer?.cancel();
+    _keyCapturer = null;
+    _resetCaptureState();
   }
 
   Future<void> _saveHotkeyConfig(int keyCode, String keyName,
@@ -190,10 +190,12 @@ class ModeTabState extends State<ModeTab> {
     // Conflict check — PTT 和 Toggle 允许共键（短按=toggle，长按=PTT）
     final activeKeys = getActiveHotkeys(context, excludeFeature: _isCapturingKey ? 'ptt' : 'toggleInput');
     // 额外排除 PTT↔Toggle 互相（它们可以相同）
-    if (_isCapturingKey) activeKeys.remove(ConfigService().toggleInputKeyCode);
-    if (_isCapturingToggleInputKey) activeKeys.remove(ConfigService().pttKeyCode);
-    if (activeKeys.containsKey(keyCode)) {
-      final conflictWith = activeKeys[keyCode]!;
+    final c = ConfigService();
+    if (_isCapturingKey) activeKeys.remove((c.toggleInputKeyCode, c.toggleInputModifiers));
+    if (_isCapturingToggleInputKey) activeKeys.remove((c.pttKeyCode, c.pttModifiers));
+    final hotkeyId = (keyCode, requiredMods);
+    final conflictWith = findHotkeyConflict(activeKeys, hotkeyId);
+    if (conflictWith != null) {
       _stopKeyCapture();
       if (mounted) {
         showMacosAlertDialog(
@@ -252,33 +254,11 @@ class ModeTabState extends State<ModeTab> {
   }
 
   Widget _hotkeyBadge(String keyName,
-      {bool isCapturing = false, VoidCallback? onTap}) {
-    final loc = AppLocalizations.of(context)!;
-    final display = isCapturing
-        ? loc.pressAnyKey
-        : (keyName.isEmpty ? loc.notSet : keyName);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: isCapturing
-              ? AppTheme.getAccent(context)
-              : MacosColors.systemGrayColor.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          display,
-          style: AppTheme.mono(context).copyWith(
-            fontSize: 11,
-            color: isCapturing
-                ? Colors.white
-                : (keyName.isEmpty ? MacosColors.systemGrayColor : null),
-          ),
-        ),
-      ),
-    );
-  }
+      {bool isCapturing = false,
+      VoidCallback? onTap,
+      VoidCallback? onClear}) =>
+      hotkeyBadge(context, keyName,
+          isCapturing: isCapturing, onTap: onTap, onClear: onClear);
 
   Widget _compactDivider() {
     return Divider(
@@ -297,9 +277,21 @@ class ModeTabState extends State<ModeTab> {
           Text('快捷键与时长', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
         ]),
         const SizedBox(height: 10),
-        _compactRow('长按说话 (PTT)', _hotkeyBadge(_currentKeyName, isCapturing: _isCapturingKey, onTap: () => _startKeyCapture())),
+        _compactRow('长按说话 (PTT)', _hotkeyBadge(
+          _currentKeyName,
+          isCapturing: _isCapturingKey,
+          onTap: () => _startKeyCapture(),
+        )),
         const SizedBox(height: 6),
-        _compactRow('单击切换 (Toggle)', _hotkeyBadge(_toggleInputKeyName, isCapturing: _isCapturingToggleInputKey, onTap: () => _startKeyCapture('toggleInput'))),
+        _compactRow('单击切换 (Toggle)', _hotkeyBadge(
+          _toggleInputKeyName,
+          isCapturing: _isCapturingToggleInputKey,
+          onTap: () => _startKeyCapture('toggleInput'),
+          onClear: _toggleInputKeyName.isEmpty ? null : () async {
+            await ConfigService().clearToggleInputKey();
+            setState(() => _toggleInputKeyName = '');
+          },
+        )),
         _compactDivider(),
         _compactRow(loc.toggleMaxDuration, MacosPopupButton<int>(
           value: _toggleMaxDuration,
@@ -351,6 +343,8 @@ class ModeTabState extends State<ModeTab> {
       );
       await _refresh();
     } catch (e) {
+      if (!mounted) return;
+      if (!context.mounted) return;
       showSettingsError(context, e.toString());
     } finally {
       if (mounted) setState(() { _downloadingIds.remove(model.id); });
@@ -478,6 +472,8 @@ class ModeTabState extends State<ModeTab> {
       );
       await _refresh();
     } catch (e) {
+      if (!mounted) return;
+      if (!context.mounted) return;
       showSettingsError(context, e.toString());
     } finally {
       if (mounted) setState(() { _downloadingIds.remove(model.id); });
@@ -514,6 +510,8 @@ class ModeTabState extends State<ModeTab> {
       final path = await _modelManager.getPunctuationModelPath();
       if (path != null) await _engine.initPunctuation(path);
     } catch (e) {
+      if (!mounted) return;
+      if (!context.mounted) return;
       showSettingsError(context, e.toString());
     } finally {
       if (mounted) setState(() { _downloadingIds.remove(punctId); });

@@ -61,34 +61,37 @@ class _OnboardingPageState extends State<OnboardingPage> {
     setState(() => _checkingPermissions = false);
   }
 
-  Future<void> _openInputMonitoringSettings() async {
-    setState(() => _inputMonitoringAttempted = true);
-    final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
+  /// Open system settings and poll until permission is granted or timeout
+  Future<void> _openAndPollPermission(String urlFragment, String Function() checker, void Function() onAttempted) async {
+    onAttempted();
+    final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?$urlFragment');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
-    await Future.delayed(const Duration(seconds: 2));
-    await _checkPermissions();
+    // Poll every 1.5s for up to 30s (user may need time to find and toggle the switch)
+    for (int i = 0; i < 20; i++) {
+      await Future.delayed(const Duration(milliseconds: 1500));
+      await _checkPermissions();
+      if (checker() == 'granted') break;
+    }
+  }
+
+  Future<void> _openInputMonitoringSettings() async {
+    await _openAndPollPermission('Privacy_ListenEvent',
+      () => _inputMonitoringGranted ? 'granted' : '',
+      () => setState(() => _inputMonitoringAttempted = true));
   }
 
   Future<void> _openAccessibilitySettings() async {
-    setState(() => _accessibilityAttempted = true);
-    final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-    await Future.delayed(const Duration(seconds: 2));
-    await _checkPermissions();
+    await _openAndPollPermission('Privacy_Accessibility',
+      () => _accessibilityGranted ? 'granted' : '',
+      () => setState(() => _accessibilityAttempted = true));
   }
 
   Future<void> _openMicrophoneSettings() async {
-    setState(() => _microphoneAttempted = true);
-    final uri = Uri.parse('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-    await Future.delayed(const Duration(seconds: 2));
-    await _checkPermissions();
+    await _openAndPollPermission('Privacy_Microphone',
+      () => _microphoneGranted ? 'granted' : '',
+      () => setState(() => _microphoneAttempted = true));
   }
 
   AppLocalizations get _l10n => AppLocalizations.of(context)!;

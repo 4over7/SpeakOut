@@ -143,7 +143,7 @@ Hotkey → native_input.m (CGEventTap)
 | Native | `native_lib/` | Objective-C: CGEventTap + AudioQueue ring buffer |
 | Gateway | `gateway/` | Cloudflare Workers (Hono): license, billing, version check |
 
-**Codebase**: ~29,000 lines across 86 files. 531 tests.
+**Codebase**: ~29,000 lines across 86 files. 564+ tests.
 
 ---
 
@@ -151,8 +151,8 @@ Hotkey → native_input.m (CGEventTap)
 
 ```bash
 flutter pub get          # Dependencies
-flutter analyze          # Static analysis (0 issues)
-flutter test             # Run tests (531 tests)
+flutter analyze          # Static analysis
+flutter test             # Run tests (564+ tests)
 flutter build macos --release  # Build
 ./scripts/install.sh     # Install to /Applications
 ./scripts/create_styled_dmg.sh  # Create DMG
@@ -168,8 +168,8 @@ cd native_lib && clang -dynamiclib -framework Cocoa -framework Carbon \
 ## Security
 
 - **Offline Mode** — Audio never leaves your device
-- **Credentials** — API keys stored in macOS Keychain (flutter_secure_storage)
-- **Logging** — User speech content never logged by default; developer mode only records metadata
+- **Credentials** — API keys stored in SharedPreferences (local, not synced); export/backup includes plaintext keys with explicit user confirmation
+- **Logging** — User speech content never logged by default; developer mode logs may include input/output text for debugging
 - **Independent Review** — Passed 4 rounds of independent third-party security review
 
 ---
@@ -202,7 +202,7 @@ Copyright © 2026 Leon. All Rights Reserved.
 - **12 家 LLM** — 百炼、DeepSeek、豆包、OpenAI、Claude、智谱、Kimi、MiniMax、Gemini、讯飞、Groq、Ollama 本地
 - **闪念笔记** — 独立热键，语音直接保存为 Markdown
 - **专业词汇** — 行业词典 + 个人词库，术语注入 LLM 实现领域感知
-- **安全存储** — API 密钥存入系统 Keychain，通过独立第三方安全评审
+- **安全存储** — API 密钥存于本地 SharedPreferences，导出备份含明文密钥（需用户确认）
 
 ## 安装
 
