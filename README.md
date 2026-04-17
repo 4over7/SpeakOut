@@ -10,7 +10,8 @@
   [Download](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [Changelog](CHANGELOG.md)
 
   ![Platform](https://img.shields.io/badge/platform-macOS%2013+-blue)
-  ![Tests](https://img.shields.io/badge/tests-531%20passed-brightgreen)
+  ![Version](https://img.shields.io/badge/version-1.7.1-brightgreen)
+  ![Tests](https://img.shields.io/badge/tests-598%20passed-brightgreen)
   ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
 </div>
@@ -72,18 +73,21 @@ LLM post-processing: fix homophones, remove filler words, translate, enforce out
 - **Professional Vocabulary** — Industry dictionaries (Tech/Medical/Legal/Finance/Education) + personal dictionary
 - **Typewriter Mode** (Alpha) — Stream LLM output character by character to cursor
 
-### Flash Notes
+### ⚡ Superpowers
 
-Capture thoughts without switching apps.
+Hotkey-driven productivity features on top of voice input:
 
-- **Dedicated Hotkey** — Hold to speak, release to auto-save
-- **Daily Markdown** — Timestamped entries in `YYYY-MM-DD.md`
-- **Custom Directory** — Choose where notes are stored
+- **Flash Notes** — Dedicated hotkey, speak and auto-save as timestamped Markdown to any folder
+- **AI Organize** — Select any text, press hotkey, LLM restructures logic and appends below the original (keeps source intact)
+- **Instant Translation** — Speak source language, output target language in real time (works with any AI Polish LLM)
+- **Correction Feedback** — Spot an ASR/LLM mistake? Fix it inline, press the feedback hotkey — LLM diffs against the last recording trace and auto-learns the term into your vocabulary
+- **AI Debug** — Hold hotkey to capture screenshot + voice description of a bug, auto-sent to Claude Code / Cursor / bound AI coding windows (up to 5 slots)
 
 ### Smart Audio
 
 - **Bluetooth Detection** — Auto-detects headset connect/disconnect
 - **Device Selection** — Choose preferred mic in settings
+- **Pre-segmentation** — 3s pause triggers background decoding, minimizing final wait on stop
 
 ---
 
@@ -143,7 +147,7 @@ Hotkey → native_input.m (CGEventTap)
 | Native | `native_lib/` | Objective-C: CGEventTap + AudioQueue ring buffer |
 | Gateway | `gateway/` | Cloudflare Workers (Hono): license, billing, version check |
 
-**Codebase**: ~29,000 lines across 86 files. 564+ tests.
+**Codebase**: ~29,000 lines across 86 files. 598 tests.
 
 ---
 
@@ -151,8 +155,8 @@ Hotkey → native_input.m (CGEventTap)
 
 ```bash
 flutter pub get          # Dependencies
-flutter analyze          # Static analysis
-flutter test             # Run tests (564+ tests)
+flutter analyze          # Static analysis (0 issues)
+flutter test             # Run tests (598 tests)
 flutter build macos --release  # Build
 ./scripts/install.sh     # Install to /Applications
 ./scripts/create_styled_dmg.sh  # Create DMG
@@ -195,14 +199,33 @@ Copyright © 2026 Leon. All Rights Reserved.
 
 ## 功能亮点
 
+### 语音输入
 - **完全离线可用** — 无需账号、无需联网、无需 API Key，安装即用。8 款本地模型基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，中英识别准确率媲美云端，音频不出设备
-- **11 种语言** — 中英日韩粤 + 西法德俄葡，支持自动检测和实时翻译
 - **三种工作模式** — 纯离线（隐私优先）/ 智能（离线识别 + AI 润色）/ 云端（高精度）
-- **6 家云端 ASR** — 阿里云百炼、Groq、OpenAI、火山引擎、讯飞、腾讯云
+- **两种触发方式** — 按住说话（PTT）或单击切换（Toggle）；PTT 和 Toggle 可共用一个键
+- **预分段识别** — 录音中检测到 3 秒停顿自动后台解码，停止时只等最后一段，显著减少等待
+
+### 11 种语言 + 口译
+- 中英日韩粤 + 西法德俄葡，支持输入/输出自动检测
+- **口译模式** — 输入中文→输出英文等任意组合，LLM 自动翻译（需智能模式）
+
+### ⚡ 超能力（热键驱动）
+- **闪念笔记** — 独立热键，语音直接保存为 Markdown，按天归档到自定义目录
+- **AI 梳理** — 选中文字按快捷键，LLM 深度重组逻辑结构并追加在原文下一行
+- **即时翻译** — 按住说话自动翻译为目标语言，不影响正常录音
+- **纠错反馈** — 发现识别错误，改完按反馈键，LLM 对比最近录音自动学入词汇表
+- **AI 一键调试** — 按住截屏+语音描述 bug，自动发送到绑定的 Claude Code / Cursor 窗口（最多 5 槽位）
+
+### 云端服务（可选增强）
+- **6 家云端 ASR** — 阿里云百炼（DashScope 实时）、Groq、OpenAI、火山引擎、讯飞、腾讯云
 - **12 家 LLM** — 百炼、DeepSeek、豆包、OpenAI、Claude、智谱、Kimi、MiniMax、Gemini、讯飞、Groq、Ollama 本地
-- **闪念笔记** — 独立热键，语音直接保存为 Markdown
-- **专业词汇** — 行业词典 + 个人词库，术语注入 LLM 实现领域感知
-- **安全存储** — API 密钥存于本地 SharedPreferences，导出备份含明文密钥（需用户确认）
+- **服务商预置** — 新用户打开云账户即可看到完整列表，点击配置即用
+- **账户导入/导出** — 跨设备迁移，JSONL 格式，含凭证
+
+### 专业词汇 & 安全
+- **行业词典 + 个人词库** — 术语注入 LLM 实现领域感知
+- **API 密钥本地存储** — SharedPreferences，不上云、不同步；导出备份含明文密钥需用户确认
+- **签名公证** — Developer ID 签名 + Apple 公证，下载双击即用，无 Gatekeeper 警告
 
 ## 安装
 
