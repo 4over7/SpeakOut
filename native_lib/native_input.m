@@ -741,11 +741,40 @@ int check_accessibility_permission() {
 
 // 3. Check Key State (Watchdog)
 // Returns 1 if key is physically down, 0 if up.
+//
+// Modifier keys (Option/Shift/Control/Command/Fn/CapsLock) are NOT reliable
+// via CGEventSourceKeyState — it often returns false while the key is held.
+// Use CGEventSourceFlagsState + device-specific masks instead, matching the
+// logic in the FlagsChanged handler above so Left/Right are distinguished.
 int check_key_pressed(int keyCode) {
-  // kCGEventSourceStateHIDSystemState combines physical keyboard state
-  bool isDown = CGEventSourceKeyState(kCGEventSourceStateHIDSystemState,
-                                      (CGKeyCode)keyCode);
-  return isDown ? 1 : 0;
+  switch (keyCode) {
+    case 58: case 61:   // Option (L / R)
+    case 56: case 60:   // Shift  (L / R)
+    case 59: case 62:   // Control (L / R)
+    case 55: case 54:   // Command (L / R)
+    case 57:            // CapsLock
+    case 63: {          // Fn
+      CGEventFlags flags = CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState);
+      unsigned int devFlags = (unsigned int)(flags & 0xFFFF);
+      switch (keyCode) {
+        case 58: return (devFlags & NX_DEVICELALTKEYMASK)   ? 1 : 0;
+        case 61: return (devFlags & NX_DEVICERALTKEYMASK)   ? 1 : 0;
+        case 56: return (devFlags & NX_DEVICELSHIFTKEYMASK) ? 1 : 0;
+        case 60: return (devFlags & NX_DEVICERSHIFTKEYMASK) ? 1 : 0;
+        case 59: return (devFlags & NX_DEVICELCTLKEYMASK)   ? 1 : 0;
+        case 62: return (devFlags & NX_DEVICERCTLKEYMASK)   ? 1 : 0;
+        case 55: return (devFlags & NX_DEVICELCMDKEYMASK)   ? 1 : 0;
+        case 54: return (devFlags & NX_DEVICERCMDKEYMASK)   ? 1 : 0;
+        case 57: return (flags & kCGEventFlagMaskAlphaShift)  ? 1 : 0;
+        case 63: return (flags & kCGEventFlagMaskSecondaryFn) ? 1 : 0;
+      }
+      return 0;
+    }
+    default:
+      // Normal keys: CGEventSourceKeyState is reliable
+      return CGEventSourceKeyState(kCGEventSourceStateHIDSystemState,
+                                   (CGKeyCode)keyCode) ? 1 : 0;
+  }
 }
 
 // ============================================================================

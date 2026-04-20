@@ -1,5 +1,10 @@
 # SpeakOut Version History
 
+## [1.7.2] - 2026-04-20
+
+### 热键修复
+- **长按 modifier 键瞬时断开修复** — 长按 Right Option / Left Option / Shift / Command / Fn 等 modifier 作为 PTT 键时，录音约 600ms 后自动断开、悬浮窗只闪一下。根因：watchdog 用的 `CGEventSourceKeyState` 对 modifier 键不可靠，连续 3 次误报为"已松开"就强制停止。改用 `CGEventSourceFlagsState` + device-specific mask 判断，与事件监听逻辑一致，能正确区分 Left/Right modifier。
+
 ## [1.7.1] - 2026-04-15
 
 ### 热键体验改进
