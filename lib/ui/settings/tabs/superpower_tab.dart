@@ -169,17 +169,18 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   /// 统一的冲突弹窗：标题和消息都基于真实冲突的功能名
   void _showHotkeyInUseDialog(String keyName, String conflictFeature) {
+    final loc = AppLocalizations.of(context)!;
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
             size: 48, color: Colors.orange),
-        title: Text('$keyName 已被「$conflictFeature」使用',
+        title: Text(loc.hotkeyInUseTitle(keyName, conflictFeature),
             style: const TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('该按键已被占用，请选择其他按键。'),
+        message: Text(loc.hotkeyConflictTaken),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
-          child: const Text('好的'),
+          child: Text(loc.hotkeyInUseOk),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -196,17 +197,18 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     if (conflictWith != null) {
       await clearKey();
       if (mounted) {
+        final loc = AppLocalizations.of(context)!;
         showMacosAlertDialog(
           context: context,
           builder: (_) => MacosAlertDialog(
             appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
                 size: 48, color: Colors.orange),
-            title: Text('$keyName 已被「$conflictWith」占用',
+            title: Text(loc.hotkeyConflictAutoClearTitle(keyName, conflictWith),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            message: const Text('快捷键已自动清除，请重新设置。'),
+            message: Text(loc.hotkeyConflictAutoClearMsg),
             primaryButton: PushButton(
               controlSize: ControlSize.large,
-              child: const Text('好的'),
+              child: Text(loc.hotkeyInUseOk),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -236,7 +238,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Future<void> _validateDiaryDirectory() async {
     final dirPath = ConfigService().diaryDirectory;
     if (dirPath.isEmpty) {
-      setState(() => _diaryDirError = '未设置保存目录');
+      setState(() => _diaryDirError = AppLocalizations.of(context)!.diaryDirNotSet);
       return;
     }
     try {
@@ -247,7 +249,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       await testFile.delete();
       setState(() => _diaryDirError = '');
     } catch (e) {
-      setState(() => _diaryDirError = '无法写入目录，请重新选择（macOS 需重新授权）');
+      setState(() => _diaryDirError = AppLocalizations.of(context)!.diaryDirCannotWrite);
     }
   }
 
@@ -342,10 +344,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildDiaryCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: loc.diaryMode,
-      titleIcon: CupertinoIcons.book,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.diaryMode : null,
+      titleIcon: showTitle ? CupertinoIcons.book : null,
       accentColor: AppTheme.triggerNote,
       trailing: MacosSwitch(
         value: config.diaryEnabled,
@@ -399,7 +402,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                     Expanded(
                       child: Text(
                         _diaryDirError == null
-                            ? '请选择保存目录以授权访问'
+                            ? loc.diaryDirPick
                             : _diaryDirError!,
                         style: TextStyle(
                           fontSize: 11,
@@ -471,7 +474,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ),
         ] else
           Text(
-            '随时随地语音记录灵感，自动保存为 Markdown 日记。',
+            loc.diaryDesc,
             style: AppTheme.caption(context),
           ),
       ],
@@ -484,10 +487,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildOrganizeCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: loc.organizeEnabled,
-      titleIcon: CupertinoIcons.text_alignleft,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.organizeEnabled : null,
+      titleIcon: showTitle ? CupertinoIcons.text_alignleft : null,
       accentColor: AppTheme.triggerOrganize,
       trailing: MacosSwitch(
         value: config.organizeEnabled,
@@ -525,7 +529,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _showOrganizePrompt ? '收起' : '编辑指令',
+                    _showOrganizePrompt ? loc.organizeCollapse : loc.organizeEditInstruction,
                     style: AppTheme.caption(context).copyWith(
                         color: AppTheme.triggerOrganize, fontSize: 11),
                   ),
@@ -621,10 +625,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildTranslateCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: loc.quickTranslate,
-      titleIcon: CupertinoIcons.globe,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.quickTranslate : null,
+      titleIcon: showTitle ? CupertinoIcons.globe : null,
       accentColor: AppTheme.triggerTranslate,
       trailing: MacosSwitch(
         value: config.translateEnabled,
@@ -715,10 +720,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildCorrectionCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: '纠错反馈',
-      titleIcon: CupertinoIcons.checkmark_seal,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.sidebarCorrection : null,
+      titleIcon: showTitle ? CupertinoIcons.checkmark_seal : null,
       accentColor: AppTheme.triggerCorrect,
       trailing: MacosSwitch(
         value: config.correctionEnabled,
@@ -739,7 +745,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       children: [
         if (config.correctionEnabled) ...[
           _compactRow(
-            '纠错快捷键',
+            loc.correctionHotkey,
             _hotkeyBadge(
               config.correctionKeyName,
               isCapturing: false,
@@ -758,17 +764,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 secondary: true,
                 onPressed: () async {
                   final result = await FilePicker.platform.saveFile(
-                    dialogTitle: '导出纠错数据',
+                    dialogTitle: loc.correctionExportDialog,
                     fileName: 'speakout_corrections.jsonl',
                   );
                   if (result != null) {
                     final ok = await CorrectionService().exportData(result);
                     if (mounted) {
-                      showSettingsInfo(ok ? '导出成功' : '导出失败：无数据');
+                      showSettingsInfo(ok ? loc.correctionExportSuccess : loc.correctionExportFailedEmpty);
                     }
                   }
                 },
-                child: const Text('导出', style: TextStyle(fontSize: 11)),
+                child: Text(loc.correctionExportBtn, style: const TextStyle(fontSize: 11)),
               ),
               const SizedBox(width: 6),
               PushButton(
@@ -776,7 +782,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 secondary: true,
                 onPressed: () async {
                   final result = await FilePicker.platform.pickFiles(
-                    dialogTitle: '导入纠错数据',
+                    dialogTitle: loc.correctionImportDialog,
                     type: FileType.custom,
                     allowedExtensions: ['jsonl', 'json'],
                   );
@@ -785,17 +791,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                     final count = await CorrectionService()
                         .importData(result.files.single.path!);
                     if (mounted) {
-                      showSettingsInfo('导入 $count 条记录（词汇已同步）');
+                      showSettingsInfo(loc.correctionImportSuccess(count));
                     }
                   }
                 },
-                child: const Text('导入', style: TextStyle(fontSize: 11)),
+                child: Text(loc.correctionImportBtn, style: const TextStyle(fontSize: 11)),
               ),
             ],
           ),
         ] else
           Text(
-            '选中修正后的文字，一键提交纠错。ASR 自动学习你的用词习惯。',
+            loc.correctionDesc,
             style: AppTheme.caption(context),
           ),
       ],
@@ -810,10 +816,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final config = ConfigService();
     final slotCount = config.aiReportSlotCount;
     final baseKeyName = config.aiReportBaseKeyName;
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: 'AI 一键调试',
-      titleIcon: CupertinoIcons.camera_viewfinder,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.sidebarAiReport : null,
+      titleIcon: showTitle ? CupertinoIcons.camera_viewfinder : null,
       accentColor: AppTheme.triggerAiReport,
       trailing: MacosSwitch(
         value: config.aiReportEnabled,
@@ -827,7 +834,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.aiReportEnabled) ...[
           // 基础按键
           _compactRow(
-            '基础按键',
+            loc.aiReportBaseKey,
             _hotkeyBadge(
               baseKeyName,
               isCapturing: false,
@@ -842,7 +849,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '按住 $baseKeyName + 数字键（1-$slotCount）选择目标窗口',
+                loc.aiReportBaseKeyDesc(baseKeyName, slotCount),
                 style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor),
               ),
             ),
@@ -866,7 +873,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                   MacosIcon(CupertinoIcons.plus_circle, size: 13, color: AppTheme.triggerAiReport),
                   const SizedBox(width: 4),
                   Text(
-                    slotCount == 0 ? '添加第一个窗口' : '添加窗口',
+                    slotCount == 0 ? loc.aiReportAddFirstWindow : loc.aiReportAddWindow,
                     style: AppTheme.caption(context).copyWith(color: AppTheme.triggerAiReport, fontSize: 11),
                   ),
                 ],
@@ -875,12 +882,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ],
           const SizedBox(height: 6),
           Text(
-            '为 AI Coding 而生 — 截屏+语音自动发送到绑定窗口',
+            loc.aiReportDescShort,
             style: AppTheme.caption(context).copyWith(fontSize: 10),
           ),
         ] else
           Text(
-            '为 AI Coding 而生 — 截屏+语音描述，一键发送到 Claude Code / Cursor。',
+            loc.aiReportDescLong,
             style: AppTheme.caption(context),
           ),
       ],
@@ -889,6 +896,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   /// 单个槽位行：[#N] App名 — 窗口标题 [绑定] [删除]
   Widget _buildAiReportSlotRow(int index) {
+    final loc = AppLocalizations.of(context)!;
     final config = ConfigService();
     final appName = config.aiReportSlotAppName(index);
     final windowTitle = config.aiReportSlotWindowTitle(index);
@@ -898,14 +906,14 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     // 显示文本：App名 — 窗口标题
     String displayText;
     if (isBinding) {
-      displayText = '请切换到目标窗口...';
+      displayText = loc.aiReportSwitchWindow;
     } else if (appName != null && appName.isNotEmpty) {
       displayText = appName;
       if (windowTitle != null && windowTitle.isNotEmpty) {
         displayText += ' — $windowTitle';
       }
     } else {
-      displayText = '未绑定';
+      displayText = loc.aiReportUnbound;
     }
 
     return Row(
@@ -956,18 +964,19 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   /// 绑定槽位目标窗口：3秒倒计时 → 读取前台 App
   Future<void> _bindSlotTargetWindow(int slotIndex) async {
     setState(() => _bindingAiReportSlot = slotIndex);
+    final loc = AppLocalizations.of(context)!;
 
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const Icon(CupertinoIcons.camera_viewfinder,
             size: 48, color: Color(0xFFE74C3C)),
-        title: const Text('绑定 AI 工具窗口',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('点击「开始」后，你有 3 秒时间切换到目标窗口。'),
+        title: Text(loc.aiReportBindTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        message: Text(loc.aiReportBindMsg),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
-          child: const Text('开始'),
+          child: Text(loc.aiReportStart),
           onPressed: () {
             Navigator.of(context).pop();
             _doSlotBind(slotIndex);
@@ -976,7 +985,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         secondaryButton: PushButton(
           controlSize: ControlSize.large,
           secondary: true,
-          child: const Text('取消'),
+          child: Text(loc.aiReportCancel),
           onPressed: () {
             Navigator.of(context).pop();
             setState(() => _bindingAiReportSlot = -1);
@@ -1047,10 +1056,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ('${loc.diaryMode}（Toggle）', config.toggleDiaryKeyName,
           config.diaryEnabled && config.toggleDiaryEnabled),
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
-      ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
-      ('纠错反馈', config.correctionKeyName, config.correctionEnabled),
+      (loc.organizeEnabled, config.organizeKeyName, config.organizeEnabled),
+      (loc.featureCorrection, config.correctionKeyName, config.correctionEnabled),
       if (config.aiReportSlotCount > 0)
-        ('AI 一键调试', config.aiReportBaseKeyName, config.aiReportEnabled),
+        (loc.featureAiReport, config.aiReportBaseKeyName, config.aiReportEnabled),
     ];
 
     final activeEntries = entries.where((e) => e.$3 && e.$2.isNotEmpty).toList();
@@ -1070,7 +1079,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             children: [
               MacosIcon(CupertinoIcons.keyboard, size: 11, color: MacosColors.systemGrayColor),
               const SizedBox(width: 6),
-              Text('已启用的快捷键', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+              Text(loc.activeHotkeys, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
             ],
           ),
           const SizedBox(height: 6),

@@ -2185,6 +2185,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-switch to higher-quality mic when Bluetooth headset is connected'**
   String get autoOptimizeAudioDesc;
+
+  /// No description provided for @hotkeyConflictTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'That key is taken. Please choose another.'**
+  String get hotkeyConflictTaken;
+
+  /// No description provided for @hotkeyConflictAutoClearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{keyName} is taken by \"{feature}\"'**
+  String hotkeyConflictAutoClearTitle(String keyName, String feature);
+
+  /// No description provided for @hotkeyConflictAutoClearMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'The hotkey has been cleared. Please set a new one.'**
+  String get hotkeyConflictAutoClearMsg;
+
+  /// No description provided for @modelActivateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Model activation failed: {err}'**
+  String modelActivateFailed(String err);
+
+  /// No description provided for @punctAutoLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Punctuation model auto-loaded'**
+  String get punctAutoLoaded;
+
+  /// No description provided for @punctMissingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This model has no punctuation'**
+  String get punctMissingTitle;
+
+  /// No description provided for @punctMissingMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'This model outputs text without punctuation. Consider downloading the punctuation model for better readability.\n\nDownload now?'**
+  String get punctMissingMsg;
+
+  /// No description provided for @punctDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get punctDownload;
+
+  /// No description provided for @punctSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get punctSkip;
+
+  /// No description provided for @offlineDataLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'All data is processed locally; nothing is uploaded'**
+  String get offlineDataLocal;
+
+  /// No description provided for @asrModel.
+  ///
+  /// In en, this message translates to:
+  /// **'ASR Model'**
+  String get asrModel;
+
+  /// No description provided for @manageCloudAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Cloud Accounts'**
+  String get manageCloudAccounts;
+
+  /// No description provided for @typewriterEffect.
+  ///
+  /// In en, this message translates to:
+  /// **'Typewriter Effect'**
+  String get typewriterEffect;
+
+  /// No description provided for @ollamaServerRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Make sure Ollama is running (ollama serve)'**
+  String get ollamaServerRequired;
+
+  /// No description provided for @manageModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Models'**
+  String get manageModels;
+
+  /// No description provided for @llmRecommendations.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendations'**
+  String get llmRecommendations;
+
+  /// No description provided for @llmTagFastest.
+  ///
+  /// In en, this message translates to:
+  /// **'Fastest'**
+  String get llmTagFastest;
+
+  /// No description provided for @llmTagStable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable Pick'**
+  String get llmTagStable;
+
+  /// No description provided for @llmTagFastestNote.
+  ///
+  /// In en, this message translates to:
+  /// **'May fluctuate at peak'**
+  String get llmTagFastestNote;
+
+  /// No description provided for @llmTagStableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Least fluctuation, stable quality'**
+  String get llmTagStableNote;
+
+  /// No description provided for @llmDataSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source: 2026-03-21 benchmark, non-streaming API, China Mainland network'**
+  String get llmDataSource;
+
+  /// No description provided for @llmModelField.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get llmModelField;
+
+  /// No description provided for @llmModelCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom...'**
+  String get llmModelCustom;
+
+  /// No description provided for @llmModelNamePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Model name'**
+  String get llmModelNamePlaceholder;
+
+  /// No description provided for @diaryDirNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'No save directory set'**
+  String get diaryDirNotSet;
+
+  /// No description provided for @diaryDirCannotWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot write to this directory, please reselect (macOS requires re-authorization)'**
+  String get diaryDirCannotWrite;
+
+  /// No description provided for @diaryDirPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a save directory to grant access'**
+  String get diaryDirPick;
+
+  /// No description provided for @diaryDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Record ideas anywhere with voice, auto-saved as Markdown diary.'**
+  String get diaryDesc;
+
+  /// No description provided for @organizeCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get organizeCollapse;
+
+  /// No description provided for @organizeEditInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Prompt'**
+  String get organizeEditInstruction;
+
+  /// No description provided for @correctionHotkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction Hotkey'**
+  String get correctionHotkey;
+
+  /// No description provided for @correctionExportDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Correction Data'**
+  String get correctionExportDialog;
+
+  /// No description provided for @correctionImportDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Correction Data'**
+  String get correctionImportDialog;
+
+  /// No description provided for @correctionExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Export successful'**
+  String get correctionExportSuccess;
+
+  /// No description provided for @correctionExportFailedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: no data'**
+  String get correctionExportFailedEmpty;
+
+  /// No description provided for @correctionImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} entries (vocab synced)'**
+  String correctionImportSuccess(int count);
+
+  /// No description provided for @correctionExportBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get correctionExportBtn;
+
+  /// No description provided for @correctionImportBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get correctionImportBtn;
+
+  /// No description provided for @correctionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the corrected text and submit. ASR learns your wording over time.'**
+  String get correctionDesc;
+
+  /// No description provided for @aiReportBaseKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Base Key'**
+  String get aiReportBaseKey;
+
+  /// No description provided for @aiReportBaseKeyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold {baseKeyName} + digit (1–{slotCount}) to pick target window'**
+  String aiReportBaseKeyDesc(String baseKeyName, int slotCount);
+
+  /// No description provided for @aiReportAddFirstWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add First Window'**
+  String get aiReportAddFirstWindow;
+
+  /// No description provided for @aiReportAddWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Window'**
+  String get aiReportAddWindow;
+
+  /// No description provided for @aiReportDescShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Built for AI Coding — screenshot + voice auto-sent to bound window'**
+  String get aiReportDescShort;
+
+  /// No description provided for @aiReportDescLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.'**
+  String get aiReportDescLong;
+
+  /// No description provided for @aiReportSwitchWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to target window...'**
+  String get aiReportSwitchWindow;
+
+  /// No description provided for @aiReportUnbound.
+  ///
+  /// In en, this message translates to:
+  /// **'Unbound'**
+  String get aiReportUnbound;
+
+  /// No description provided for @aiReportBindTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind AI Tool Window'**
+  String get aiReportBindTitle;
+
+  /// No description provided for @aiReportBindMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'After clicking \"Start\", you have 3 seconds to switch to the target window.'**
+  String get aiReportBindMsg;
+
+  /// No description provided for @aiReportStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get aiReportStart;
+
+  /// No description provided for @aiReportCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get aiReportCancel;
+
+  /// No description provided for @activeHotkeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Hotkeys'**
+  String get activeHotkeys;
+
+  /// No description provided for @appProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'SpeakOut · 子曰'**
+  String get appProductName;
+
+  /// No description provided for @aboutVersionCopyTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-click to copy version'**
+  String get aboutVersionCopyTip;
+
+  /// No description provided for @aboutVersionCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get aboutVersionCopied;
+
+  /// No description provided for @aboutUpdateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Update'**
+  String get aboutUpdateDownload;
+
+  /// No description provided for @aboutPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get aboutPrivacyPolicy;
+
+  /// No description provided for @clearHotkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear hotkey'**
+  String get clearHotkey;
+
+  /// No description provided for @featureCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction'**
+  String get featureCorrection;
+
+  /// No description provided for @featureAiReport.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Debug'**
+  String get featureAiReport;
+
+  /// No description provided for @shortcutsAndDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts & Duration'**
+  String get shortcutsAndDuration;
 }
 
 class _AppLocalizationsDelegate

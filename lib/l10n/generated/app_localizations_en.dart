@@ -1145,4 +1145,206 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get autoOptimizeAudioDesc =>
       'Auto-switch to higher-quality mic when Bluetooth headset is connected';
+
+  @override
+  String get hotkeyConflictTaken => 'That key is taken. Please choose another.';
+
+  @override
+  String hotkeyConflictAutoClearTitle(String keyName, String feature) {
+    return '$keyName is taken by \"$feature\"';
+  }
+
+  @override
+  String get hotkeyConflictAutoClearMsg =>
+      'The hotkey has been cleared. Please set a new one.';
+
+  @override
+  String modelActivateFailed(String err) {
+    return 'Model activation failed: $err';
+  }
+
+  @override
+  String get punctAutoLoaded => 'Punctuation model auto-loaded';
+
+  @override
+  String get punctMissingTitle => 'This model has no punctuation';
+
+  @override
+  String get punctMissingMsg =>
+      'This model outputs text without punctuation. Consider downloading the punctuation model for better readability.\n\nDownload now?';
+
+  @override
+  String get punctDownload => 'Download';
+
+  @override
+  String get punctSkip => 'Not now';
+
+  @override
+  String get offlineDataLocal =>
+      'All data is processed locally; nothing is uploaded';
+
+  @override
+  String get asrModel => 'ASR Model';
+
+  @override
+  String get manageCloudAccounts => 'Manage Cloud Accounts';
+
+  @override
+  String get typewriterEffect => 'Typewriter Effect';
+
+  @override
+  String get ollamaServerRequired =>
+      'Make sure Ollama is running (ollama serve)';
+
+  @override
+  String get manageModels => 'Manage Models';
+
+  @override
+  String get llmRecommendations => 'Recommendations';
+
+  @override
+  String get llmTagFastest => 'Fastest';
+
+  @override
+  String get llmTagStable => 'Stable Pick';
+
+  @override
+  String get llmTagFastestNote => 'May fluctuate at peak';
+
+  @override
+  String get llmTagStableNote => 'Least fluctuation, stable quality';
+
+  @override
+  String get llmDataSource =>
+      'Source: 2026-03-21 benchmark, non-streaming API, China Mainland network';
+
+  @override
+  String get llmModelField => 'Model';
+
+  @override
+  String get llmModelCustom => 'Custom...';
+
+  @override
+  String get llmModelNamePlaceholder => 'Model name';
+
+  @override
+  String get diaryDirNotSet => 'No save directory set';
+
+  @override
+  String get diaryDirCannotWrite =>
+      'Cannot write to this directory, please reselect (macOS requires re-authorization)';
+
+  @override
+  String get diaryDirPick => 'Please select a save directory to grant access';
+
+  @override
+  String get diaryDesc =>
+      'Record ideas anywhere with voice, auto-saved as Markdown diary.';
+
+  @override
+  String get organizeCollapse => 'Collapse';
+
+  @override
+  String get organizeEditInstruction => 'Edit Prompt';
+
+  @override
+  String get correctionHotkey => 'Correction Hotkey';
+
+  @override
+  String get correctionExportDialog => 'Export Correction Data';
+
+  @override
+  String get correctionImportDialog => 'Import Correction Data';
+
+  @override
+  String get correctionExportSuccess => 'Export successful';
+
+  @override
+  String get correctionExportFailedEmpty => 'Export failed: no data';
+
+  @override
+  String correctionImportSuccess(int count) {
+    return 'Imported $count entries (vocab synced)';
+  }
+
+  @override
+  String get correctionExportBtn => 'Export';
+
+  @override
+  String get correctionImportBtn => 'Import';
+
+  @override
+  String get correctionDesc =>
+      'Select the corrected text and submit. ASR learns your wording over time.';
+
+  @override
+  String get aiReportBaseKey => 'Base Key';
+
+  @override
+  String aiReportBaseKeyDesc(String baseKeyName, int slotCount) {
+    return 'Hold $baseKeyName + digit (1–$slotCount) to pick target window';
+  }
+
+  @override
+  String get aiReportAddFirstWindow => 'Add First Window';
+
+  @override
+  String get aiReportAddWindow => 'Add Window';
+
+  @override
+  String get aiReportDescShort =>
+      'Built for AI Coding — screenshot + voice auto-sent to bound window';
+
+  @override
+  String get aiReportDescLong =>
+      'Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.';
+
+  @override
+  String get aiReportSwitchWindow => 'Switch to target window...';
+
+  @override
+  String get aiReportUnbound => 'Unbound';
+
+  @override
+  String get aiReportBindTitle => 'Bind AI Tool Window';
+
+  @override
+  String get aiReportBindMsg =>
+      'After clicking \"Start\", you have 3 seconds to switch to the target window.';
+
+  @override
+  String get aiReportStart => 'Start';
+
+  @override
+  String get aiReportCancel => 'Cancel';
+
+  @override
+  String get activeHotkeys => 'Active Hotkeys';
+
+  @override
+  String get appProductName => 'SpeakOut · 子曰';
+
+  @override
+  String get aboutVersionCopyTip => 'Double-click to copy version';
+
+  @override
+  String get aboutVersionCopied => 'Copied';
+
+  @override
+  String get aboutUpdateDownload => 'Download Update';
+
+  @override
+  String get aboutPrivacyPolicy => 'Privacy Policy';
+
+  @override
+  String get clearHotkey => 'Clear hotkey';
+
+  @override
+  String get featureCorrection => 'Correction';
+
+  @override
+  String get featureAiReport => 'AI Debug';
+
+  @override
+  String get shortcutsAndDuration => 'Shortcuts & Duration';
 }

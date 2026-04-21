@@ -210,17 +210,18 @@ class ModeTabState extends State<ModeTab> {
     if (conflictWith != null) {
       _stopKeyCapture();
       if (mounted) {
+        final loc = AppLocalizations.of(context)!;
         showMacosAlertDialog(
           context: context,
           builder: (_) => MacosAlertDialog(
             appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
                 size: 48, color: Colors.orange),
-            title: Text('$displayName 已被「$conflictWith」使用',
+            title: Text(loc.hotkeyInUseTitle(displayName, conflictWith),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            message: const Text('该按键已被占用，请选择其他按键。'),
+            message: Text(loc.hotkeyConflictTaken),
             primaryButton: PushButton(
               controlSize: ControlSize.large,
-              child: const Text('好的'),
+              child: Text(loc.hotkeyInUseOk),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -286,16 +287,16 @@ class ModeTabState extends State<ModeTab> {
         Row(children: [
           const Text('⌨️', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
-          Text('快捷键与时长', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(loc.shortcutsAndDuration, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
         ]),
         const SizedBox(height: 10),
-        _compactRow('长按说话 (PTT)', _hotkeyBadge(
+        _compactRow(loc.shortcutsPttTitle, _hotkeyBadge(
           _currentKeyName,
           isCapturing: _isCapturingKey,
           onTap: () => _startKeyCapture(),
         )),
         const SizedBox(height: 6),
-        _compactRow('单击切换 (Toggle)', _hotkeyBadge(
+        _compactRow(loc.shortcutsToggleTitle, _hotkeyBadge(
           _toggleInputKeyName,
           isCapturing: _isCapturingToggleInputKey,
           onTap: () => _startKeyCapture('toggleInput'),
@@ -411,7 +412,10 @@ class ModeTabState extends State<ModeTab> {
           await ConfigService().setActiveModelId(previousModelId);
         }
         setState(() { _activatingId = null; });
-        if (mounted) showSettingsError(context, '模型激活失败: $e');
+        if (mounted) {
+          final loc = AppLocalizations.of(context)!;
+          showSettingsError(context, loc.modelActivateFailed('$e'));
+        }
         return;
       }
       // Model has no built-in punctuation -> prompt user + auto-load punctuation model
@@ -420,24 +424,25 @@ class ModeTabState extends State<ModeTab> {
         if (punctPath != null) {
           await _engine.initPunctuation(punctPath, activeModelName: model.name);
           if (mounted) {
-            showSettingsInfo('已自动加载标点模型');
+            showSettingsInfo(AppLocalizations.of(context)!.punctAutoLoaded);
           }
         } else if (mounted) {
+          final loc = AppLocalizations.of(context)!;
           final confirmed = await showMacosAlertDialog<bool>(
             context: context,
             builder: (_) => MacosAlertDialog(
               appIcon: const MacosIcon(CupertinoIcons.textformat_abc, size: 48),
-              title: const Text('该模型不含标点符号'),
-              message: const Text('此模型输出的文字没有标点。建议下载标点模型以获得更好的阅读体验。\n\n是否前往下载？'),
+              title: Text(loc.punctMissingTitle),
+              message: Text(loc.punctMissingMsg),
               primaryButton: PushButton(
                 controlSize: ControlSize.large,
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('去下载'),
+                child: Text(loc.punctDownload),
               ),
               secondaryButton: PushButton(
                 controlSize: ControlSize.large,
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('暂不需要'),
+                child: Text(loc.punctSkip),
               ),
             ),
           );
@@ -1248,7 +1253,7 @@ class ModeTabState extends State<ModeTab> {
         ),
         const SizedBox(height: 6),
         Text(
-          '所有数据在本地处理，不上传任何信息',
+          loc.offlineDataLocal,
           style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
         ),
       ],
@@ -1347,7 +1352,7 @@ class ModeTabState extends State<ModeTab> {
         )),
         if (asrModels.length > 1) ...[
           const SizedBox(height: 6),
-          _compactRow('识别模型', MacosPopupButton<String>(
+          _compactRow(loc.asrModel, MacosPopupButton<String>(
             value: effectiveAsrModelId,
             items: asrModels.map((m) => MacosPopupMenuItem(
               value: m.id,
@@ -1370,7 +1375,7 @@ class ModeTabState extends State<ModeTab> {
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () => widget.onNavigateToTab(3),
-          child: Text('管理云服务账户 ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+          child: Text('${loc.manageCloudAccounts} ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
         ),
       ],
     );
@@ -1421,7 +1426,7 @@ class ModeTabState extends State<ModeTab> {
           )),
           const SizedBox(height: 6),
           // Typewriter effect
-          _compactRow('打字机效果', Row(
+          _compactRow(loc.typewriterEffect, Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
@@ -1473,7 +1478,7 @@ class ModeTabState extends State<ModeTab> {
         if (!advanced || ConfigService().llmProviderType == 'cloud')
           _buildCloudLlmAccountSelector(loc)
         else ...[
-          Text('确保 Ollama 已启动（ollama serve）', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+          Text(loc.ollamaServerRequired, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
           const SizedBox(height: 8),
           buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
           const SizedBox(height: 6),
@@ -1542,7 +1547,7 @@ class ModeTabState extends State<ModeTab> {
         GestureDetector(
           onTap: () => setState(() => _workModeAdvancedExpanded = true),
           child: Text(
-            '管理模型 ▸',
+            '${loc.manageModels} ▸',
             style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
           ),
         ),
@@ -1651,6 +1656,7 @@ class ModeTabState extends State<ModeTab> {
   // --- LLM recommendation ---
 
   Widget _buildLlmRecommendation() {
+    final loc = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1665,16 +1671,16 @@ class ModeTabState extends State<ModeTab> {
             children: [
               MacosIcon(CupertinoIcons.lightbulb, size: 14, color: AppTheme.getAccent(context)),
               const SizedBox(width: 6),
-              Text('选型参考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.getAccent(context))),
+              Text(loc.llmRecommendations, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.getAccent(context))),
             ],
           ),
           const SizedBox(height: 8),
-          _buildRecommendItem('DeepSeek deepseek-chat', '极致速度', '~129ms', '高峰期可能波动'),
+          _buildRecommendItem('DeepSeek deepseek-chat', loc.llmTagFastest, '~129ms', loc.llmTagFastestNote),
           const SizedBox(height: 4),
-          _buildRecommendItem('阿里云百炼 qwen-turbo', '稳定首选', '~573ms', '波动最小，质量稳定'),
+          _buildRecommendItem('阿里云百炼 qwen-turbo', loc.llmTagStable, '~573ms', loc.llmTagStableNote),
           const SizedBox(height: 6),
           Text(
-            '数据来源：2026-03-21 实测，非流式 API，中国大陆网络',
+            loc.llmDataSource,
             style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor),
           ),
         ],
@@ -1706,6 +1712,7 @@ class ModeTabState extends State<ModeTab> {
   // --- LLM model selector ---
 
   Widget _buildLlmModelSelector(CloudAccount? account, CloudProvider? provider) {
+    final loc = AppLocalizations.of(context)!;
     final presets = provider?.llmModels ?? [];
     final currentModel = ConfigService().llmModelOverride ?? provider?.llmDefaultModel ?? '';
 
@@ -1747,7 +1754,7 @@ class ModeTabState extends State<ModeTab> {
             children: [
               const MacosIcon(CupertinoIcons.cube_box, size: 14, color: MacosColors.systemGrayColor),
               const SizedBox(width: 6),
-              Text('模型', style: AppTheme.caption(context)),
+              Text(loc.llmModelField, style: AppTheme.caption(context)),
               const Spacer(),
               if (presets.isNotEmpty)
                 MacosPopupButton<String>(
@@ -1768,9 +1775,9 @@ class ModeTabState extends State<ModeTab> {
                         ],
                       ),
                     )),
-                    const MacosPopupMenuItem(
+                    MacosPopupMenuItem(
                       value: _kCustomModelSentinel,
-                      child: Text('自定义...'),
+                      child: Text(loc.llmModelCustom),
                     ),
                   ],
                   onChanged: (v) async {
@@ -1792,7 +1799,7 @@ class ModeTabState extends State<ModeTab> {
             const SizedBox(height: 8),
             MacosTextField(
               controller: _llmCustomModelController,
-              placeholder: provider?.llmModelHint ?? '模型名称',
+              placeholder: provider?.llmModelHint ?? loc.llmModelNamePlaceholder,
               onChanged: (v) async {
                 _llmModelController.text = v;
                 await ConfigService().setLlmModel(v);

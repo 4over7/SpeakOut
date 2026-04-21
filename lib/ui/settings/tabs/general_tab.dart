@@ -154,9 +154,11 @@ class _GeneralTabState extends State<GeneralTab> {
       audioSubtitle = loc.audioDeviceCurrent(_currentAudioDevice!.name);
     }
 
+    // 单页面视图下不重复 page header 的标题
+    final showTitle = widget.viewFilter == GeneralView.all;
     return SettingsCard(
-      title: loc.tabGeneral,
-      titleIcon: CupertinoIcons.settings,
+      title: showTitle ? loc.tabGeneral : null,
+      titleIcon: showTitle ? CupertinoIcons.settings : null,
       accentColor: AppTheme.getAccent(context),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       children: [
@@ -245,17 +247,20 @@ class _GeneralTabState extends State<GeneralTab> {
 
   Widget _buildPermissionsCard() {
     final loc = AppLocalizations.of(context)!;
+    final showTitle = widget.viewFilter == GeneralView.all;
     return SettingsCard(
       padding: const EdgeInsets.all(14),
       children: [
-        Row(
-          children: [
-            const MacosIcon(CupertinoIcons.lock_shield, size: 14, color: MacosColors.systemGrayColor),
-            const SizedBox(width: 6),
-            Text(loc.permissionsSectionTitle, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-          ],
-        ),
-        const SizedBox(height: 8),
+        if (showTitle) ...[
+          Row(
+            children: [
+              const MacosIcon(CupertinoIcons.lock_shield, size: 14, color: MacosColors.systemGrayColor),
+              const SizedBox(width: 6),
+              Text(loc.permissionsSectionTitle, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(

@@ -423,5 +423,87 @@
   "bluetoothMicWarning": "Bluetooth mic may reduce quality",
   "switchToBuiltin": "Switch to built-in",
   "autoOptimizeAudio": "Auto-optimize audio",
-  "autoOptimizeAudioDesc": "Auto-switch to higher-quality mic when Bluetooth headset is connected"
+  "autoOptimizeAudioDesc": "Auto-switch to higher-quality mic when Bluetooth headset is connected",
+
+  "hotkeyConflictTaken": "That key is taken. Please choose another.",
+  "hotkeyConflictAutoClearTitle": "{keyName} is taken by \"{feature}\"",
+  "@hotkeyConflictAutoClearTitle": {
+    "placeholders": {"keyName": {"type": "String"}, "feature": {"type": "String"}}
+  },
+  "hotkeyConflictAutoClearMsg": "The hotkey has been cleared. Please set a new one.",
+
+  "modelActivateFailed": "Model activation failed: {err}",
+  "@modelActivateFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
+  "punctAutoLoaded": "Punctuation model auto-loaded",
+  "punctMissingTitle": "This model has no punctuation",
+  "punctMissingMsg": "This model outputs text without punctuation. Consider downloading the punctuation model for better readability.\n\nDownload now?",
+  "punctDownload": "Download",
+  "punctSkip": "Not now",
+
+  "offlineDataLocal": "All data is processed locally; nothing is uploaded",
+  "asrModel": "ASR Model",
+  "manageCloudAccounts": "Manage Cloud Accounts",
+  "typewriterEffect": "Typewriter Effect",
+  "ollamaServerRequired": "Make sure Ollama is running (ollama serve)",
+  "manageModels": "Manage Models",
+  "llmRecommendations": "Recommendations",
+  "llmTagFastest": "Fastest",
+  "llmTagStable": "Stable Pick",
+  "llmTagFastestNote": "May fluctuate at peak",
+  "llmTagStableNote": "Least fluctuation, stable quality",
+  "llmDataSource": "Source: 2026-03-21 benchmark, non-streaming API, China Mainland network",
+  "llmModelField": "Model",
+  "llmModelCustom": "Custom...",
+  "llmModelNamePlaceholder": "Model name",
+
+  "diaryDirNotSet": "No save directory set",
+  "diaryDirCannotWrite": "Cannot write to this directory, please reselect (macOS requires re-authorization)",
+  "diaryDirPick": "Please select a save directory to grant access",
+  "diaryDesc": "Record ideas anywhere with voice, auto-saved as Markdown diary.",
+
+  "organizeCollapse": "Collapse",
+  "organizeEditInstruction": "Edit Prompt",
+
+  "correctionHotkey": "Correction Hotkey",
+  "correctionExportDialog": "Export Correction Data",
+  "correctionImportDialog": "Import Correction Data",
+  "correctionExportSuccess": "Export successful",
+  "correctionExportFailedEmpty": "Export failed: no data",
+  "correctionImportSuccess": "Imported {count} entries (vocab synced)",
+  "@correctionImportSuccess": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "correctionExportBtn": "Export",
+  "correctionImportBtn": "Import",
+  "correctionDesc": "Select the corrected text and submit. ASR learns your wording over time.",
+
+  "aiReportBaseKey": "Base Key",
+  "aiReportBaseKeyDesc": "Hold {baseKeyName} + digit (1–{slotCount}) to pick target window",
+  "@aiReportBaseKeyDesc": {
+    "placeholders": {"baseKeyName": {"type": "String"}, "slotCount": {"type": "int"}}
+  },
+  "aiReportAddFirstWindow": "Add First Window",
+  "aiReportAddWindow": "Add Window",
+  "aiReportDescShort": "Built for AI Coding — screenshot + voice auto-sent to bound window",
+  "aiReportDescLong": "Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.",
+  "aiReportSwitchWindow": "Switch to target window...",
+  "aiReportUnbound": "Unbound",
+  "aiReportBindTitle": "Bind AI Tool Window",
+  "aiReportBindMsg": "After clicking \"Start\", you have 3 seconds to switch to the target window.",
+  "aiReportStart": "Start",
+  "aiReportCancel": "Cancel",
+  "activeHotkeys": "Active Hotkeys",
+
+  "appProductName": "SpeakOut · 子曰",
+  "aboutVersionCopyTip": "Double-click to copy version",
+  "aboutVersionCopied": "Copied",
+  "aboutUpdateDownload": "Download Update",
+  "aboutPrivacyPolicy": "Privacy Policy",
+
+  "clearHotkey": "Clear hotkey",
+  "featureCorrection": "Correction",
+  "featureAiReport": "AI Debug",
+  "shortcutsAndDuration": "Shortcuts & Duration"
 }

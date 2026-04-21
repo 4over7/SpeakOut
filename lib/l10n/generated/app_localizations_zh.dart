@@ -1095,4 +1095,196 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoOptimizeAudioDesc => '蓝牙耳机时自动切换到高质量麦克风';
+
+  @override
+  String get hotkeyConflictTaken => '该按键已被占用，请选择其他按键。';
+
+  @override
+  String hotkeyConflictAutoClearTitle(String keyName, String feature) {
+    return '$keyName 已被「$feature」占用';
+  }
+
+  @override
+  String get hotkeyConflictAutoClearMsg => '快捷键已自动清除，请重新设置。';
+
+  @override
+  String modelActivateFailed(String err) {
+    return '模型激活失败：$err';
+  }
+
+  @override
+  String get punctAutoLoaded => '已自动加载标点模型';
+
+  @override
+  String get punctMissingTitle => '该模型不含标点符号';
+
+  @override
+  String get punctMissingMsg => '此模型输出的文字没有标点。建议下载标点模型以获得更好的阅读体验。\n\n是否前往下载？';
+
+  @override
+  String get punctDownload => '去下载';
+
+  @override
+  String get punctSkip => '暂不需要';
+
+  @override
+  String get offlineDataLocal => '所有数据在本地处理，不上传任何信息';
+
+  @override
+  String get asrModel => '识别模型';
+
+  @override
+  String get manageCloudAccounts => '管理云服务账户';
+
+  @override
+  String get typewriterEffect => '打字机效果';
+
+  @override
+  String get ollamaServerRequired => '确保 Ollama 已启动（ollama serve）';
+
+  @override
+  String get manageModels => '管理模型';
+
+  @override
+  String get llmRecommendations => '选型参考';
+
+  @override
+  String get llmTagFastest => '极致速度';
+
+  @override
+  String get llmTagStable => '稳定首选';
+
+  @override
+  String get llmTagFastestNote => '高峰期可能波动';
+
+  @override
+  String get llmTagStableNote => '波动最小，质量稳定';
+
+  @override
+  String get llmDataSource => '数据来源：2026-03-21 实测，非流式 API，中国大陆网络';
+
+  @override
+  String get llmModelField => '模型';
+
+  @override
+  String get llmModelCustom => '自定义...';
+
+  @override
+  String get llmModelNamePlaceholder => '模型名称';
+
+  @override
+  String get diaryDirNotSet => '未设置保存目录';
+
+  @override
+  String get diaryDirCannotWrite => '无法写入目录，请重新选择（macOS 需重新授权）';
+
+  @override
+  String get diaryDirPick => '请选择保存目录以授权访问';
+
+  @override
+  String get diaryDesc => '随时随地语音记录灵感，自动保存为 Markdown 日记。';
+
+  @override
+  String get organizeCollapse => '收起';
+
+  @override
+  String get organizeEditInstruction => '编辑指令';
+
+  @override
+  String get correctionHotkey => '纠错快捷键';
+
+  @override
+  String get correctionExportDialog => '导出纠错数据';
+
+  @override
+  String get correctionImportDialog => '导入纠错数据';
+
+  @override
+  String get correctionExportSuccess => '导出成功';
+
+  @override
+  String get correctionExportFailedEmpty => '导出失败：无数据';
+
+  @override
+  String correctionImportSuccess(int count) {
+    return '导入 $count 条记录（词汇已同步）';
+  }
+
+  @override
+  String get correctionExportBtn => '导出';
+
+  @override
+  String get correctionImportBtn => '导入';
+
+  @override
+  String get correctionDesc => '选中修正后的文字，一键提交纠错。ASR 自动学习你的用词习惯。';
+
+  @override
+  String get aiReportBaseKey => '基础按键';
+
+  @override
+  String aiReportBaseKeyDesc(String baseKeyName, int slotCount) {
+    return '按住 $baseKeyName + 数字键（1–$slotCount）选择目标窗口';
+  }
+
+  @override
+  String get aiReportAddFirstWindow => '添加第一个窗口';
+
+  @override
+  String get aiReportAddWindow => '添加窗口';
+
+  @override
+  String get aiReportDescShort => '为 AI Coding 而生 — 截屏+语音自动发送到绑定窗口';
+
+  @override
+  String get aiReportDescLong =>
+      '为 AI Coding 而生 — 截屏+语音描述，一键发送到 Claude Code / Cursor。';
+
+  @override
+  String get aiReportSwitchWindow => '请切换到目标窗口...';
+
+  @override
+  String get aiReportUnbound => '未绑定';
+
+  @override
+  String get aiReportBindTitle => '绑定 AI 工具窗口';
+
+  @override
+  String get aiReportBindMsg => '点击「开始」后，你有 3 秒时间切换到目标窗口。';
+
+  @override
+  String get aiReportStart => '开始';
+
+  @override
+  String get aiReportCancel => '取消';
+
+  @override
+  String get activeHotkeys => '已启用的快捷键';
+
+  @override
+  String get appProductName => '子曰 SpeakOut';
+
+  @override
+  String get aboutVersionCopyTip => '双击复制版本号';
+
+  @override
+  String get aboutVersionCopied => '已复制';
+
+  @override
+  String get aboutUpdateDownload => '下载更新';
+
+  @override
+  String get aboutPrivacyPolicy => '隐私政策';
+
+  @override
+  String get clearHotkey => '清除快捷键';
+
+  @override
+  String get featureCorrection => '纠错反馈';
+
+  @override
+  String get featureAiReport => 'AI 一键调试';
+
+  @override
+  String get shortcutsAndDuration => '快捷键与时长';
 }

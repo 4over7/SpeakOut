@@ -128,7 +128,7 @@ class _AboutTabState extends State<AboutTab> {
 
           // App name
           Text(
-            '子曰 SpeakOut',
+            loc.appProductName,
             style: AppTheme.display(context).copyWith(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -150,7 +150,7 @@ class _AboutTabState extends State<AboutTab> {
                   });
                 },
                 child: Tooltip(
-                  message: '双击复制版本号',
+                  message: loc.aboutVersionCopyTip,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -173,7 +173,7 @@ class _AboutTabState extends State<AboutTab> {
                           const SizedBox(width: 4),
                         ],
                         Text(
-                          _versionCopied ? '已复制' : 'v$_version',
+                          _versionCopied ? loc.aboutVersionCopied : 'v$_version',
                           style: AppTheme.mono(context).copyWith(
                             fontSize: 12,
                             color: _versionCopied
@@ -256,7 +256,7 @@ class _AboutTabState extends State<AboutTab> {
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
-                                      UpdateService().canAutoUpdate ? '下载更新' : loc.updateAction,
+                                      UpdateService().canAutoUpdate ? loc.aboutUpdateDownload : loc.updateAction,
                                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
                                     ),
                                   ),
@@ -309,7 +309,7 @@ class _AboutTabState extends State<AboutTab> {
           // Privacy policy
           GestureDetector(
             onTap: () => launchUrl(Uri.parse('https://github.com/4over7/SpeakOut/wiki/Privacy-Policy')),
-            child: Text('隐私政策', style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), decoration: TextDecoration.underline)),
+            child: Text(loc.aboutPrivacyPolicy, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), decoration: TextDecoration.underline)),
           ),
 
           const SizedBox(height: 48),

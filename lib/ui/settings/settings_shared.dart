@@ -228,7 +228,7 @@ Widget hotkeyBadge(
           child: GestureDetector(
             onTap: onClear,
             child: Tooltip(
-              message: '清除快捷键',
+              message: loc.clearHotkey,
               child: Icon(CupertinoIcons.clear_circled,
                   size: 14, color: MacosColors.systemGrayColor),
             ),
@@ -290,10 +290,10 @@ Map<HotkeyId, String> getActiveHotkeys(BuildContext context, {String? excludeFea
     map[(config.translateKeyCode, config.translateModifiers)] = loc.quickTranslate;
   }
   if (config.correctionEnabled && config.correctionKeyCode != 0 && excludeFeature != 'correction') {
-    map[(config.correctionKeyCode, config.correctionModifiers)] = '纠错反馈';
+    map[(config.correctionKeyCode, config.correctionModifiers)] = loc.featureCorrection;
   }
   if (config.aiReportEnabled && config.aiReportBaseKeyCode != 0 && excludeFeature != 'aiReport') {
-    map[(config.aiReportBaseKeyCode, 0)] = 'AI 一键调试';
+    map[(config.aiReportBaseKeyCode, 0)] = loc.featureAiReport;
   }
   return map;
 }

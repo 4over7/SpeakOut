@@ -76,9 +76,9 @@ class _SettingsPageState extends State<SettingsPage> {
           titleWidth: 150.0,
           actions: [
             ToolBarIconButton(
-              label: 'v1.8 预览',
+              label: 'v1.8 Preview',
               icon: const MacosIcon(CupertinoIcons.sidebar_left),
-              tooltipMessage: '打开 v1.8 sidebar 预览（脚手架）',
+              tooltipMessage: 'v1.8 Preview',
               showLabel: false,
               onPressed: () {
                 Navigator.of(context).push(
