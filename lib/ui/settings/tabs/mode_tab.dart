@@ -914,7 +914,9 @@ class ModeTabState extends State<ModeTab> {
 
   /// v1.8 sidebar 识别引擎页：模式选择 + 语言 + 模型/ASR 相关
   /// 不包含 hotkey（在 shortcuts_page）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
+  /// Simple：模式 + 语言 + 当前模型卡；Advanced：加 offline 模型列表 + streaming/punct。
   Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode, bool isTranslation) {
+    final advanced = ConfigService().showAdvanced;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(4),
       child: Column(
@@ -926,7 +928,7 @@ class ModeTabState extends State<ModeTab> {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: KeyedSubtree(
-              key: ValueKey('recognition_$currentMode'),
+              key: ValueKey('recognition_${currentMode}_$advanced'),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -937,10 +939,12 @@ class ModeTabState extends State<ModeTab> {
                   ] else ...[
                     const SizedBox(height: 10),
                     _buildModelInfoCard(loc),
-                    const SizedBox(height: 10),
-                    _buildOfflineModelListCard(loc),
-                    const SizedBox(height: 10),
-                    _buildStreamingAndPunctCard(loc),
+                    if (advanced) ...[
+                      const SizedBox(height: 10),
+                      _buildOfflineModelListCard(loc),
+                      const SizedBox(height: 10),
+                      _buildStreamingAndPunctCard(loc),
+                    ],
                   ],
                   const SizedBox(height: 24),
                 ],
@@ -1330,6 +1334,8 @@ class ModeTabState extends State<ModeTab> {
   }
 
   Widget _buildAiConfigCardSmart(AppLocalizations loc) {
+    // v1.8 sidebar AI Plus 的高级开关（旧 5-tab 用 ModeTabView.all，默认全展示）
+    final advanced = widget.viewFilter != ModeTabView.aiPlus || ConfigService().showAdvanced;
     return SettingsCard(
       padding: const EdgeInsets.all(14),
       children: [
@@ -1355,71 +1361,73 @@ class ModeTabState extends State<ModeTab> {
           ],
         ),
         const SizedBox(height: 8),
-        // LLM Provider type
-        _compactRow(loc.llmProvider, MacosPopupButton<String>(
-          value: ConfigService().llmProviderType,
-          items: [
-            MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
-            MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
-          ],
-          onChanged: (v) async {
-            if (v != null) {
-              await ConfigService().setLlmProviderType(v);
-              setState(() {});
-            }
-          },
-        )),
-        const SizedBox(height: 6),
-        // Typewriter effect
-        _compactRow('打字机效果', Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
-              ),
-              child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
-            ),
-            const SizedBox(width: 8),
-            MacosSwitch(
-              value: ConfigService().typewriterEnabled,
-              onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
-            ),
-          ],
-        )),
-        Divider(height: 16, color: AppTheme.getBorder(context)),
-        // System Prompt
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
-            GestureDetector(
-              onTap: () async {
-                await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
-                _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+        if (advanced) ...[
+          // LLM Provider type
+          _compactRow(loc.llmProvider, MacosPopupButton<String>(
+            value: ConfigService().llmProviderType,
+            items: [
+              MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+              MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+            ],
+            onChanged: (v) async {
+              if (v != null) {
+                await ConfigService().setLlmProviderType(v);
                 setState(() {});
-              },
-              child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        MacosTextField(
-          maxLines: 4,
-          placeholder: "Enter instructions for AI...",
-          controller: _aiPromptController,
-          decoration: BoxDecoration(
-            color: AppTheme.getInputBackground(context),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.getBorder(context)),
+              }
+            },
+          )),
+          const SizedBox(height: 6),
+          // Typewriter effect
+          _compactRow('打字机效果', Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
+                ),
+                child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
+              ),
+              const SizedBox(width: 8),
+              MacosSwitch(
+                value: ConfigService().typewriterEnabled,
+                onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
+              ),
+            ],
+          )),
+          Divider(height: 16, color: AppTheme.getBorder(context)),
+          // System Prompt
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
+              GestureDetector(
+                onTap: () async {
+                  await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                  _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+                  setState(() {});
+                },
+                child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+              ),
+            ],
           ),
-          onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
-        ),
-        Divider(height: 16, color: AppTheme.getBorder(context)),
-        // LLM config (cloud or ollama)
-        if (ConfigService().llmProviderType == 'cloud')
+          const SizedBox(height: 6),
+          MacosTextField(
+            maxLines: 4,
+            placeholder: "Enter instructions for AI...",
+            controller: _aiPromptController,
+            decoration: BoxDecoration(
+              color: AppTheme.getInputBackground(context),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.getBorder(context)),
+            ),
+            onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
+          ),
+          Divider(height: 16, color: AppTheme.getBorder(context)),
+        ],
+        // LLM config — Simple 模式强制 cloud；Advanced 按 provider 切换
+        if (!advanced || ConfigService().llmProviderType == 'cloud')
           _buildCloudLlmAccountSelector(loc)
         else ...[
           Text('确保 Ollama 已启动（ollama serve）', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),

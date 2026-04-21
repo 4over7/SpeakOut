@@ -32,6 +32,9 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
 
   int _toggleMaxDuration = 0;
 
+  // Simple 模式共享键捕获标记（写入 ptt + toggleInput 两处）
+  bool _isCapturingSharedKey = false;
+
   HotkeyCapturer? _keyCapturer;
 
   @override
@@ -54,10 +57,13 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
   void _startKeyCapture([String target = 'ptt']) {
     _keyCapturer?.cancel();
     setState(() {
-      if (target == 'toggleInput') {
-        _isCapturingToggleInputKey = true;
-      } else {
-        _isCapturingKey = true;
+      switch (target) {
+        case 'toggleInput':
+          _isCapturingToggleInputKey = true;
+        case 'shared':
+          _isCapturingSharedKey = true;
+        default:
+          _isCapturingKey = true;
       }
     });
     _keyCapturer = HotkeyCapturer(
@@ -75,6 +81,7 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
     setState(() {
       _isCapturingKey = false;
       _isCapturingToggleInputKey = false;
+      _isCapturingSharedKey = false;
     });
   }
 
@@ -89,9 +96,11 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
     final requiredMods = stripOwnModifier(keyCode, modifierFlags);
     final displayName = requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
 
-    final activeKeys = getActiveHotkeys(context, excludeFeature: _isCapturingKey ? 'ptt' : 'toggleInput');
-    if (_isCapturingKey) activeKeys.remove((config.toggleInputKeyCode, config.toggleInputModifiers));
-    if (_isCapturingToggleInputKey) activeKeys.remove((config.pttKeyCode, config.pttModifiers));
+    // 确定排除的 feature：shared 模式排除 ptt 和 toggleInput 两者（因为是要写入这两者）
+    final excludeFeature = _isCapturingToggleInputKey ? 'toggleInput' : 'ptt';
+    final activeKeys = getActiveHotkeys(context, excludeFeature: excludeFeature);
+    if (_isCapturingKey || _isCapturingSharedKey) activeKeys.remove((config.toggleInputKeyCode, config.toggleInputModifiers));
+    if (_isCapturingToggleInputKey || _isCapturingSharedKey) activeKeys.remove((config.pttKeyCode, config.pttModifiers));
     final hotkeyId = (keyCode, requiredMods);
     final conflictWith = findHotkeyConflict(activeKeys, hotkeyId);
     if (conflictWith != null) {
@@ -113,7 +122,18 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
       return;
     }
 
-    if (_isCapturingToggleInputKey) {
+    if (_isCapturingSharedKey) {
+      // Simple 模式：共享键同时写入 PTT 和 ToggleInput
+      await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
+      await config.setToggleInputKey(keyCode, displayName, modifiers: requiredMods);
+      CoreEngine().pttKeyCode = keyCode;
+      setState(() {
+        _currentKeyCode = keyCode;
+        _currentKeyName = displayName;
+        _toggleInputKeyName = displayName;
+        _isCapturingSharedKey = false;
+      });
+    } else if (_isCapturingToggleInputKey) {
       await config.setToggleInputKey(keyCode, displayName, modifiers: requiredMods);
       setState(() {
         _toggleInputKeyName = displayName;
@@ -133,68 +153,102 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final advanced = ConfigService().showAdvanced;
+
     return ListView(
       padding: const EdgeInsets.all(4),
       children: [
-        SettingsCard(
-          title: '录音键',
-          titleIcon: CupertinoIcons.mic,
-          accentColor: AppTheme.getAccent(context),
-          children: [
-            _row(
-              '长按说话 (PTT)',
-              '长按该键录音，松开停止',
-              hotkeyBadge(
-                context,
-                _currentKeyName,
-                isCapturing: _isCapturingKey,
-                onTap: () => _startKeyCapture('ptt'),
-              ),
-            ),
-            const SizedBox(height: 14),
-            _row(
-              '单击切换 (Toggle)',
-              '点一下开录、再点一下停',
-              hotkeyBadge(
-                context,
-                _toggleInputKeyName,
-                isCapturing: _isCapturingToggleInputKey,
-                onTap: () => _startKeyCapture('toggleInput'),
-                onClear: _toggleInputKeyName.isEmpty
-                    ? null
-                    : () async {
-                        await ConfigService().clearToggleInputKey();
-                        setState(() => _toggleInputKeyName = '');
-                      },
-              ),
-            ),
-            const SizedBox(height: 14),
-            _row(
-              loc.toggleMaxDuration,
-              'Toggle 模式下自动停止录音的时长',
-              MacosPopupButton<int>(
-                value: _toggleMaxDuration,
-                items: [
-                  MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
-                  MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
-                  MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
-                  MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
-                  MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
-                ],
-                onChanged: (v) async {
-                  if (v != null) {
-                    await ConfigService().setToggleMaxDuration(v);
-                    setState(() => _toggleMaxDuration = v);
-                  }
-                },
-              ),
-            ),
-          ],
-        ),
+        advanced ? _buildAdvancedCard(loc) : _buildSimpleCard(loc),
         const SizedBox(height: 12),
-        _Tip(
+        _buildMaxDurationCard(loc),
+        const SizedBox(height: 12),
+        const _Tip(
           icon: CupertinoIcons.lightbulb,
           text: '推荐 Right Option / Fn / F13-F19 — Cmd / Ctrl 等组合键常被系统应用占用。',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSimpleCard(AppLocalizations loc) {
+    return SettingsCard(
+      title: '录音键',
+      titleIcon: CupertinoIcons.mic,
+      accentColor: AppTheme.getAccent(context),
+      children: [
+        _row(
+          '录音键',
+          '短按 = 切换录音，长按 = 说话松开停',
+          hotkeyBadge(
+            context,
+            _currentKeyName,
+            isCapturing: _isCapturingSharedKey,
+            onTap: () => _startKeyCapture('shared'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdvancedCard(AppLocalizations loc) {
+    return SettingsCard(
+      title: '录音键（PTT / Toggle 分键）',
+      titleIcon: CupertinoIcons.mic,
+      accentColor: AppTheme.getAccent(context),
+      children: [
+        _row(
+          '长按说话 (PTT)',
+          '长按该键录音，松开停止',
+          hotkeyBadge(
+            context,
+            _currentKeyName,
+            isCapturing: _isCapturingKey,
+            onTap: () => _startKeyCapture('ptt'),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _row(
+          '单击切换 (Toggle)',
+          '点一下开录、再点一下停',
+          hotkeyBadge(
+            context,
+            _toggleInputKeyName,
+            isCapturing: _isCapturingToggleInputKey,
+            onTap: () => _startKeyCapture('toggleInput'),
+            onClear: _toggleInputKeyName.isEmpty
+                ? null
+                : () async {
+                    await ConfigService().clearToggleInputKey();
+                    setState(() => _toggleInputKeyName = '');
+                  },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMaxDurationCard(AppLocalizations loc) {
+    return SettingsCard(
+      children: [
+        _row(
+          loc.toggleMaxDuration,
+          'Toggle 模式下自动停止录音的时长',
+          MacosPopupButton<int>(
+            value: _toggleMaxDuration,
+            items: [
+              MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
+              MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
+              MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
+              MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
+              MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
+            ],
+            onChanged: (v) async {
+              if (v != null) {
+                await ConfigService().setToggleMaxDuration(v);
+                setState(() => _toggleMaxDuration = v);
+              }
+            },
+          ),
         ),
       ],
     );

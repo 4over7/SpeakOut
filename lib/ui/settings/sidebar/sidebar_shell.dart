@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
+import '../../../services/config_service.dart';
 import '../../theme.dart';
 import 'pages/about_page.dart';
 import 'pages/ai_plus_page.dart';
@@ -47,6 +48,7 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
             id: 'shortcuts',
             label: '快捷键',
             icon: CupertinoIcons.keyboard,
+            hasAdvanced: true,
             builder: (_) => const ShortcutsPage(),
           ),
           SidebarEntry(
@@ -64,12 +66,14 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
             id: 'recognition',
             label: '识别引擎',
             icon: CupertinoIcons.waveform_circle_fill,
+            hasAdvanced: true,
             builder: (_) => const RecognitionEnginePage(),
           ),
           SidebarEntry(
             id: 'ai_plus',
             label: 'AI Plus',
             icon: CupertinoIcons.sparkles,
+            hasAdvanced: true,
             builder: (_) => const AiPlusPage(),
           ),
           SidebarEntry(
@@ -170,14 +174,84 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
                   Expanded(
                     child: Container(
                       color: AppTheme.getBackground(context),
-                      padding: const EdgeInsets.all(20),
-                      child: selected.builder(context),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _PageHeader(
+                            entry: selected,
+                            showAdvanced: ConfigService().showAdvanced,
+                            onToggleAdvanced: (v) async {
+                              await ConfigService().setShowAdvanced(v);
+                              if (mounted) setState(() {});
+                            },
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: selected.builder(context),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PageHeader extends StatelessWidget {
+  final SidebarEntry entry;
+  final bool showAdvanced;
+  final ValueChanged<bool> onToggleAdvanced;
+
+  const _PageHeader({
+    required this.entry,
+    required this.showAdvanced,
+    required this.onToggleAdvanced,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppTheme.getBorder(context), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          MacosIcon(entry.icon, size: 20, color: AppTheme.getAccent(context)),
+          const SizedBox(width: 10),
+          Text(
+            entry.label,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.getTextPrimary(context),
+            ),
+          ),
+          const Spacer(),
+          if (entry.hasAdvanced) ...[
+            Text(
+              '显示高级',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.getTextSecondary(context),
+              ),
+            ),
+            const SizedBox(width: 8),
+            MacosSwitch(
+              value: showAdvanced,
+              onChanged: onToggleAdvanced,
+            ),
+          ],
         ],
       ),
     );

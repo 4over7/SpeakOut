@@ -6,12 +6,15 @@ class SidebarEntry {
   final String label;
   final IconData icon;
   final WidgetBuilder builder;
+  /// 是否有 Simple/Advanced 差异。true 时右上角显示"显示高级"开关。
+  final bool hasAdvanced;
 
   const SidebarEntry({
     required this.id,
     required this.label,
     required this.icon,
     required this.builder,
+    this.hasAdvanced = false,
   });
 }
 

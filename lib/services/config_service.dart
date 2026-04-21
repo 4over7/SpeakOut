@@ -546,6 +546,10 @@ class ConfigService {
   bool get typewriterEnabled => _prefs?.getBool('typewriter_enabled') ?? false;
   Future<void> setTypewriterEnabled(bool v) async => await _prefs?.setBool('typewriter_enabled', v);
 
+  // --- v1.8 Sidebar: Simple / Advanced 视图切换 ---
+  bool get showAdvanced => _prefs?.getBool('ui_show_advanced') ?? false;
+  Future<void> setShowAdvanced(bool v) async => await _prefs?.setBool('ui_show_advanced', v);
+
   // --- First Launch / Onboarding ---
   static const String _kOnboardingCompleted = 'onboarding_completed';
   
