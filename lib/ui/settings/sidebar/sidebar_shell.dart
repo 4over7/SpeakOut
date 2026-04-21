@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import '../../theme.dart';
+import 'pages/ai_plus_page.dart';
 import 'pages/placeholder_page.dart';
+import 'pages/recognition_engine_page.dart';
 import 'pages/shortcuts_page.dart';
 import 'pages/vocab_page.dart';
 import 'sidebar_item.dart';
@@ -50,8 +52,18 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
       SidebarSection(
         title: '语音',
         entries: [
-          placeholder('recognition', '识别引擎', CupertinoIcons.waveform_circle_fill, 'mode_tab.dart'),
-          placeholder('ai_plus', 'AI Plus', CupertinoIcons.sparkles, 'mode_tab.dart'),
+          SidebarEntry(
+            id: 'recognition',
+            label: '识别引擎',
+            icon: CupertinoIcons.waveform_circle_fill,
+            builder: (_) => const RecognitionEnginePage(),
+          ),
+          SidebarEntry(
+            id: 'ai_plus',
+            label: 'AI Plus',
+            icon: CupertinoIcons.sparkles,
+            builder: (_) => const AiPlusPage(),
+          ),
           SidebarEntry(
             id: 'vocab',
             label: '词典',

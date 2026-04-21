@@ -17,10 +17,21 @@ import '../../widgets/settings_widgets.dart';
 import '../../vocab_settings_page.dart';
 import '../settings_shared.dart';
 
+/// Which subset of mode_tab to render.
+/// `all` — legacy 5-tab settings page (default).
+/// `recognition` — v1.8 sidebar 识别引擎 page: mode selector + language + models + aliyun.
+/// `aiPlus` — v1.8 sidebar AI Plus page: LLM 配置独立视图.
+enum ModeTabView { all, recognition, aiPlus }
+
 class ModeTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
+  final ModeTabView viewFilter;
 
-  const ModeTab({super.key, required this.onNavigateToTab});
+  const ModeTab({
+    super.key,
+    required this.onNavigateToTab,
+    this.viewFilter = ModeTabView.all,
+  });
 
   @override
   State<ModeTab> createState() => ModeTabState();
@@ -796,6 +807,15 @@ class ModeTabState extends State<ModeTab> {
     final currentMode = ConfigService().workMode;
     final isTranslation = _isTranslationMode();
 
+    switch (widget.viewFilter) {
+      case ModeTabView.recognition:
+        return _buildRecognitionOnlyView(loc, currentMode, isTranslation);
+      case ModeTabView.aiPlus:
+        return _buildAiPlusOnlyView(loc);
+      case ModeTabView.all:
+        break;
+    }
+
     return Column(
       children: [
         Expanded(child: SingleChildScrollView(
@@ -887,6 +907,88 @@ class ModeTabState extends State<ModeTab> {
         )),
 
       ],
+    );
+  }
+
+  // --- v1.8 sidebar filtered views ---
+
+  /// v1.8 sidebar 识别引擎页：模式选择 + 语言 + 模型/ASR 相关
+  /// 不包含 hotkey（在 shortcuts_page）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
+  Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode, bool isTranslation) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildModeSelector(loc, currentMode, isTranslation),
+          ..._buildLanguageHints(loc),
+          const SizedBox(height: 12),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: KeyedSubtree(
+              key: ValueKey('recognition_$currentMode'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLanguageCard(loc),
+                  if (currentMode == 'cloud') ...[
+                    const SizedBox(height: 10),
+                    _buildAiConfigCardCloud(loc),
+                  ] else ...[
+                    const SizedBox(height: 10),
+                    _buildModelInfoCard(loc),
+                    const SizedBox(height: 10),
+                    _buildOfflineModelListCard(loc),
+                    const SizedBox(height: 10),
+                    _buildStreamingAndPunctCard(loc),
+                  ],
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// v1.8 sidebar AI Plus 页：只渲染 LLM 配置，独立于 workMode
+  /// （与原 _buildAiConfigCardSmart 同内容）
+  Widget _buildAiPlusOnlyView(AppLocalizations loc) {
+    final currentMode = ConfigService().workMode;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (currentMode != 'smart')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemOrangeColor),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(
+                      'AI 润色当前不生效：需在「识别引擎」页把工作模式切为 Smart（离线 + 云端 AI）。LLM 配置仍可在此编辑。',
+                      style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
+                    )),
+                  ],
+                ),
+              ),
+            ),
+          _buildAiConfigCardSmart(loc),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 
