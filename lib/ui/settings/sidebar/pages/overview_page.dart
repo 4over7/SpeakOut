@@ -74,8 +74,9 @@ class OverviewPage extends StatelessWidget {
 
         // Feature cards (2x2 grid)
         SettingsCardGrid(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 12,
+          runSpacing: 12,
+          forceDualColumn: true,
           children: [
             _FeatureCard(
               icon: CupertinoIcons.lock_shield_fill,
