@@ -77,21 +77,21 @@ class _SettingsCardState extends State<SettingsCard> {
                         children: [
                           if (widget.titleIcon != null) ...[
                             MacosIcon(widget.titleIcon, size: 16, color: widget.accentColor ?? AppTheme.getAccent(context)),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                           ],
                           Expanded(
                             child: Text(
                               widget.title!,
                               style: AppTheme.body(context).copyWith(
                                 fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                                fontSize: 15,
                               ),
                             ),
                           ),
                           ?widget.trailing,
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                     ],
                     ...widget.children,
                   ],

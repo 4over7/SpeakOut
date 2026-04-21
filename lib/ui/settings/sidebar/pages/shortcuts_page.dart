@@ -118,9 +118,62 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
     return ListView(
       padding: const EdgeInsets.all(4),
       children: [
-        advanced ? _buildAdvancedCard(loc) : _buildSimpleCard(loc),
-        const SizedBox(height: 12),
-        _buildMaxDurationCard(loc),
+        SettingsCard(
+          title: advanced ? loc.shortcutsSplitTitle : loc.shortcutsRecordKey,
+          titleIcon: CupertinoIcons.mic,
+          accentColor: AppTheme.getAccent(context),
+          children: [
+            if (advanced) ...[
+              _row(
+                loc.shortcutsPttTitle,
+                loc.shortcutsPttHint,
+                hotkeyBadge(context, _currentKeyName, onTap: () => _recordHotkey('ptt')),
+              ),
+              _divider(),
+              _row(
+                loc.shortcutsToggleTitle,
+                loc.shortcutsToggleHint,
+                hotkeyBadge(
+                  context,
+                  _toggleInputKeyName,
+                  onTap: () => _recordHotkey('toggleInput'),
+                  onClear: _toggleInputKeyName.isEmpty
+                      ? null
+                      : () async {
+                          await ConfigService().clearToggleInputKey();
+                          setState(() => _toggleInputKeyName = '');
+                        },
+                ),
+              ),
+            ] else
+              _row(
+                loc.shortcutsRecordKey,
+                loc.shortcutsSharedHint,
+                hotkeyBadge(context, _currentKeyName, onTap: () => _recordHotkey('shared')),
+              ),
+            _divider(),
+            _row(
+              loc.toggleMaxDuration,
+              'Toggle',
+              MacosPopupButton<int>(
+                value: _toggleMaxDuration,
+                items: [
+                  MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
+                  MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
+                  MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
+                  MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
+                  MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
+                ],
+                onChanged: (v) async {
+                  if (v != null) {
+                    await ConfigService().setToggleMaxDuration(v);
+                    setState(() => _toggleMaxDuration = v);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         _Tip(
           icon: CupertinoIcons.lightbulb,
@@ -130,84 +183,13 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
     );
   }
 
-  Widget _buildSimpleCard(AppLocalizations loc) {
-    return SettingsCard(
-      title: loc.shortcutsRecordKey,
-      titleIcon: CupertinoIcons.mic,
-      accentColor: AppTheme.getAccent(context),
-      children: [
-        _row(
-          loc.shortcutsRecordKey,
-          loc.shortcutsSharedHint,
-          hotkeyBadge(
-            context,
-            _currentKeyName,
-            onTap: () => _recordHotkey('shared'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAdvancedCard(AppLocalizations loc) {
-    return SettingsCard(
-      title: loc.shortcutsSplitTitle,
-      titleIcon: CupertinoIcons.mic,
-      accentColor: AppTheme.getAccent(context),
-      children: [
-        _row(
-          loc.shortcutsPttTitle,
-          loc.shortcutsPttHint,
-          hotkeyBadge(
-            context,
-            _currentKeyName,
-            onTap: () => _recordHotkey('ptt'),
-          ),
-        ),
-        const SizedBox(height: 14),
-        _row(
-          loc.shortcutsToggleTitle,
-          loc.shortcutsToggleHint,
-          hotkeyBadge(
-            context,
-            _toggleInputKeyName,
-            onTap: () => _recordHotkey('toggleInput'),
-            onClear: _toggleInputKeyName.isEmpty
-                ? null
-                : () async {
-                    await ConfigService().clearToggleInputKey();
-                    setState(() => _toggleInputKeyName = '');
-                  },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMaxDurationCard(AppLocalizations loc) {
-    return SettingsCard(
-      children: [
-        _row(
-          loc.toggleMaxDuration,
-          'Toggle 模式下自动停止录音的时长',
-          MacosPopupButton<int>(
-            value: _toggleMaxDuration,
-            items: [
-              MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
-              MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
-              MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
-              MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
-              MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
-            ],
-            onChanged: (v) async {
-              if (v != null) {
-                await ConfigService().setToggleMaxDuration(v);
-                setState(() => _toggleMaxDuration = v);
-              }
-            },
-          ),
-        ),
-      ],
+  Widget _divider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Container(
+        height: 1,
+        color: AppTheme.getBorder(context),
+      ),
     );
   }
 
