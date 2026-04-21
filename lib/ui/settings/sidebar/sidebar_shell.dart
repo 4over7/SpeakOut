@@ -1,15 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import '../../theme.dart';
+import 'pages/about_page.dart';
 import 'pages/ai_plus_page.dart';
-import 'pages/placeholder_page.dart';
+import 'pages/general_pages.dart';
+import 'pages/overview_page.dart';
 import 'pages/recognition_engine_page.dart';
 import 'pages/shortcuts_page.dart';
+import 'pages/superpower_pages.dart';
 import 'pages/vocab_page.dart';
 import 'sidebar_item.dart';
 
 /// v1.8 设置页新版 shell：左 sidebar + 右 content。
-/// D1 阶段只做脚手架，13 个页面均为 placeholder，D2/D3 迁移真实内容。
 class SettingsSidebarShell extends StatefulWidget {
   const SettingsSidebarShell({super.key});
 
@@ -21,32 +23,38 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
   String _selectedId = 'overview';
 
   List<SidebarSection> _buildSections() {
-    SidebarEntry placeholder(String id, String label, IconData icon, String src) {
-      return SidebarEntry(
-        id: id,
-        label: label,
-        icon: icon,
-        builder: (_) => SidebarPlaceholderPage(title: label, sourceFile: src),
-      );
-    }
-
     return [
       SidebarSection(
         entries: [
-          placeholder('overview', '概览', CupertinoIcons.square_grid_2x2, 'Phase 4'),
+          SidebarEntry(
+            id: 'overview',
+            label: '概览',
+            icon: CupertinoIcons.square_grid_2x2,
+            builder: (_) => const OverviewPage(),
+          ),
         ],
       ),
       SidebarSection(
         title: '基础',
         entries: [
-          placeholder('general', '通用', CupertinoIcons.settings, 'general_tab.dart'),
+          SidebarEntry(
+            id: 'general',
+            label: '通用',
+            icon: CupertinoIcons.settings,
+            builder: (_) => const GeneralPage(),
+          ),
           SidebarEntry(
             id: 'shortcuts',
             label: '快捷键',
             icon: CupertinoIcons.keyboard,
             builder: (_) => const ShortcutsPage(),
           ),
-          placeholder('permissions', '权限', CupertinoIcons.lock_shield, 'general_tab.dart'),
+          SidebarEntry(
+            id: 'permissions',
+            label: '权限',
+            icon: CupertinoIcons.lock_shield,
+            builder: (_) => const PermissionsPage(),
+          ),
         ],
       ),
       SidebarSection(
@@ -75,17 +83,47 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
       SidebarSection(
         title: '超能力',
         entries: [
-          placeholder('diary', '闪念笔记', CupertinoIcons.lightbulb, 'superpower_tab.dart'),
-          placeholder('organize', 'AI 梳理', CupertinoIcons.wand_stars, 'superpower_tab.dart'),
-          placeholder('translate', '即时翻译', CupertinoIcons.globe, 'superpower_tab.dart'),
-          placeholder('correction', '纠错反馈', CupertinoIcons.pencil_circle, 'superpower_tab.dart'),
-          placeholder('debug', 'AI 调试', CupertinoIcons.ant, 'superpower_tab.dart'),
+          SidebarEntry(
+            id: 'diary',
+            label: '闪念笔记',
+            icon: CupertinoIcons.lightbulb,
+            builder: (_) => const DiaryPage(),
+          ),
+          SidebarEntry(
+            id: 'organize',
+            label: 'AI 梳理',
+            icon: CupertinoIcons.wand_stars,
+            builder: (_) => const OrganizePage(),
+          ),
+          SidebarEntry(
+            id: 'translate',
+            label: '即时翻译',
+            icon: CupertinoIcons.globe,
+            builder: (_) => const TranslatePage(),
+          ),
+          SidebarEntry(
+            id: 'correction',
+            label: '纠错反馈',
+            icon: CupertinoIcons.pencil_circle,
+            builder: (_) => const CorrectionPage(),
+          ),
+          SidebarEntry(
+            id: 'debug',
+            label: 'AI 调试',
+            icon: CupertinoIcons.ant,
+            builder: (_) => const AiReportPage(),
+          ),
         ],
       ),
       SidebarSection(
         title: '其他',
         entries: [
-          placeholder('about', '关于', CupertinoIcons.info_circle, 'about_tab.dart'),
+          SidebarEntry(
+            id: 'about',
+            label: '关于',
+            icon: CupertinoIcons.info_circle,
+            builder: (_) => const AboutPage(),
+          ),
         ],
       ),
     ];

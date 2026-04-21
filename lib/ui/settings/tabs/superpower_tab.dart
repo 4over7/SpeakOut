@@ -15,12 +15,22 @@ import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
 
+/// Which subset of superpower_tab to render.
+/// `all` — legacy 5-tab settings page (默认, 5 卡 + hotkey overview).
+/// 其余 — v1.8 sidebar 下的单个超能力独立页.
+enum SuperpowerView { all, diary, organize, translate, correction, aiReport }
+
 /// "超能力" tab — 4 independent features as a dual-column card grid:
 /// 闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈
 class SuperpowerTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
+  final SuperpowerView viewFilter;
 
-  const SuperpowerTab({super.key, required this.onNavigateToTab});
+  const SuperpowerTab({
+    super.key,
+    required this.onNavigateToTab,
+    this.viewFilter = SuperpowerView.all,
+  });
 
   @override
   State<SuperpowerTab> createState() => _SuperpowerTabState();
@@ -356,6 +366,29 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+
+    // v1.8 sidebar single-card views
+    Widget? single;
+    switch (widget.viewFilter) {
+      case SuperpowerView.diary:
+        single = _buildDiaryCard(loc);
+      case SuperpowerView.organize:
+        single = _buildOrganizeCard(loc);
+      case SuperpowerView.translate:
+        single = _buildTranslateCard(loc);
+      case SuperpowerView.correction:
+        single = _buildCorrectionCard(loc);
+      case SuperpowerView.aiReport:
+        single = _buildAiReportCard(loc);
+      case SuperpowerView.all:
+        single = null;
+    }
+    if (single != null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(4),
+        child: single,
+      );
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(4),

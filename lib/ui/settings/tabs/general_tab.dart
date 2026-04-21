@@ -11,11 +11,19 @@ import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
 
+/// Which subset of general_tab to render.
+enum GeneralView { all, general, permissions }
+
 /// General tab — general settings and system permissions.
 class GeneralTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
+  final GeneralView viewFilter;
 
-  const GeneralTab({super.key, required this.onNavigateToTab});
+  const GeneralTab({
+    super.key,
+    required this.onNavigateToTab,
+    this.viewFilter = GeneralView.all,
+  });
 
   @override
   State<GeneralTab> createState() => _GeneralTabState();
@@ -80,6 +88,22 @@ class _GeneralTabState extends State<GeneralTab> {
     final engine = CoreEngine();
     final isBluetooth = _useSystemDefaultAudio && (_currentAudioDevice?.isBluetooth ?? false);
 
+    // v1.8 sidebar single-card views
+    switch (widget.viewFilter) {
+      case GeneralView.general:
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(4),
+          child: _buildGeneralCard(loc, engine, isBluetooth),
+        );
+      case GeneralView.permissions:
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(4),
+          child: _buildPermissionsCard(),
+        );
+      case GeneralView.all:
+        break;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(4),
       child: Column(
@@ -88,10 +112,20 @@ class _GeneralTabState extends State<GeneralTab> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              // --- General Settings card ---
-              SettingsCard(
-                padding: const EdgeInsets.all(14),
-                children: [
+              _buildGeneralCard(loc, engine, isBluetooth),
+              _buildPermissionsCard(),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneralCard(AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
                   Row(
                     children: [
                       const MacosIcon(CupertinoIcons.settings, size: 14, color: MacosColors.systemGrayColor),
@@ -173,50 +207,44 @@ class _GeneralTabState extends State<GeneralTab> {
                     onChanged: (v) { setState(() => _autoManageAudio = v); engine.audioDeviceService?.autoManageEnabled = v; },
                   )),
                   Text('蓝牙耳机时自动切换到高质量麦克风', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
-                ],
-              ),
+      ],
+    );
+  }
 
-              // --- System Permissions card ---
-              SettingsCard(
-                padding: const EdgeInsets.all(14),
-                children: [
-                  Row(
-                    children: [
-                      const MacosIcon(CupertinoIcons.lock_shield, size: 14, color: MacosColors.systemGrayColor),
-                      const SizedBox(width: 6),
-                      Text('系统权限', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Warning banner
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.25)),
-                    ),
-                    child: Text(
-                      '更换签名证书后如快捷键失效，请逐项重新授权。',
-                      style: TextStyle(fontSize: 10, color: MacosColors.systemOrangeColor, height: 1.3),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _permissionRow('辅助功能', '快捷键+文本注入', CupertinoIcons.hand_raised,
-                    'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'),
-                  const SizedBox(height: 6),
-                  _permissionRow('输入监控', '键盘触发录音', CupertinoIcons.keyboard,
-                    'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'),
-                  const SizedBox(height: 6),
-                  _permissionRow('麦克风', '语音采集', CupertinoIcons.mic,
-                    'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'),
-                ],
-              ),
-            ],
+  Widget _buildPermissionsCard() {
+    return SettingsCard(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Row(
+          children: [
+            const MacosIcon(CupertinoIcons.lock_shield, size: 14, color: MacosColors.systemGrayColor),
+            const SizedBox(width: 6),
+            Text('系统权限', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.25)),
           ),
-          const SizedBox(height: 24),
-        ],
-      ),
+          child: Text(
+            '更换签名证书后如快捷键失效，请逐项重新授权。',
+            style: TextStyle(fontSize: 10, color: MacosColors.systemOrangeColor, height: 1.3),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _permissionRow('辅助功能', '快捷键+文本注入', CupertinoIcons.hand_raised,
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'),
+        const SizedBox(height: 6),
+        _permissionRow('输入监控', '键盘触发录音', CupertinoIcons.keyboard,
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'),
+        const SizedBox(height: 6),
+        _permissionRow('麦克风', '语音采集', CupertinoIcons.mic,
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'),
+      ],
     );
   }
 
