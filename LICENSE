@@ -1,0 +1,62 @@
+SpeakOut (子曰) — Proprietary Software License
+
+Copyright © 2025-2026 Lindan Wang (Leon). All Rights Reserved.
+
+This source code is made publicly visible for the purposes of transparency,
+user trust, security review, and community discussion. Its public availability
+does NOT constitute an open-source license, and NO rights are granted beyond
+what is explicitly permitted below.
+
+1. PERMITTED USES
+
+   a. You may view and read the source code for personal educational purposes.
+   b. You may report security vulnerabilities or bugs to the author.
+   c. You may submit pull requests. Contributions are offered under the same
+      terms as this License; by submitting, you grant the copyright holder
+      a worldwide, royalty-free license to use, modify, and distribute the
+      contribution as part of SpeakOut.
+
+2. PROHIBITED USES
+
+   Except with the express prior written permission of the copyright holder,
+   you MAY NOT:
+
+   a. Copy, modify, merge, publish, distribute, sublicense, or sell copies
+      of the software or substantial portions of it.
+   b. Use the source code, in whole or in part, to build or distribute any
+      derivative product, whether for commercial or non-commercial purposes.
+   c. Remove or alter any copyright, trademark, or other proprietary notices.
+   d. Use the name "SpeakOut", "子曰", or any associated trademarks, logos,
+      or branding in derivative works, promotional material, or competing
+      products.
+
+3. OFFICIAL DISTRIBUTIONS
+
+   The only authorized distributions of SpeakOut are:
+   - https://github.com/4over7/SpeakOut/releases  (GitHub Releases, DMG)
+   - The Mac App Store (when available)
+
+   Any binary, installer, or package obtained elsewhere is unauthorized.
+
+4. WARRANTY AND LIABILITY
+
+   THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+   OTHER LIABILITY ARISING FROM THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+5. THIRD-PARTY COMPONENTS
+
+   SpeakOut incorporates third-party open-source libraries, each governed by
+   its own license. Third-party licenses are listed in the application's
+   "About" page and do not modify the terms of this License for SpeakOut's
+   own source code.
+
+6. CONTACT
+
+   For commercial licensing inquiries, partnership, or permissions beyond
+   those granted here, contact: 4over7@gmail.com
+
+This License is effective as of the date of first publication and applies
+retroactively to all prior source code in this repository.

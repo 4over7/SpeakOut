@@ -180,7 +180,11 @@ cd native_lib && clang -dynamiclib -framework Cocoa -framework Carbon \
 
 ## License
 
-Copyright © 2026 Leon. All Rights Reserved.
+Copyright © 2025-2026 Lindan Wang (Leon). All Rights Reserved.
+
+See [LICENSE](./LICENSE) for full terms. Source code is publicly visible for
+transparency, user trust, and security review — this is **not** an open-source
+license.
 
 ---
 
