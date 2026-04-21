@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../theme.dart';
 import '../widgets/settings_widgets.dart';
+import 'sidebar/sidebar_shell.dart';
 import 'tabs/general_tab.dart';
 import 'tabs/mode_tab.dart';
 import 'tabs/superpower_tab.dart';
@@ -72,6 +74,19 @@ class _SettingsPageState extends State<SettingsPage> {
         toolBar: ToolBar(
           title: Text(loc.settings),
           titleWidth: 150.0,
+          actions: [
+            ToolBarIconButton(
+              label: 'v1.8 预览',
+              icon: const MacosIcon(CupertinoIcons.sidebar_left),
+              tooltipMessage: '打开 v1.8 sidebar 预览（脚手架）',
+              showLabel: false,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsSidebarShell()),
+                );
+              },
+            ),
+          ],
         ),
         children: [
           ContentArea(
