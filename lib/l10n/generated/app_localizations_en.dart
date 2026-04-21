@@ -1127,4 +1127,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String aboutImportFailed(String err) {
     return 'Import failed: $err';
   }
+
+  @override
+  String audioDeviceCurrent(String name) {
+    return 'Current: $name';
+  }
+
+  @override
+  String get bluetoothMicWarning => 'Bluetooth mic may reduce quality';
+
+  @override
+  String get switchToBuiltin => 'Switch to built-in';
+
+  @override
+  String get autoOptimizeAudio => 'Auto-optimize audio';
+
+  @override
+  String get autoOptimizeAudioDesc =>
+      'Auto-switch to higher-quality mic when Bluetooth headset is connected';
 }

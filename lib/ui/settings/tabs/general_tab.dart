@@ -72,16 +72,6 @@ class _GeneralTabState extends State<GeneralTab> {
   // Build
   // ---------------------------------------------------------------------------
 
-  Widget _compactRow(String label, Widget trailing) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: AppTheme.body(context).copyWith(fontSize: 12)),
-        trailing,
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -123,91 +113,133 @@ class _GeneralTabState extends State<GeneralTab> {
   }
 
   Widget _buildGeneralCard(AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
+    final audioDropdown = SizedBox(
+      width: 200,
+      child: MacosPopupButton<String>(
+        value: () {
+          if (_useSystemDefaultAudio) return 'system';
+          final savedId = ConfigService().audioInputDeviceId;
+          if (savedId != null && _audioDevices.any((d) => d.id == savedId)) return savedId;
+          return 'system';
+        }(),
+        items: [
+          MacosPopupMenuItem(value: 'system', child: Text(loc.systemDefault)),
+          ..._audioDevices.map((d) => MacosPopupMenuItem(
+            value: d.id,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (d.isBluetooth) const Padding(padding: EdgeInsets.only(right: 4), child: MacosIcon(CupertinoIcons.bluetooth, size: 12)),
+              Text(d.name),
+            ]),
+          )),
+        ],
+        onChanged: (value) async {
+          if (value == null) return;
+          final service = engine.audioDeviceService;
+          if (service == null) return;
+          if (value == 'system') {
+            service.clearPreferredDevice();
+            await ConfigService().setAudioInputDeviceId(null);
+          } else {
+            service.setInputDevice(value);
+            final device = _audioDevices.firstWhere((d) => d.id == value, orElse: () => _audioDevices.first);
+            await ConfigService().setAudioInputDeviceId(value, name: device.name);
+          }
+          _loadAudioDevices();
+        },
+      ),
+    );
+
+    String? audioSubtitle;
+    if (_useSystemDefaultAudio && _currentAudioDevice != null) {
+      audioSubtitle = loc.audioDeviceCurrent(_currentAudioDevice!.name);
+    }
+
     return SettingsCard(
-      padding: const EdgeInsets.all(14),
+      title: loc.tabGeneral,
+      titleIcon: CupertinoIcons.settings,
+      accentColor: AppTheme.getAccent(context),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       children: [
-                  Row(
-                    children: [
-                      const MacosIcon(CupertinoIcons.settings, size: 14, color: MacosColors.systemGrayColor),
-                      const SizedBox(width: 6),
-                      Text(loc.tabGeneral, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _compactRow(loc.language, buildDropdown(
-                    context,
-                    value: ConfigService().appLanguage,
-                    items: {'system': loc.langSystem, 'zh': '简体中文', 'en': 'English'},
-                    onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState(() {}); },
-                  )),
-                  const SizedBox(height: 8),
-                  _compactRow(loc.audioInput, SizedBox(width: 200, child: MacosPopupButton<String>(
-                    value: () {
-                      if (_useSystemDefaultAudio) return 'system';
-                      final savedId = ConfigService().audioInputDeviceId;
-                      if (savedId != null && _audioDevices.any((d) => d.id == savedId)) return savedId;
-                      return 'system';
-                    }(),
-                    items: [
-                      MacosPopupMenuItem(value: 'system', child: Text(loc.systemDefault)),
-                      ..._audioDevices.map((d) => MacosPopupMenuItem(
-                        value: d.id,
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          if (d.isBluetooth) const Padding(padding: EdgeInsets.only(right: 4), child: MacosIcon(CupertinoIcons.bluetooth, size: 12)),
-                          Text(d.name),
-                        ]),
-                      )),
-                    ],
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      final service = engine.audioDeviceService;
-                      if (service == null) return;
-                      if (value == 'system') {
-                        service.clearPreferredDevice();
-                        await ConfigService().setAudioInputDeviceId(null);
-                      } else {
-                        service.setInputDevice(value);
-                        final device = _audioDevices.firstWhere((d) => d.id == value, orElse: () => _audioDevices.first);
-                        await ConfigService().setAudioInputDeviceId(value, name: device.name);
-                      }
-                      _loadAudioDevices();
-                    },
-                  ))),
-                  if (_useSystemDefaultAudio && _currentAudioDevice != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('当前: ${_currentAudioDevice!.name}', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
-                    ),
-                  if (isBluetooth)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Row(children: [
-                        const MacosIcon(CupertinoIcons.exclamationmark_triangle, color: Colors.orange, size: 12),
-                        const SizedBox(width: 4),
-                        Text('蓝牙麦克风可能降低质量', style: TextStyle(fontSize: 10, color: Colors.orange)),
-                        const SizedBox(width: 6),
-                        GestureDetector(
-                          onTap: () async {
-                            final service = engine.audioDeviceService;
-                            if (service == null) return;
-                            service.switchToBuiltinMic();
-                            final builtIn = service.builtInMicrophone;
-                            if (builtIn != null && builtIn.id.isNotEmpty) {
-                              await ConfigService().setAudioInputDeviceId(builtIn.id, name: builtIn.name);
-                            }
-                            _loadAudioDevices();
-                          },
-                          child: Text('切换内置', style: TextStyle(fontSize: 10, color: MacosColors.systemBlueColor, decoration: TextDecoration.underline)),
-                        ),
-                      ]),
-                    ),
-                  Divider(height: 16, color: AppTheme.getBorder(context)),
-                  _compactRow('自动优化音频', MacosSwitch(
-                    value: _autoManageAudio,
-                    onChanged: (v) { setState(() => _autoManageAudio = v); engine.audioDeviceService?.autoManageEnabled = v; },
-                  )),
-                  Text('蓝牙耳机时自动切换到高质量麦克风', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+        _settingsRow(
+          label: loc.language,
+          trailing: SizedBox(
+            width: 200,
+            child: buildDropdown(
+              context,
+              value: ConfigService().appLanguage,
+              items: {'system': loc.langSystem, 'zh': loc.langZhHans, 'en': loc.langEn},
+              onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState(() {}); },
+            ),
+          ),
+        ),
+        _rowDivider(),
+        _settingsRow(
+          label: loc.audioInput,
+          subtitle: audioSubtitle,
+          trailing: audioDropdown,
+        ),
+        if (isBluetooth)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(children: [
+              const MacosIcon(CupertinoIcons.exclamationmark_triangle, color: Colors.orange, size: 12),
+              const SizedBox(width: 6),
+              Expanded(child: Text(loc.bluetoothMicWarning, style: const TextStyle(fontSize: 11, color: Colors.orange))),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () async {
+                  final service = engine.audioDeviceService;
+                  if (service == null) return;
+                  service.switchToBuiltinMic();
+                  final builtIn = service.builtInMicrophone;
+                  if (builtIn != null && builtIn.id.isNotEmpty) {
+                    await ConfigService().setAudioInputDeviceId(builtIn.id, name: builtIn.name);
+                  }
+                  _loadAudioDevices();
+                },
+                child: Text(loc.switchToBuiltin, style: TextStyle(fontSize: 11, color: MacosColors.systemBlueColor, decoration: TextDecoration.underline)),
+              ),
+            ]),
+          ),
+        _rowDivider(),
+        _settingsRow(
+          label: loc.autoOptimizeAudio,
+          subtitle: loc.autoOptimizeAudioDesc,
+          trailing: MacosSwitch(
+            value: _autoManageAudio,
+            onChanged: (v) { setState(() => _autoManageAudio = v); engine.audioDeviceService?.autoManageEnabled = v; },
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _settingsRow({required String label, String? subtitle, required Widget trailing}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.getTextPrimary(context))),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        trailing,
+      ],
+    );
+  }
+
+  Widget _rowDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Container(height: 1, color: AppTheme.getBorder(context)),
     );
   }
 

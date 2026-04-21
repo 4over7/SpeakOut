@@ -2155,6 +2155,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import failed: {err}'**
   String aboutImportFailed(String err);
+
+  /// No description provided for @audioDeviceCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: {name}'**
+  String audioDeviceCurrent(String name);
+
+  /// No description provided for @bluetoothMicWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth mic may reduce quality'**
+  String get bluetoothMicWarning;
+
+  /// No description provided for @switchToBuiltin.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to built-in'**
+  String get switchToBuiltin;
+
+  /// No description provided for @autoOptimizeAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-optimize audio'**
+  String get autoOptimizeAudio;
+
+  /// No description provided for @autoOptimizeAudioDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-switch to higher-quality mic when Bluetooth headset is connected'**
+  String get autoOptimizeAudioDesc;
 }
 
 class _AppLocalizationsDelegate

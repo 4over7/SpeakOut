@@ -1078,4 +1078,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String aboutImportFailed(String err) {
     return '导入失败：$err';
   }
+
+  @override
+  String audioDeviceCurrent(String name) {
+    return '当前：$name';
+  }
+
+  @override
+  String get bluetoothMicWarning => '蓝牙麦克风可能降低质量';
+
+  @override
+  String get switchToBuiltin => '切换到内置';
+
+  @override
+  String get autoOptimizeAudio => '自动优化音频';
+
+  @override
+  String get autoOptimizeAudioDesc => '蓝牙耳机时自动切换到高质量麦克风';
 }

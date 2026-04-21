@@ -414,5 +414,14 @@
   "aboutImportFailed": "Import failed: {err}",
   "@aboutImportFailed": {
     "placeholders": {"err": {"type": "String"}}
-  }
+  },
+
+  "audioDeviceCurrent": "Current: {name}",
+  "@audioDeviceCurrent": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "bluetoothMicWarning": "Bluetooth mic may reduce quality",
+  "switchToBuiltin": "Switch to built-in",
+  "autoOptimizeAudio": "Auto-optimize audio",
+  "autoOptimizeAudioDesc": "Auto-switch to higher-quality mic when Bluetooth headset is connected"
 }

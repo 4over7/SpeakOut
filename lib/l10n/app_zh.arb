@@ -374,5 +374,14 @@
   "aboutImportFailed": "导入失败：{err}",
   "@aboutImportFailed": {
     "placeholders": {"err": {"type": "String"}}
-  }
+  },
+
+  "audioDeviceCurrent": "当前：{name}",
+  "@audioDeviceCurrent": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "bluetoothMicWarning": "蓝牙麦克风可能降低质量",
+  "switchToBuiltin": "切换到内置",
+  "autoOptimizeAudio": "自动优化音频",
+  "autoOptimizeAudioDesc": "蓝牙耳机时自动切换到高质量麦克风"
 }
