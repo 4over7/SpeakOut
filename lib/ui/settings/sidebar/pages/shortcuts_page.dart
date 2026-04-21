@@ -8,11 +8,9 @@ import '../../../../services/config_service.dart';
 import '../../../theme.dart';
 import '../../../widgets/settings_widgets.dart';
 import '../../settings_shared.dart';
+import '../hotkey_recorder_modal.dart';
 
 /// v1.8 Sidebar - 快捷键页
-///
-/// D2 从 mode_tab._buildHotkeyCard 提取，独立维护 state。
-/// 旧 mode_tab 暂时保留（旧 tab 设置页仍在用），Phase 6 清理时一并删除。
 class ShortcutsPage extends StatefulWidget {
   const ShortcutsPage({super.key});
 
@@ -21,21 +19,10 @@ class ShortcutsPage extends StatefulWidget {
 }
 
 class _ShortcutsPageState extends State<ShortcutsPage> {
-  final CoreEngine _engine = CoreEngine();
-
   int _currentKeyCode = AppConstants.kDefaultPttKeyCode;
   String _currentKeyName = AppConstants.kDefaultPttKeyName;
-  bool _isCapturingKey = false;
-
   String _toggleInputKeyName = '';
-  bool _isCapturingToggleInputKey = false;
-
   int _toggleMaxDuration = 0;
-
-  // Simple 模式共享键捕获标记（写入 ptt + toggleInput 两处）
-  bool _isCapturingSharedKey = false;
-
-  HotkeyCapturer? _keyCapturer;
 
   @override
   void initState() {
@@ -48,69 +35,45 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
     CoreEngine().pttKeyCode = _currentKeyCode;
   }
 
-  @override
-  void dispose() {
-    _keyCapturer?.cancel();
-    super.dispose();
-  }
+  Future<void> _recordHotkey(String target) async {
+    String title;
+    String subtitle;
+    switch (target) {
+      case 'shared':
+        title = '录制录音键';
+        subtitle = '短按 = 切换录音，长按 = 说话松开停（共享键）';
+      case 'ptt':
+        title = '录制 PTT 键';
+        subtitle = '长按该键录音，松开停止';
+      case 'toggleInput':
+        title = '录制 Toggle 键';
+        subtitle = '点一下开录、再点一下停';
+      default:
+        title = '录制快捷键';
+        subtitle = '请按下您想要设置的按键';
+    }
 
-  void _startKeyCapture([String target = 'ptt']) {
-    _keyCapturer?.cancel();
-    setState(() {
-      switch (target) {
-        case 'toggleInput':
-          _isCapturingToggleInputKey = true;
-        case 'shared':
-          _isCapturingSharedKey = true;
-        default:
-          _isCapturingKey = true;
-      }
-    });
-    _keyCapturer = HotkeyCapturer(
-      keyStream: _engine.rawKeyEventStream,
-      onCaptured: (keyCode, modifierFlags) {
-        _saveHotkeyConfig(keyCode, mapKeyCodeToString(keyCode), modifierFlags: modifierFlags);
-        _resetCaptureState();
-      },
-      onTimeout: _resetCaptureState,
-    )..start();
-  }
+    final result = await showHotkeyRecorder(context, title: title, subtitle: subtitle);
+    if (result == null || !mounted) return;
 
-  void _resetCaptureState() {
-    if (!mounted) return;
-    setState(() {
-      _isCapturingKey = false;
-      _isCapturingToggleInputKey = false;
-      _isCapturingSharedKey = false;
-    });
-  }
-
-  void _stopKeyCapture() {
-    _keyCapturer?.cancel();
-    _keyCapturer = null;
-    _resetCaptureState();
-  }
-
-  Future<void> _saveHotkeyConfig(int keyCode, String keyName, {int modifierFlags = 0}) async {
+    // 冲突检查
     final config = ConfigService();
-    final requiredMods = stripOwnModifier(keyCode, modifierFlags);
-    final displayName = requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
-
-    // 确定排除的 feature：shared 模式排除 ptt 和 toggleInput 两者（因为是要写入这两者）
-    final excludeFeature = _isCapturingToggleInputKey ? 'toggleInput' : 'ptt';
+    final excludeFeature = target == 'toggleInput' ? 'toggleInput' : 'ptt';
     final activeKeys = getActiveHotkeys(context, excludeFeature: excludeFeature);
-    if (_isCapturingKey || _isCapturingSharedKey) activeKeys.remove((config.toggleInputKeyCode, config.toggleInputModifiers));
-    if (_isCapturingToggleInputKey || _isCapturingSharedKey) activeKeys.remove((config.pttKeyCode, config.pttModifiers));
-    final hotkeyId = (keyCode, requiredMods);
-    final conflictWith = findHotkeyConflict(activeKeys, hotkeyId);
+    if (target == 'shared' || target == 'ptt') {
+      activeKeys.remove((config.toggleInputKeyCode, config.toggleInputModifiers));
+    }
+    if (target == 'shared' || target == 'toggleInput') {
+      activeKeys.remove((config.pttKeyCode, config.pttModifiers));
+    }
+    final conflictWith = findHotkeyConflict(activeKeys, (result.keyCode, result.modifiers));
     if (conflictWith != null) {
-      _stopKeyCapture();
       if (!mounted) return;
-      showMacosAlertDialog(
+      await showMacosAlertDialog(
         context: context,
         builder: (_) => MacosAlertDialog(
           appIcon: const Icon(CupertinoIcons.exclamationmark_triangle, size: 48, color: Colors.orange),
-          title: Text('$displayName 已被「$conflictWith」使用', style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text('${result.displayName} 已被「$conflictWith」使用', style: const TextStyle(fontWeight: FontWeight.bold)),
           message: const Text('该按键已被占用，请选择其他按键。'),
           primaryButton: PushButton(
             controlSize: ControlSize.large,
@@ -122,31 +85,27 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
       return;
     }
 
-    if (_isCapturingSharedKey) {
-      // Simple 模式：共享键同时写入 PTT 和 ToggleInput
-      await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
-      await config.setToggleInputKey(keyCode, displayName, modifiers: requiredMods);
-      CoreEngine().pttKeyCode = keyCode;
-      setState(() {
-        _currentKeyCode = keyCode;
-        _currentKeyName = displayName;
-        _toggleInputKeyName = displayName;
-        _isCapturingSharedKey = false;
-      });
-    } else if (_isCapturingToggleInputKey) {
-      await config.setToggleInputKey(keyCode, displayName, modifiers: requiredMods);
-      setState(() {
-        _toggleInputKeyName = displayName;
-        _isCapturingToggleInputKey = false;
-      });
-    } else {
-      await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
-      CoreEngine().pttKeyCode = keyCode;
-      setState(() {
-        _currentKeyCode = keyCode;
-        _currentKeyName = displayName;
-        _isCapturingKey = false;
-      });
+    // 保存
+    switch (target) {
+      case 'shared':
+        await config.setPttKey(result.keyCode, result.displayName, modifiers: result.modifiers);
+        await config.setToggleInputKey(result.keyCode, result.displayName, modifiers: result.modifiers);
+        CoreEngine().pttKeyCode = result.keyCode;
+        setState(() {
+          _currentKeyCode = result.keyCode;
+          _currentKeyName = result.displayName;
+          _toggleInputKeyName = result.displayName;
+        });
+      case 'toggleInput':
+        await config.setToggleInputKey(result.keyCode, result.displayName, modifiers: result.modifiers);
+        setState(() => _toggleInputKeyName = result.displayName);
+      default:
+        await config.setPttKey(result.keyCode, result.displayName, modifiers: result.modifiers);
+        CoreEngine().pttKeyCode = result.keyCode;
+        setState(() {
+          _currentKeyCode = result.keyCode;
+          _currentKeyName = result.displayName;
+        });
     }
   }
 
@@ -182,8 +141,7 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
           hotkeyBadge(
             context,
             _currentKeyName,
-            isCapturing: _isCapturingSharedKey,
-            onTap: () => _startKeyCapture('shared'),
+            onTap: () => _recordHotkey('shared'),
           ),
         ),
       ],
@@ -202,8 +160,7 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
           hotkeyBadge(
             context,
             _currentKeyName,
-            isCapturing: _isCapturingKey,
-            onTap: () => _startKeyCapture('ptt'),
+            onTap: () => _recordHotkey('ptt'),
           ),
         ),
         const SizedBox(height: 14),
@@ -213,8 +170,7 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
           hotkeyBadge(
             context,
             _toggleInputKeyName,
-            isCapturing: _isCapturingToggleInputKey,
-            onTap: () => _startKeyCapture('toggleInput'),
+            onTap: () => _recordHotkey('toggleInput'),
             onClear: _toggleInputKeyName.isEmpty
                 ? null
                 : () async {
