@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
@@ -27,11 +29,14 @@ class _AboutTabState extends State<AboutTab> {
   bool _isCheckingUpdate = false;
   bool _versionCopied = false;
   String? _updateResult;
+  String _modelsDir = '';
+  bool _diagnosticsCopied = false;
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _loadModelsDir();
   }
 
   Future<void> _loadVersion() async {
@@ -39,6 +44,50 @@ class _AboutTabState extends State<AboutTab> {
       final info = await PackageInfo.fromPlatform();
       if (mounted) setState(() => _version = '${info.version}+${info.buildNumber}');
     } catch (_) {}
+  }
+
+  Future<void> _loadModelsDir() async {
+    try {
+      final appSupport = await getApplicationSupportDirectory();
+      if (mounted) setState(() => _modelsDir = '${appSupport.path}/Models');
+    } catch (_) {}
+  }
+
+  Future<void> _revealInFinder(String path) async {
+    if (path.isEmpty) return;
+    await Process.run('open', ['-R', path]);
+  }
+
+  Future<void> _copyDiagnostics() async {
+    final info = await PackageInfo.fromPlatform();
+    final buf = StringBuffer();
+    buf.writeln('SpeakOut 诊断信息');
+    buf.writeln('==========================');
+    buf.writeln('App Version: ${info.version}+${info.buildNumber}');
+    buf.writeln('Distribution: ${Distribution.channel}');
+    buf.writeln('Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
+    buf.writeln('Locale: ${Platform.localeName}');
+    buf.writeln('');
+    buf.writeln('Config');
+    buf.writeln('  workMode: ${ConfigService().workMode}');
+    buf.writeln('  activeModelId: ${ConfigService().activeModelId}');
+    buf.writeln('  inputLanguage: ${ConfigService().inputLanguage}');
+    buf.writeln('  outputLanguage: ${ConfigService().outputLanguage}');
+    buf.writeln('  aiCorrectionEnabled: ${ConfigService().aiCorrectionEnabled}');
+    buf.writeln('  llmProviderType: ${ConfigService().llmProviderType}');
+    buf.writeln('  verboseLogging: ${ConfigService().verboseLogging}');
+    buf.writeln('');
+    buf.writeln('Paths');
+    buf.writeln('  modelsDir: $_modelsDir');
+    buf.writeln('  logDir: ${ConfigService().logDirectory.isEmpty ? "(stdout only)" : ConfigService().logDirectory}');
+    buf.writeln('  gatewayUrl: ${ConfigService.kDefaultGatewayUrl}');
+
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (!mounted) return;
+    setState(() => _diagnosticsCopied = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _diagnosticsCopied = false);
+    });
   }
 
   @override
@@ -311,6 +360,58 @@ class _AboutTabState extends State<AboutTab> {
                           },
                         ),
                     ],
+                  ),
+                ),
+                const SettingsDivider(),
+                SettingsTile(
+                  label: '模型目录',
+                  icon: CupertinoIcons.cube_box,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _modelsDir.isEmpty
+                            ? '加载中…'
+                            : _modelsDir.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
+                        style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
+                      ),
+                      const SizedBox(width: 8),
+                      MacosIconButton(
+                        icon: const MacosIcon(CupertinoIcons.arrow_right_square, size: 16),
+                        backgroundColor: MacosColors.transparent,
+                        onPressed: _modelsDir.isEmpty ? null : () => _revealInFinder(_modelsDir),
+                      ),
+                    ],
+                  ),
+                ),
+                const SettingsDivider(),
+                SettingsTile(
+                  label: 'Gateway URL',
+                  subtitle: '许可证 / 订阅 / 云端 Token 代理服务',
+                  icon: CupertinoIcons.cloud,
+                  child: Text(
+                    ConfigService.kDefaultGatewayUrl.replaceFirst('https://', ''),
+                    style: AppTheme.caption(context).copyWith(
+                      color: MacosColors.systemGrayColor,
+                      fontFamily: 'SF Mono',
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+                const SettingsDivider(),
+                SettingsTile(
+                  label: '诊断信息',
+                  subtitle: '复制版本 / 配置 / 路径信息到剪贴板（报错时发给我）',
+                  icon: CupertinoIcons.ant,
+                  child: PushButton(
+                    controlSize: ControlSize.regular,
+                    color: _diagnosticsCopied ? MacosColors.systemGreenColor : null,
+                    secondary: !_diagnosticsCopied,
+                    onPressed: _copyDiagnostics,
+                    child: Text(
+                      _diagnosticsCopied ? '已复制' : '复制',
+                      style: TextStyle(color: _diagnosticsCopied ? Colors.white : null),
+                    ),
                   ),
                 ),
               ],

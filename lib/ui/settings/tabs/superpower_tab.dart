@@ -14,6 +14,7 @@ import '../../../engine/core_engine.dart';
 import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
+import '../sidebar/hotkey_recorder_modal.dart';
 
 /// Which subset of superpower_tab to render.
 /// `all` — legacy 5-tab settings page (默认, 5 卡 + hotkey overview).
@@ -42,29 +43,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // ---------------------------------------------------------------------------
 
   // Diary
-  bool _isCapturingDiaryKey = false;
   String _diaryKeyName = 'Right Option';
-  bool _isCapturingToggleDiaryKey = false;
   String _toggleDiaryKeyName = '';
   String? _diaryDirError;
 
   // Organize
-  bool _isCapturingOrganizeKey = false;
   late final TextEditingController _organizePromptController;
   bool _showOrganizePrompt = false;
 
-  // Translate
-  bool _isCapturingTranslateKey = false;
-
-  // Correction
-  bool _isCapturingCorrectionKey = false;
-
   // AI Report
-  bool _isCapturingAiReportBaseKey = false;
   int _bindingAiReportSlot = -1; // -1 = not binding
 
-  // Key capture infrastructure
-  HotkeyCapturer? _keyCapturer;
   final CoreEngine _engine = CoreEngine();
 
   // ---------------------------------------------------------------------------
@@ -86,7 +75,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   @override
   void dispose() {
-    _keyCapturer?.cancel();
     _organizePromptController.dispose();
     super.dispose();
   }
@@ -104,140 +92,64 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Key capture
+  // Key capture（使用热键 modal）
   // ---------------------------------------------------------------------------
 
-  void _startKeyCapture(String target) {
-    _keyCapturer?.cancel();
-    setState(() {
-      switch (target) {
-        case 'diary':
-          _isCapturingDiaryKey = true;
-        case 'toggleDiary':
-          _isCapturingToggleDiaryKey = true;
-        case 'organize':
-          _isCapturingOrganizeKey = true;
-        case 'translate':
-          _isCapturingTranslateKey = true;
-        case 'correction':
-          _isCapturingCorrectionKey = true;
-        case 'aiReport':
-          _isCapturingAiReportBaseKey = true;
-      }
-    });
+  static const Map<String, (String, String)> _targetLabels = {
+    'diary': ('录制闪念笔记快捷键', '长按该键开始记录笔记'),
+    'toggleDiary': ('录制笔记 Toggle 快捷键', '点一下开录、再点一下停'),
+    'organize': ('录制 AI 梳理快捷键', '选中文字后按此键重组'),
+    'translate': ('录制即时翻译快捷键', '选中文字后按此键翻译'),
+    'correction': ('录制纠错反馈快捷键', '选中文字后按此键提交纠错'),
+    'aiReport': ('录制 AI 调试基础键', '长按此键 + 数字 1-5 激活'),
+  };
 
-    _keyCapturer = HotkeyCapturer(
-      keyStream: _engine.rawKeyEventStream,
-      onCaptured: (keyCode, modifierFlags) {
-        final keyName = mapKeyCodeToString(keyCode);
-        _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
-        _resetCaptureState();
-      },
-      onTimeout: _resetCaptureState,
-    )..start();
-  }
+  Future<void> _startKeyCapture(String target) async {
+    final labels = _targetLabels[target] ?? ('录制快捷键', '请按下您想要的按键');
+    final result = await showHotkeyRecorder(context, title: labels.$1, subtitle: labels.$2);
+    if (result == null || !mounted) return;
 
-  void _resetCaptureState() {
-    if (mounted) {
-      setState(() {
-        _isCapturingDiaryKey = false;
-        _isCapturingToggleDiaryKey = false;
-        _isCapturingOrganizeKey = false;
-        _isCapturingTranslateKey = false;
-        _isCapturingCorrectionKey = false;
-        _isCapturingAiReportBaseKey = false;
-      });
-    }
-  }
-
-  void _stopKeyCapture() {
-    _keyCapturer?.cancel();
-    _keyCapturer = null;
-    _resetCaptureState();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Hotkey save with conflict detection
-  // ---------------------------------------------------------------------------
-
-  Future<void> _saveHotkeyConfig(int keyCode, String keyName,
-      {int modifierFlags = 0}) async {
     final config = ConfigService();
-    final isDiaryGroup = _isCapturingDiaryKey || _isCapturingToggleDiaryKey;
+    final keyCode = result.keyCode;
+    final mods = result.modifiers;
+    final displayName = result.displayName;
+    // aiReport 存储为裸键（忽略修饰键），其他都带修饰键
+    final keyName = mapKeyCodeToString(keyCode);
 
-    final requiredMods = stripOwnModifier(keyCode, modifierFlags);
-    final displayName =
-        requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
-
-    // Determine which feature is being captured
-    final String currentFeature;
-    if (_isCapturingAiReportBaseKey) {
-      currentFeature = 'aiReport';
-    } else if (_isCapturingCorrectionKey) {
-      currentFeature = 'correction';
-    } else if (_isCapturingTranslateKey) {
-      currentFeature = 'translate';
-    } else if (_isCapturingOrganizeKey) {
-      currentFeature = 'organize';
-    } else if (_isCapturingToggleDiaryKey) {
-      currentFeature = 'toggleDiary';
-    } else if (_isCapturingDiaryKey) {
-      currentFeature = 'diary';
-    } else {
-      currentFeature = '';
+    // 冲突检查
+    final activeKeys = getActiveHotkeys(context, excludeFeature: target);
+    final isDiaryGroup = target == 'diary' || target == 'toggleDiary';
+    if (isDiaryGroup) {
+      if (target == 'diary') activeKeys.remove((config.toggleDiaryKeyCode, config.toggleDiaryModifiers));
+      if (target == 'toggleDiary') activeKeys.remove((config.diaryKeyCode, config.diaryModifiers));
     }
-
-    // Unified conflict check using (keyCode, modifiers) tuple
-    if (currentFeature.isNotEmpty) {
-      final activeKeys = getActiveHotkeys(context, excludeFeature: currentFeature);
-      // Diary group: also exclude the other diary key (diary ↔ toggleDiary can share)
-      if (isDiaryGroup) {
-        if (_isCapturingDiaryKey) activeKeys.remove((config.toggleDiaryKeyCode, config.toggleDiaryModifiers));
-        if (_isCapturingToggleDiaryKey) activeKeys.remove((config.diaryKeyCode, config.diaryModifiers));
-      }
-      // AI Report base key stores and matches as bare key (modifiers=0),
-      // so conflict check must also use (keyCode, 0) to match what's actually stored.
-      final hotkeyId = _isCapturingAiReportBaseKey ? (keyCode, 0) : (keyCode, requiredMods);
-      final conflict = findHotkeyConflict(activeKeys, hotkeyId);
-      if (conflict != null) {
-        _stopKeyCapture();
-        _showHotkeyInUseDialog(displayName, conflict);
-        return;
-      }
+    final hotkeyId = target == 'aiReport' ? (keyCode, 0) : (keyCode, mods);
+    final conflict = findHotkeyConflict(activeKeys, hotkeyId);
+    if (conflict != null) {
+      if (mounted) _showHotkeyInUseDialog(displayName, conflict);
+      return;
     }
 
     // Feature-specific saving
-    if (_isCapturingAiReportBaseKey) {
-      // AI Report base key is a hold-to-record trigger — modifiers are intentionally
-      // ignored (user needs free fingers for number keys). Save bare key name only.
-      await config.setAiReportBaseKey(keyCode, keyName);
-      setState(() => _isCapturingAiReportBaseKey = false);
-    } else if (_isCapturingCorrectionKey) {
-      await config.setCorrectionKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() => _isCapturingCorrectionKey = false);
-    } else if (_isCapturingTranslateKey) {
-      await config.setTranslateKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() => _isCapturingTranslateKey = false);
-    } else if (_isCapturingOrganizeKey) {
-      await config.setOrganizeKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() => _isCapturingOrganizeKey = false);
-    } else if (_isCapturingToggleDiaryKey) {
-      await config.setToggleDiaryKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() {
-        _toggleDiaryKeyName = displayName;
-        _isCapturingToggleDiaryKey = false;
-      });
-    } else if (_isCapturingDiaryKey) {
-      await config.setDiaryKey(keyCode, displayName, modifiers: requiredMods);
-      setState(() {
-        _diaryKeyName = displayName;
-        _isCapturingDiaryKey = false;
-      });
+    switch (target) {
+      case 'aiReport':
+        await config.setAiReportBaseKey(keyCode, keyName);
+      case 'correction':
+        await config.setCorrectionKey(keyCode, displayName, modifiers: mods);
+      case 'translate':
+        await config.setTranslateKey(keyCode, displayName, modifiers: mods);
+      case 'organize':
+        await config.setOrganizeKey(keyCode, displayName, modifiers: mods);
+      case 'toggleDiary':
+        await config.setToggleDiaryKey(keyCode, displayName, modifiers: mods);
+        if (mounted) setState(() => _toggleDiaryKeyName = displayName);
+        return;
+      case 'diary':
+        await config.setDiaryKey(keyCode, displayName, modifiers: mods);
+        if (mounted) setState(() => _diaryKeyName = displayName);
+        return;
     }
+    if (mounted) setState(() {});
   }
 
   // ---------------------------------------------------------------------------
@@ -495,7 +407,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.pttMode,
             _hotkeyBadge(
               _diaryKeyName,
-              isCapturing: _isCapturingDiaryKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('diary'),
               onClear: _diaryKeyName.isEmpty ? null : () async {
                 await ConfigService().clearDiaryKey();
@@ -508,7 +420,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.toggleModeTip,
             _hotkeyBadge(
               _toggleDiaryKeyName,
-              isCapturing: _isCapturingToggleDiaryKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('toggleDiary'),
               onClear: _toggleDiaryKeyName.isEmpty ? null : () async {
                 await ConfigService().clearToggleDiaryKey();
@@ -585,7 +497,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.organizeHotkey,
             _hotkeyBadge(
               config.organizeKeyName,
-              isCapturing: _isCapturingOrganizeKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('organize'),
               onClear: config.organizeKeyName.isEmpty ? null : () async {
                 await config.clearOrganizeKey();
@@ -722,7 +634,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.translateHotkey,
             _hotkeyBadge(
               config.translateKeyName,
-              isCapturing: _isCapturingTranslateKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('translate'),
               onClear: config.translateKeyName.isEmpty ? null : () async {
                 await config.clearTranslateKey();
@@ -819,7 +731,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             '纠错快捷键',
             _hotkeyBadge(
               config.correctionKeyName,
-              isCapturing: _isCapturingCorrectionKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('correction'),
               onClear: config.correctionKeyName.isEmpty ? null : () async {
                 await config.clearCorrectionKey();
@@ -907,7 +819,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             '基础按键',
             _hotkeyBadge(
               baseKeyName,
-              isCapturing: _isCapturingAiReportBaseKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('aiReport'),
               onClear: baseKeyName.isEmpty ? null : () async {
                 await config.clearAiReportBaseKey();
