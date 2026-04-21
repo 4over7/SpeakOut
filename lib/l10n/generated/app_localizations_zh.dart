@@ -989,4 +989,93 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get actionCopied => '已复制';
+
+  @override
+  String get permissionsSectionTitle => '系统权限';
+
+  @override
+  String get permissionsReauthTip => '更换签名证书后如快捷键失效，请逐项重新授权。';
+
+  @override
+  String get permissionsAccessibility => '辅助功能';
+
+  @override
+  String get permissionsAccessibilityDesc => '快捷键+文本注入';
+
+  @override
+  String get permissionsInputMonitoring => '输入监控';
+
+  @override
+  String get permissionsInputMonitoringDesc => '键盘触发录音';
+
+  @override
+  String get permissionsMicrophone => '麦克风';
+
+  @override
+  String get permissionsMicrophoneDesc => '语音采集';
+
+  @override
+  String get permissionsOpen => '打开';
+
+  @override
+  String get aboutDeveloper => '开发者';
+
+  @override
+  String get aboutVerboseLogging => '详细日志';
+
+  @override
+  String get aboutLogDir => '日志输出目录';
+
+  @override
+  String get aboutLogDirUnset => '未设置（仅输出到控制台）';
+
+  @override
+  String get aboutLoading => '加载中…';
+
+  @override
+  String get aboutConfigBackup => '配置备份';
+
+  @override
+  String get aboutExportConfig => '导出配置';
+
+  @override
+  String get aboutExportConfigDesc => '将所有设置和凭证导出为文件（含明文密钥，请妥善保管）';
+
+  @override
+  String get aboutExportAction => '导出';
+
+  @override
+  String get aboutExportFileTitle => '导出配置文件';
+
+  @override
+  String get aboutImportConfig => '导入配置';
+
+  @override
+  String get aboutImportConfigDesc => '从备份文件恢复所有设置，立即生效';
+
+  @override
+  String get aboutImportAction => '导入';
+
+  @override
+  String get aboutImportFileTitle => '选择配置文件';
+
+  @override
+  String aboutExportSuccess(String msg) {
+    return '已导出：$msg';
+  }
+
+  @override
+  String aboutExportFailed(String err) {
+    return '导出失败：$err';
+  }
+
+  @override
+  String aboutImportSuccess(String msg) {
+    return '$msg，配置已生效';
+  }
+
+  @override
+  String aboutImportFailed(String err) {
+    return '导入失败：$err';
+  }
 }

@@ -333,5 +333,46 @@
   "aboutDiagnostics": "诊断信息",
   "aboutDiagnosticsDesc": "复制版本 / 配置 / 路径信息到剪贴板（报错时发给我）",
   "actionCopy": "复制",
-  "actionCopied": "已复制"
+  "actionCopied": "已复制",
+
+  "permissionsSectionTitle": "系统权限",
+  "permissionsReauthTip": "更换签名证书后如快捷键失效，请逐项重新授权。",
+  "permissionsAccessibility": "辅助功能",
+  "permissionsAccessibilityDesc": "快捷键+文本注入",
+  "permissionsInputMonitoring": "输入监控",
+  "permissionsInputMonitoringDesc": "键盘触发录音",
+  "permissionsMicrophone": "麦克风",
+  "permissionsMicrophoneDesc": "语音采集",
+  "permissionsOpen": "打开",
+
+  "aboutDeveloper": "开发者",
+  "aboutVerboseLogging": "详细日志",
+  "aboutLogDir": "日志输出目录",
+  "aboutLogDirUnset": "未设置（仅输出到控制台）",
+  "aboutLoading": "加载中…",
+  "aboutConfigBackup": "配置备份",
+  "aboutExportConfig": "导出配置",
+  "aboutExportConfigDesc": "将所有设置和凭证导出为文件（含明文密钥，请妥善保管）",
+  "aboutExportAction": "导出",
+  "aboutExportFileTitle": "导出配置文件",
+  "aboutImportConfig": "导入配置",
+  "aboutImportConfigDesc": "从备份文件恢复所有设置，立即生效",
+  "aboutImportAction": "导入",
+  "aboutImportFileTitle": "选择配置文件",
+  "aboutExportSuccess": "已导出：{msg}",
+  "@aboutExportSuccess": {
+    "placeholders": {"msg": {"type": "String"}}
+  },
+  "aboutExportFailed": "导出失败：{err}",
+  "@aboutExportFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
+  "aboutImportSuccess": "{msg}，配置已生效",
+  "@aboutImportSuccess": {
+    "placeholders": {"msg": {"type": "String"}}
+  },
+  "aboutImportFailed": "导入失败：{err}",
+  "@aboutImportFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  }
 }

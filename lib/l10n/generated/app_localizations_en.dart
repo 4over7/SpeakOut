@@ -1035,4 +1035,96 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionCopied => 'Copied';
+
+  @override
+  String get permissionsSectionTitle => 'System Permissions';
+
+  @override
+  String get permissionsReauthTip =>
+      'If shortcuts stop working after a code-signing change, re-grant each permission below.';
+
+  @override
+  String get permissionsAccessibility => 'Accessibility';
+
+  @override
+  String get permissionsAccessibilityDesc => 'Shortcuts + text injection';
+
+  @override
+  String get permissionsInputMonitoring => 'Input Monitoring';
+
+  @override
+  String get permissionsInputMonitoringDesc => 'Keyboard-triggered recording';
+
+  @override
+  String get permissionsMicrophone => 'Microphone';
+
+  @override
+  String get permissionsMicrophoneDesc => 'Audio capture';
+
+  @override
+  String get permissionsOpen => 'Open';
+
+  @override
+  String get aboutDeveloper => 'Developer';
+
+  @override
+  String get aboutVerboseLogging => 'Verbose Logging';
+
+  @override
+  String get aboutLogDir => 'Log Directory';
+
+  @override
+  String get aboutLogDirUnset => 'Not set (console only)';
+
+  @override
+  String get aboutLoading => 'Loading…';
+
+  @override
+  String get aboutConfigBackup => 'Config Backup';
+
+  @override
+  String get aboutExportConfig => 'Export Config';
+
+  @override
+  String get aboutExportConfigDesc =>
+      'Export all settings and credentials to file (plaintext keys included, store safely)';
+
+  @override
+  String get aboutExportAction => 'Export';
+
+  @override
+  String get aboutExportFileTitle => 'Export Config File';
+
+  @override
+  String get aboutImportConfig => 'Import Config';
+
+  @override
+  String get aboutImportConfigDesc =>
+      'Restore all settings from a backup file, takes effect immediately';
+
+  @override
+  String get aboutImportAction => 'Import';
+
+  @override
+  String get aboutImportFileTitle => 'Choose Config File';
+
+  @override
+  String aboutExportSuccess(String msg) {
+    return 'Exported: $msg';
+  }
+
+  @override
+  String aboutExportFailed(String err) {
+    return 'Export failed: $err';
+  }
+
+  @override
+  String aboutImportSuccess(String msg) {
+    return '$msg, config applied';
+  }
+
+  @override
+  String aboutImportFailed(String err) {
+    return 'Import failed: $err';
+  }
 }

@@ -373,5 +373,46 @@
   "aboutDiagnostics": "Diagnostics",
   "aboutDiagnosticsDesc": "Copy version / config / paths to clipboard (paste when reporting bugs)",
   "actionCopy": "Copy",
-  "actionCopied": "Copied"
+  "actionCopied": "Copied",
+
+  "permissionsSectionTitle": "System Permissions",
+  "permissionsReauthTip": "If shortcuts stop working after a code-signing change, re-grant each permission below.",
+  "permissionsAccessibility": "Accessibility",
+  "permissionsAccessibilityDesc": "Shortcuts + text injection",
+  "permissionsInputMonitoring": "Input Monitoring",
+  "permissionsInputMonitoringDesc": "Keyboard-triggered recording",
+  "permissionsMicrophone": "Microphone",
+  "permissionsMicrophoneDesc": "Audio capture",
+  "permissionsOpen": "Open",
+
+  "aboutDeveloper": "Developer",
+  "aboutVerboseLogging": "Verbose Logging",
+  "aboutLogDir": "Log Directory",
+  "aboutLogDirUnset": "Not set (console only)",
+  "aboutLoading": "Loading…",
+  "aboutConfigBackup": "Config Backup",
+  "aboutExportConfig": "Export Config",
+  "aboutExportConfigDesc": "Export all settings and credentials to file (plaintext keys included, store safely)",
+  "aboutExportAction": "Export",
+  "aboutExportFileTitle": "Export Config File",
+  "aboutImportConfig": "Import Config",
+  "aboutImportConfigDesc": "Restore all settings from a backup file, takes effect immediately",
+  "aboutImportAction": "Import",
+  "aboutImportFileTitle": "Choose Config File",
+  "aboutExportSuccess": "Exported: {msg}",
+  "@aboutExportSuccess": {
+    "placeholders": {"msg": {"type": "String"}}
+  },
+  "aboutExportFailed": "Export failed: {err}",
+  "@aboutExportFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
+  "aboutImportSuccess": "{msg}, config applied",
+  "@aboutImportSuccess": {
+    "placeholders": {"msg": {"type": "String"}}
+  },
+  "aboutImportFailed": "Import failed: {err}",
+  "@aboutImportFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  }
 }

@@ -58,6 +58,15 @@ class _AboutTabState extends State<AboutTab> {
     await Process.run('open', ['-R', path]);
   }
 
+  /// 长路径智能截断：首尾保留，中段用 `…`
+  String _shortenPath(String path, {int maxLen = 56}) {
+    final normalized = path.replaceFirst(RegExp(r'^/Users/[^/]+'), '~');
+    if (normalized.length <= maxLen) return normalized;
+    const head = 16;
+    final keepTail = maxLen - head - 3;
+    return '${normalized.substring(0, head)}…${normalized.substring(normalized.length - keepTail)}';
+  }
+
   Future<void> _copyDiagnostics() async {
     final info = await PackageInfo.fromPlatform();
     final buf = StringBuffer();
@@ -309,10 +318,10 @@ class _AboutTabState extends State<AboutTab> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: SettingsGroup(
-              title: '开发者',
+              title: loc.aboutDeveloper,
               children: [
                 SettingsTile(
-                  label: '详细日志',
+                  label: loc.aboutVerboseLogging,
                   icon: CupertinoIcons.doc_text,
                   child: MacosSwitch(
                     value: ConfigService().verboseLogging,
@@ -325,23 +334,19 @@ class _AboutTabState extends State<AboutTab> {
                 ),
                 const SettingsDivider(),
                 SettingsTile(
-                  label: '日志输出目录',
+                  label: loc.aboutLogDir,
+                  subtitle: ConfigService().logDirectory.isEmpty
+                      ? loc.aboutLogDirUnset
+                      : _shortenPath(ConfigService().logDirectory),
                   icon: CupertinoIcons.folder,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        ConfigService().logDirectory.isEmpty
-                            ? '未设置（仅输出到控制台）'
-                            : ConfigService().logDirectory.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
-                        style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
-                      ),
-                      const SizedBox(width: 8),
                       MacosIconButton(
                         icon: const MacosIcon(CupertinoIcons.folder_badge_plus, size: 16),
                         backgroundColor: MacosColors.transparent,
                         onPressed: () async {
-                          final dir = await FilePicker.platform.getDirectoryPath(dialogTitle: '选择日志输出目录');
+                          final dir = await FilePicker.platform.getDirectoryPath(dialogTitle: loc.aboutLogDir);
                           if (dir != null) {
                             await ConfigService().setLogDirectory(dir);
                             AppService().applyVerboseLogging();
@@ -365,23 +370,12 @@ class _AboutTabState extends State<AboutTab> {
                 const SettingsDivider(),
                 SettingsTile(
                   label: loc.aboutModelsDir,
+                  subtitle: _modelsDir.isEmpty ? loc.aboutLoading : _shortenPath(_modelsDir),
                   icon: CupertinoIcons.cube_box,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _modelsDir.isEmpty
-                            ? '加载中…'
-                            : _modelsDir.replaceFirst(RegExp(r'^/Users/[^/]+'), '~'),
-                        style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor),
-                      ),
-                      const SizedBox(width: 8),
-                      MacosIconButton(
-                        icon: const MacosIcon(CupertinoIcons.arrow_right_square, size: 16),
-                        backgroundColor: MacosColors.transparent,
-                        onPressed: _modelsDir.isEmpty ? null : () => _revealInFinder(_modelsDir),
-                      ),
-                    ],
+                  child: MacosIconButton(
+                    icon: const MacosIcon(CupertinoIcons.arrow_right_square, size: 16),
+                    backgroundColor: MacosColors.transparent,
+                    onPressed: _modelsDir.isEmpty ? null : () => _revealInFinder(_modelsDir),
                   ),
                 ),
                 const SettingsDivider(),
@@ -424,18 +418,18 @@ class _AboutTabState extends State<AboutTab> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: SettingsGroup(
-              title: '配置备份',
+              title: loc.aboutConfigBackup,
               children: [
                 SettingsTile(
-                  label: '导出配置',
-                  subtitle: '将所有设置和凭证导出为文件（含明文密钥，请妥善保管）',
+                  label: loc.aboutExportConfig,
+                  subtitle: loc.aboutExportConfigDesc,
                   icon: CupertinoIcons.arrow_up_doc,
                   child: PushButton(
                     controlSize: ControlSize.regular,
                     secondary: true,
                     onPressed: () async {
                       final path = await FilePicker.platform.saveFile(
-                        dialogTitle: '导出配置文件',
+                        dialogTitle: loc.aboutExportFileTitle,
                         fileName: 'speakout_config.json',
                         allowedExtensions: ['json'],
                         type: FileType.custom,
@@ -444,26 +438,28 @@ class _AboutTabState extends State<AboutTab> {
                         final result = await ConfigBackupService.exportToFile(path);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(result.success ? '已导出：${result.message}' : '导出失败：${result.error}'),
+                            content: Text(result.success
+                                ? loc.aboutExportSuccess(result.message)
+                                : loc.aboutExportFailed(result.error ?? '')),
                             behavior: SnackBarBehavior.floating,
                           ));
                         }
                       }
                     },
-                    child: const Text('导出'),
+                    child: Text(loc.aboutExportAction),
                   ),
                 ),
                 const SettingsDivider(),
                 SettingsTile(
-                  label: '导入配置',
-                  subtitle: '从备份文件恢复所有设置，立即生效',
+                  label: loc.aboutImportConfig,
+                  subtitle: loc.aboutImportConfigDesc,
                   icon: CupertinoIcons.arrow_down_doc,
                   child: PushButton(
                     controlSize: ControlSize.regular,
                     secondary: true,
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles(
-                        dialogTitle: '选择配置文件',
+                        dialogTitle: loc.aboutImportFileTitle,
                         allowedExtensions: ['json'],
                         type: FileType.custom,
                       );
@@ -472,14 +468,16 @@ class _AboutTabState extends State<AboutTab> {
                         if (context.mounted) {
                           setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(importResult.success ? '${importResult.message}，配置已生效' : '导入失败：${importResult.error}'),
+                            content: Text(importResult.success
+                                ? loc.aboutImportSuccess(importResult.message)
+                                : loc.aboutImportFailed(importResult.error ?? '')),
                             backgroundColor: importResult.success ? MacosColors.systemGreenColor : null,
                             behavior: SnackBarBehavior.floating,
                           ));
                         }
                       }
                     },
-                    child: const Text('导入'),
+                    child: Text(loc.aboutImportAction),
                   ),
                 ),
               ],

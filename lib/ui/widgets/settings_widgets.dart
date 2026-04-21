@@ -40,9 +40,15 @@ class _SettingsCardState extends State<SettingsCard> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = widget.onTap != null && _hover
-        ? (widget.accentColor ?? AppTheme.getAccent(context)).withValues(alpha: 0.4)
-        : AppTheme.getBorder(context);
+    // hover: onTap 存在时 border 用 accent；否则用轻微加深的 border
+    final Color borderColor;
+    if (_hover) {
+      borderColor = widget.onTap != null
+          ? (widget.accentColor ?? AppTheme.getAccent(context)).withValues(alpha: 0.4)
+          : (widget.accentColor ?? AppTheme.getAccent(context)).withValues(alpha: 0.22);
+    } else {
+      borderColor = AppTheme.getBorder(context);
+    }
 
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
@@ -103,16 +109,19 @@ class _SettingsCardState extends State<SettingsCard> {
       ),
     );
 
-    if (widget.onTap == null) return card;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
+    // onTap == null: 仍有 hover 视觉（border 轻微 accent tint），但无 click cursor
+    final region = MouseRegion(
+      cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: card,
-      ),
+      child: card,
+    );
+
+    if (widget.onTap == null) return region;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: region,
     );
   }
 }

@@ -1993,6 +1993,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copied'**
   String get actionCopied;
+
+  /// No description provided for @permissionsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System Permissions'**
+  String get permissionsSectionTitle;
+
+  /// No description provided for @permissionsReauthTip.
+  ///
+  /// In en, this message translates to:
+  /// **'If shortcuts stop working after a code-signing change, re-grant each permission below.'**
+  String get permissionsReauthTip;
+
+  /// No description provided for @permissionsAccessibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility'**
+  String get permissionsAccessibility;
+
+  /// No description provided for @permissionsAccessibilityDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts + text injection'**
+  String get permissionsAccessibilityDesc;
+
+  /// No description provided for @permissionsInputMonitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Monitoring'**
+  String get permissionsInputMonitoring;
+
+  /// No description provided for @permissionsInputMonitoringDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard-triggered recording'**
+  String get permissionsInputMonitoringDesc;
+
+  /// No description provided for @permissionsMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get permissionsMicrophone;
+
+  /// No description provided for @permissionsMicrophoneDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio capture'**
+  String get permissionsMicrophoneDesc;
+
+  /// No description provided for @permissionsOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get permissionsOpen;
+
+  /// No description provided for @aboutDeveloper.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer'**
+  String get aboutDeveloper;
+
+  /// No description provided for @aboutVerboseLogging.
+  ///
+  /// In en, this message translates to:
+  /// **'Verbose Logging'**
+  String get aboutVerboseLogging;
+
+  /// No description provided for @aboutLogDir.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Directory'**
+  String get aboutLogDir;
+
+  /// No description provided for @aboutLogDirUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set (console only)'**
+  String get aboutLogDirUnset;
+
+  /// No description provided for @aboutLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get aboutLoading;
+
+  /// No description provided for @aboutConfigBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Config Backup'**
+  String get aboutConfigBackup;
+
+  /// No description provided for @aboutExportConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Config'**
+  String get aboutExportConfig;
+
+  /// No description provided for @aboutExportConfigDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Export all settings and credentials to file (plaintext keys included, store safely)'**
+  String get aboutExportConfigDesc;
+
+  /// No description provided for @aboutExportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get aboutExportAction;
+
+  /// No description provided for @aboutExportFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Config File'**
+  String get aboutExportFileTitle;
+
+  /// No description provided for @aboutImportConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Config'**
+  String get aboutImportConfig;
+
+  /// No description provided for @aboutImportConfigDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore all settings from a backup file, takes effect immediately'**
+  String get aboutImportConfigDesc;
+
+  /// No description provided for @aboutImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get aboutImportAction;
+
+  /// No description provided for @aboutImportFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Config File'**
+  String get aboutImportFileTitle;
+
+  /// No description provided for @aboutExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported: {msg}'**
+  String aboutExportSuccess(String msg);
+
+  /// No description provided for @aboutExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {err}'**
+  String aboutExportFailed(String err);
+
+  /// No description provided for @aboutImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'{msg}, config applied'**
+  String aboutImportSuccess(String msg);
+
+  /// No description provided for @aboutImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {err}'**
+  String aboutImportFailed(String err);
 }
 
 class _AppLocalizationsDelegate

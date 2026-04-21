@@ -212,6 +212,7 @@ class _GeneralTabState extends State<GeneralTab> {
   }
 
   Widget _buildPermissionsCard() {
+    final loc = AppLocalizations.of(context)!;
     return SettingsCard(
       padding: const EdgeInsets.all(14),
       children: [
@@ -219,7 +220,7 @@ class _GeneralTabState extends State<GeneralTab> {
           children: [
             const MacosIcon(CupertinoIcons.lock_shield, size: 14, color: MacosColors.systemGrayColor),
             const SizedBox(width: 6),
-            Text('系统权限', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(loc.permissionsSectionTitle, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
           ],
         ),
         const SizedBox(height: 8),
@@ -231,24 +232,25 @@ class _GeneralTabState extends State<GeneralTab> {
             border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.25)),
           ),
           child: Text(
-            '更换签名证书后如快捷键失效，请逐项重新授权。',
+            loc.permissionsReauthTip,
             style: TextStyle(fontSize: 10, color: MacosColors.systemOrangeColor, height: 1.3),
           ),
         ),
         const SizedBox(height: 10),
-        _permissionRow('辅助功能', '快捷键+文本注入', CupertinoIcons.hand_raised,
+        _permissionRow(loc.permissionsAccessibility, loc.permissionsAccessibilityDesc, CupertinoIcons.hand_raised,
           'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'),
         const SizedBox(height: 6),
-        _permissionRow('输入监控', '键盘触发录音', CupertinoIcons.keyboard,
+        _permissionRow(loc.permissionsInputMonitoring, loc.permissionsInputMonitoringDesc, CupertinoIcons.keyboard,
           'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'),
         const SizedBox(height: 6),
-        _permissionRow('麦克风', '语音采集', CupertinoIcons.mic,
+        _permissionRow(loc.permissionsMicrophone, loc.permissionsMicrophoneDesc, CupertinoIcons.mic,
           'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'),
       ],
     );
   }
 
   Widget _permissionRow(String label, String desc, IconData icon, String url) {
+    final loc = AppLocalizations.of(context)!;
     return Row(
       children: [
         MacosIcon(icon, size: 14, color: MacosColors.systemGrayColor),
@@ -264,7 +266,7 @@ class _GeneralTabState extends State<GeneralTab> {
         ),
         GestureDetector(
           onTap: () => launchUrl(Uri.parse(url)),
-          child: Text('打开 ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+          child: Text('${loc.permissionsOpen} ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
         ),
       ],
     );
