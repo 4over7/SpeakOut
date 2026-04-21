@@ -266,6 +266,7 @@
   "sidebarVocab": "词典",
   "sidebarCorrection": "纠错反馈",
   "sidebarAiReport": "AI 调试",
+  "sidebarDeveloper": "开发者选项",
   "showAdvanced": "显示高级",
 
   "shortcutsRecordKey": "录音键",

@@ -850,6 +850,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarAiReport => 'AI Debug';
 
   @override
+  String get sidebarDeveloper => 'Developer';
+
+  @override
   String get showAdvanced => 'Advanced';
 
   @override

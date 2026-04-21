@@ -816,6 +816,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarAiReport => 'AI 调试';
 
   @override
+  String get sidebarDeveloper => '开发者选项';
+
+  @override
   String get showAdvanced => '显示高级';
 
   @override

@@ -3,8 +3,8 @@ import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
 import '../../theme.dart';
-import 'pages/about_page.dart';
 import 'pages/ai_plus_page.dart';
+import 'pages/developer_page.dart';
 import 'pages/general_pages.dart';
 import 'pages/overview_page.dart';
 import 'pages/recognition_engine_page.dart';
@@ -142,10 +142,10 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
         title: loc.sidebarSectionOther,
         entries: [
           SidebarEntry(
-            id: 'about',
-            label: loc.tabAbout,
-            icon: CupertinoIcons.info_circle,
-            builder: (_) => AboutPage(),
+            id: 'developer',
+            label: loc.sidebarDeveloper,
+            icon: CupertinoIcons.wrench_fill,
+            builder: (_) => DeveloperPage(),
           ),
         ],
       ),

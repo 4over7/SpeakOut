@@ -306,6 +306,7 @@
   "sidebarVocab": "Vocabulary",
   "sidebarCorrection": "Correction",
   "sidebarAiReport": "AI Debug",
+  "sidebarDeveloper": "Developer",
   "showAdvanced": "Advanced",
 
   "shortcutsRecordKey": "Record Key",

@@ -1658,6 +1658,12 @@ abstract class AppLocalizations {
   /// **'AI Debug'**
   String get sidebarAiReport;
 
+  /// No description provided for @sidebarDeveloper.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer'**
+  String get sidebarDeveloper;
+
   /// No description provided for @showAdvanced.
   ///
   /// In en, this message translates to:
