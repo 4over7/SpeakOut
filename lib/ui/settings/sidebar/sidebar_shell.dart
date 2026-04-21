@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import '../../theme.dart';
 import 'pages/placeholder_page.dart';
+import 'pages/shortcuts_page.dart';
+import 'pages/vocab_page.dart';
 import 'sidebar_item.dart';
 
 /// v1.8 设置页新版 shell：左 sidebar + 右 content。
@@ -36,7 +38,12 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
         title: '基础',
         entries: [
           placeholder('general', '通用', CupertinoIcons.settings, 'general_tab.dart'),
-          placeholder('shortcuts', '快捷键', CupertinoIcons.keyboard, 'mode_tab.dart'),
+          SidebarEntry(
+            id: 'shortcuts',
+            label: '快捷键',
+            icon: CupertinoIcons.keyboard,
+            builder: (_) => const ShortcutsPage(),
+          ),
           placeholder('permissions', '权限', CupertinoIcons.lock_shield, 'general_tab.dart'),
         ],
       ),
@@ -45,7 +52,12 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
         entries: [
           placeholder('recognition', '识别引擎', CupertinoIcons.waveform_circle_fill, 'mode_tab.dart'),
           placeholder('ai_plus', 'AI Plus', CupertinoIcons.sparkles, 'mode_tab.dart'),
-          placeholder('vocab', '词典', CupertinoIcons.book, 'mode_tab.dart'),
+          SidebarEntry(
+            id: 'vocab',
+            label: '词典',
+            icon: CupertinoIcons.book,
+            builder: (_) => const VocabPage(),
+          ),
         ],
       ),
       SidebarSection(
