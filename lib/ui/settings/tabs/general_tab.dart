@@ -130,19 +130,22 @@ class _GeneralTabState extends State<GeneralTab> {
       children: [
         _settingsRow(
           label: loc.language,
-          trailing: MacosPopupButton<String>(
-            value: ConfigService().appLanguage,
-            items: [
-              MacosPopupMenuItem(value: 'system', child: Text(loc.langSystem)),
-              MacosPopupMenuItem(value: 'zh', child: Text(loc.langZhHans)),
-              MacosPopupMenuItem(value: 'en', child: Text(loc.langEn)),
-            ],
-            onChanged: (v) async {
-              if (v != null) {
-                await ConfigService().setAppLanguage(v);
-                setState(() {});
-              }
-            },
+          trailing: SizedBox(
+            width: 160,
+            child: MacosPopupButton<String>(
+              value: ConfigService().appLanguage,
+              items: [
+                MacosPopupMenuItem(value: 'system', child: Text(loc.langSystem)),
+                MacosPopupMenuItem(value: 'zh', child: Text(loc.langZhHans)),
+                MacosPopupMenuItem(value: 'en', child: Text(loc.langEn)),
+              ],
+              onChanged: (v) async {
+                if (v != null) {
+                  await ConfigService().setAppLanguage(v);
+                  setState(() {});
+                }
+              },
+            ),
           ),
         ),
       ],
@@ -151,7 +154,7 @@ class _GeneralTabState extends State<GeneralTab> {
 
   Widget _buildAudioCardSingle(AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
     final audioDropdown = SizedBox(
-      width: 200,
+      width: 160,
       child: MacosPopupButton<String>(
         value: () {
           if (_useSystemDefaultAudio) return 'system';
@@ -345,24 +348,25 @@ class _GeneralTabState extends State<GeneralTab> {
     );
   }
 
+  /// label 与 trailing 水平对齐（同一行），subtitle 独立换行在下方，不影响 trailing 位置。
   Widget _settingsRow({required String label, String? subtitle, required Widget trailing}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.getTextPrimary(context))),
-              if (subtitle != null) ...[
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
-              ],
-            ],
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.getTextPrimary(context))),
+            ),
+            const SizedBox(width: 12),
+            trailing,
+          ],
         ),
-        const SizedBox(width: 12),
-        trailing,
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(subtitle, style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
+        ],
       ],
     );
   }

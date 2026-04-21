@@ -777,7 +777,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get translateNoLlm => '即时翻译需要配置 LLM 服务。请在「云服务账户」中添加 LLM 服务商。';
 
   @override
-  String get settingsV18PreviewTitle => '设置（v1.8 预览）';
+  String get settingsV18PreviewTitle => '设置';
 
   @override
   String get sidebarSectionBasic => '基础';

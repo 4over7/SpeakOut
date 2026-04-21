@@ -253,7 +253,7 @@
   "translateHotkey": "翻译快捷键",
   "translateNoLlm": "即时翻译需要配置 LLM 服务。请在「云服务账户」中添加 LLM 服务商。",
 
-  "settingsV18PreviewTitle": "设置（v1.8 预览）",
+  "settingsV18PreviewTitle": "设置",
   "sidebarSectionBasic": "基础",
   "sidebarSectionVoice": "语音",
   "sidebarSectionSuperpower": "超能力",

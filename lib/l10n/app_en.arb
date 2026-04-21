@@ -293,7 +293,7 @@
   "translateHotkey": "Translate Hotkey",
   "translateNoLlm": "Quick Translate requires an LLM service. Please add one in Cloud Accounts.",
 
-  "settingsV18PreviewTitle": "Settings (v1.8 Preview)",
+  "settingsV18PreviewTitle": "Settings",
   "sidebarSectionBasic": "Basic",
   "sidebarSectionVoice": "Voice",
   "sidebarSectionSuperpower": "Superpower",

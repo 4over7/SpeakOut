@@ -811,7 +811,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Quick Translate requires an LLM service. Please add one in Cloud Accounts.';
 
   @override
-  String get settingsV18PreviewTitle => 'Settings (v1.8 Preview)';
+  String get settingsV18PreviewTitle => 'Settings';
 
   @override
   String get sidebarSectionBasic => 'Basic';

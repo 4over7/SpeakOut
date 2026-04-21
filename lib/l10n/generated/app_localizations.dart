@@ -1583,7 +1583,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsV18PreviewTitle.
   ///
   /// In en, this message translates to:
-  /// **'Settings (v1.8 Preview)'**
+  /// **'Settings'**
   String get settingsV18PreviewTitle;
 
   /// No description provided for @sidebarSectionBasic.
