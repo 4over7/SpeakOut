@@ -20,8 +20,26 @@ class SettingsSidebarShell extends StatefulWidget {
   State<SettingsSidebarShell> createState() => _SettingsSidebarShellState();
 }
 
+/// 给 sidebar 内的 page 用：跳转到另一个 sidebar 条目。
+class SidebarNavigation extends InheritedWidget {
+  final void Function(String pageId) goto;
+
+  const SidebarNavigation({super.key, required this.goto, required super.child});
+
+  static SidebarNavigation? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SidebarNavigation>();
+
+  @override
+  bool updateShouldNotify(SidebarNavigation oldWidget) => goto != oldWidget.goto;
+}
+
 class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
   String _selectedId = 'overview';
+
+  void _goto(String id) {
+    if (_selectedId == id) return;
+    setState(() => _selectedId = id);
+  }
 
   List<SidebarSection> _buildSections() {
     return [
@@ -147,7 +165,9 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
     final sections = _buildSections();
     final selected = _findEntry(sections, _selectedId) ?? sections.first.entries.first;
 
-    return MacosWindow(
+    return SidebarNavigation(
+      goto: _goto,
+      child: MacosWindow(
       backgroundColor: AppTheme.getBackground(context),
       disableWallpaperTinting: true,
       child: MacosScaffold(
@@ -201,6 +221,7 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
           ),
         ],
       ),
+    ),
     );
   }
 }

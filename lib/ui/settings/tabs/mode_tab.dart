@@ -16,6 +16,7 @@ import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../../vocab_settings_page.dart';
 import '../settings_shared.dart';
+import '../sidebar/sidebar_shell.dart';
 
 /// Which subset of mode_tab to render.
 /// `all` — legacy 5-tab settings page (default).
@@ -924,6 +925,10 @@ class ModeTabState extends State<ModeTab> {
         children: [
           _buildModeSelector(loc, currentMode, isTranslation),
           ..._buildLanguageHints(loc),
+          if (currentMode == 'smart') ...[
+            const SizedBox(height: 10),
+            _buildSmartModeAiPlusHint(),
+          ],
           const SizedBox(height: 12),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
@@ -951,6 +956,43 @@ class ModeTabState extends State<ModeTab> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Smart 模式下给出"前往 AI Plus 配置 LLM"的提示横幅
+  Widget _buildSmartModeAiPlusHint() {
+    final nav = SidebarNavigation.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.getAccent(context).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.getAccent(context).withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          MacosIcon(CupertinoIcons.sparkles, size: 16, color: AppTheme.getAccent(context)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Smart 模式需在「AI Plus」页配置 LLM（服务商 / 模型 / API Key），否则 AI 润色不生效。',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.getTextPrimary(context),
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (nav != null)
+            PushButton(
+              controlSize: ControlSize.regular,
+              color: AppTheme.getAccent(context),
+              onPressed: () => nav.goto('ai_plus'),
+              child: const Text('前往 AI Plus', style: TextStyle(color: Colors.white)),
+            ),
         ],
       ),
     );
