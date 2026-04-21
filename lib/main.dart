@@ -506,6 +506,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     final loc = AppLocalizations.of(context)!;
     
     return MacosWindow(
+      backgroundColor: AppTheme.getBackground(context),
+      disableWallpaperTinting: true,
       // sidebar: removed for cleaner UI
       child: MacosScaffold(
         backgroundColor: AppTheme.getBackground(context), // Match mockup

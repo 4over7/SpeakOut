@@ -53,11 +53,13 @@ class HotkeyRecorderModal extends StatefulWidget {
 }
 
 class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
-  static const int _totalSeconds = 15;
+  static const int _totalSeconds = 8;
 
   HotkeyCapturer? _capturer;
   Timer? _tickTimer;
+  StreamSubscription<(int, int)>? _previewSub;
   int _secondsLeft = _totalSeconds;
+  String? _previewKey;
 
   @override
   void initState() {
@@ -72,6 +74,17 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
       onCaptured: _onCaptured,
       onTimeout: _onTimeout,
     )..start();
+
+    // 实时按键预览（独立订阅，只看不拦截）
+    _previewSub = CoreEngine().rawKeyEventStream.listen((event) {
+      if (!mounted) return;
+      final (keyCode, mods) = event;
+      if (keyCode == 53) return; // ESC
+      final name = mapKeyCodeToString(keyCode);
+      final requiredMods = stripOwnModifier(keyCode, mods);
+      final display = requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : name;
+      setState(() => _previewKey = display);
+    });
 
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -102,6 +115,7 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
   void dispose() {
     _capturer?.cancel();
     _tickTimer?.cancel();
+    _previewSub?.cancel();
     super.dispose();
   }
 
@@ -153,7 +167,35 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              // 实时按键预览
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _previewKey != null
+                      ? accent.withValues(alpha: 0.1)
+                      : AppTheme.getInputBackground(context),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _previewKey != null
+                        ? accent.withValues(alpha: 0.4)
+                        : AppTheme.getBorder(context),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    _previewKey ?? '—',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'SF Mono',
+                      fontWeight: FontWeight.w600,
+                      color: _previewKey != null ? accent : AppTheme.getTextSecondary(context),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
               // 倒计时进度条
               ClipRRect(
                 borderRadius: BorderRadius.circular(3),

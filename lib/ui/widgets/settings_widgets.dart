@@ -78,26 +78,31 @@ class _SettingsCardState extends State<SettingsCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (widget.title != null) ...[
+                    // Header row: title+icon (optional) + trailing (optional)
+                    // 即使 title=null 也 render trailing（右对齐）
+                    if (widget.title != null || widget.trailing != null) ...[
                       Row(
                         children: [
                           if (widget.titleIcon != null) ...[
                             MacosIcon(widget.titleIcon, size: 16, color: widget.accentColor ?? AppTheme.getAccent(context)),
                             const SizedBox(width: 10),
                           ],
-                          Expanded(
-                            child: Text(
-                              widget.title!,
-                              style: AppTheme.body(context).copyWith(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
+                          if (widget.title != null)
+                            Expanded(
+                              child: Text(
+                                widget.title!,
+                                style: AppTheme.body(context).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
                               ),
-                            ),
-                          ),
+                            )
+                          else
+                            const Spacer(),
                           ?widget.trailing,
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      if (widget.title != null) const SizedBox(height: 14),
                     ],
                     ...widget.children,
                   ],

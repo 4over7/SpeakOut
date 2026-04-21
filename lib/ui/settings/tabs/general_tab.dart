@@ -81,10 +81,7 @@ class _GeneralTabState extends State<GeneralTab> {
     // v1.8 sidebar single-card views
     switch (widget.viewFilter) {
       case GeneralView.general:
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(4),
-          child: _buildGeneralCard(loc, engine, isBluetooth),
-        );
+        return _buildGeneralSingleView(loc, engine, isBluetooth);
       case GeneralView.permissions:
         return SingleChildScrollView(
           padding: const EdgeInsets.all(4),
@@ -109,6 +106,132 @@ class _GeneralTabState extends State<GeneralTab> {
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  /// sidebar 单页视图：三个独立 feature 卡
+  Widget _buildGeneralSingleView(AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
+    return ListView(
+      padding: const EdgeInsets.all(4),
+      children: [
+        _buildLanguageCardSingle(loc),
+        const SizedBox(height: 12),
+        _buildAudioCardSingle(loc, engine, isBluetooth),
+        const SizedBox(height: 12),
+        _buildAutoOptimizeCardSingle(loc, engine),
+      ],
+    );
+  }
+
+  Widget _buildLanguageCardSingle(AppLocalizations loc) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _settingsRow(
+          label: loc.language,
+          trailing: SizedBox(
+            width: 200,
+            child: buildDropdown(
+              context,
+              value: ConfigService().appLanguage,
+              items: {'system': loc.langSystem, 'zh': loc.langZhHans, 'en': loc.langEn},
+              onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState(() {}); },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAudioCardSingle(AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
+    final audioDropdown = SizedBox(
+      width: 200,
+      child: MacosPopupButton<String>(
+        value: () {
+          if (_useSystemDefaultAudio) return 'system';
+          final savedId = ConfigService().audioInputDeviceId;
+          if (savedId != null && _audioDevices.any((d) => d.id == savedId)) return savedId;
+          return 'system';
+        }(),
+        items: [
+          MacosPopupMenuItem(value: 'system', child: Text(loc.systemDefault)),
+          ..._audioDevices.map((d) => MacosPopupMenuItem(
+            value: d.id,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (d.isBluetooth) const Padding(padding: EdgeInsets.only(right: 4), child: MacosIcon(CupertinoIcons.bluetooth, size: 12)),
+              Text(d.name),
+            ]),
+          )),
+        ],
+        onChanged: (value) async {
+          if (value == null) return;
+          final service = engine.audioDeviceService;
+          if (service == null) return;
+          if (value == 'system') {
+            service.clearPreferredDevice();
+            await ConfigService().setAudioInputDeviceId(null);
+          } else {
+            service.setInputDevice(value);
+            final device = _audioDevices.firstWhere((d) => d.id == value, orElse: () => _audioDevices.first);
+            await ConfigService().setAudioInputDeviceId(value, name: device.name);
+          }
+          _loadAudioDevices();
+        },
+      ),
+    );
+
+    String? audioSubtitle;
+    if (_useSystemDefaultAudio && _currentAudioDevice != null) {
+      audioSubtitle = loc.audioDeviceCurrent(_currentAudioDevice!.name);
+    }
+
+    return SettingsCard(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _settingsRow(
+          label: loc.audioInput,
+          subtitle: audioSubtitle,
+          trailing: audioDropdown,
+        ),
+        if (isBluetooth) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            const MacosIcon(CupertinoIcons.exclamationmark_triangle, color: Colors.orange, size: 12),
+            const SizedBox(width: 6),
+            Expanded(child: Text(loc.bluetoothMicWarning, style: const TextStyle(fontSize: 11, color: Colors.orange))),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () async {
+                final service = engine.audioDeviceService;
+                if (service == null) return;
+                service.switchToBuiltinMic();
+                final builtIn = service.builtInMicrophone;
+                if (builtIn != null && builtIn.id.isNotEmpty) {
+                  await ConfigService().setAudioInputDeviceId(builtIn.id, name: builtIn.name);
+                }
+                _loadAudioDevices();
+              },
+              child: Text(loc.switchToBuiltin, style: TextStyle(fontSize: 11, color: MacosColors.systemBlueColor, decoration: TextDecoration.underline)),
+            ),
+          ]),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAutoOptimizeCardSingle(AppLocalizations loc, CoreEngine engine) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _settingsRow(
+          label: loc.autoOptimizeAudio,
+          subtitle: loc.autoOptimizeAudioDesc,
+          trailing: MacosSwitch(
+            value: _autoManageAudio,
+            onChanged: (v) { setState(() => _autoManageAudio = v); engine.audioDeviceService?.autoManageEnabled = v; },
+          ),
+        ),
+      ],
     );
   }
 
