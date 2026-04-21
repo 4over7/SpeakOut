@@ -109,17 +109,18 @@ class _GeneralTabState extends State<GeneralTab> {
     );
   }
 
-  /// sidebar 单页视图：三个独立 feature 卡
+  /// sidebar 单页视图：三个独立 feature 卡，双列布局
   Widget _buildGeneralSingleView(AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
-    return ListView(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(4),
-      children: [
-        _buildLanguageCardSingle(loc),
-        const SizedBox(height: 12),
-        _buildAudioCardSingle(loc, engine, isBluetooth),
-        const SizedBox(height: 12),
-        _buildAutoOptimizeCardSingle(loc, engine),
-      ],
+      child: SettingsCardGrid(
+        forceDualColumn: true,
+        children: [
+          _buildLanguageCardSingle(loc),
+          _buildAudioCardSingle(loc, engine, isBluetooth),
+          _buildAutoOptimizeCardSingle(loc, engine),
+        ],
+      ),
     );
   }
 
@@ -129,14 +130,19 @@ class _GeneralTabState extends State<GeneralTab> {
       children: [
         _settingsRow(
           label: loc.language,
-          trailing: SizedBox(
-            width: 200,
-            child: buildDropdown(
-              context,
-              value: ConfigService().appLanguage,
-              items: {'system': loc.langSystem, 'zh': loc.langZhHans, 'en': loc.langEn},
-              onChanged: (v) async { await ConfigService().setAppLanguage(v!); setState(() {}); },
-            ),
+          trailing: MacosPopupButton<String>(
+            value: ConfigService().appLanguage,
+            items: [
+              MacosPopupMenuItem(value: 'system', child: Text(loc.langSystem)),
+              MacosPopupMenuItem(value: 'zh', child: Text(loc.langZhHans)),
+              MacosPopupMenuItem(value: 'en', child: Text(loc.langEn)),
+            ],
+            onChanged: (v) async {
+              if (v != null) {
+                await ConfigService().setAppLanguage(v);
+                setState(() {});
+              }
+            },
           ),
         ),
       ],

@@ -167,7 +167,7 @@ class SettingsCardGrid extends StatelessWidget {
           );
         }
 
-        // Dual column
+        // Dual column (奇数项时最后一行右侧 Expanded 空占位，保持半宽)
         final List<Widget> rows = [];
         for (int i = 0; i < children.length; i += 2) {
           final left = children[i];
