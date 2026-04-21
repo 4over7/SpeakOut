@@ -963,6 +963,7 @@ class ModeTabState extends State<ModeTab> {
 
   /// Smart 模式下给出"前往 AI Plus 配置 LLM"的提示横幅
   Widget _buildSmartModeAiPlusHint() {
+    final loc = AppLocalizations.of(context)!;
     final nav = SidebarNavigation.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
@@ -977,7 +978,7 @@ class ModeTabState extends State<ModeTab> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Smart 模式需在「AI Plus」页配置 LLM（服务商 / 模型 / API Key），否则 AI 润色不生效。',
+              loc.smartNeedsAiPlusConfig,
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.getTextPrimary(context),
@@ -991,7 +992,7 @@ class ModeTabState extends State<ModeTab> {
               controlSize: ControlSize.regular,
               color: AppTheme.getAccent(context),
               onPressed: () => nav.goto('ai_plus'),
-              child: const Text('前往 AI Plus', style: TextStyle(color: Colors.white)),
+              child: Text(loc.gotoAiPlus, style: const TextStyle(color: Colors.white)),
             ),
         ],
       ),
@@ -1024,7 +1025,7 @@ class ModeTabState extends State<ModeTab> {
                     const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemOrangeColor),
                     const SizedBox(width: 8),
                     Expanded(child: Text(
-                      'AI 润色当前不生效：需在「识别引擎」页把工作模式切为 Smart（离线 + 云端 AI）。LLM 配置仍可在此编辑。',
+                      loc.aiPlusNotActive,
                       style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
                     )),
                   ],

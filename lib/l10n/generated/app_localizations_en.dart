@@ -809,4 +809,230 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get translateNoLlm =>
       'Quick Translate requires an LLM service. Please add one in Cloud Accounts.';
+
+  @override
+  String get settingsV18PreviewTitle => 'Settings (v1.8 Preview)';
+
+  @override
+  String get sidebarSectionBasic => 'Basic';
+
+  @override
+  String get sidebarSectionVoice => 'Voice';
+
+  @override
+  String get sidebarSectionSuperpower => 'Superpower';
+
+  @override
+  String get sidebarSectionOther => 'Other';
+
+  @override
+  String get sidebarOverview => 'Overview';
+
+  @override
+  String get sidebarShortcuts => 'Shortcuts';
+
+  @override
+  String get sidebarPermissions => 'Permissions';
+
+  @override
+  String get sidebarRecognition => 'Recognition';
+
+  @override
+  String get sidebarAiPlus => 'AI Plus';
+
+  @override
+  String get sidebarVocab => 'Vocabulary';
+
+  @override
+  String get sidebarCorrection => 'Correction';
+
+  @override
+  String get sidebarAiReport => 'AI Debug';
+
+  @override
+  String get showAdvanced => 'Advanced';
+
+  @override
+  String get shortcutsRecordKey => 'Record Key';
+
+  @override
+  String get shortcutsSharedHint =>
+      'Tap = toggle recording, Hold = push-to-talk';
+
+  @override
+  String get shortcutsSplitTitle => 'Record Key (PTT / Toggle separately)';
+
+  @override
+  String get shortcutsPttTitle => 'Push-to-Talk (PTT)';
+
+  @override
+  String get shortcutsPttHint => 'Hold to record, release to stop';
+
+  @override
+  String get shortcutsToggleTitle => 'Toggle';
+
+  @override
+  String get shortcutsToggleHint => 'Tap to start, tap again to stop';
+
+  @override
+  String get shortcutsTip =>
+      'Recommended: Right Option / Fn / F13–F19 — Cmd / Ctrl combos are often taken by system apps.';
+
+  @override
+  String get hotkeyModalTitle => 'Record Hotkey';
+
+  @override
+  String get hotkeyModalSubtitle =>
+      'Press the key or combination you want to set';
+
+  @override
+  String hotkeyModalCountdown(int seconds) {
+    return 'Cancels in ${seconds}s · Press ESC to exit';
+  }
+
+  @override
+  String get hotkeyModalRecommend => 'Recommended';
+
+  @override
+  String get hotkeyModalAvoid =>
+      'Avoid Cmd / Ctrl combinations (often taken by system apps)';
+
+  @override
+  String hotkeyInUseTitle(String keyName, String feature) {
+    return '$keyName is already used by \"$feature\"';
+  }
+
+  @override
+  String get hotkeyInUseMessage => 'That key is taken. Please choose another.';
+
+  @override
+  String get hotkeyInUseOk => 'OK';
+
+  @override
+  String get hotkeyRecordDiary => 'Record Flash Note Key';
+
+  @override
+  String get hotkeyRecordDiaryHint => 'Hold to start recording a note';
+
+  @override
+  String get hotkeyRecordToggleDiary => 'Record Note Toggle Key';
+
+  @override
+  String get hotkeyRecordToggleDiaryHint => 'Tap to start, tap again to stop';
+
+  @override
+  String get hotkeyRecordOrganize => 'Record AI Organize Key';
+
+  @override
+  String get hotkeyRecordOrganizeHint =>
+      'After selecting text, press to reorganize';
+
+  @override
+  String get hotkeyRecordTranslate => 'Record Quick Translate Key';
+
+  @override
+  String get hotkeyRecordTranslateHint =>
+      'After selecting text, press to translate';
+
+  @override
+  String get hotkeyRecordCorrection => 'Record Correction Key';
+
+  @override
+  String get hotkeyRecordCorrectionHint =>
+      'After selecting text, press to submit correction';
+
+  @override
+  String get hotkeyRecordAiReport => 'Record AI Debug Base Key';
+
+  @override
+  String get hotkeyRecordAiReportHint => 'Hold + digit 1-5 to activate';
+
+  @override
+  String get overviewWelcome => 'Welcome to SpeakOut';
+
+  @override
+  String get overviewTagline =>
+      'macOS offline-first AI dictation · Private · Free & Open';
+
+  @override
+  String get overviewGetStarted => 'Get Started';
+
+  @override
+  String get featureOfflineTitle => 'Offline Recognition';
+
+  @override
+  String get featureOfflineDesc =>
+      'Local Sherpa-ONNX ASR, on-device; accuracy rivals cloud';
+
+  @override
+  String get featureAiPolishTitle => 'AI Polish';
+
+  @override
+  String get featureAiPolishDesc =>
+      'Cloud LLM fixes homophones, punctuation, and grammar';
+
+  @override
+  String get featureSuperpowerTitle => 'Superpower';
+
+  @override
+  String get featureSuperpowerDesc =>
+      'Flash Note / AI Organize / Quick Translate / Correction / AI Debug';
+
+  @override
+  String get featureVocabTitle => 'Professional Vocab';
+
+  @override
+  String get featureVocabDesc =>
+      'Custom terms injected into LLM prompt; medical / legal / finance packs';
+
+  @override
+  String get overviewHelpTitle => 'Help & Support';
+
+  @override
+  String get linkWikiFaq => 'Wiki · FAQ';
+
+  @override
+  String get linkChangelog => 'Changelog';
+
+  @override
+  String get linkXHandle => 'X · @4over7';
+
+  @override
+  String get linkFeedback => 'Feedback · 4over7@gmail.com';
+
+  @override
+  String get linkGithubIssues => 'GitHub Issues';
+
+  @override
+  String get smartNeedsAiPlusConfig =>
+      'Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won\'t apply.';
+
+  @override
+  String get gotoAiPlus => 'Go to AI Plus';
+
+  @override
+  String get aiPlusNotActive =>
+      'AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.';
+
+  @override
+  String get aboutModelsDir => 'Models Directory';
+
+  @override
+  String get aboutGatewayUrl => 'Gateway URL';
+
+  @override
+  String get aboutGatewayDesc => 'License / subscription / cloud token proxy';
+
+  @override
+  String get aboutDiagnostics => 'Diagnostics';
+
+  @override
+  String get aboutDiagnosticsDesc =>
+      'Copy version / config / paths to clipboard (paste when reporting bugs)';
+
+  @override
+  String get actionCopy => 'Copy';
+
+  @override
+  String get actionCopied => 'Copied';
 }

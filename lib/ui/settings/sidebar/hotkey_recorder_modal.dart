@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
+import 'package:speakout/l10n/generated/app_localizations.dart';
 
 import '../../../engine/core_engine.dart';
 import '../../theme.dart';
@@ -25,13 +26,14 @@ Future<HotkeyRecorderResult?> showHotkeyRecorder(
   String? title,
   String? subtitle,
 }) {
+  final loc = AppLocalizations.of(context)!;
   return showDialog<HotkeyRecorderResult>(
     context: context,
     barrierDismissible: true,
     barrierColor: Colors.black.withValues(alpha: 0.45),
     builder: (_) => HotkeyRecorderModal(
-      title: title ?? '录制快捷键',
-      subtitle: subtitle ?? '请按下您想要设置的按键或组合键',
+      title: title ?? loc.hotkeyModalTitle,
+      subtitle: subtitle ?? loc.hotkeyModalSubtitle,
     ),
   );
 }
@@ -105,6 +107,7 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final accent = AppTheme.getAccent(context);
     final progress = _secondsLeft / _totalSeconds;
 
@@ -163,7 +166,7 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
               ),
               const SizedBox(height: 8),
               Text(
-                '$_secondsLeft 秒后自动取消 · 按 ESC 立即退出',
+                loc.hotkeyModalCountdown(_secondsLeft),
                 style: TextStyle(
                   fontSize: 11,
                   color: AppTheme.getTextSecondary(context),
@@ -180,7 +183,7 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '推荐',
+                      loc.hotkeyModalRecommend,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -198,7 +201,7 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '避开 Cmd / Ctrl 等常被系统应用占用的组合键',
+                      loc.hotkeyModalAvoid,
                       style: TextStyle(
                         fontSize: 10,
                         color: AppTheme.getTextSecondary(context),

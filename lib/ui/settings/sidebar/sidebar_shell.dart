@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
+import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
 import '../../theme.dart';
 import 'pages/about_page.dart';
@@ -41,108 +42,108 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
     setState(() => _selectedId = id);
   }
 
-  List<SidebarSection> _buildSections() {
+  List<SidebarSection> _buildSections(AppLocalizations loc) {
     return [
       SidebarSection(
         entries: [
           SidebarEntry(
             id: 'overview',
-            label: '概览',
+            label: loc.sidebarOverview,
             icon: CupertinoIcons.square_grid_2x2,
             builder: (_) => OverviewPage(),
           ),
         ],
       ),
       SidebarSection(
-        title: '基础',
+        title: loc.sidebarSectionBasic,
         entries: [
           SidebarEntry(
             id: 'general',
-            label: '通用',
+            label: loc.tabGeneral,
             icon: CupertinoIcons.settings,
             builder: (_) => GeneralPage(),
           ),
           SidebarEntry(
             id: 'shortcuts',
-            label: '快捷键',
+            label: loc.sidebarShortcuts,
             icon: CupertinoIcons.keyboard,
             hasAdvanced: true,
             builder: (_) => ShortcutsPage(),
           ),
           SidebarEntry(
             id: 'permissions',
-            label: '权限',
+            label: loc.sidebarPermissions,
             icon: CupertinoIcons.lock_shield,
             builder: (_) => PermissionsPage(),
           ),
         ],
       ),
       SidebarSection(
-        title: '语音',
+        title: loc.sidebarSectionVoice,
         entries: [
           SidebarEntry(
             id: 'recognition',
-            label: '识别引擎',
+            label: loc.sidebarRecognition,
             icon: CupertinoIcons.waveform_circle_fill,
             hasAdvanced: true,
             builder: (_) => RecognitionEnginePage(),
           ),
           SidebarEntry(
             id: 'ai_plus',
-            label: 'AI Plus',
+            label: loc.sidebarAiPlus,
             icon: CupertinoIcons.sparkles,
             hasAdvanced: true,
             builder: (_) => AiPlusPage(),
           ),
           SidebarEntry(
             id: 'vocab',
-            label: '词典',
+            label: loc.sidebarVocab,
             icon: CupertinoIcons.book,
             builder: (_) => VocabPage(),
           ),
         ],
       ),
       SidebarSection(
-        title: '超能力',
+        title: loc.sidebarSectionSuperpower,
         entries: [
           SidebarEntry(
             id: 'diary',
-            label: '闪念笔记',
+            label: loc.diaryMode,
             icon: CupertinoIcons.lightbulb,
             builder: (_) => DiaryPage(),
           ),
           SidebarEntry(
             id: 'organize',
-            label: 'AI 梳理',
+            label: loc.organizeEnabled,
             icon: CupertinoIcons.wand_stars,
             builder: (_) => OrganizePage(),
           ),
           SidebarEntry(
             id: 'translate',
-            label: '即时翻译',
+            label: loc.quickTranslate,
             icon: CupertinoIcons.globe,
             builder: (_) => TranslatePage(),
           ),
           SidebarEntry(
             id: 'correction',
-            label: '纠错反馈',
+            label: loc.sidebarCorrection,
             icon: CupertinoIcons.pencil_circle,
             builder: (_) => CorrectionPage(),
           ),
           SidebarEntry(
             id: 'debug',
-            label: 'AI 调试',
+            label: loc.sidebarAiReport,
             icon: CupertinoIcons.ant,
             builder: (_) => AiReportPage(),
           ),
         ],
       ),
       SidebarSection(
-        title: '其他',
+        title: loc.sidebarSectionOther,
         entries: [
           SidebarEntry(
             id: 'about',
-            label: '关于',
+            label: loc.tabAbout,
             icon: CupertinoIcons.info_circle,
             builder: (_) => AboutPage(),
           ),
@@ -162,7 +163,8 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
 
   @override
   Widget build(BuildContext context) {
-    final sections = _buildSections();
+    final loc = AppLocalizations.of(context)!;
+    final sections = _buildSections(loc);
     final selected = _findEntry(sections, _selectedId) ?? sections.first.entries.first;
 
     return SidebarNavigation(
@@ -173,8 +175,8 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
       child: MacosScaffold(
         backgroundColor: AppTheme.getBackground(context),
         toolBar: ToolBar(
-          title: const Text('设置（v1.8 预览）'),
-          titleWidth: 200,
+          title: Text(loc.settingsV18PreviewTitle),
+          titleWidth: 220,
         ),
         children: [
           ContentArea(
@@ -261,7 +263,7 @@ class _PageHeader extends StatelessWidget {
           const Spacer(),
           if (entry.hasAdvanced) ...[
             Text(
-              '显示高级',
+              AppLocalizations.of(context)!.showAdvanced,
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.getTextSecondary(context),

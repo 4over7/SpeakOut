@@ -364,7 +364,7 @@ class _AboutTabState extends State<AboutTab> {
                 ),
                 const SettingsDivider(),
                 SettingsTile(
-                  label: '模型目录',
+                  label: loc.aboutModelsDir,
                   icon: CupertinoIcons.cube_box,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -386,8 +386,8 @@ class _AboutTabState extends State<AboutTab> {
                 ),
                 const SettingsDivider(),
                 SettingsTile(
-                  label: 'Gateway URL',
-                  subtitle: '许可证 / 订阅 / 云端 Token 代理服务',
+                  label: loc.aboutGatewayUrl,
+                  subtitle: loc.aboutGatewayDesc,
                   icon: CupertinoIcons.cloud,
                   child: Text(
                     ConfigService.kDefaultGatewayUrl.replaceFirst('https://', ''),
@@ -400,8 +400,8 @@ class _AboutTabState extends State<AboutTab> {
                 ),
                 const SettingsDivider(),
                 SettingsTile(
-                  label: '诊断信息',
-                  subtitle: '复制版本 / 配置 / 路径信息到剪贴板（报错时发给我）',
+                  label: loc.aboutDiagnostics,
+                  subtitle: loc.aboutDiagnosticsDesc,
                   icon: CupertinoIcons.ant,
                   child: PushButton(
                     controlSize: ControlSize.regular,
@@ -409,7 +409,7 @@ class _AboutTabState extends State<AboutTab> {
                     secondary: !_diagnosticsCopied,
                     onPressed: _copyDiagnostics,
                     child: Text(
-                      _diagnosticsCopied ? '已复制' : '复制',
+                      _diagnosticsCopied ? loc.actionCopied : loc.actionCopy,
                       style: TextStyle(color: _diagnosticsCopied ? Colors.white : null),
                     ),
                   ),

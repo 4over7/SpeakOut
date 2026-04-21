@@ -36,21 +36,22 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
   }
 
   Future<void> _recordHotkey(String target) async {
+    final loc = AppLocalizations.of(context)!;
     String title;
     String subtitle;
     switch (target) {
       case 'shared':
-        title = '录制录音键';
-        subtitle = '短按 = 切换录音，长按 = 说话松开停（共享键）';
+        title = loc.shortcutsRecordKey;
+        subtitle = loc.shortcutsSharedHint;
       case 'ptt':
-        title = '录制 PTT 键';
-        subtitle = '长按该键录音，松开停止';
+        title = loc.shortcutsPttTitle;
+        subtitle = loc.shortcutsPttHint;
       case 'toggleInput':
-        title = '录制 Toggle 键';
-        subtitle = '点一下开录、再点一下停';
+        title = loc.shortcutsToggleTitle;
+        subtitle = loc.shortcutsToggleHint;
       default:
-        title = '录制快捷键';
-        subtitle = '请按下您想要设置的按键';
+        title = loc.hotkeyModalTitle;
+        subtitle = loc.hotkeyModalSubtitle;
     }
 
     final result = await showHotkeyRecorder(context, title: title, subtitle: subtitle);
@@ -73,11 +74,11 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
         context: context,
         builder: (_) => MacosAlertDialog(
           appIcon: const Icon(CupertinoIcons.exclamationmark_triangle, size: 48, color: Colors.orange),
-          title: Text('${result.displayName} 已被「$conflictWith」使用', style: const TextStyle(fontWeight: FontWeight.bold)),
-          message: const Text('该按键已被占用，请选择其他按键。'),
+          title: Text(loc.hotkeyInUseTitle(result.displayName, conflictWith), style: const TextStyle(fontWeight: FontWeight.bold)),
+          message: Text(loc.hotkeyInUseMessage),
           primaryButton: PushButton(
             controlSize: ControlSize.large,
-            child: const Text('好的'),
+            child: Text(loc.hotkeyInUseOk),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
@@ -121,9 +122,9 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
         const SizedBox(height: 12),
         _buildMaxDurationCard(loc),
         const SizedBox(height: 12),
-        const _Tip(
+        _Tip(
           icon: CupertinoIcons.lightbulb,
-          text: '推荐 Right Option / Fn / F13-F19 — Cmd / Ctrl 等组合键常被系统应用占用。',
+          text: loc.shortcutsTip,
         ),
       ],
     );
@@ -131,13 +132,13 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
 
   Widget _buildSimpleCard(AppLocalizations loc) {
     return SettingsCard(
-      title: '录音键',
+      title: loc.shortcutsRecordKey,
       titleIcon: CupertinoIcons.mic,
       accentColor: AppTheme.getAccent(context),
       children: [
         _row(
-          '录音键',
-          '短按 = 切换录音，长按 = 说话松开停',
+          loc.shortcutsRecordKey,
+          loc.shortcutsSharedHint,
           hotkeyBadge(
             context,
             _currentKeyName,
@@ -150,13 +151,13 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
 
   Widget _buildAdvancedCard(AppLocalizations loc) {
     return SettingsCard(
-      title: '录音键（PTT / Toggle 分键）',
+      title: loc.shortcutsSplitTitle,
       titleIcon: CupertinoIcons.mic,
       accentColor: AppTheme.getAccent(context),
       children: [
         _row(
-          '长按说话 (PTT)',
-          '长按该键录音，松开停止',
+          loc.shortcutsPttTitle,
+          loc.shortcutsPttHint,
           hotkeyBadge(
             context,
             _currentKeyName,
@@ -165,8 +166,8 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
         ),
         const SizedBox(height: 14),
         _row(
-          '单击切换 (Toggle)',
-          '点一下开录、再点一下停',
+          loc.shortcutsToggleTitle,
+          loc.shortcutsToggleHint,
           hotkeyBadge(
             context,
             _toggleInputKeyName,

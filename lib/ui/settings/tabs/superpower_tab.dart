@@ -95,17 +95,28 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Key capture（使用热键 modal）
   // ---------------------------------------------------------------------------
 
-  static const Map<String, (String, String)> _targetLabels = {
-    'diary': ('录制闪念笔记快捷键', '长按该键开始记录笔记'),
-    'toggleDiary': ('录制笔记 Toggle 快捷键', '点一下开录、再点一下停'),
-    'organize': ('录制 AI 梳理快捷键', '选中文字后按此键重组'),
-    'translate': ('录制即时翻译快捷键', '选中文字后按此键翻译'),
-    'correction': ('录制纠错反馈快捷键', '选中文字后按此键提交纠错'),
-    'aiReport': ('录制 AI 调试基础键', '长按此键 + 数字 1-5 激活'),
-  };
+  (String, String) _hotkeyRecorderLabels(String target, AppLocalizations loc) {
+    switch (target) {
+      case 'diary':
+        return (loc.hotkeyRecordDiary, loc.hotkeyRecordDiaryHint);
+      case 'toggleDiary':
+        return (loc.hotkeyRecordToggleDiary, loc.hotkeyRecordToggleDiaryHint);
+      case 'organize':
+        return (loc.hotkeyRecordOrganize, loc.hotkeyRecordOrganizeHint);
+      case 'translate':
+        return (loc.hotkeyRecordTranslate, loc.hotkeyRecordTranslateHint);
+      case 'correction':
+        return (loc.hotkeyRecordCorrection, loc.hotkeyRecordCorrectionHint);
+      case 'aiReport':
+        return (loc.hotkeyRecordAiReport, loc.hotkeyRecordAiReportHint);
+      default:
+        return (loc.hotkeyModalTitle, loc.hotkeyModalSubtitle);
+    }
+  }
 
   Future<void> _startKeyCapture(String target) async {
-    final labels = _targetLabels[target] ?? ('录制快捷键', '请按下您想要的按键');
+    final loc = AppLocalizations.of(context)!;
+    final labels = _hotkeyRecorderLabels(target, loc);
     final result = await showHotkeyRecorder(context, title: labels.$1, subtitle: labels.$2);
     if (result == null || !mounted) return;
 

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
+import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../theme.dart';
 import '../../../widgets/settings_widgets.dart';
@@ -14,6 +15,7 @@ class OverviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final accent = AppTheme.getAccent(context);
     final nav = SidebarNavigation.of(context);
 
@@ -41,7 +43,7 @@ class OverviewPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '欢迎使用 SpeakOut',
+                      loc.overviewWelcome,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -50,7 +52,7 @@ class OverviewPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'macOS 离线优先 AI 语音输入 · 隐私安全 · 免费开源',
+                      loc.overviewTagline,
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.getTextSecondary(context),
@@ -63,7 +65,7 @@ class OverviewPage extends StatelessWidget {
                 controlSize: ControlSize.regular,
                 color: accent,
                 onPressed: () => nav?.goto('shortcuts'),
-                child: const Text('开始配置', style: TextStyle(color: Colors.white)),
+                child: Text(loc.overviewGetStarted, style: const TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -78,29 +80,29 @@ class OverviewPage extends StatelessWidget {
             _FeatureCard(
               icon: CupertinoIcons.lock_shield_fill,
               iconColor: MacosColors.systemGreenColor,
-              title: '离线识别',
-              desc: '本地 Sherpa-ONNX ASR，中英识别媲美云端，音频不出设备',
+              title: loc.featureOfflineTitle,
+              desc: loc.featureOfflineDesc,
               onTap: () => nav?.goto('recognition'),
             ),
             _FeatureCard(
               icon: CupertinoIcons.sparkles,
               iconColor: accent,
-              title: 'AI 润色',
-              desc: '云端 LLM 智能纠错，修复同音字、标点、语法',
+              title: loc.featureAiPolishTitle,
+              desc: loc.featureAiPolishDesc,
               onTap: () => nav?.goto('ai_plus'),
             ),
             _FeatureCard(
               icon: CupertinoIcons.bolt_fill,
               iconColor: MacosColors.systemYellowColor,
-              title: '超能力',
-              desc: '闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈 / AI 调试',
+              title: loc.featureSuperpowerTitle,
+              desc: loc.featureSuperpowerDesc,
               onTap: () => nav?.goto('diary'),
             ),
             _FeatureCard(
               icon: CupertinoIcons.book,
               iconColor: MacosColors.systemBlueColor,
-              title: '专业词典',
-              desc: '自定义术语注入 LLM prompt，医疗 / 法律 / 金融等包',
+              title: loc.featureVocabTitle,
+              desc: loc.featureVocabDesc,
               onTap: () => nav?.goto('vocab'),
             ),
           ],
@@ -109,32 +111,32 @@ class OverviewPage extends StatelessWidget {
 
         // Help links
         SettingsCard(
-          title: '帮助与支持',
+          title: loc.overviewHelpTitle,
           titleIcon: CupertinoIcons.question_circle,
           children: [
             _LinkRow(
               icon: CupertinoIcons.book_solid,
-              label: 'Wiki · FAQ',
+              label: loc.linkWikiFaq,
               url: 'https://github.com/4over7/SpeakOut/wiki',
             ),
             _LinkRow(
               icon: CupertinoIcons.arrow_2_circlepath,
-              label: '更新日志',
+              label: loc.linkChangelog,
               url: 'https://github.com/4over7/SpeakOut/releases',
             ),
             _LinkRow(
               icon: CupertinoIcons.chat_bubble_2_fill,
-              label: 'X · @4over7',
+              label: loc.linkXHandle,
               url: 'https://x.com/4over7',
             ),
             _LinkRow(
               icon: CupertinoIcons.envelope_fill,
-              label: '反馈 · 4over7@gmail.com',
+              label: loc.linkFeedback,
               url: 'mailto:4over7@gmail.com?subject=SpeakOut%20Feedback',
             ),
             _LinkRow(
               icon: CupertinoIcons.exclamationmark_bubble_fill,
-              label: 'GitHub Issues',
+              label: loc.linkGithubIssues,
               url: 'https://github.com/4over7/SpeakOut/issues',
               isLast: true,
             ),

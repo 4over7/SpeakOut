@@ -1579,6 +1579,420 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quick Translate requires an LLM service. Please add one in Cloud Accounts.'**
   String get translateNoLlm;
+
+  /// No description provided for @settingsV18PreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings (v1.8 Preview)'**
+  String get settingsV18PreviewTitle;
+
+  /// No description provided for @sidebarSectionBasic.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic'**
+  String get sidebarSectionBasic;
+
+  /// No description provided for @sidebarSectionVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get sidebarSectionVoice;
+
+  /// No description provided for @sidebarSectionSuperpower.
+  ///
+  /// In en, this message translates to:
+  /// **'Superpower'**
+  String get sidebarSectionSuperpower;
+
+  /// No description provided for @sidebarSectionOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get sidebarSectionOther;
+
+  /// No description provided for @sidebarOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get sidebarOverview;
+
+  /// No description provided for @sidebarShortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get sidebarShortcuts;
+
+  /// No description provided for @sidebarPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get sidebarPermissions;
+
+  /// No description provided for @sidebarRecognition.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognition'**
+  String get sidebarRecognition;
+
+  /// No description provided for @sidebarAiPlus.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Plus'**
+  String get sidebarAiPlus;
+
+  /// No description provided for @sidebarVocab.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocabulary'**
+  String get sidebarVocab;
+
+  /// No description provided for @sidebarCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction'**
+  String get sidebarCorrection;
+
+  /// No description provided for @sidebarAiReport.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Debug'**
+  String get sidebarAiReport;
+
+  /// No description provided for @showAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get showAdvanced;
+
+  /// No description provided for @shortcutsRecordKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Key'**
+  String get shortcutsRecordKey;
+
+  /// No description provided for @shortcutsSharedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap = toggle recording, Hold = push-to-talk'**
+  String get shortcutsSharedHint;
+
+  /// No description provided for @shortcutsSplitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Key (PTT / Toggle separately)'**
+  String get shortcutsSplitTitle;
+
+  /// No description provided for @shortcutsPttTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Push-to-Talk (PTT)'**
+  String get shortcutsPttTitle;
+
+  /// No description provided for @shortcutsPttHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to record, release to stop'**
+  String get shortcutsPttHint;
+
+  /// No description provided for @shortcutsToggleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle'**
+  String get shortcutsToggleTitle;
+
+  /// No description provided for @shortcutsToggleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to start, tap again to stop'**
+  String get shortcutsToggleHint;
+
+  /// No description provided for @shortcutsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended: Right Option / Fn / F13–F19 — Cmd / Ctrl combos are often taken by system apps.'**
+  String get shortcutsTip;
+
+  /// No description provided for @hotkeyModalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Hotkey'**
+  String get hotkeyModalTitle;
+
+  /// No description provided for @hotkeyModalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Press the key or combination you want to set'**
+  String get hotkeyModalSubtitle;
+
+  /// No description provided for @hotkeyModalCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancels in {seconds}s · Press ESC to exit'**
+  String hotkeyModalCountdown(int seconds);
+
+  /// No description provided for @hotkeyModalRecommend.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get hotkeyModalRecommend;
+
+  /// No description provided for @hotkeyModalAvoid.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid Cmd / Ctrl combinations (often taken by system apps)'**
+  String get hotkeyModalAvoid;
+
+  /// No description provided for @hotkeyInUseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{keyName} is already used by \"{feature}\"'**
+  String hotkeyInUseTitle(String keyName, String feature);
+
+  /// No description provided for @hotkeyInUseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'That key is taken. Please choose another.'**
+  String get hotkeyInUseMessage;
+
+  /// No description provided for @hotkeyInUseOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get hotkeyInUseOk;
+
+  /// No description provided for @hotkeyRecordDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Flash Note Key'**
+  String get hotkeyRecordDiary;
+
+  /// No description provided for @hotkeyRecordDiaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to start recording a note'**
+  String get hotkeyRecordDiaryHint;
+
+  /// No description provided for @hotkeyRecordToggleDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Note Toggle Key'**
+  String get hotkeyRecordToggleDiary;
+
+  /// No description provided for @hotkeyRecordToggleDiaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to start, tap again to stop'**
+  String get hotkeyRecordToggleDiaryHint;
+
+  /// No description provided for @hotkeyRecordOrganize.
+  ///
+  /// In en, this message translates to:
+  /// **'Record AI Organize Key'**
+  String get hotkeyRecordOrganize;
+
+  /// No description provided for @hotkeyRecordOrganizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After selecting text, press to reorganize'**
+  String get hotkeyRecordOrganizeHint;
+
+  /// No description provided for @hotkeyRecordTranslate.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Quick Translate Key'**
+  String get hotkeyRecordTranslate;
+
+  /// No description provided for @hotkeyRecordTranslateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After selecting text, press to translate'**
+  String get hotkeyRecordTranslateHint;
+
+  /// No description provided for @hotkeyRecordCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Correction Key'**
+  String get hotkeyRecordCorrection;
+
+  /// No description provided for @hotkeyRecordCorrectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After selecting text, press to submit correction'**
+  String get hotkeyRecordCorrectionHint;
+
+  /// No description provided for @hotkeyRecordAiReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Record AI Debug Base Key'**
+  String get hotkeyRecordAiReport;
+
+  /// No description provided for @hotkeyRecordAiReportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold + digit 1-5 to activate'**
+  String get hotkeyRecordAiReportHint;
+
+  /// No description provided for @overviewWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to SpeakOut'**
+  String get overviewWelcome;
+
+  /// No description provided for @overviewTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS offline-first AI dictation · Private · Free & Open'**
+  String get overviewTagline;
+
+  /// No description provided for @overviewGetStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Started'**
+  String get overviewGetStarted;
+
+  /// No description provided for @featureOfflineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Recognition'**
+  String get featureOfflineTitle;
+
+  /// No description provided for @featureOfflineDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Sherpa-ONNX ASR, on-device; accuracy rivals cloud'**
+  String get featureOfflineDesc;
+
+  /// No description provided for @featureAiPolishTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish'**
+  String get featureAiPolishTitle;
+
+  /// No description provided for @featureAiPolishDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud LLM fixes homophones, punctuation, and grammar'**
+  String get featureAiPolishDesc;
+
+  /// No description provided for @featureSuperpowerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Superpower'**
+  String get featureSuperpowerTitle;
+
+  /// No description provided for @featureSuperpowerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash Note / AI Organize / Quick Translate / Correction / AI Debug'**
+  String get featureSuperpowerDesc;
+
+  /// No description provided for @featureVocabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional Vocab'**
+  String get featureVocabTitle;
+
+  /// No description provided for @featureVocabDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom terms injected into LLM prompt; medical / legal / finance packs'**
+  String get featureVocabDesc;
+
+  /// No description provided for @overviewHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get overviewHelpTitle;
+
+  /// No description provided for @linkWikiFaq.
+  ///
+  /// In en, this message translates to:
+  /// **'Wiki · FAQ'**
+  String get linkWikiFaq;
+
+  /// No description provided for @linkChangelog.
+  ///
+  /// In en, this message translates to:
+  /// **'Changelog'**
+  String get linkChangelog;
+
+  /// No description provided for @linkXHandle.
+  ///
+  /// In en, this message translates to:
+  /// **'X · @4over7'**
+  String get linkXHandle;
+
+  /// No description provided for @linkFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback · 4over7@gmail.com'**
+  String get linkFeedback;
+
+  /// No description provided for @linkGithubIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub Issues'**
+  String get linkGithubIssues;
+
+  /// No description provided for @smartNeedsAiPlusConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won\'t apply.'**
+  String get smartNeedsAiPlusConfig;
+
+  /// No description provided for @gotoAiPlus.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to AI Plus'**
+  String get gotoAiPlus;
+
+  /// No description provided for @aiPlusNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.'**
+  String get aiPlusNotActive;
+
+  /// No description provided for @aboutModelsDir.
+  ///
+  /// In en, this message translates to:
+  /// **'Models Directory'**
+  String get aboutModelsDir;
+
+  /// No description provided for @aboutGatewayUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway URL'**
+  String get aboutGatewayUrl;
+
+  /// No description provided for @aboutGatewayDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'License / subscription / cloud token proxy'**
+  String get aboutGatewayDesc;
+
+  /// No description provided for @aboutDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get aboutDiagnostics;
+
+  /// No description provided for @aboutDiagnosticsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy version / config / paths to clipboard (paste when reporting bugs)'**
+  String get aboutDiagnosticsDesc;
+
+  /// No description provided for @actionCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get actionCopy;
+
+  /// No description provided for @actionCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get actionCopied;
 }
 
 class _AppLocalizationsDelegate
