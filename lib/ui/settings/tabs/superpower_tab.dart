@@ -14,13 +14,24 @@ import '../../../engine/core_engine.dart';
 import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
+import '../sidebar/hotkey_recorder_modal.dart';
+
+/// Which subset of superpower_tab to render.
+/// `all` — legacy 5-tab settings page (默认, 5 卡 + hotkey overview).
+/// 其余 — v1.8 sidebar 下的单个超能力独立页.
+enum SuperpowerView { all, diary, organize, translate, correction, aiReport }
 
 /// "超能力" tab — 4 independent features as a dual-column card grid:
 /// 闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈
 class SuperpowerTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
+  final SuperpowerView viewFilter;
 
-  const SuperpowerTab({super.key, required this.onNavigateToTab});
+  const SuperpowerTab({
+    super.key,
+    required this.onNavigateToTab,
+    this.viewFilter = SuperpowerView.all,
+  });
 
   @override
   State<SuperpowerTab> createState() => _SuperpowerTabState();
@@ -32,29 +43,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // ---------------------------------------------------------------------------
 
   // Diary
-  bool _isCapturingDiaryKey = false;
   String _diaryKeyName = 'Right Option';
-  bool _isCapturingToggleDiaryKey = false;
   String _toggleDiaryKeyName = '';
   String? _diaryDirError;
 
   // Organize
-  bool _isCapturingOrganizeKey = false;
   late final TextEditingController _organizePromptController;
   bool _showOrganizePrompt = false;
 
-  // Translate
-  bool _isCapturingTranslateKey = false;
-
-  // Correction
-  bool _isCapturingCorrectionKey = false;
-
   // AI Report
-  bool _isCapturingAiReportBaseKey = false;
   int _bindingAiReportSlot = -1; // -1 = not binding
 
-  // Key capture infrastructure
-  HotkeyCapturer? _keyCapturer;
   final CoreEngine _engine = CoreEngine();
 
   // ---------------------------------------------------------------------------
@@ -76,7 +75,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   @override
   void dispose() {
-    _keyCapturer?.cancel();
     _organizePromptController.dispose();
     super.dispose();
   }
@@ -94,140 +92,75 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Key capture
+  // Key capture（使用热键 modal）
   // ---------------------------------------------------------------------------
 
-  void _startKeyCapture(String target) {
-    _keyCapturer?.cancel();
-    setState(() {
-      switch (target) {
-        case 'diary':
-          _isCapturingDiaryKey = true;
-        case 'toggleDiary':
-          _isCapturingToggleDiaryKey = true;
-        case 'organize':
-          _isCapturingOrganizeKey = true;
-        case 'translate':
-          _isCapturingTranslateKey = true;
-        case 'correction':
-          _isCapturingCorrectionKey = true;
-        case 'aiReport':
-          _isCapturingAiReportBaseKey = true;
-      }
-    });
-
-    _keyCapturer = HotkeyCapturer(
-      keyStream: _engine.rawKeyEventStream,
-      onCaptured: (keyCode, modifierFlags) {
-        final keyName = mapKeyCodeToString(keyCode);
-        _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
-        _resetCaptureState();
-      },
-      onTimeout: _resetCaptureState,
-    )..start();
-  }
-
-  void _resetCaptureState() {
-    if (mounted) {
-      setState(() {
-        _isCapturingDiaryKey = false;
-        _isCapturingToggleDiaryKey = false;
-        _isCapturingOrganizeKey = false;
-        _isCapturingTranslateKey = false;
-        _isCapturingCorrectionKey = false;
-        _isCapturingAiReportBaseKey = false;
-      });
+  (String, String) _hotkeyRecorderLabels(String target, AppLocalizations loc) {
+    switch (target) {
+      case 'diary':
+        return (loc.hotkeyRecordDiary, loc.hotkeyRecordDiaryHint);
+      case 'toggleDiary':
+        return (loc.hotkeyRecordToggleDiary, loc.hotkeyRecordToggleDiaryHint);
+      case 'organize':
+        return (loc.hotkeyRecordOrganize, loc.hotkeyRecordOrganizeHint);
+      case 'translate':
+        return (loc.hotkeyRecordTranslate, loc.hotkeyRecordTranslateHint);
+      case 'correction':
+        return (loc.hotkeyRecordCorrection, loc.hotkeyRecordCorrectionHint);
+      case 'aiReport':
+        return (loc.hotkeyRecordAiReport, loc.hotkeyRecordAiReportHint);
+      default:
+        return (loc.hotkeyModalTitle, loc.hotkeyModalSubtitle);
     }
   }
 
-  void _stopKeyCapture() {
-    _keyCapturer?.cancel();
-    _keyCapturer = null;
-    _resetCaptureState();
-  }
+  Future<void> _startKeyCapture(String target) async {
+    final loc = AppLocalizations.of(context)!;
+    final labels = _hotkeyRecorderLabels(target, loc);
+    final result = await showHotkeyRecorder(context, title: labels.$1, subtitle: labels.$2);
+    if (result == null || !mounted) return;
 
-  // ---------------------------------------------------------------------------
-  // Hotkey save with conflict detection
-  // ---------------------------------------------------------------------------
-
-  Future<void> _saveHotkeyConfig(int keyCode, String keyName,
-      {int modifierFlags = 0}) async {
     final config = ConfigService();
-    final isDiaryGroup = _isCapturingDiaryKey || _isCapturingToggleDiaryKey;
+    final keyCode = result.keyCode;
+    final mods = result.modifiers;
+    final displayName = result.displayName;
+    // aiReport 存储为裸键（忽略修饰键），其他都带修饰键
+    final keyName = mapKeyCodeToString(keyCode);
 
-    final requiredMods = stripOwnModifier(keyCode, modifierFlags);
-    final displayName =
-        requiredMods != 0 ? comboKeyName(keyCode, requiredMods) : keyName;
-
-    // Determine which feature is being captured
-    final String currentFeature;
-    if (_isCapturingAiReportBaseKey) {
-      currentFeature = 'aiReport';
-    } else if (_isCapturingCorrectionKey) {
-      currentFeature = 'correction';
-    } else if (_isCapturingTranslateKey) {
-      currentFeature = 'translate';
-    } else if (_isCapturingOrganizeKey) {
-      currentFeature = 'organize';
-    } else if (_isCapturingToggleDiaryKey) {
-      currentFeature = 'toggleDiary';
-    } else if (_isCapturingDiaryKey) {
-      currentFeature = 'diary';
-    } else {
-      currentFeature = '';
+    // 冲突检查
+    final activeKeys = getActiveHotkeys(context, excludeFeature: target);
+    final isDiaryGroup = target == 'diary' || target == 'toggleDiary';
+    if (isDiaryGroup) {
+      if (target == 'diary') activeKeys.remove((config.toggleDiaryKeyCode, config.toggleDiaryModifiers));
+      if (target == 'toggleDiary') activeKeys.remove((config.diaryKeyCode, config.diaryModifiers));
     }
-
-    // Unified conflict check using (keyCode, modifiers) tuple
-    if (currentFeature.isNotEmpty) {
-      final activeKeys = getActiveHotkeys(context, excludeFeature: currentFeature);
-      // Diary group: also exclude the other diary key (diary ↔ toggleDiary can share)
-      if (isDiaryGroup) {
-        if (_isCapturingDiaryKey) activeKeys.remove((config.toggleDiaryKeyCode, config.toggleDiaryModifiers));
-        if (_isCapturingToggleDiaryKey) activeKeys.remove((config.diaryKeyCode, config.diaryModifiers));
-      }
-      // AI Report base key stores and matches as bare key (modifiers=0),
-      // so conflict check must also use (keyCode, 0) to match what's actually stored.
-      final hotkeyId = _isCapturingAiReportBaseKey ? (keyCode, 0) : (keyCode, requiredMods);
-      final conflict = findHotkeyConflict(activeKeys, hotkeyId);
-      if (conflict != null) {
-        _stopKeyCapture();
-        _showHotkeyInUseDialog(displayName, conflict);
-        return;
-      }
+    final hotkeyId = target == 'aiReport' ? (keyCode, 0) : (keyCode, mods);
+    final conflict = findHotkeyConflict(activeKeys, hotkeyId);
+    if (conflict != null) {
+      if (mounted) _showHotkeyInUseDialog(displayName, conflict);
+      return;
     }
 
     // Feature-specific saving
-    if (_isCapturingAiReportBaseKey) {
-      // AI Report base key is a hold-to-record trigger — modifiers are intentionally
-      // ignored (user needs free fingers for number keys). Save bare key name only.
-      await config.setAiReportBaseKey(keyCode, keyName);
-      setState(() => _isCapturingAiReportBaseKey = false);
-    } else if (_isCapturingCorrectionKey) {
-      await config.setCorrectionKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() => _isCapturingCorrectionKey = false);
-    } else if (_isCapturingTranslateKey) {
-      await config.setTranslateKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() => _isCapturingTranslateKey = false);
-    } else if (_isCapturingOrganizeKey) {
-      await config.setOrganizeKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() => _isCapturingOrganizeKey = false);
-    } else if (_isCapturingToggleDiaryKey) {
-      await config.setToggleDiaryKey(keyCode, displayName,
-          modifiers: requiredMods);
-      setState(() {
-        _toggleDiaryKeyName = displayName;
-        _isCapturingToggleDiaryKey = false;
-      });
-    } else if (_isCapturingDiaryKey) {
-      await config.setDiaryKey(keyCode, displayName, modifiers: requiredMods);
-      setState(() {
-        _diaryKeyName = displayName;
-        _isCapturingDiaryKey = false;
-      });
+    switch (target) {
+      case 'aiReport':
+        await config.setAiReportBaseKey(keyCode, keyName);
+      case 'correction':
+        await config.setCorrectionKey(keyCode, displayName, modifiers: mods);
+      case 'translate':
+        await config.setTranslateKey(keyCode, displayName, modifiers: mods);
+      case 'organize':
+        await config.setOrganizeKey(keyCode, displayName, modifiers: mods);
+      case 'toggleDiary':
+        await config.setToggleDiaryKey(keyCode, displayName, modifiers: mods);
+        if (mounted) setState(() => _toggleDiaryKeyName = displayName);
+        return;
+      case 'diary':
+        await config.setDiaryKey(keyCode, displayName, modifiers: mods);
+        if (mounted) setState(() => _diaryKeyName = displayName);
+        return;
     }
+    if (mounted) setState(() {});
   }
 
   // ---------------------------------------------------------------------------
@@ -236,17 +169,18 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   /// 统一的冲突弹窗：标题和消息都基于真实冲突的功能名
   void _showHotkeyInUseDialog(String keyName, String conflictFeature) {
+    final loc = AppLocalizations.of(context)!;
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
             size: 48, color: Colors.orange),
-        title: Text('$keyName 已被「$conflictFeature」使用',
+        title: Text(loc.hotkeyInUseTitle(keyName, conflictFeature),
             style: const TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('该按键已被占用，请选择其他按键。'),
+        message: Text(loc.hotkeyConflictTaken),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
-          child: const Text('好的'),
+          child: Text(loc.hotkeyInUseOk),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -263,17 +197,18 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     if (conflictWith != null) {
       await clearKey();
       if (mounted) {
+        final loc = AppLocalizations.of(context)!;
         showMacosAlertDialog(
           context: context,
           builder: (_) => MacosAlertDialog(
             appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
                 size: 48, color: Colors.orange),
-            title: Text('$keyName 已被「$conflictWith」占用',
+            title: Text(loc.hotkeyConflictAutoClearTitle(keyName, conflictWith),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            message: const Text('快捷键已自动清除，请重新设置。'),
+            message: Text(loc.hotkeyConflictAutoClearMsg),
             primaryButton: PushButton(
               controlSize: ControlSize.large,
-              child: const Text('好的'),
+              child: Text(loc.hotkeyInUseOk),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -303,7 +238,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Future<void> _validateDiaryDirectory() async {
     final dirPath = ConfigService().diaryDirectory;
     if (dirPath.isEmpty) {
-      setState(() => _diaryDirError = '未设置保存目录');
+      setState(() => _diaryDirError = AppLocalizations.of(context)!.diaryDirNotSet);
       return;
     }
     try {
@@ -314,7 +249,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       await testFile.delete();
       setState(() => _diaryDirError = '');
     } catch (e) {
-      setState(() => _diaryDirError = '无法写入目录，请重新选择（macOS 需重新授权）');
+      setState(() => _diaryDirError = AppLocalizations.of(context)!.diaryDirCannotWrite);
     }
   }
 
@@ -357,6 +292,29 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
 
+    // v1.8 sidebar single-card views
+    Widget? single;
+    switch (widget.viewFilter) {
+      case SuperpowerView.diary:
+        single = _buildDiaryCard(loc);
+      case SuperpowerView.organize:
+        single = _buildOrganizeCard(loc);
+      case SuperpowerView.translate:
+        single = _buildTranslateCard(loc);
+      case SuperpowerView.correction:
+        single = _buildCorrectionCard(loc);
+      case SuperpowerView.aiReport:
+        single = _buildAiReportCard(loc);
+      case SuperpowerView.all:
+        single = null;
+    }
+    if (single != null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(4),
+        child: single,
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(4),
       child: Column(
@@ -386,10 +344,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildDiaryCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: loc.diaryMode,
-      titleIcon: CupertinoIcons.book,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.diaryMode : null,
+      titleIcon: showTitle ? CupertinoIcons.book : null,
       accentColor: AppTheme.triggerNote,
       trailing: MacosSwitch(
         value: config.diaryEnabled,
@@ -443,7 +402,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                     Expanded(
                       child: Text(
                         _diaryDirError == null
-                            ? '请选择保存目录以授权访问'
+                            ? loc.diaryDirPick
                             : _diaryDirError!,
                         style: TextStyle(
                           fontSize: 11,
@@ -462,7 +421,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.pttMode,
             _hotkeyBadge(
               _diaryKeyName,
-              isCapturing: _isCapturingDiaryKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('diary'),
               onClear: _diaryKeyName.isEmpty ? null : () async {
                 await ConfigService().clearDiaryKey();
@@ -475,7 +434,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.toggleModeTip,
             _hotkeyBadge(
               _toggleDiaryKeyName,
-              isCapturing: _isCapturingToggleDiaryKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('toggleDiary'),
               onClear: _toggleDiaryKeyName.isEmpty ? null : () async {
                 await ConfigService().clearToggleDiaryKey();
@@ -515,7 +474,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ),
         ] else
           Text(
-            '随时随地语音记录灵感，自动保存为 Markdown 日记。',
+            loc.diaryDesc,
             style: AppTheme.caption(context),
           ),
       ],
@@ -528,10 +487,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildOrganizeCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: loc.organizeEnabled,
-      titleIcon: CupertinoIcons.text_alignleft,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.organizeEnabled : null,
+      titleIcon: showTitle ? CupertinoIcons.text_alignleft : null,
       accentColor: AppTheme.triggerOrganize,
       trailing: MacosSwitch(
         value: config.organizeEnabled,
@@ -552,7 +512,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.organizeHotkey,
             _hotkeyBadge(
               config.organizeKeyName,
-              isCapturing: _isCapturingOrganizeKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('organize'),
               onClear: config.organizeKeyName.isEmpty ? null : () async {
                 await config.clearOrganizeKey();
@@ -569,7 +529,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _showOrganizePrompt ? '收起' : '编辑指令',
+                    _showOrganizePrompt ? loc.organizeCollapse : loc.organizeEditInstruction,
                     style: AppTheme.caption(context).copyWith(
                         color: AppTheme.triggerOrganize, fontSize: 11),
                   ),
@@ -665,10 +625,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildTranslateCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: loc.quickTranslate,
-      titleIcon: CupertinoIcons.globe,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.quickTranslate : null,
+      titleIcon: showTitle ? CupertinoIcons.globe : null,
       accentColor: AppTheme.triggerTranslate,
       trailing: MacosSwitch(
         value: config.translateEnabled,
@@ -689,7 +650,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.translateHotkey,
             _hotkeyBadge(
               config.translateKeyName,
-              isCapturing: _isCapturingTranslateKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('translate'),
               onClear: config.translateKeyName.isEmpty ? null : () async {
                 await config.clearTranslateKey();
@@ -759,10 +720,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   Widget _buildCorrectionCard(AppLocalizations loc) {
     final config = ConfigService();
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: '纠错反馈',
-      titleIcon: CupertinoIcons.checkmark_seal,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.sidebarCorrection : null,
+      titleIcon: showTitle ? CupertinoIcons.checkmark_seal : null,
       accentColor: AppTheme.triggerCorrect,
       trailing: MacosSwitch(
         value: config.correctionEnabled,
@@ -783,10 +745,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       children: [
         if (config.correctionEnabled) ...[
           _compactRow(
-            '纠错快捷键',
+            loc.correctionHotkey,
             _hotkeyBadge(
               config.correctionKeyName,
-              isCapturing: _isCapturingCorrectionKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('correction'),
               onClear: config.correctionKeyName.isEmpty ? null : () async {
                 await config.clearCorrectionKey();
@@ -802,17 +764,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 secondary: true,
                 onPressed: () async {
                   final result = await FilePicker.platform.saveFile(
-                    dialogTitle: '导出纠错数据',
+                    dialogTitle: loc.correctionExportDialog,
                     fileName: 'speakout_corrections.jsonl',
                   );
                   if (result != null) {
                     final ok = await CorrectionService().exportData(result);
                     if (mounted) {
-                      showSettingsInfo(ok ? '导出成功' : '导出失败：无数据');
+                      showSettingsInfo(ok ? loc.correctionExportSuccess : loc.correctionExportFailedEmpty);
                     }
                   }
                 },
-                child: const Text('导出', style: TextStyle(fontSize: 11)),
+                child: Text(loc.correctionExportBtn, style: const TextStyle(fontSize: 11)),
               ),
               const SizedBox(width: 6),
               PushButton(
@@ -820,7 +782,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 secondary: true,
                 onPressed: () async {
                   final result = await FilePicker.platform.pickFiles(
-                    dialogTitle: '导入纠错数据',
+                    dialogTitle: loc.correctionImportDialog,
                     type: FileType.custom,
                     allowedExtensions: ['jsonl', 'json'],
                   );
@@ -829,17 +791,17 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                     final count = await CorrectionService()
                         .importData(result.files.single.path!);
                     if (mounted) {
-                      showSettingsInfo('导入 $count 条记录（词汇已同步）');
+                      showSettingsInfo(loc.correctionImportSuccess(count));
                     }
                   }
                 },
-                child: const Text('导入', style: TextStyle(fontSize: 11)),
+                child: Text(loc.correctionImportBtn, style: const TextStyle(fontSize: 11)),
               ),
             ],
           ),
         ] else
           Text(
-            '选中修正后的文字，一键提交纠错。ASR 自动学习你的用词习惯。',
+            loc.correctionDesc,
             style: AppTheme.caption(context),
           ),
       ],
@@ -854,10 +816,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final config = ConfigService();
     final slotCount = config.aiReportSlotCount;
     final baseKeyName = config.aiReportBaseKeyName;
+    final showTitle = widget.viewFilter == SuperpowerView.all;
     return SettingsCard(
-      minHeight: 100,
-      title: 'AI 一键调试',
-      titleIcon: CupertinoIcons.camera_viewfinder,
+      minHeight: showTitle ? 100 : null,
+      title: showTitle ? loc.sidebarAiReport : null,
+      titleIcon: showTitle ? CupertinoIcons.camera_viewfinder : null,
       accentColor: AppTheme.triggerAiReport,
       trailing: MacosSwitch(
         value: config.aiReportEnabled,
@@ -871,10 +834,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         if (config.aiReportEnabled) ...[
           // 基础按键
           _compactRow(
-            '基础按键',
+            loc.aiReportBaseKey,
             _hotkeyBadge(
               baseKeyName,
-              isCapturing: _isCapturingAiReportBaseKey,
+              isCapturing: false,
               onTap: () => _startKeyCapture('aiReport'),
               onClear: baseKeyName.isEmpty ? null : () async {
                 await config.clearAiReportBaseKey();
@@ -886,7 +849,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '按住 $baseKeyName + 数字键（1-$slotCount）选择目标窗口',
+                loc.aiReportBaseKeyDesc(baseKeyName, slotCount),
                 style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor),
               ),
             ),
@@ -910,7 +873,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                   MacosIcon(CupertinoIcons.plus_circle, size: 13, color: AppTheme.triggerAiReport),
                   const SizedBox(width: 4),
                   Text(
-                    slotCount == 0 ? '添加第一个窗口' : '添加窗口',
+                    slotCount == 0 ? loc.aiReportAddFirstWindow : loc.aiReportAddWindow,
                     style: AppTheme.caption(context).copyWith(color: AppTheme.triggerAiReport, fontSize: 11),
                   ),
                 ],
@@ -919,12 +882,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           ],
           const SizedBox(height: 6),
           Text(
-            '为 AI Coding 而生 — 截屏+语音自动发送到绑定窗口',
+            loc.aiReportDescShort,
             style: AppTheme.caption(context).copyWith(fontSize: 10),
           ),
         ] else
           Text(
-            '为 AI Coding 而生 — 截屏+语音描述，一键发送到 Claude Code / Cursor。',
+            loc.aiReportDescLong,
             style: AppTheme.caption(context),
           ),
       ],
@@ -933,6 +896,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
   /// 单个槽位行：[#N] App名 — 窗口标题 [绑定] [删除]
   Widget _buildAiReportSlotRow(int index) {
+    final loc = AppLocalizations.of(context)!;
     final config = ConfigService();
     final appName = config.aiReportSlotAppName(index);
     final windowTitle = config.aiReportSlotWindowTitle(index);
@@ -942,14 +906,14 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     // 显示文本：App名 — 窗口标题
     String displayText;
     if (isBinding) {
-      displayText = '请切换到目标窗口...';
+      displayText = loc.aiReportSwitchWindow;
     } else if (appName != null && appName.isNotEmpty) {
       displayText = appName;
       if (windowTitle != null && windowTitle.isNotEmpty) {
         displayText += ' — $windowTitle';
       }
     } else {
-      displayText = '未绑定';
+      displayText = loc.aiReportUnbound;
     }
 
     return Row(
@@ -1000,18 +964,19 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   /// 绑定槽位目标窗口：3秒倒计时 → 读取前台 App
   Future<void> _bindSlotTargetWindow(int slotIndex) async {
     setState(() => _bindingAiReportSlot = slotIndex);
+    final loc = AppLocalizations.of(context)!;
 
     showMacosAlertDialog(
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const Icon(CupertinoIcons.camera_viewfinder,
             size: 48, color: Color(0xFFE74C3C)),
-        title: const Text('绑定 AI 工具窗口',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        message: const Text('点击「开始」后，你有 3 秒时间切换到目标窗口。'),
+        title: Text(loc.aiReportBindTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        message: Text(loc.aiReportBindMsg),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
-          child: const Text('开始'),
+          child: Text(loc.aiReportStart),
           onPressed: () {
             Navigator.of(context).pop();
             _doSlotBind(slotIndex);
@@ -1020,7 +985,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         secondaryButton: PushButton(
           controlSize: ControlSize.large,
           secondary: true,
-          child: const Text('取消'),
+          child: Text(loc.aiReportCancel),
           onPressed: () {
             Navigator.of(context).pop();
             setState(() => _bindingAiReportSlot = -1);
@@ -1091,10 +1056,10 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ('${loc.diaryMode}（Toggle）', config.toggleDiaryKeyName,
           config.diaryEnabled && config.toggleDiaryEnabled),
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
-      ('AI 梳理', config.organizeKeyName, config.organizeEnabled),
-      ('纠错反馈', config.correctionKeyName, config.correctionEnabled),
+      (loc.organizeEnabled, config.organizeKeyName, config.organizeEnabled),
+      (loc.featureCorrection, config.correctionKeyName, config.correctionEnabled),
       if (config.aiReportSlotCount > 0)
-        ('AI 一键调试', config.aiReportBaseKeyName, config.aiReportEnabled),
+        (loc.featureAiReport, config.aiReportBaseKeyName, config.aiReportEnabled),
     ];
 
     final activeEntries = entries.where((e) => e.$3 && e.$2.isNotEmpty).toList();
@@ -1114,7 +1079,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             children: [
               MacosIcon(CupertinoIcons.keyboard, size: 11, color: MacosColors.systemGrayColor),
               const SizedBox(width: 6),
-              Text('已启用的快捷键', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+              Text(loc.activeHotkeys, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
             ],
           ),
           const SizedBox(height: 6),

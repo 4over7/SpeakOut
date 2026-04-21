@@ -506,10 +506,43 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     final loc = AppLocalizations.of(context)!;
     
     return MacosWindow(
+      backgroundColor: AppTheme.getBackground(context),
+      disableWallpaperTinting: true,
       // sidebar: removed for cleaner UI
       child: MacosScaffold(
         backgroundColor: AppTheme.getBackground(context), // Match mockup
-        toolBar: ToolBar(title: Text(loc.appTitle)),
+        toolBar: ToolBar(
+          title: Text(loc.appTitle),
+          actions: [
+            ToolBarIconButton(
+              label: 'Chat',
+              icon: const MacosIcon(CupertinoIcons.chat_bubble_2_fill),
+              tooltipMessage: 'Chat',
+              showLabel: false,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ChatPage()),
+                );
+              },
+            ),
+            ToolBarIconButton(
+              label: 'Settings',
+              icon: const MacosIcon(CupertinoIcons.settings),
+              tooltipMessage: loc.settings,
+              showLabel: false,
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => SettingsPage()),
+                );
+                if (mounted) {
+                  setState(() {
+                    _currentKeyName = ConfigService().pttKeyName;
+                  });
+                }
+              },
+            ),
+          ],
+        ),
         children: [
           ContentArea(
             builder: (context, scrollController) {
@@ -517,50 +550,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                 color: AppTheme.getBackground(context), // Force background
                 child: Stack(
                 children: [
-                  // Chat Button (Top Right, Left of Settings)
-                  Positioned(
-                    top: 16,
-                    right: 64, // Shift left
-                    child: MacosIconButton(
-                      icon: const MacosIcon(
-                        CupertinoIcons.chat_bubble_2_fill,
-                        color: MacosColors.systemGrayColor,
-                        size: 32,
-                      ),
-                      backgroundColor: MacosColors.transparent,
-                      onPressed: () {
-                         Navigator.of(context).push(
-                           MaterialPageRoute(builder: (_) => const ChatPage()),
-                         );
-                      },
-                    ),
-                  ),
-
-                  // Settings Button (Top Right)
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: MacosIconButton(
-                      icon: const MacosIcon(
-                        CupertinoIcons.settings,
-                        color: MacosColors.systemGrayColor,
-                        size: 36,
-                      ),
-                      backgroundColor: MacosColors.transparent,
-                      onPressed: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => SettingsPage()),
-                        );
-                        // Reload hotkey
-                        if (mounted) {
-                          setState(() {
-                             _currentKeyName = ConfigService().pttKeyName;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  
                   // === FIXED LAYOUT WITH STACK ===
                   // Error message at top
                   if (_lastError.isNotEmpty)

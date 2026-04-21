@@ -775,4 +775,516 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get translateNoLlm => '即时翻译需要配置 LLM 服务。请在「云服务账户」中添加 LLM 服务商。';
+
+  @override
+  String get settingsV18PreviewTitle => '设置';
+
+  @override
+  String get sidebarSectionBasic => '基础';
+
+  @override
+  String get sidebarSectionVoice => '语音';
+
+  @override
+  String get sidebarSectionSuperpower => '超能力';
+
+  @override
+  String get sidebarSectionOther => '其他';
+
+  @override
+  String get sidebarOverview => '概览';
+
+  @override
+  String get sidebarShortcuts => '快捷键';
+
+  @override
+  String get sidebarPermissions => '权限';
+
+  @override
+  String get sidebarRecognition => '识别引擎';
+
+  @override
+  String get sidebarAiPlus => 'AI Plus';
+
+  @override
+  String get sidebarVocab => '词典';
+
+  @override
+  String get sidebarCorrection => '纠错反馈';
+
+  @override
+  String get sidebarAiReport => 'AI 调试';
+
+  @override
+  String get showAdvanced => '显示高级';
+
+  @override
+  String get shortcutsRecordKey => '录音键';
+
+  @override
+  String get shortcutsSharedHint => '短按 = 切换录音，长按 = 说话松开停';
+
+  @override
+  String get shortcutsSplitTitle => '录音键（PTT / Toggle 分键）';
+
+  @override
+  String get shortcutsPttTitle => '长按说话 (PTT)';
+
+  @override
+  String get shortcutsPttHint => '长按该键录音，松开停止';
+
+  @override
+  String get shortcutsToggleTitle => '单击切换 (Toggle)';
+
+  @override
+  String get shortcutsToggleHint => '点一下开录、再点一下停';
+
+  @override
+  String get shortcutsTip =>
+      '推荐 Right Option / Fn / F13–F19 — Cmd / Ctrl 等组合键常被系统应用占用。';
+
+  @override
+  String get hotkeyModalTitle => '录制快捷键';
+
+  @override
+  String get hotkeyModalSubtitle => '请按下您想要设置的按键或组合键';
+
+  @override
+  String hotkeyModalCountdown(int seconds) {
+    return '$seconds 秒后自动取消 · 按 ESC 立即退出';
+  }
+
+  @override
+  String get hotkeyModalRecommend => '推荐';
+
+  @override
+  String get hotkeyModalAvoid => '避开 Cmd / Ctrl 等常被系统应用占用的组合键';
+
+  @override
+  String hotkeyInUseTitle(String keyName, String feature) {
+    return '$keyName 已被「$feature」使用';
+  }
+
+  @override
+  String get hotkeyInUseMessage => '该按键已被占用，请选择其他按键。';
+
+  @override
+  String get hotkeyInUseOk => '好的';
+
+  @override
+  String get hotkeyRecordDiary => '录制闪念笔记快捷键';
+
+  @override
+  String get hotkeyRecordDiaryHint => '长按该键开始记录笔记';
+
+  @override
+  String get hotkeyRecordToggleDiary => '录制笔记 Toggle 快捷键';
+
+  @override
+  String get hotkeyRecordToggleDiaryHint => '点一下开录、再点一下停';
+
+  @override
+  String get hotkeyRecordOrganize => '录制 AI 梳理快捷键';
+
+  @override
+  String get hotkeyRecordOrganizeHint => '选中文字后按此键重组';
+
+  @override
+  String get hotkeyRecordTranslate => '录制即时翻译快捷键';
+
+  @override
+  String get hotkeyRecordTranslateHint => '选中文字后按此键翻译';
+
+  @override
+  String get hotkeyRecordCorrection => '录制纠错反馈快捷键';
+
+  @override
+  String get hotkeyRecordCorrectionHint => '选中文字后按此键提交纠错';
+
+  @override
+  String get hotkeyRecordAiReport => '录制 AI 调试基础键';
+
+  @override
+  String get hotkeyRecordAiReportHint => '长按此键 + 数字 1-5 激活';
+
+  @override
+  String get overviewWelcome => '欢迎使用 SpeakOut';
+
+  @override
+  String get overviewTagline => 'macOS 离线优先 AI 语音输入 · 隐私安全 · 免费开源';
+
+  @override
+  String get overviewGetStarted => '开始配置';
+
+  @override
+  String get featureOfflineTitle => '离线识别';
+
+  @override
+  String get featureOfflineDesc => '本地 Sherpa-ONNX ASR，中英识别媲美云端，音频不出设备';
+
+  @override
+  String get featureAiPolishTitle => 'AI 润色';
+
+  @override
+  String get featureAiPolishDesc => '云端 LLM 智能纠错，修复同音字、标点、语法';
+
+  @override
+  String get featureSuperpowerTitle => '超能力';
+
+  @override
+  String get featureSuperpowerDesc => '闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈 / AI 调试';
+
+  @override
+  String get featureVocabTitle => '专业词典';
+
+  @override
+  String get featureVocabDesc => '自定义术语注入 LLM prompt，医疗 / 法律 / 金融等包';
+
+  @override
+  String get overviewHelpTitle => '帮助与支持';
+
+  @override
+  String get linkWikiFaq => 'Wiki · FAQ';
+
+  @override
+  String get linkChangelog => '更新日志';
+
+  @override
+  String get linkXHandle => 'X · @4over7';
+
+  @override
+  String get linkFeedback => '反馈 · 4over7@gmail.com';
+
+  @override
+  String get linkGithubIssues => 'GitHub Issues';
+
+  @override
+  String get smartNeedsAiPlusConfig =>
+      'Smart 模式需在「AI Plus」页配置 LLM（服务商 / 模型 / API Key），否则 AI 润色不生效。';
+
+  @override
+  String get gotoAiPlus => '前往 AI Plus';
+
+  @override
+  String get aiPlusNotActive =>
+      'AI 润色当前不生效：需在「识别引擎」页把工作模式切为 Smart（离线 + 云端 AI）。LLM 配置仍可在此编辑。';
+
+  @override
+  String get aboutModelsDir => '模型目录';
+
+  @override
+  String get aboutGatewayUrl => 'Gateway URL';
+
+  @override
+  String get aboutGatewayDesc => '许可证 / 订阅 / 云端 Token 代理服务';
+
+  @override
+  String get aboutDiagnostics => '诊断信息';
+
+  @override
+  String get aboutDiagnosticsDesc => '复制版本 / 配置 / 路径信息到剪贴板（报错时发给我）';
+
+  @override
+  String get actionCopy => '复制';
+
+  @override
+  String get actionCopied => '已复制';
+
+  @override
+  String get permissionsSectionTitle => '系统权限';
+
+  @override
+  String get permissionsReauthTip => '更换签名证书后如快捷键失效，请逐项重新授权。';
+
+  @override
+  String get permissionsAccessibility => '辅助功能';
+
+  @override
+  String get permissionsAccessibilityDesc => '快捷键+文本注入';
+
+  @override
+  String get permissionsInputMonitoring => '输入监控';
+
+  @override
+  String get permissionsInputMonitoringDesc => '键盘触发录音';
+
+  @override
+  String get permissionsMicrophone => '麦克风';
+
+  @override
+  String get permissionsMicrophoneDesc => '语音采集';
+
+  @override
+  String get permissionsOpen => '打开';
+
+  @override
+  String get aboutDeveloper => '开发者';
+
+  @override
+  String get aboutVerboseLogging => '详细日志';
+
+  @override
+  String get aboutLogDir => '日志输出目录';
+
+  @override
+  String get aboutLogDirUnset => '未设置（仅输出到控制台）';
+
+  @override
+  String get aboutLoading => '加载中…';
+
+  @override
+  String get aboutConfigBackup => '配置备份';
+
+  @override
+  String get aboutExportConfig => '导出配置';
+
+  @override
+  String get aboutExportConfigDesc => '将所有设置和凭证导出为文件（含明文密钥，请妥善保管）';
+
+  @override
+  String get aboutExportAction => '导出';
+
+  @override
+  String get aboutExportFileTitle => '导出配置文件';
+
+  @override
+  String get aboutImportConfig => '导入配置';
+
+  @override
+  String get aboutImportConfigDesc => '从备份文件恢复所有设置，立即生效';
+
+  @override
+  String get aboutImportAction => '导入';
+
+  @override
+  String get aboutImportFileTitle => '选择配置文件';
+
+  @override
+  String aboutExportSuccess(String msg) {
+    return '已导出：$msg';
+  }
+
+  @override
+  String aboutExportFailed(String err) {
+    return '导出失败：$err';
+  }
+
+  @override
+  String aboutImportSuccess(String msg) {
+    return '$msg，配置已生效';
+  }
+
+  @override
+  String aboutImportFailed(String err) {
+    return '导入失败：$err';
+  }
+
+  @override
+  String audioDeviceCurrent(String name) {
+    return '当前：$name';
+  }
+
+  @override
+  String get bluetoothMicWarning => '蓝牙麦克风可能降低质量';
+
+  @override
+  String get switchToBuiltin => '切换到内置';
+
+  @override
+  String get autoOptimizeAudio => '自动优化音频';
+
+  @override
+  String get autoOptimizeAudioDesc => '蓝牙耳机时自动切换到高质量麦克风';
+
+  @override
+  String get hotkeyConflictTaken => '该按键已被占用，请选择其他按键。';
+
+  @override
+  String hotkeyConflictAutoClearTitle(String keyName, String feature) {
+    return '$keyName 已被「$feature」占用';
+  }
+
+  @override
+  String get hotkeyConflictAutoClearMsg => '快捷键已自动清除，请重新设置。';
+
+  @override
+  String modelActivateFailed(String err) {
+    return '模型激活失败：$err';
+  }
+
+  @override
+  String get punctAutoLoaded => '已自动加载标点模型';
+
+  @override
+  String get punctMissingTitle => '该模型不含标点符号';
+
+  @override
+  String get punctMissingMsg => '此模型输出的文字没有标点。建议下载标点模型以获得更好的阅读体验。\n\n是否前往下载？';
+
+  @override
+  String get punctDownload => '去下载';
+
+  @override
+  String get punctSkip => '暂不需要';
+
+  @override
+  String get offlineDataLocal => '所有数据在本地处理，不上传任何信息';
+
+  @override
+  String get asrModel => '识别模型';
+
+  @override
+  String get manageCloudAccounts => '管理云服务账户';
+
+  @override
+  String get typewriterEffect => '打字机效果';
+
+  @override
+  String get ollamaServerRequired => '确保 Ollama 已启动（ollama serve）';
+
+  @override
+  String get manageModels => '管理模型';
+
+  @override
+  String get llmRecommendations => '选型参考';
+
+  @override
+  String get llmTagFastest => '极致速度';
+
+  @override
+  String get llmTagStable => '稳定首选';
+
+  @override
+  String get llmTagFastestNote => '高峰期可能波动';
+
+  @override
+  String get llmTagStableNote => '波动最小，质量稳定';
+
+  @override
+  String get llmDataSource => '数据来源：2026-03-21 实测，非流式 API，中国大陆网络';
+
+  @override
+  String get llmModelField => '模型';
+
+  @override
+  String get llmModelCustom => '自定义...';
+
+  @override
+  String get llmModelNamePlaceholder => '模型名称';
+
+  @override
+  String get diaryDirNotSet => '未设置保存目录';
+
+  @override
+  String get diaryDirCannotWrite => '无法写入目录，请重新选择（macOS 需重新授权）';
+
+  @override
+  String get diaryDirPick => '请选择保存目录以授权访问';
+
+  @override
+  String get diaryDesc => '随时随地语音记录灵感，自动保存为 Markdown 日记。';
+
+  @override
+  String get organizeCollapse => '收起';
+
+  @override
+  String get organizeEditInstruction => '编辑指令';
+
+  @override
+  String get correctionHotkey => '纠错快捷键';
+
+  @override
+  String get correctionExportDialog => '导出纠错数据';
+
+  @override
+  String get correctionImportDialog => '导入纠错数据';
+
+  @override
+  String get correctionExportSuccess => '导出成功';
+
+  @override
+  String get correctionExportFailedEmpty => '导出失败：无数据';
+
+  @override
+  String correctionImportSuccess(int count) {
+    return '导入 $count 条记录（词汇已同步）';
+  }
+
+  @override
+  String get correctionExportBtn => '导出';
+
+  @override
+  String get correctionImportBtn => '导入';
+
+  @override
+  String get correctionDesc => '选中修正后的文字，一键提交纠错。ASR 自动学习你的用词习惯。';
+
+  @override
+  String get aiReportBaseKey => '基础按键';
+
+  @override
+  String aiReportBaseKeyDesc(String baseKeyName, int slotCount) {
+    return '按住 $baseKeyName + 数字键（1–$slotCount）选择目标窗口';
+  }
+
+  @override
+  String get aiReportAddFirstWindow => '添加第一个窗口';
+
+  @override
+  String get aiReportAddWindow => '添加窗口';
+
+  @override
+  String get aiReportDescShort => '为 AI Coding 而生 — 截屏+语音自动发送到绑定窗口';
+
+  @override
+  String get aiReportDescLong =>
+      '为 AI Coding 而生 — 截屏+语音描述，一键发送到 Claude Code / Cursor。';
+
+  @override
+  String get aiReportSwitchWindow => '请切换到目标窗口...';
+
+  @override
+  String get aiReportUnbound => '未绑定';
+
+  @override
+  String get aiReportBindTitle => '绑定 AI 工具窗口';
+
+  @override
+  String get aiReportBindMsg => '点击「开始」后，你有 3 秒时间切换到目标窗口。';
+
+  @override
+  String get aiReportStart => '开始';
+
+  @override
+  String get aiReportCancel => '取消';
+
+  @override
+  String get activeHotkeys => '已启用的快捷键';
+
+  @override
+  String get appProductName => '子曰 SpeakOut';
+
+  @override
+  String get aboutVersionCopyTip => '双击复制版本号';
+
+  @override
+  String get aboutVersionCopied => '已复制';
+
+  @override
+  String get aboutUpdateDownload => '下载更新';
+
+  @override
+  String get aboutPrivacyPolicy => '隐私政策';
+
+  @override
+  String get clearHotkey => '清除快捷键';
+
+  @override
+  String get featureCorrection => '纠错反馈';
+
+  @override
+  String get featureAiReport => 'AI 一键调试';
+
+  @override
+  String get shortcutsAndDuration => '快捷键与时长';
 }

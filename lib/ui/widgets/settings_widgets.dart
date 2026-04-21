@@ -9,7 +9,7 @@ import '../theme.dart';
 
 /// Independent settings card with optional colored left border.
 /// Used in trigger tab (one card per feature) and mode tab (grouped settings).
-class SettingsCard extends StatelessWidget {
+class SettingsCard extends StatefulWidget {
   final String? title;
   final IconData? titleIcon;
   final Color? accentColor;       // Colored left border
@@ -17,6 +17,7 @@ class SettingsCard extends StatelessWidget {
   final Widget? trailing;          // Top-right widget (e.g. enable switch)
   final EdgeInsets padding;
   final double? minHeight;         // 最小高度，保证卡片不会太扁
+  final VoidCallback? onTap;       // v1.8: 可点击卡片（带 hover 效果）
 
   const SettingsCard({
     super.key,
@@ -27,17 +28,36 @@ class SettingsCard extends StatelessWidget {
     this.trailing,
     this.padding = const EdgeInsets.all(16),
     this.minHeight,
+    this.onTap,
   });
 
   @override
+  State<SettingsCard> createState() => _SettingsCardState();
+}
+
+class _SettingsCardState extends State<SettingsCard> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
+    // hover: onTap 存在时 border 用 accent；否则用轻微加深的 border
+    final Color borderColor;
+    if (_hover) {
+      borderColor = widget.onTap != null
+          ? (widget.accentColor ?? AppTheme.getAccent(context)).withValues(alpha: 0.4)
+          : (widget.accentColor ?? AppTheme.getAccent(context)).withValues(alpha: 0.22);
+    } else {
+      borderColor = AppTheme.getBorder(context);
+    }
+
+    final card = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
       width: double.infinity,
-      constraints: minHeight != null ? BoxConstraints(minHeight: minHeight!) : null,
+      constraints: widget.minHeight != null ? BoxConstraints(minHeight: widget.minHeight!) : null,
       decoration: BoxDecoration(
         color: AppTheme.getCardBackground(context),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.getBorder(context)),
+        border: Border.all(color: borderColor),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
@@ -45,41 +65,46 @@ class SettingsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Colored left accent bar
-            if (accentColor != null)
+            if (widget.accentColor != null)
               Container(
                 width: 4,
                 constraints: const BoxConstraints(minHeight: 60),
-                color: accentColor,
+                color: widget.accentColor,
               ),
             // Card content
             Expanded(
               child: Padding(
-                padding: padding,
+                padding: widget.padding,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (title != null) ...[
+                    // Header row: title+icon (optional) + trailing (optional)
+                    // 即使 title=null 也 render trailing（右对齐）
+                    if (widget.title != null || widget.trailing != null) ...[
                       Row(
                         children: [
-                          if (titleIcon != null) ...[
-                            MacosIcon(titleIcon, size: 16, color: accentColor ?? AppTheme.getAccent(context)),
-                            const SizedBox(width: 8),
+                          if (widget.titleIcon != null) ...[
+                            MacosIcon(widget.titleIcon, size: 16, color: widget.accentColor ?? AppTheme.getAccent(context)),
+                            const SizedBox(width: 10),
                           ],
-                          Expanded(
-                            child: Text(
-                              title!,
-                              style: AppTheme.body(context).copyWith(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                          if (widget.title != null)
+                            Expanded(
+                              child: Text(
+                                widget.title!,
+                                style: AppTheme.body(context).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
                               ),
-                            ),
-                          ),
-                          ?trailing,
+                            )
+                          else
+                            const Spacer(),
+                          ?widget.trailing,
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      if (widget.title != null) const SizedBox(height: 14),
                     ],
-                    ...children,
+                    ...widget.children,
                   ],
                 ),
               ),
@@ -88,27 +113,47 @@ class SettingsCard extends StatelessWidget {
         ),
       ),
     );
+
+    // onTap == null: 仍有 hover 视觉（border 轻微 accent tint），但无 click cursor
+    final region = MouseRegion(
+      cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: card,
+    );
+
+    if (widget.onTap == null) return region;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: region,
+    );
   }
 }
 
-/// Dual-column card grid. Falls back to single column when width < 700px.
+/// Dual-column card grid. Falls back to single column when width < [dualBreakpoint].
+/// v1.8: threshold 降到 520; 可通过 [forceDualColumn] 强制双列（无视宽度）.
 class SettingsCardGrid extends StatelessWidget {
   final List<Widget> children;
   final double spacing;
   final double runSpacing;
+  final double dualBreakpoint;
+  final bool forceDualColumn;
 
   const SettingsCardGrid({
     super.key,
     required this.children,
     this.spacing = 12,
     this.runSpacing = 12,
+    this.dualBreakpoint = 520,
+    this.forceDualColumn = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final useDualColumn = constraints.maxWidth >= 700;
+        final useDualColumn = forceDualColumn || constraints.maxWidth >= dualBreakpoint;
 
         if (!useDualColumn) {
           // Single column
@@ -122,7 +167,7 @@ class SettingsCardGrid extends StatelessWidget {
           );
         }
 
-        // Dual column
+        // Dual column (奇数项时最后一行右侧 Expanded 空占位，保持半宽)
         final List<Widget> rows = [];
         for (int i = 0; i < children.length; i += 2) {
           final left = children[i];

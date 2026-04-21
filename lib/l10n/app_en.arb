@@ -291,5 +291,219 @@
   "quickTranslateDesc": "Press hotkey to record, result auto-translates to target language (does not affect normal recording settings)",
   "translateTargetLanguage": "Target Language",
   "translateHotkey": "Translate Hotkey",
-  "translateNoLlm": "Quick Translate requires an LLM service. Please add one in Cloud Accounts."
+  "translateNoLlm": "Quick Translate requires an LLM service. Please add one in Cloud Accounts.",
+
+  "settingsV18PreviewTitle": "Settings",
+  "sidebarSectionBasic": "Basic",
+  "sidebarSectionVoice": "Voice",
+  "sidebarSectionSuperpower": "Superpower",
+  "sidebarSectionOther": "Other",
+  "sidebarOverview": "Overview",
+  "sidebarShortcuts": "Shortcuts",
+  "sidebarPermissions": "Permissions",
+  "sidebarRecognition": "Recognition",
+  "sidebarAiPlus": "AI Plus",
+  "sidebarVocab": "Vocabulary",
+  "sidebarCorrection": "Correction",
+  "sidebarAiReport": "AI Debug",
+  "showAdvanced": "Advanced",
+
+  "shortcutsRecordKey": "Record Key",
+  "shortcutsSharedHint": "Tap = toggle recording, Hold = push-to-talk",
+  "shortcutsSplitTitle": "Record Key (PTT / Toggle separately)",
+  "shortcutsPttTitle": "Push-to-Talk (PTT)",
+  "shortcutsPttHint": "Hold to record, release to stop",
+  "shortcutsToggleTitle": "Toggle",
+  "shortcutsToggleHint": "Tap to start, tap again to stop",
+  "shortcutsTip": "Recommended: Right Option / Fn / F13–F19 — Cmd / Ctrl combos are often taken by system apps.",
+
+  "hotkeyModalTitle": "Record Hotkey",
+  "hotkeyModalSubtitle": "Press the key or combination you want to set",
+  "hotkeyModalCountdown": "Cancels in {seconds}s · Press ESC to exit",
+  "@hotkeyModalCountdown": {
+    "placeholders": {"seconds": {"type": "int"}}
+  },
+  "hotkeyModalRecommend": "Recommended",
+  "hotkeyModalAvoid": "Avoid Cmd / Ctrl combinations (often taken by system apps)",
+  "hotkeyInUseTitle": "{keyName} is already used by \"{feature}\"",
+  "@hotkeyInUseTitle": {
+    "placeholders": {"keyName": {"type": "String"}, "feature": {"type": "String"}}
+  },
+  "hotkeyInUseMessage": "That key is taken. Please choose another.",
+  "hotkeyInUseOk": "OK",
+
+  "hotkeyRecordDiary": "Record Flash Note Key",
+  "hotkeyRecordDiaryHint": "Hold to start recording a note",
+  "hotkeyRecordToggleDiary": "Record Note Toggle Key",
+  "hotkeyRecordToggleDiaryHint": "Tap to start, tap again to stop",
+  "hotkeyRecordOrganize": "Record AI Organize Key",
+  "hotkeyRecordOrganizeHint": "After selecting text, press to reorganize",
+  "hotkeyRecordTranslate": "Record Quick Translate Key",
+  "hotkeyRecordTranslateHint": "After selecting text, press to translate",
+  "hotkeyRecordCorrection": "Record Correction Key",
+  "hotkeyRecordCorrectionHint": "After selecting text, press to submit correction",
+  "hotkeyRecordAiReport": "Record AI Debug Base Key",
+  "hotkeyRecordAiReportHint": "Hold + digit 1-5 to activate",
+
+  "overviewWelcome": "Welcome to SpeakOut",
+  "overviewTagline": "macOS offline-first AI dictation · Private · Free & Open",
+  "overviewGetStarted": "Get Started",
+  "featureOfflineTitle": "Offline Recognition",
+  "featureOfflineDesc": "Local Sherpa-ONNX ASR, on-device; accuracy rivals cloud",
+  "featureAiPolishTitle": "AI Polish",
+  "featureAiPolishDesc": "Cloud LLM fixes homophones, punctuation, and grammar",
+  "featureSuperpowerTitle": "Superpower",
+  "featureSuperpowerDesc": "Flash Note / AI Organize / Quick Translate / Correction / AI Debug",
+  "featureVocabTitle": "Professional Vocab",
+  "featureVocabDesc": "Custom terms injected into LLM prompt; medical / legal / finance packs",
+  "overviewHelpTitle": "Help & Support",
+  "linkWikiFaq": "Wiki · FAQ",
+  "linkChangelog": "Changelog",
+  "linkXHandle": "X · @4over7",
+  "linkFeedback": "Feedback · 4over7@gmail.com",
+  "linkGithubIssues": "GitHub Issues",
+
+  "smartNeedsAiPlusConfig": "Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won't apply.",
+  "gotoAiPlus": "Go to AI Plus",
+  "aiPlusNotActive": "AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.",
+
+  "aboutModelsDir": "Models Directory",
+  "aboutGatewayUrl": "Gateway URL",
+  "aboutGatewayDesc": "License / subscription / cloud token proxy",
+  "aboutDiagnostics": "Diagnostics",
+  "aboutDiagnosticsDesc": "Copy version / config / paths to clipboard (paste when reporting bugs)",
+  "actionCopy": "Copy",
+  "actionCopied": "Copied",
+
+  "permissionsSectionTitle": "System Permissions",
+  "permissionsReauthTip": "If shortcuts stop working after a code-signing change, re-grant each permission below.",
+  "permissionsAccessibility": "Accessibility",
+  "permissionsAccessibilityDesc": "Shortcuts + text injection",
+  "permissionsInputMonitoring": "Input Monitoring",
+  "permissionsInputMonitoringDesc": "Keyboard-triggered recording",
+  "permissionsMicrophone": "Microphone",
+  "permissionsMicrophoneDesc": "Audio capture",
+  "permissionsOpen": "Open",
+
+  "aboutDeveloper": "Developer",
+  "aboutVerboseLogging": "Verbose Logging",
+  "aboutLogDir": "Log Directory",
+  "aboutLogDirUnset": "Not set (console only)",
+  "aboutLoading": "Loading…",
+  "aboutConfigBackup": "Config Backup",
+  "aboutExportConfig": "Export Config",
+  "aboutExportConfigDesc": "Export all settings and credentials to file (plaintext keys included, store safely)",
+  "aboutExportAction": "Export",
+  "aboutExportFileTitle": "Export Config File",
+  "aboutImportConfig": "Import Config",
+  "aboutImportConfigDesc": "Restore all settings from a backup file, takes effect immediately",
+  "aboutImportAction": "Import",
+  "aboutImportFileTitle": "Choose Config File",
+  "aboutExportSuccess": "Exported: {msg}",
+  "@aboutExportSuccess": {
+    "placeholders": {"msg": {"type": "String"}}
+  },
+  "aboutExportFailed": "Export failed: {err}",
+  "@aboutExportFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
+  "aboutImportSuccess": "{msg}, config applied",
+  "@aboutImportSuccess": {
+    "placeholders": {"msg": {"type": "String"}}
+  },
+  "aboutImportFailed": "Import failed: {err}",
+  "@aboutImportFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
+
+  "audioDeviceCurrent": "Current: {name}",
+  "@audioDeviceCurrent": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "bluetoothMicWarning": "Bluetooth mic may reduce quality",
+  "switchToBuiltin": "Switch to built-in",
+  "autoOptimizeAudio": "Auto-optimize audio",
+  "autoOptimizeAudioDesc": "Auto-switch to higher-quality mic when Bluetooth headset is connected",
+
+  "hotkeyConflictTaken": "That key is taken. Please choose another.",
+  "hotkeyConflictAutoClearTitle": "{keyName} is taken by \"{feature}\"",
+  "@hotkeyConflictAutoClearTitle": {
+    "placeholders": {"keyName": {"type": "String"}, "feature": {"type": "String"}}
+  },
+  "hotkeyConflictAutoClearMsg": "The hotkey has been cleared. Please set a new one.",
+
+  "modelActivateFailed": "Model activation failed: {err}",
+  "@modelActivateFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
+  "punctAutoLoaded": "Punctuation model auto-loaded",
+  "punctMissingTitle": "This model has no punctuation",
+  "punctMissingMsg": "This model outputs text without punctuation. Consider downloading the punctuation model for better readability.\n\nDownload now?",
+  "punctDownload": "Download",
+  "punctSkip": "Not now",
+
+  "offlineDataLocal": "All data is processed locally; nothing is uploaded",
+  "asrModel": "ASR Model",
+  "manageCloudAccounts": "Manage Cloud Accounts",
+  "typewriterEffect": "Typewriter Effect",
+  "ollamaServerRequired": "Make sure Ollama is running (ollama serve)",
+  "manageModels": "Manage Models",
+  "llmRecommendations": "Recommendations",
+  "llmTagFastest": "Fastest",
+  "llmTagStable": "Stable Pick",
+  "llmTagFastestNote": "May fluctuate at peak",
+  "llmTagStableNote": "Least fluctuation, stable quality",
+  "llmDataSource": "Source: 2026-03-21 benchmark, non-streaming API, China Mainland network",
+  "llmModelField": "Model",
+  "llmModelCustom": "Custom...",
+  "llmModelNamePlaceholder": "Model name",
+
+  "diaryDirNotSet": "No save directory set",
+  "diaryDirCannotWrite": "Cannot write to this directory, please reselect (macOS requires re-authorization)",
+  "diaryDirPick": "Please select a save directory to grant access",
+  "diaryDesc": "Record ideas anywhere with voice, auto-saved as Markdown diary.",
+
+  "organizeCollapse": "Collapse",
+  "organizeEditInstruction": "Edit Prompt",
+
+  "correctionHotkey": "Correction Hotkey",
+  "correctionExportDialog": "Export Correction Data",
+  "correctionImportDialog": "Import Correction Data",
+  "correctionExportSuccess": "Export successful",
+  "correctionExportFailedEmpty": "Export failed: no data",
+  "correctionImportSuccess": "Imported {count} entries (vocab synced)",
+  "@correctionImportSuccess": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "correctionExportBtn": "Export",
+  "correctionImportBtn": "Import",
+  "correctionDesc": "Select the corrected text and submit. ASR learns your wording over time.",
+
+  "aiReportBaseKey": "Base Key",
+  "aiReportBaseKeyDesc": "Hold {baseKeyName} + digit (1–{slotCount}) to pick target window",
+  "@aiReportBaseKeyDesc": {
+    "placeholders": {"baseKeyName": {"type": "String"}, "slotCount": {"type": "int"}}
+  },
+  "aiReportAddFirstWindow": "Add First Window",
+  "aiReportAddWindow": "Add Window",
+  "aiReportDescShort": "Built for AI Coding — screenshot + voice auto-sent to bound window",
+  "aiReportDescLong": "Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.",
+  "aiReportSwitchWindow": "Switch to target window...",
+  "aiReportUnbound": "Unbound",
+  "aiReportBindTitle": "Bind AI Tool Window",
+  "aiReportBindMsg": "After clicking \"Start\", you have 3 seconds to switch to the target window.",
+  "aiReportStart": "Start",
+  "aiReportCancel": "Cancel",
+  "activeHotkeys": "Active Hotkeys",
+
+  "appProductName": "SpeakOut · 子曰",
+  "aboutVersionCopyTip": "Double-click to copy version",
+  "aboutVersionCopied": "Copied",
+  "aboutUpdateDownload": "Download Update",
+  "aboutPrivacyPolicy": "Privacy Policy",
+
+  "clearHotkey": "Clear hotkey",
+  "featureCorrection": "Correction",
+  "featureAiReport": "AI Debug",
+  "shortcutsAndDuration": "Shortcuts & Duration"
 }

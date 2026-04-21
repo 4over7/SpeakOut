@@ -809,4 +809,542 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get translateNoLlm =>
       'Quick Translate requires an LLM service. Please add one in Cloud Accounts.';
+
+  @override
+  String get settingsV18PreviewTitle => 'Settings';
+
+  @override
+  String get sidebarSectionBasic => 'Basic';
+
+  @override
+  String get sidebarSectionVoice => 'Voice';
+
+  @override
+  String get sidebarSectionSuperpower => 'Superpower';
+
+  @override
+  String get sidebarSectionOther => 'Other';
+
+  @override
+  String get sidebarOverview => 'Overview';
+
+  @override
+  String get sidebarShortcuts => 'Shortcuts';
+
+  @override
+  String get sidebarPermissions => 'Permissions';
+
+  @override
+  String get sidebarRecognition => 'Recognition';
+
+  @override
+  String get sidebarAiPlus => 'AI Plus';
+
+  @override
+  String get sidebarVocab => 'Vocabulary';
+
+  @override
+  String get sidebarCorrection => 'Correction';
+
+  @override
+  String get sidebarAiReport => 'AI Debug';
+
+  @override
+  String get showAdvanced => 'Advanced';
+
+  @override
+  String get shortcutsRecordKey => 'Record Key';
+
+  @override
+  String get shortcutsSharedHint =>
+      'Tap = toggle recording, Hold = push-to-talk';
+
+  @override
+  String get shortcutsSplitTitle => 'Record Key (PTT / Toggle separately)';
+
+  @override
+  String get shortcutsPttTitle => 'Push-to-Talk (PTT)';
+
+  @override
+  String get shortcutsPttHint => 'Hold to record, release to stop';
+
+  @override
+  String get shortcutsToggleTitle => 'Toggle';
+
+  @override
+  String get shortcutsToggleHint => 'Tap to start, tap again to stop';
+
+  @override
+  String get shortcutsTip =>
+      'Recommended: Right Option / Fn / F13–F19 — Cmd / Ctrl combos are often taken by system apps.';
+
+  @override
+  String get hotkeyModalTitle => 'Record Hotkey';
+
+  @override
+  String get hotkeyModalSubtitle =>
+      'Press the key or combination you want to set';
+
+  @override
+  String hotkeyModalCountdown(int seconds) {
+    return 'Cancels in ${seconds}s · Press ESC to exit';
+  }
+
+  @override
+  String get hotkeyModalRecommend => 'Recommended';
+
+  @override
+  String get hotkeyModalAvoid =>
+      'Avoid Cmd / Ctrl combinations (often taken by system apps)';
+
+  @override
+  String hotkeyInUseTitle(String keyName, String feature) {
+    return '$keyName is already used by \"$feature\"';
+  }
+
+  @override
+  String get hotkeyInUseMessage => 'That key is taken. Please choose another.';
+
+  @override
+  String get hotkeyInUseOk => 'OK';
+
+  @override
+  String get hotkeyRecordDiary => 'Record Flash Note Key';
+
+  @override
+  String get hotkeyRecordDiaryHint => 'Hold to start recording a note';
+
+  @override
+  String get hotkeyRecordToggleDiary => 'Record Note Toggle Key';
+
+  @override
+  String get hotkeyRecordToggleDiaryHint => 'Tap to start, tap again to stop';
+
+  @override
+  String get hotkeyRecordOrganize => 'Record AI Organize Key';
+
+  @override
+  String get hotkeyRecordOrganizeHint =>
+      'After selecting text, press to reorganize';
+
+  @override
+  String get hotkeyRecordTranslate => 'Record Quick Translate Key';
+
+  @override
+  String get hotkeyRecordTranslateHint =>
+      'After selecting text, press to translate';
+
+  @override
+  String get hotkeyRecordCorrection => 'Record Correction Key';
+
+  @override
+  String get hotkeyRecordCorrectionHint =>
+      'After selecting text, press to submit correction';
+
+  @override
+  String get hotkeyRecordAiReport => 'Record AI Debug Base Key';
+
+  @override
+  String get hotkeyRecordAiReportHint => 'Hold + digit 1-5 to activate';
+
+  @override
+  String get overviewWelcome => 'Welcome to SpeakOut';
+
+  @override
+  String get overviewTagline =>
+      'macOS offline-first AI dictation · Private · Free & Open';
+
+  @override
+  String get overviewGetStarted => 'Get Started';
+
+  @override
+  String get featureOfflineTitle => 'Offline Recognition';
+
+  @override
+  String get featureOfflineDesc =>
+      'Local Sherpa-ONNX ASR, on-device; accuracy rivals cloud';
+
+  @override
+  String get featureAiPolishTitle => 'AI Polish';
+
+  @override
+  String get featureAiPolishDesc =>
+      'Cloud LLM fixes homophones, punctuation, and grammar';
+
+  @override
+  String get featureSuperpowerTitle => 'Superpower';
+
+  @override
+  String get featureSuperpowerDesc =>
+      'Flash Note / AI Organize / Quick Translate / Correction / AI Debug';
+
+  @override
+  String get featureVocabTitle => 'Professional Vocab';
+
+  @override
+  String get featureVocabDesc =>
+      'Custom terms injected into LLM prompt; medical / legal / finance packs';
+
+  @override
+  String get overviewHelpTitle => 'Help & Support';
+
+  @override
+  String get linkWikiFaq => 'Wiki · FAQ';
+
+  @override
+  String get linkChangelog => 'Changelog';
+
+  @override
+  String get linkXHandle => 'X · @4over7';
+
+  @override
+  String get linkFeedback => 'Feedback · 4over7@gmail.com';
+
+  @override
+  String get linkGithubIssues => 'GitHub Issues';
+
+  @override
+  String get smartNeedsAiPlusConfig =>
+      'Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won\'t apply.';
+
+  @override
+  String get gotoAiPlus => 'Go to AI Plus';
+
+  @override
+  String get aiPlusNotActive =>
+      'AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.';
+
+  @override
+  String get aboutModelsDir => 'Models Directory';
+
+  @override
+  String get aboutGatewayUrl => 'Gateway URL';
+
+  @override
+  String get aboutGatewayDesc => 'License / subscription / cloud token proxy';
+
+  @override
+  String get aboutDiagnostics => 'Diagnostics';
+
+  @override
+  String get aboutDiagnosticsDesc =>
+      'Copy version / config / paths to clipboard (paste when reporting bugs)';
+
+  @override
+  String get actionCopy => 'Copy';
+
+  @override
+  String get actionCopied => 'Copied';
+
+  @override
+  String get permissionsSectionTitle => 'System Permissions';
+
+  @override
+  String get permissionsReauthTip =>
+      'If shortcuts stop working after a code-signing change, re-grant each permission below.';
+
+  @override
+  String get permissionsAccessibility => 'Accessibility';
+
+  @override
+  String get permissionsAccessibilityDesc => 'Shortcuts + text injection';
+
+  @override
+  String get permissionsInputMonitoring => 'Input Monitoring';
+
+  @override
+  String get permissionsInputMonitoringDesc => 'Keyboard-triggered recording';
+
+  @override
+  String get permissionsMicrophone => 'Microphone';
+
+  @override
+  String get permissionsMicrophoneDesc => 'Audio capture';
+
+  @override
+  String get permissionsOpen => 'Open';
+
+  @override
+  String get aboutDeveloper => 'Developer';
+
+  @override
+  String get aboutVerboseLogging => 'Verbose Logging';
+
+  @override
+  String get aboutLogDir => 'Log Directory';
+
+  @override
+  String get aboutLogDirUnset => 'Not set (console only)';
+
+  @override
+  String get aboutLoading => 'Loading…';
+
+  @override
+  String get aboutConfigBackup => 'Config Backup';
+
+  @override
+  String get aboutExportConfig => 'Export Config';
+
+  @override
+  String get aboutExportConfigDesc =>
+      'Export all settings and credentials to file (plaintext keys included, store safely)';
+
+  @override
+  String get aboutExportAction => 'Export';
+
+  @override
+  String get aboutExportFileTitle => 'Export Config File';
+
+  @override
+  String get aboutImportConfig => 'Import Config';
+
+  @override
+  String get aboutImportConfigDesc =>
+      'Restore all settings from a backup file, takes effect immediately';
+
+  @override
+  String get aboutImportAction => 'Import';
+
+  @override
+  String get aboutImportFileTitle => 'Choose Config File';
+
+  @override
+  String aboutExportSuccess(String msg) {
+    return 'Exported: $msg';
+  }
+
+  @override
+  String aboutExportFailed(String err) {
+    return 'Export failed: $err';
+  }
+
+  @override
+  String aboutImportSuccess(String msg) {
+    return '$msg, config applied';
+  }
+
+  @override
+  String aboutImportFailed(String err) {
+    return 'Import failed: $err';
+  }
+
+  @override
+  String audioDeviceCurrent(String name) {
+    return 'Current: $name';
+  }
+
+  @override
+  String get bluetoothMicWarning => 'Bluetooth mic may reduce quality';
+
+  @override
+  String get switchToBuiltin => 'Switch to built-in';
+
+  @override
+  String get autoOptimizeAudio => 'Auto-optimize audio';
+
+  @override
+  String get autoOptimizeAudioDesc =>
+      'Auto-switch to higher-quality mic when Bluetooth headset is connected';
+
+  @override
+  String get hotkeyConflictTaken => 'That key is taken. Please choose another.';
+
+  @override
+  String hotkeyConflictAutoClearTitle(String keyName, String feature) {
+    return '$keyName is taken by \"$feature\"';
+  }
+
+  @override
+  String get hotkeyConflictAutoClearMsg =>
+      'The hotkey has been cleared. Please set a new one.';
+
+  @override
+  String modelActivateFailed(String err) {
+    return 'Model activation failed: $err';
+  }
+
+  @override
+  String get punctAutoLoaded => 'Punctuation model auto-loaded';
+
+  @override
+  String get punctMissingTitle => 'This model has no punctuation';
+
+  @override
+  String get punctMissingMsg =>
+      'This model outputs text without punctuation. Consider downloading the punctuation model for better readability.\n\nDownload now?';
+
+  @override
+  String get punctDownload => 'Download';
+
+  @override
+  String get punctSkip => 'Not now';
+
+  @override
+  String get offlineDataLocal =>
+      'All data is processed locally; nothing is uploaded';
+
+  @override
+  String get asrModel => 'ASR Model';
+
+  @override
+  String get manageCloudAccounts => 'Manage Cloud Accounts';
+
+  @override
+  String get typewriterEffect => 'Typewriter Effect';
+
+  @override
+  String get ollamaServerRequired =>
+      'Make sure Ollama is running (ollama serve)';
+
+  @override
+  String get manageModels => 'Manage Models';
+
+  @override
+  String get llmRecommendations => 'Recommendations';
+
+  @override
+  String get llmTagFastest => 'Fastest';
+
+  @override
+  String get llmTagStable => 'Stable Pick';
+
+  @override
+  String get llmTagFastestNote => 'May fluctuate at peak';
+
+  @override
+  String get llmTagStableNote => 'Least fluctuation, stable quality';
+
+  @override
+  String get llmDataSource =>
+      'Source: 2026-03-21 benchmark, non-streaming API, China Mainland network';
+
+  @override
+  String get llmModelField => 'Model';
+
+  @override
+  String get llmModelCustom => 'Custom...';
+
+  @override
+  String get llmModelNamePlaceholder => 'Model name';
+
+  @override
+  String get diaryDirNotSet => 'No save directory set';
+
+  @override
+  String get diaryDirCannotWrite =>
+      'Cannot write to this directory, please reselect (macOS requires re-authorization)';
+
+  @override
+  String get diaryDirPick => 'Please select a save directory to grant access';
+
+  @override
+  String get diaryDesc =>
+      'Record ideas anywhere with voice, auto-saved as Markdown diary.';
+
+  @override
+  String get organizeCollapse => 'Collapse';
+
+  @override
+  String get organizeEditInstruction => 'Edit Prompt';
+
+  @override
+  String get correctionHotkey => 'Correction Hotkey';
+
+  @override
+  String get correctionExportDialog => 'Export Correction Data';
+
+  @override
+  String get correctionImportDialog => 'Import Correction Data';
+
+  @override
+  String get correctionExportSuccess => 'Export successful';
+
+  @override
+  String get correctionExportFailedEmpty => 'Export failed: no data';
+
+  @override
+  String correctionImportSuccess(int count) {
+    return 'Imported $count entries (vocab synced)';
+  }
+
+  @override
+  String get correctionExportBtn => 'Export';
+
+  @override
+  String get correctionImportBtn => 'Import';
+
+  @override
+  String get correctionDesc =>
+      'Select the corrected text and submit. ASR learns your wording over time.';
+
+  @override
+  String get aiReportBaseKey => 'Base Key';
+
+  @override
+  String aiReportBaseKeyDesc(String baseKeyName, int slotCount) {
+    return 'Hold $baseKeyName + digit (1–$slotCount) to pick target window';
+  }
+
+  @override
+  String get aiReportAddFirstWindow => 'Add First Window';
+
+  @override
+  String get aiReportAddWindow => 'Add Window';
+
+  @override
+  String get aiReportDescShort =>
+      'Built for AI Coding — screenshot + voice auto-sent to bound window';
+
+  @override
+  String get aiReportDescLong =>
+      'Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.';
+
+  @override
+  String get aiReportSwitchWindow => 'Switch to target window...';
+
+  @override
+  String get aiReportUnbound => 'Unbound';
+
+  @override
+  String get aiReportBindTitle => 'Bind AI Tool Window';
+
+  @override
+  String get aiReportBindMsg =>
+      'After clicking \"Start\", you have 3 seconds to switch to the target window.';
+
+  @override
+  String get aiReportStart => 'Start';
+
+  @override
+  String get aiReportCancel => 'Cancel';
+
+  @override
+  String get activeHotkeys => 'Active Hotkeys';
+
+  @override
+  String get appProductName => 'SpeakOut · 子曰';
+
+  @override
+  String get aboutVersionCopyTip => 'Double-click to copy version';
+
+  @override
+  String get aboutVersionCopied => 'Copied';
+
+  @override
+  String get aboutUpdateDownload => 'Download Update';
+
+  @override
+  String get aboutPrivacyPolicy => 'Privacy Policy';
+
+  @override
+  String get clearHotkey => 'Clear hotkey';
+
+  @override
+  String get featureCorrection => 'Correction';
+
+  @override
+  String get featureAiReport => 'AI Debug';
+
+  @override
+  String get shortcutsAndDuration => 'Shortcuts & Duration';
 }

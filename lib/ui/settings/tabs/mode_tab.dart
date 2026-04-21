@@ -16,11 +16,23 @@ import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../../vocab_settings_page.dart';
 import '../settings_shared.dart';
+import '../sidebar/sidebar_shell.dart';
+
+/// Which subset of mode_tab to render.
+/// `all` — legacy 5-tab settings page (default).
+/// `recognition` — v1.8 sidebar 识别引擎 page: mode selector + language + models + aliyun.
+/// `aiPlus` — v1.8 sidebar AI Plus page: LLM 配置独立视图.
+enum ModeTabView { all, recognition, aiPlus }
 
 class ModeTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
+  final ModeTabView viewFilter;
 
-  const ModeTab({super.key, required this.onNavigateToTab});
+  const ModeTab({
+    super.key,
+    required this.onNavigateToTab,
+    this.viewFilter = ModeTabView.all,
+  });
 
   @override
   State<ModeTab> createState() => ModeTabState();
@@ -198,17 +210,18 @@ class ModeTabState extends State<ModeTab> {
     if (conflictWith != null) {
       _stopKeyCapture();
       if (mounted) {
+        final loc = AppLocalizations.of(context)!;
         showMacosAlertDialog(
           context: context,
           builder: (_) => MacosAlertDialog(
             appIcon: const Icon(CupertinoIcons.exclamationmark_triangle,
                 size: 48, color: Colors.orange),
-            title: Text('$displayName 已被「$conflictWith」使用',
+            title: Text(loc.hotkeyInUseTitle(displayName, conflictWith),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            message: const Text('该按键已被占用，请选择其他按键。'),
+            message: Text(loc.hotkeyConflictTaken),
             primaryButton: PushButton(
               controlSize: ControlSize.large,
-              child: const Text('好的'),
+              child: Text(loc.hotkeyInUseOk),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -274,16 +287,16 @@ class ModeTabState extends State<ModeTab> {
         Row(children: [
           const Text('⌨️', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
-          Text('快捷键与时长', style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(loc.shortcutsAndDuration, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
         ]),
         const SizedBox(height: 10),
-        _compactRow('长按说话 (PTT)', _hotkeyBadge(
+        _compactRow(loc.shortcutsPttTitle, _hotkeyBadge(
           _currentKeyName,
           isCapturing: _isCapturingKey,
           onTap: () => _startKeyCapture(),
         )),
         const SizedBox(height: 6),
-        _compactRow('单击切换 (Toggle)', _hotkeyBadge(
+        _compactRow(loc.shortcutsToggleTitle, _hotkeyBadge(
           _toggleInputKeyName,
           isCapturing: _isCapturingToggleInputKey,
           onTap: () => _startKeyCapture('toggleInput'),
@@ -399,7 +412,10 @@ class ModeTabState extends State<ModeTab> {
           await ConfigService().setActiveModelId(previousModelId);
         }
         setState(() { _activatingId = null; });
-        if (mounted) showSettingsError(context, '模型激活失败: $e');
+        if (mounted) {
+          final loc = AppLocalizations.of(context)!;
+          showSettingsError(context, loc.modelActivateFailed('$e'));
+        }
         return;
       }
       // Model has no built-in punctuation -> prompt user + auto-load punctuation model
@@ -408,24 +424,25 @@ class ModeTabState extends State<ModeTab> {
         if (punctPath != null) {
           await _engine.initPunctuation(punctPath, activeModelName: model.name);
           if (mounted) {
-            showSettingsInfo('已自动加载标点模型');
+            showSettingsInfo(AppLocalizations.of(context)!.punctAutoLoaded);
           }
         } else if (mounted) {
+          final loc = AppLocalizations.of(context)!;
           final confirmed = await showMacosAlertDialog<bool>(
             context: context,
             builder: (_) => MacosAlertDialog(
               appIcon: const MacosIcon(CupertinoIcons.textformat_abc, size: 48),
-              title: const Text('该模型不含标点符号'),
-              message: const Text('此模型输出的文字没有标点。建议下载标点模型以获得更好的阅读体验。\n\n是否前往下载？'),
+              title: Text(loc.punctMissingTitle),
+              message: Text(loc.punctMissingMsg),
               primaryButton: PushButton(
                 controlSize: ControlSize.large,
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('去下载'),
+                child: Text(loc.punctDownload),
               ),
               secondaryButton: PushButton(
                 controlSize: ControlSize.large,
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('暂不需要'),
+                child: Text(loc.punctSkip),
               ),
             ),
           );
@@ -796,6 +813,15 @@ class ModeTabState extends State<ModeTab> {
     final currentMode = ConfigService().workMode;
     final isTranslation = _isTranslationMode();
 
+    switch (widget.viewFilter) {
+      case ModeTabView.recognition:
+        return _buildRecognitionOnlyView(loc, currentMode, isTranslation);
+      case ModeTabView.aiPlus:
+        return _buildAiPlusOnlyView(loc);
+      case ModeTabView.all:
+        break;
+    }
+
     return Column(
       children: [
         Expanded(child: SingleChildScrollView(
@@ -887,6 +913,134 @@ class ModeTabState extends State<ModeTab> {
         )),
 
       ],
+    );
+  }
+
+  // --- v1.8 sidebar filtered views ---
+
+  /// v1.8 sidebar 识别引擎页：模式选择 + 语言 + 模型/ASR 相关
+  /// 不包含 hotkey（在 shortcuts_page）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
+  /// Simple：模式 + 语言 + 当前模型卡；Advanced：加 offline 模型列表 + streaming/punct。
+  Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode, bool isTranslation) {
+    final advanced = ConfigService().showAdvanced;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildModeSelector(loc, currentMode, isTranslation),
+          ..._buildLanguageHints(loc),
+          if (currentMode == 'smart') ...[
+            const SizedBox(height: 10),
+            _buildSmartModeAiPlusHint(),
+          ],
+          const SizedBox(height: 12),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: KeyedSubtree(
+              key: ValueKey('recognition_${currentMode}_$advanced'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLanguageCard(loc),
+                  if (currentMode == 'cloud') ...[
+                    const SizedBox(height: 10),
+                    _buildAiConfigCardCloud(loc),
+                  ] else ...[
+                    const SizedBox(height: 10),
+                    _buildModelInfoCard(loc),
+                    if (advanced) ...[
+                      const SizedBox(height: 10),
+                      _buildOfflineModelListCard(loc),
+                      const SizedBox(height: 10),
+                      _buildStreamingAndPunctCard(loc),
+                    ],
+                  ],
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Smart 模式下给出"前往 AI Plus 配置 LLM"的提示横幅
+  Widget _buildSmartModeAiPlusHint() {
+    final loc = AppLocalizations.of(context)!;
+    final nav = SidebarNavigation.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.getAccent(context).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.getAccent(context).withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          MacosIcon(CupertinoIcons.sparkles, size: 16, color: AppTheme.getAccent(context)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              loc.smartNeedsAiPlusConfig,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.getTextPrimary(context),
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (nav != null)
+            PushButton(
+              controlSize: ControlSize.regular,
+              color: AppTheme.getAccent(context),
+              onPressed: () => nav.goto('ai_plus'),
+              child: Text(loc.gotoAiPlus, style: const TextStyle(color: Colors.white)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// v1.8 sidebar AI Plus 页：只渲染 LLM 配置，独立于 workMode
+  /// （与原 _buildAiConfigCardSmart 同内容）
+  Widget _buildAiPlusOnlyView(AppLocalizations loc) {
+    final currentMode = ConfigService().workMode;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (currentMode != 'smart')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const MacosIcon(CupertinoIcons.info_circle, size: 14, color: MacosColors.systemOrangeColor),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(
+                      loc.aiPlusNotActive,
+                      style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
+                    )),
+                  ],
+                ),
+              ),
+            ),
+          _buildAiConfigCardSmart(loc),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 
@@ -1099,7 +1253,7 @@ class ModeTabState extends State<ModeTab> {
         ),
         const SizedBox(height: 6),
         Text(
-          '所有数据在本地处理，不上传任何信息',
+          loc.offlineDataLocal,
           style: AppTheme.caption(context).copyWith(color: MacosColors.systemGreenColor, height: 1.4),
         ),
       ],
@@ -1198,7 +1352,7 @@ class ModeTabState extends State<ModeTab> {
         )),
         if (asrModels.length > 1) ...[
           const SizedBox(height: 6),
-          _compactRow('识别模型', MacosPopupButton<String>(
+          _compactRow(loc.asrModel, MacosPopupButton<String>(
             value: effectiveAsrModelId,
             items: asrModels.map((m) => MacosPopupMenuItem(
               value: m.id,
@@ -1221,13 +1375,15 @@ class ModeTabState extends State<ModeTab> {
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () => widget.onNavigateToTab(3),
-          child: Text('管理云服务账户 ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+          child: Text('${loc.manageCloudAccounts} ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
         ),
       ],
     );
   }
 
   Widget _buildAiConfigCardSmart(AppLocalizations loc) {
+    // v1.8 sidebar AI Plus 的高级开关（旧 5-tab 用 ModeTabView.all，默认全展示）
+    final advanced = widget.viewFilter != ModeTabView.aiPlus || ConfigService().showAdvanced;
     return SettingsCard(
       padding: const EdgeInsets.all(14),
       children: [
@@ -1253,74 +1409,76 @@ class ModeTabState extends State<ModeTab> {
           ],
         ),
         const SizedBox(height: 8),
-        // LLM Provider type
-        _compactRow(loc.llmProvider, MacosPopupButton<String>(
-          value: ConfigService().llmProviderType,
-          items: [
-            MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
-            MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
-          ],
-          onChanged: (v) async {
-            if (v != null) {
-              await ConfigService().setLlmProviderType(v);
-              setState(() {});
-            }
-          },
-        )),
-        const SizedBox(height: 6),
-        // Typewriter effect
-        _compactRow('打字机效果', Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
-              ),
-              child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
-            ),
-            const SizedBox(width: 8),
-            MacosSwitch(
-              value: ConfigService().typewriterEnabled,
-              onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
-            ),
-          ],
-        )),
-        Divider(height: 16, color: AppTheme.getBorder(context)),
-        // System Prompt
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
-            GestureDetector(
-              onTap: () async {
-                await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
-                _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+        if (advanced) ...[
+          // LLM Provider type
+          _compactRow(loc.llmProvider, MacosPopupButton<String>(
+            value: ConfigService().llmProviderType,
+            items: [
+              MacosPopupMenuItem(value: 'cloud', child: Text(loc.llmProviderCloud)),
+              MacosPopupMenuItem(value: 'ollama', child: Text(loc.llmProviderOllama)),
+            ],
+            onChanged: (v) async {
+              if (v != null) {
+                await ConfigService().setLlmProviderType(v);
                 setState(() {});
-              },
-              child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        MacosTextField(
-          maxLines: 4,
-          placeholder: "Enter instructions for AI...",
-          controller: _aiPromptController,
-          decoration: BoxDecoration(
-            color: AppTheme.getInputBackground(context),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.getBorder(context)),
+              }
+            },
+          )),
+          const SizedBox(height: 6),
+          // Typewriter effect
+          _compactRow(loc.typewriterEffect, Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: MacosColors.systemRedColor.withValues(alpha: 0.5)),
+                ),
+                child: const Text('Alpha', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: MacosColors.systemRedColor)),
+              ),
+              const SizedBox(width: 8),
+              MacosSwitch(
+                value: ConfigService().typewriterEnabled,
+                onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
+              ),
+            ],
+          )),
+          Divider(height: 16, color: AppTheme.getBorder(context)),
+          // System Prompt
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(loc.systemPrompt, style: AppTheme.body(context).copyWith(fontSize: 12)),
+              GestureDetector(
+                onTap: () async {
+                  await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
+                  _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+                  setState(() {});
+                },
+                child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+              ),
+            ],
           ),
-          onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
-        ),
-        Divider(height: 16, color: AppTheme.getBorder(context)),
-        // LLM config (cloud or ollama)
-        if (ConfigService().llmProviderType == 'cloud')
+          const SizedBox(height: 6),
+          MacosTextField(
+            maxLines: 4,
+            placeholder: "Enter instructions for AI...",
+            controller: _aiPromptController,
+            decoration: BoxDecoration(
+              color: AppTheme.getInputBackground(context),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.getBorder(context)),
+            ),
+            onChanged: (v) => ConfigService().setAiCorrectionPrompt(v),
+          ),
+          Divider(height: 16, color: AppTheme.getBorder(context)),
+        ],
+        // LLM config — Simple 模式强制 cloud；Advanced 按 provider 切换
+        if (!advanced || ConfigService().llmProviderType == 'cloud')
           _buildCloudLlmAccountSelector(loc)
         else ...[
-          Text('确保 Ollama 已启动（ollama serve）', style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+          Text(loc.ollamaServerRequired, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
           const SizedBox(height: 8),
           buildApiItem(context, loc.ollamaUrl, CupertinoIcons.link, ConfigService().ollamaBaseUrl, (v) => ConfigService().setOllamaBaseUrl(v), placeholder: "http://localhost:11434"),
           const SizedBox(height: 6),
@@ -1389,7 +1547,7 @@ class ModeTabState extends State<ModeTab> {
         GestureDetector(
           onTap: () => setState(() => _workModeAdvancedExpanded = true),
           child: Text(
-            '管理模型 ▸',
+            '${loc.manageModels} ▸',
             style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context)),
           ),
         ),
@@ -1498,6 +1656,7 @@ class ModeTabState extends State<ModeTab> {
   // --- LLM recommendation ---
 
   Widget _buildLlmRecommendation() {
+    final loc = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1512,16 +1671,16 @@ class ModeTabState extends State<ModeTab> {
             children: [
               MacosIcon(CupertinoIcons.lightbulb, size: 14, color: AppTheme.getAccent(context)),
               const SizedBox(width: 6),
-              Text('选型参考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.getAccent(context))),
+              Text(loc.llmRecommendations, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.getAccent(context))),
             ],
           ),
           const SizedBox(height: 8),
-          _buildRecommendItem('DeepSeek deepseek-chat', '极致速度', '~129ms', '高峰期可能波动'),
+          _buildRecommendItem('DeepSeek deepseek-chat', loc.llmTagFastest, '~129ms', loc.llmTagFastestNote),
           const SizedBox(height: 4),
-          _buildRecommendItem('阿里云百炼 qwen-turbo', '稳定首选', '~573ms', '波动最小，质量稳定'),
+          _buildRecommendItem('阿里云百炼 qwen-turbo', loc.llmTagStable, '~573ms', loc.llmTagStableNote),
           const SizedBox(height: 6),
           Text(
-            '数据来源：2026-03-21 实测，非流式 API，中国大陆网络',
+            loc.llmDataSource,
             style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor),
           ),
         ],
@@ -1553,6 +1712,7 @@ class ModeTabState extends State<ModeTab> {
   // --- LLM model selector ---
 
   Widget _buildLlmModelSelector(CloudAccount? account, CloudProvider? provider) {
+    final loc = AppLocalizations.of(context)!;
     final presets = provider?.llmModels ?? [];
     final currentModel = ConfigService().llmModelOverride ?? provider?.llmDefaultModel ?? '';
 
@@ -1594,7 +1754,7 @@ class ModeTabState extends State<ModeTab> {
             children: [
               const MacosIcon(CupertinoIcons.cube_box, size: 14, color: MacosColors.systemGrayColor),
               const SizedBox(width: 6),
-              Text('模型', style: AppTheme.caption(context)),
+              Text(loc.llmModelField, style: AppTheme.caption(context)),
               const Spacer(),
               if (presets.isNotEmpty)
                 MacosPopupButton<String>(
@@ -1615,9 +1775,9 @@ class ModeTabState extends State<ModeTab> {
                         ],
                       ),
                     )),
-                    const MacosPopupMenuItem(
+                    MacosPopupMenuItem(
                       value: _kCustomModelSentinel,
-                      child: Text('自定义...'),
+                      child: Text(loc.llmModelCustom),
                     ),
                   ],
                   onChanged: (v) async {
@@ -1639,7 +1799,7 @@ class ModeTabState extends State<ModeTab> {
             const SizedBox(height: 8),
             MacosTextField(
               controller: _llmCustomModelController,
-              placeholder: provider?.llmModelHint ?? '模型名称',
+              placeholder: provider?.llmModelHint ?? loc.llmModelNamePlaceholder,
               onChanged: (v) async {
                 _llmModelController.text = v;
                 await ConfigService().setLlmModel(v);
