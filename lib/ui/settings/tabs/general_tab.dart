@@ -83,10 +83,7 @@ class _GeneralTabState extends State<GeneralTab> {
       case GeneralView.general:
         return _buildGeneralSingleView(loc, engine, isBluetooth);
       case GeneralView.permissions:
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(4),
-          child: _buildPermissionsCard(),
-        );
+        return _buildPermissionsSingleView(loc);
       case GeneralView.all:
         break;
     }
@@ -224,6 +221,95 @@ class _GeneralTabState extends State<GeneralTab> {
             ),
           ]),
         ],
+      ],
+    );
+  }
+
+  /// sidebar 权限页：顶部警告横幅 + 3 张小卡（Accessibility / Input Monitoring / Microphone）双列
+  Widget _buildPermissionsSingleView(AppLocalizations loc) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        children: [
+          // Warning banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 14, color: MacosColors.systemOrangeColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.permissionsReauthTip,
+                    style: TextStyle(fontSize: 11, color: MacosColors.systemOrangeColor, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SettingsCardGrid(
+            forceDualColumn: true,
+            children: [
+              _buildSinglePermissionCard(
+                loc.permissionsAccessibility,
+                loc.permissionsAccessibilityDesc,
+                CupertinoIcons.hand_raised,
+                'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+                loc,
+              ),
+              _buildSinglePermissionCard(
+                loc.permissionsInputMonitoring,
+                loc.permissionsInputMonitoringDesc,
+                CupertinoIcons.keyboard,
+                'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent',
+                loc,
+              ),
+              _buildSinglePermissionCard(
+                loc.permissionsMicrophone,
+                loc.permissionsMicrophoneDesc,
+                CupertinoIcons.mic,
+                'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+                loc,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSinglePermissionCard(String label, String desc, IconData icon, String url, AppLocalizations loc) {
+    return SettingsCard(
+      padding: const EdgeInsets.all(16),
+      onTap: () => launchUrl(Uri.parse(url)),
+      children: [
+        Row(
+          children: [
+            MacosIcon(icon, size: 20, color: AppTheme.getAccent(context)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context))),
+                  const SizedBox(height: 2),
+                  Text(desc, style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
+                ],
+              ),
+            ),
+            Text(
+              '${loc.permissionsOpen} ▸',
+              style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
       ],
     );
   }

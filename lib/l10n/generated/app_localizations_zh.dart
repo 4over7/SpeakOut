@@ -18,19 +18,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabModels => '语音模型';
 
   @override
-  String get language => '界面语言 (Interface)';
+  String get language => '界面语言';
 
   @override
-  String get langSystem => '跟随系统 (System Default)';
+  String get langSystem => '跟随系统';
 
   @override
-  String get inputLanguage => '输入语言 (Input)';
+  String get inputLanguage => '输入语言';
 
   @override
   String get inputLanguageDesc => '你说什么语言';
 
   @override
-  String get outputLanguage => '输出语言 (Output)';
+  String get outputLanguage => '输出语言';
 
   @override
   String get outputLanguageDesc => '文字输出的语言，不同于输入语言时自动翻译';
@@ -93,10 +93,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get audioInput => '音频输入设备 (Audio Input)';
+  String get audioInput => '音频输入设备';
 
   @override
-  String get systemDefault => '系统默认 (System Default)';
+  String get systemDefault => '系统默认';
 
   @override
   String get aiCorrection => 'AI 润色';

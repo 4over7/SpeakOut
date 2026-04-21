@@ -921,6 +921,7 @@ class ModeTabState extends State<ModeTab> {
   /// v1.8 sidebar 识别引擎页：模式选择 + 语言 + 模型/ASR 相关
   /// 不包含 hotkey（在 shortcuts_page）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
   /// Simple：模式 + 语言 + 当前模型卡；Advanced：加 offline 模型列表 + streaming/punct。
+  /// 视觉上分两区：顶部"工作模式"（模式选择+hints）+ 下方"配置"（语言/模型 双列卡）。
   Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode, bool isTranslation) {
     final advanced = ConfigService().showAdvanced;
     return SingleChildScrollView(
@@ -928,13 +929,24 @@ class ModeTabState extends State<ModeTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // --- 区 1: 工作模式 ---
           _buildModeSelector(loc, currentMode, isTranslation),
           ..._buildLanguageHints(loc),
           if (currentMode == 'smart') ...[
             const SizedBox(height: 10),
             _buildSmartModeAiPlusHint(),
           ],
-          const SizedBox(height: 12),
+
+          // Section separator
+          const SizedBox(height: 24),
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            color: AppTheme.getBorder(context),
+          ),
+          const SizedBox(height: 20),
+
+          // --- 区 2: 配置 ---
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: KeyedSubtree(
@@ -942,19 +954,25 @@ class ModeTabState extends State<ModeTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildLanguageCard(loc),
-                  if (currentMode == 'cloud') ...[
-                    const SizedBox(height: 10),
-                    _buildAiConfigCardCloud(loc),
-                  ] else ...[
-                    const SizedBox(height: 10),
-                    _buildModelInfoCard(loc),
-                    if (advanced) ...[
-                      const SizedBox(height: 10),
-                      _buildOfflineModelListCard(loc),
-                      const SizedBox(height: 10),
-                      _buildStreamingAndPunctCard(loc),
+                  SettingsCardGrid(
+                    forceDualColumn: true,
+                    children: [
+                      _buildLanguageCard(loc),
+                      if (currentMode == 'cloud')
+                        _buildAiConfigCardCloud(loc)
+                      else
+                        _buildModelInfoCard(loc),
                     ],
+                  ),
+                  if (currentMode != 'cloud' && advanced) ...[
+                    const SizedBox(height: 12),
+                    SettingsCardGrid(
+                      forceDualColumn: true,
+                      children: [
+                        _buildOfflineModelListCard(loc),
+                        _buildStreamingAndPunctCard(loc),
+                      ],
+                    ),
                   ],
                   const SizedBox(height: 24),
                 ],
