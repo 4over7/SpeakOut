@@ -67,7 +67,7 @@ class _OverviewPageState extends State<OverviewPage> {
     return ListView(
       padding: const EdgeInsets.all(4),
       children: [
-        // Welcome hero
+        // Welcome hero（含 logo + 名称 + tagline + 版本 + 更新 + 开始配置）
         _buildWelcomeHero(loc, accent, nav),
         const SizedBox(height: 16),
 
@@ -109,10 +109,6 @@ class _OverviewPageState extends State<OverviewPage> {
         ),
         const SizedBox(height: 16),
 
-        // App info
-        _buildAppInfoCard(loc, accent),
-        const SizedBox(height: 16),
-
         // Help links
         SettingsCard(
           title: loc.overviewHelpTitle,
@@ -125,39 +121,158 @@ class _OverviewPageState extends State<OverviewPage> {
             _LinkRow(icon: CupertinoIcons.exclamationmark_bubble_fill, label: loc.linkGithubIssues, url: 'https://github.com/4over7/SpeakOut/issues', isLast: true),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+
+        // Footer (powered by + copyright + privacy)
+        _buildFooter(loc, accent),
+        const SizedBox(height: 16),
       ],
     );
   }
 
+  /// Hero: app icon + 产品名 + tagline + 版本 badge + 检查更新 + 开始配置
   Widget _buildWelcomeHero(AppLocalizations loc, Color accent, SidebarNavigation? nav) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accent.withValues(alpha: 0.12), accent.withValues(alpha: 0.04)],
+          colors: [accent.withValues(alpha: 0.14), accent.withValues(alpha: 0.04)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: accent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          MacosIcon(CupertinoIcons.mic_circle_fill, size: 44, color: accent),
-          const SizedBox(width: 16),
+          // App icon（实际 logo）
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset('assets/app_icon.png', width: 72, height: 72),
+            ),
+          ),
+          const SizedBox(width: 18),
+          // Title + tagline + version
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(loc.overviewWelcome, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.getTextPrimary(context))),
+                Text(
+                  loc.appProductName,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.getTextPrimary(context),
+                    letterSpacing: 0.3,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(loc.overviewTagline, style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context))),
+                Text(
+                  loc.overviewTagline,
+                  style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context)),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    // Version badge
+                    GestureDetector(
+                      onDoubleTap: () {
+                        Clipboard.setData(ClipboardData(text: _version));
+                        setState(() => _versionCopied = true);
+                        Future.delayed(const Duration(seconds: 2), () {
+                          if (mounted) setState(() => _versionCopied = false);
+                        });
+                      },
+                      child: Tooltip(
+                        message: loc.aboutVersionCopyTip,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _versionCopied
+                                ? MacosColors.systemGreenColor.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: accent.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_versionCopied) ...[
+                                const MacosIcon(CupertinoIcons.checkmark, size: 11, color: MacosColors.systemGreenColor),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                _versionCopied ? loc.aboutVersionCopied : 'v$_version',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'SF Mono',
+                                  color: _versionCopied
+                                      ? MacosColors.systemGreenColor
+                                      : AppTheme.getTextPrimary(context).withValues(alpha: 0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Check update
+                    if (Distribution.supportsUpdateCheck) ...[
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: _isCheckingUpdate ? null : () => _checkUpdate(loc),
+                        child: Tooltip(
+                          message: loc.updateAction,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: accent.withValues(alpha: 0.2)),
+                            ),
+                            child: _isCheckingUpdate
+                                ? const SizedBox(width: 12, height: 12, child: CupertinoActivityIndicator())
+                                : MacosIcon(CupertinoIcons.arrow_clockwise, size: 12, color: AppTheme.getTextSecondary(context)),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_updateResult != null) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _updateResult!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _updateResult == loc.updateUpToDate
+                                ? MacosColors.systemGrayColor
+                                : MacosColors.systemOrangeColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
+          const SizedBox(width: 12),
           PushButton(
-            controlSize: ControlSize.regular,
+            controlSize: ControlSize.large,
             color: accent,
             onPressed: () => nav?.goto('shortcuts'),
             child: Text(loc.overviewGetStarted, style: const TextStyle(color: Colors.white)),
@@ -167,136 +282,49 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  Widget _buildAppInfoCard(AppLocalizations loc, Color accent) {
-    return SettingsCard(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.asset('assets/app_icon.png', width: 64, height: 64),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.appProductName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.getTextPrimary(context))),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      // Version badge (double-tap to copy)
-                      GestureDetector(
-                        onDoubleTap: () {
-                          Clipboard.setData(ClipboardData(text: _version));
-                          setState(() => _versionCopied = true);
-                          Future.delayed(const Duration(seconds: 2), () {
-                            if (mounted) setState(() => _versionCopied = false);
-                          });
-                        },
-                        child: Tooltip(
-                          message: loc.aboutVersionCopyTip,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _versionCopied
-                                  ? MacosColors.systemGreenColor.withValues(alpha: 0.15)
-                                  : MacosColors.systemGrayColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_versionCopied) ...[
-                                  const MacosIcon(CupertinoIcons.checkmark, size: 11, color: MacosColors.systemGreenColor),
-                                  const SizedBox(width: 4),
-                                ],
-                                Text(
-                                  _versionCopied ? loc.aboutVersionCopied : 'v$_version',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontFamily: 'SF Mono',
-                                    color: _versionCopied ? MacosColors.systemGreenColor : MacosColors.labelColor.resolveFrom(context).withValues(alpha: 0.8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Check update button
-                      if (Distribution.supportsUpdateCheck) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _isCheckingUpdate ? null : () => _checkUpdate(loc),
-                          child: Tooltip(
-                            message: loc.updateAction,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: MacosColors.systemGrayColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: _isCheckingUpdate
-                                  ? const SizedBox(width: 12, height: 12, child: CupertinoActivityIndicator())
-                                  : const MacosIcon(CupertinoIcons.arrow_clockwise, size: 12, color: MacosColors.secondaryLabelColor),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (_updateResult != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      _updateResult!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _updateResult == loc.updateUpToDate
-                            ? MacosColors.systemGrayColor
-                            : MacosColors.systemOrangeColor,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Divider(height: 1, color: AppTheme.getBorder(context)),
-        const SizedBox(height: 12),
-        // Powered by
-        Row(
-          children: [
-            Text('${loc.aboutPoweredBy}  ', style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
-            Text('Sherpa-ONNX · Aliyun NLS · Ollama', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context))),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                loc.aboutCopyright,
+  /// 底部 footer（低调显示 powered by + 版权 + 隐私）
+  Widget _buildFooter(AppLocalizations loc, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                loc.aboutPoweredBy,
                 style: TextStyle(fontSize: 10, color: AppTheme.getTextSecondary(context).withValues(alpha: 0.8)),
               ),
-            ),
-            GestureDetector(
-              onTap: () => launchUrl(Uri.parse('https://github.com/4over7/SpeakOut/wiki/Privacy-Policy')),
-              child: Text(
-                loc.aboutPrivacyPolicy,
-                style: TextStyle(fontSize: 11, color: accent, decoration: TextDecoration.underline),
+              const SizedBox(width: 6),
+              Text(
+                'Sherpa-ONNX · Aliyun NLS · Ollama',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppTheme.getTextSecondary(context)),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  loc.aboutCopyright,
+                  style: TextStyle(fontSize: 10, color: AppTheme.getTextSecondary(context).withValues(alpha: 0.6)),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => launchUrl(Uri.parse('https://github.com/4over7/SpeakOut/wiki/Privacy-Policy')),
+                child: Text(
+                  loc.aboutPrivacyPolicy,
+                  style: TextStyle(fontSize: 10, color: accent.withValues(alpha: 0.9), decoration: TextDecoration.underline),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
+
 }
 
 class _FeatureCard extends StatelessWidget {
