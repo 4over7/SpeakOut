@@ -95,6 +95,53 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Key capture（使用热键 modal）
   // ---------------------------------------------------------------------------
 
+  /// disabled 状态下的 hero 视觉：大 icon + 标题 + 说明。
+  /// 旧 5-tab (viewFilter=all) 下保持短 desc（grid 空间小）。
+  Widget _buildDisabledHero({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String desc,
+  }) {
+    if (widget.viewFilter == SuperpowerView.all) {
+      return Text(desc, style: AppTheme.caption(context));
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: MacosIcon(icon, size: 32, color: iconColor),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.getTextPrimary(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            desc,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppTheme.getTextSecondary(context),
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   (String, String) _hotkeyRecorderLabels(String target, AppLocalizations loc) {
     switch (target) {
       case 'diary':
@@ -473,9 +520,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             ),
           ),
         ] else
-          Text(
-            loc.diaryDesc,
-            style: AppTheme.caption(context),
+          _buildDisabledHero(
+            icon: CupertinoIcons.book,
+            iconColor: AppTheme.triggerNote,
+            title: loc.diaryMode,
+            desc: loc.diaryDesc,
           ),
       ],
     );
@@ -609,11 +658,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             ),
           ],
         ] else
-          Text(
-            loc.organizeDesc,
-            style: AppTheme.caption(context),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          _buildDisabledHero(
+            icon: CupertinoIcons.text_alignleft,
+            iconColor: AppTheme.triggerOrganize,
+            title: loc.organizeEnabled,
+            desc: loc.organizeDesc,
           ),
       ],
     );
@@ -706,9 +755,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             ),
           ],
         ] else
-          Text(
-            loc.quickTranslateDesc,
-            style: AppTheme.caption(context),
+          _buildDisabledHero(
+            icon: CupertinoIcons.globe,
+            iconColor: AppTheme.triggerTranslate,
+            title: loc.quickTranslate,
+            desc: loc.quickTranslateDesc,
           ),
       ],
     );
@@ -800,9 +851,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             ],
           ),
         ] else
-          Text(
-            loc.correctionDesc,
-            style: AppTheme.caption(context),
+          _buildDisabledHero(
+            icon: CupertinoIcons.checkmark_seal,
+            iconColor: AppTheme.triggerCorrect,
+            title: loc.sidebarCorrection,
+            desc: loc.correctionDesc,
           ),
       ],
     );
@@ -886,9 +939,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             style: AppTheme.caption(context).copyWith(fontSize: 10),
           ),
         ] else
-          Text(
-            loc.aiReportDescLong,
-            style: AppTheme.caption(context),
+          _buildDisabledHero(
+            icon: CupertinoIcons.camera_viewfinder,
+            iconColor: AppTheme.triggerAiReport,
+            title: loc.sidebarAiReport,
+            desc: loc.aiReportDescLong,
           ),
       ],
     );
