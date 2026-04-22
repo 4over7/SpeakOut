@@ -1494,7 +1494,7 @@ class ModeTabState extends State<ModeTab> {
         ],
         // LLM config — Simple 模式强制 cloud；Advanced 按 provider 切换
         if (!advanced || ConfigService().llmProviderType == 'cloud')
-          _buildCloudLlmAccountSelector(loc)
+          _buildCloudLlmCombinedSelector(loc)
         else ...[
           Text(loc.ollamaServerRequired, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
           const SizedBox(height: 8),
@@ -1596,8 +1596,145 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
-  // --- Cloud LLM account selector ---
+  // --- Cloud LLM combined selector（合并下拉：Provider · Model 平铺 + 每个 account 的自定义项）---
 
+  Widget _buildCloudLlmCombinedSelector(AppLocalizations loc) {
+    final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
+    if (llmAccounts.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: MacosColors.systemOrangeColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: MacosColors.systemOrangeColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            const MacosIcon(CupertinoIcons.exclamationmark_triangle, size: 16, color: MacosColors.systemOrangeColor),
+            const SizedBox(width: 8),
+            Expanded(child: Text(loc.cloudAccountNone, style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor))),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => widget.onNavigateToTab(2),
+              child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), decoration: TextDecoration.underline)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 构造 account × model 组合，每个 account 末尾加"自定义..."项
+    final items = <MacosPopupMenuItem<String>>[];
+    for (final account in llmAccounts) {
+      final provider = CloudProviders.getById(account.providerId);
+      final accountName = account.displayName.isNotEmpty
+          ? account.displayName
+          : (provider?.name ?? account.providerId);
+      final models = provider?.llmModels ?? [];
+      if (models.isEmpty) {
+        items.add(MacosPopupMenuItem(
+          value: '${account.id}|${provider?.llmDefaultModel ?? ""}',
+          child: Text(accountName),
+        ));
+      } else {
+        for (final m in models) {
+          items.add(MacosPopupMenuItem(
+            value: '${account.id}|${m.id}',
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('$accountName · ${m.name}'),
+              if (m.description != null) ...[
+                const SizedBox(width: 6),
+                Text(m.description!, style: const TextStyle(fontSize: 10, color: MacosColors.systemGrayColor)),
+              ],
+            ]),
+          ));
+        }
+      }
+      // 每个 account 末尾加"自定义..."项
+      items.add(MacosPopupMenuItem(
+        value: '${account.id}|$_kCustomModelSentinel',
+        child: Text('$accountName · ${loc.llmModelCustom}',
+            style: TextStyle(color: MacosColors.systemGrayColor)),
+      ));
+    }
+
+    // 计算当前值：savedAccount 的 currentModel 是否在预设里？不在则视为 custom
+    final savedAccountId = ConfigService().selectedLlmAccountId ?? '';
+    final currentModelId = ConfigService().llmModelOverride ?? '';
+    final savedAccount = llmAccounts.firstWhere(
+      (a) => a.id == savedAccountId,
+      orElse: () => llmAccounts.first,
+    );
+    final savedProvider = CloudProviders.getById(savedAccount.providerId);
+    final savedModels = savedProvider?.llmModels ?? [];
+    final isPresetModel = savedModels.any((m) => m.id == currentModelId);
+    final isCustom = _llmModelCustom ||
+        (currentModelId.isNotEmpty && !isPresetModel && savedModels.isNotEmpty);
+
+    final currentValue = isCustom
+        ? '${savedAccount.id}|$_kCustomModelSentinel'
+        : '${savedAccount.id}|$currentModelId';
+    final validValues = items.map((i) => i.value!).toSet();
+    final effectiveValue = validValues.contains(currentValue) ? currentValue : items.first.value!;
+
+    // 同步 custom controller 文本
+    if (isCustom && _llmCustomModelController.text != currentModelId) {
+      _llmCustomModelController.text = currentModelId;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const MacosIcon(CupertinoIcons.building_2_fill, size: 16, color: MacosColors.systemGrayColor),
+            const SizedBox(width: 8),
+            Text('${loc.cloudAccountSelectLlm} · ${loc.llmModelField}', style: AppTheme.caption(context)),
+            const Spacer(),
+            MacosPopupButton<String>(
+              value: effectiveValue,
+              items: items,
+              onChanged: (v) async {
+                if (v == null) return;
+                final parts = v.split('|');
+                final newAccountId = parts[0];
+                final newModelId = parts.length > 1 ? parts[1] : '';
+                await ConfigService().setSelectedLlmAccountId(newAccountId);
+                final account = CloudAccountService().getAccountById(newAccountId);
+                if (account != null) {
+                  await ConfigService().setLlmPresetId(account.providerId);
+                }
+                if (newModelId == _kCustomModelSentinel) {
+                  // 进入 custom 模式；先保留当前 model，让用户编辑
+                  setState(() => _llmModelCustom = true);
+                } else if (newModelId.isNotEmpty) {
+                  await ConfigService().setLlmModel(newModelId);
+                  setState(() => _llmModelCustom = false);
+                }
+              },
+            ),
+          ],
+        ),
+        // Custom 输入框（仅在选中"自定义..."时显示）
+        if (isCustom) ...[
+          const SizedBox(height: 10),
+          MacosTextField(
+            controller: _llmCustomModelController,
+            placeholder: savedProvider?.llmModelHint ?? loc.llmModelNamePlaceholder,
+            onChanged: (v) async {
+              if (v.isNotEmpty) await ConfigService().setLlmModel(v);
+            },
+          ),
+        ],
+        const SizedBox(height: 12),
+        _buildLlmRecommendation(),
+      ],
+    );
+  }
+
+  // --- Cloud LLM account selector (dead code, Phase 6 清理时删) ---
+
+  // ignore: unused_element
   Widget _buildCloudLlmAccountSelector(AppLocalizations loc) {
     final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
     final savedId = ConfigService().selectedLlmAccountId ?? '';
