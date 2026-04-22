@@ -369,8 +369,18 @@
   "aiPlusNotActive": "AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.",
 
   "aboutModelsDir": "Models Directory",
-  "aboutGatewayUrl": "Gateway URL",
-  "aboutGatewayDesc": "License / subscription / cloud token proxy",
+  "aboutSystemLog": "System Log",
+  "aboutSystemLogDesc": "Export the last 10 minutes of SpeakOut-related macOS system logs (attach when reporting bugs)",
+  "aboutSystemLogExport": "Export",
+  "aboutSystemLogFileTitle": "Export System Log",
+  "aboutSystemLogSuccess": "Exported to {path}",
+  "@aboutSystemLogSuccess": {
+    "placeholders": {"path": {"type": "String"}}
+  },
+  "aboutSystemLogFailed": "Export failed: {err}",
+  "@aboutSystemLogFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
   "aboutDiagnostics": "Diagnostics",
   "aboutDiagnosticsDesc": "Copy version / config / paths to clipboard (paste when reporting bugs)",
   "actionCopy": "Copy",

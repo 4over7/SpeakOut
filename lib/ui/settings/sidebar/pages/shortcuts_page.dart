@@ -115,13 +115,22 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
     final loc = AppLocalizations.of(context)!;
     final advanced = ConfigService().showAdvanced;
 
+    // 顺序设计：第一张(PTT/共享键) + 第二张(最大时长) 保持固定；
+    // Advanced 仅在末尾新增一张 Toggle 卡（进入第二行），其余两张位置不变
     final cards = <Widget>[
-      if (advanced) ...[
-        _buildHotkeyCard(
-          loc.shortcutsPttTitle,
-          loc.shortcutsPttHint,
-          hotkeyBadge(context, _currentKeyName, onTap: () => _recordHotkey('ptt')),
-        ),
+      advanced
+          ? _buildHotkeyCard(
+              loc.shortcutsPttTitle,
+              loc.shortcutsPttHint,
+              hotkeyBadge(context, _currentKeyName, onTap: () => _recordHotkey('ptt')),
+            )
+          : _buildHotkeyCard(
+              loc.shortcutsRecordKey,
+              loc.shortcutsSharedHint,
+              hotkeyBadge(context, _currentKeyName, onTap: () => _recordHotkey('shared')),
+            ),
+      _buildMaxDurationSmallCard(loc),
+      if (advanced)
         _buildHotkeyCard(
           loc.shortcutsToggleTitle,
           loc.shortcutsToggleHint,
@@ -137,13 +146,6 @@ class _ShortcutsPageState extends State<ShortcutsPage> {
                   },
           ),
         ),
-      ] else
-        _buildHotkeyCard(
-          loc.shortcutsRecordKey,
-          loc.shortcutsSharedHint,
-          hotkeyBadge(context, _currentKeyName, onTap: () => _recordHotkey('shared')),
-        ),
-      _buildMaxDurationSmallCard(loc),
     ];
 
     return SingleChildScrollView(

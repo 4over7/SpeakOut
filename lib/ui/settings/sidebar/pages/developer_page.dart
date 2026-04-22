@@ -11,7 +11,6 @@ import '../../../../config/distribution.dart';
 import '../../../../services/app_service.dart';
 import '../../../../services/config_backup_service.dart';
 import '../../../../services/config_service.dart';
-import '../../../theme.dart';
 import '../../../widgets/settings_widgets.dart';
 
 /// v1.8 Sidebar - 开发者选项页
@@ -28,6 +27,7 @@ class DeveloperPage extends StatefulWidget {
 class _DeveloperPageState extends State<DeveloperPage> {
   String _modelsDir = '';
   bool _diagnosticsCopied = false;
+  bool _isExportingLog = false;
 
   @override
   void initState() {
@@ -55,6 +55,51 @@ class _DeveloperPageState extends State<DeveloperPage> {
     return '${normalized.substring(0, head)}…${normalized.substring(normalized.length - keepTail)}';
   }
 
+  /// 导出最近 10 分钟与 SpeakOut 相关的 macOS 系统日志到用户选择的文件。
+  /// 使用 `log show --process SpeakOut --last 10m`。
+  Future<void> _exportSystemLog(AppLocalizations loc) async {
+    if (_isExportingLog) return;
+    setState(() => _isExportingLog = true);
+    try {
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: loc.aboutSystemLogFileTitle,
+        fileName: 'speakout-syslog-$timestamp.log',
+        allowedExtensions: ['log', 'txt'],
+        type: FileType.custom,
+      );
+      if (path == null) {
+        if (mounted) setState(() => _isExportingLog = false);
+        return;
+      }
+      final result = await Process.run('log', [
+        'show',
+        '--process', 'SpeakOut',
+        '--last', '10m',
+        '--info',
+        '--debug',
+      ]);
+      if (result.exitCode != 0) {
+        throw Exception(result.stderr.toString());
+      }
+      await File(path).writeAsString(result.stdout.toString());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(loc.aboutSystemLogSuccess(path)),
+        backgroundColor: MacosColors.systemGreenColor,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(loc.aboutSystemLogFailed('$e')),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _isExportingLog = false);
+    }
+  }
+
   Future<void> _copyDiagnostics() async {
     final info = await PackageInfo.fromPlatform();
     final buf = StringBuffer();
@@ -77,7 +122,6 @@ class _DeveloperPageState extends State<DeveloperPage> {
     buf.writeln('Paths');
     buf.writeln('  modelsDir: $_modelsDir');
     buf.writeln('  logDir: ${ConfigService().logDirectory.isEmpty ? "(stdout only)" : ConfigService().logDirectory}');
-    buf.writeln('  gatewayUrl: ${ConfigService.kDefaultGatewayUrl}');
 
     await Clipboard.setData(ClipboardData(text: buf.toString()));
     if (!mounted) return;
@@ -167,16 +211,16 @@ class _DeveloperPageState extends State<DeveloperPage> {
         ),
         const SettingsDivider(),
         SettingsTile(
-          label: loc.aboutGatewayUrl,
-          subtitle: loc.aboutGatewayDesc,
-          icon: CupertinoIcons.cloud,
-          child: Text(
-            ConfigService.kDefaultGatewayUrl.replaceFirst('https://', ''),
-            style: AppTheme.caption(context).copyWith(
-              color: MacosColors.systemGrayColor,
-              fontFamily: 'SF Mono',
-              fontSize: 10,
-            ),
+          label: loc.aboutSystemLog,
+          subtitle: loc.aboutSystemLogDesc,
+          icon: CupertinoIcons.doc_text_search,
+          child: PushButton(
+            controlSize: ControlSize.regular,
+            secondary: true,
+            onPressed: _isExportingLog ? null : () => _exportSystemLog(loc),
+            child: _isExportingLog
+                ? const SizedBox(width: 14, height: 14, child: CupertinoActivityIndicator())
+                : Text(loc.aboutSystemLogExport),
           ),
         ),
         const SettingsDivider(),

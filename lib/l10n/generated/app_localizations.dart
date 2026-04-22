@@ -1964,17 +1964,41 @@ abstract class AppLocalizations {
   /// **'Models Directory'**
   String get aboutModelsDir;
 
-  /// No description provided for @aboutGatewayUrl.
+  /// No description provided for @aboutSystemLog.
   ///
   /// In en, this message translates to:
-  /// **'Gateway URL'**
-  String get aboutGatewayUrl;
+  /// **'System Log'**
+  String get aboutSystemLog;
 
-  /// No description provided for @aboutGatewayDesc.
+  /// No description provided for @aboutSystemLogDesc.
   ///
   /// In en, this message translates to:
-  /// **'License / subscription / cloud token proxy'**
-  String get aboutGatewayDesc;
+  /// **'Export the last 10 minutes of SpeakOut-related macOS system logs (attach when reporting bugs)'**
+  String get aboutSystemLogDesc;
+
+  /// No description provided for @aboutSystemLogExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get aboutSystemLogExport;
+
+  /// No description provided for @aboutSystemLogFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export System Log'**
+  String get aboutSystemLogFileTitle;
+
+  /// No description provided for @aboutSystemLogSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported to {path}'**
+  String aboutSystemLogSuccess(String path);
+
+  /// No description provided for @aboutSystemLogFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {err}'**
+  String aboutSystemLogFailed(String err);
 
   /// No description provided for @aboutDiagnostics.
   ///

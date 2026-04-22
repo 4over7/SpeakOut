@@ -976,10 +976,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutModelsDir => '模型目录';
 
   @override
-  String get aboutGatewayUrl => 'Gateway URL';
+  String get aboutSystemLog => '系统日志';
 
   @override
-  String get aboutGatewayDesc => '许可证 / 订阅 / 云端 Token 代理服务';
+  String get aboutSystemLogDesc =>
+      '导出最近 10 分钟 SpeakOut 相关的 macOS 系统日志（用于报 bug 时附给开发者）';
+
+  @override
+  String get aboutSystemLogExport => '导出';
+
+  @override
+  String get aboutSystemLogFileTitle => '导出系统日志';
+
+  @override
+  String aboutSystemLogSuccess(String path) {
+    return '已导出到 $path';
+  }
+
+  @override
+  String aboutSystemLogFailed(String err) {
+    return '导出失败：$err';
+  }
 
   @override
   String get aboutDiagnostics => '诊断信息';

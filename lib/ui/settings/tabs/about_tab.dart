@@ -380,20 +380,6 @@ class _AboutTabState extends State<AboutTab> {
                 ),
                 const SettingsDivider(),
                 SettingsTile(
-                  label: loc.aboutGatewayUrl,
-                  subtitle: loc.aboutGatewayDesc,
-                  icon: CupertinoIcons.cloud,
-                  child: Text(
-                    ConfigService.kDefaultGatewayUrl.replaceFirst('https://', ''),
-                    style: AppTheme.caption(context).copyWith(
-                      color: MacosColors.systemGrayColor,
-                      fontFamily: 'SF Mono',
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-                const SettingsDivider(),
-                SettingsTile(
                   label: loc.aboutDiagnostics,
                   subtitle: loc.aboutDiagnosticsDesc,
                   icon: CupertinoIcons.ant,

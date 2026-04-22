@@ -329,8 +329,18 @@
   "aiPlusNotActive": "AI 润色当前不生效：需在「识别引擎」页把工作模式切为 Smart（离线 + 云端 AI）。LLM 配置仍可在此编辑。",
 
   "aboutModelsDir": "模型目录",
-  "aboutGatewayUrl": "Gateway URL",
-  "aboutGatewayDesc": "许可证 / 订阅 / 云端 Token 代理服务",
+  "aboutSystemLog": "系统日志",
+  "aboutSystemLogDesc": "导出最近 10 分钟 SpeakOut 相关的 macOS 系统日志（用于报 bug 时附给开发者）",
+  "aboutSystemLogExport": "导出",
+  "aboutSystemLogFileTitle": "导出系统日志",
+  "aboutSystemLogSuccess": "已导出到 {path}",
+  "@aboutSystemLogSuccess": {
+    "placeholders": {"path": {"type": "String"}}
+  },
+  "aboutSystemLogFailed": "导出失败：{err}",
+  "@aboutSystemLogFailed": {
+    "placeholders": {"err": {"type": "String"}}
+  },
   "aboutDiagnostics": "诊断信息",
   "aboutDiagnosticsDesc": "复制版本 / 配置 / 路径信息到剪贴板（报错时发给我）",
   "actionCopy": "复制",

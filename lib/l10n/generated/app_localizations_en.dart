@@ -1021,10 +1021,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutModelsDir => 'Models Directory';
 
   @override
-  String get aboutGatewayUrl => 'Gateway URL';
+  String get aboutSystemLog => 'System Log';
 
   @override
-  String get aboutGatewayDesc => 'License / subscription / cloud token proxy';
+  String get aboutSystemLogDesc =>
+      'Export the last 10 minutes of SpeakOut-related macOS system logs (attach when reporting bugs)';
+
+  @override
+  String get aboutSystemLogExport => 'Export';
+
+  @override
+  String get aboutSystemLogFileTitle => 'Export System Log';
+
+  @override
+  String aboutSystemLogSuccess(String path) {
+    return 'Exported to $path';
+  }
+
+  @override
+  String aboutSystemLogFailed(String err) {
+    return 'Export failed: $err';
+  }
 
   @override
   String get aboutDiagnostics => 'Diagnostics';
