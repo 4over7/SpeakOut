@@ -95,6 +95,58 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Key capture（使用热键 modal）
   // ---------------------------------------------------------------------------
 
+  /// enabled 状态下的紧凑 header：小 icon + 标题 + 使用说明
+  /// 作为配置项上方的视觉锚点，避免 enabled 页面只有稀疏 rows
+  /// 旧 5-tab (viewFilter=all) 下不显示（grid 空间小）
+  Widget _buildEnabledHeader({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String hint,
+  }) {
+    if (widget.viewFilter == SuperpowerView.all) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: MacosIcon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.getTextPrimary(context),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hint,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.getTextSecondary(context),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// disabled 状态下的 hero 视觉：大 icon + 标题 + 说明。
   /// 旧 5-tab (viewFilter=all) 下保持短 desc（grid 空间小）。
   Widget _buildDisabledHero({
@@ -416,6 +468,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       padding: const EdgeInsets.all(12),
       children: [
         if (config.diaryEnabled) ...[
+          _buildEnabledHeader(
+            icon: CupertinoIcons.book,
+            iconColor: AppTheme.triggerNote,
+            title: loc.diaryMode,
+            hint: loc.diaryDesc,
+          ),
           // Directory permission warning
           if (_diaryDirError == null || _diaryDirError!.isNotEmpty)
             Padding(
@@ -557,6 +615,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       padding: const EdgeInsets.all(12),
       children: [
         if (config.organizeEnabled) ...[
+          _buildEnabledHeader(
+            icon: CupertinoIcons.text_alignleft,
+            iconColor: AppTheme.triggerOrganize,
+            title: loc.organizeEnabled,
+            hint: loc.organizeDesc,
+          ),
           _compactRow(
             loc.organizeHotkey,
             _hotkeyBadge(
@@ -695,6 +759,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       padding: const EdgeInsets.all(12),
       children: [
         if (config.translateEnabled) ...[
+          _buildEnabledHeader(
+            icon: CupertinoIcons.globe,
+            iconColor: AppTheme.triggerTranslate,
+            title: loc.quickTranslate,
+            hint: loc.quickTranslateDesc,
+          ),
           _compactRow(
             loc.translateHotkey,
             _hotkeyBadge(
@@ -795,6 +865,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       padding: const EdgeInsets.all(12),
       children: [
         if (config.correctionEnabled) ...[
+          _buildEnabledHeader(
+            icon: CupertinoIcons.checkmark_seal,
+            iconColor: AppTheme.triggerCorrect,
+            title: loc.sidebarCorrection,
+            hint: loc.correctionDesc,
+          ),
           _compactRow(
             loc.correctionHotkey,
             _hotkeyBadge(
@@ -885,6 +961,12 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       padding: const EdgeInsets.all(12),
       children: [
         if (config.aiReportEnabled) ...[
+          _buildEnabledHeader(
+            icon: CupertinoIcons.camera_viewfinder,
+            iconColor: AppTheme.triggerAiReport,
+            title: loc.sidebarAiReport,
+            hint: loc.aiReportDescLong,
+          ),
           // 基础按键
           _compactRow(
             loc.aiReportBaseKey,
