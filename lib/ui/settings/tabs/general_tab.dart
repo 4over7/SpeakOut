@@ -144,38 +144,28 @@ class _GeneralTabState extends State<GeneralTab> {
   // ---------------------------------------------------------------------------
 
   Widget _buildShortcutsSection(AppLocalizations loc) {
-    final advanced = ConfigService().showAdvanced;
     final cards = <Widget>[
-      advanced
-          ? _hotkeyCard(
-              loc.shortcutsPttTitle,
-              loc.shortcutsPttHint,
-              hotkeyBadge(context, _currentKeyName,
-                  onTap: () => _recordHotkey('ptt')),
-            )
-          : _hotkeyCard(
-              loc.shortcutsRecordKey,
-              loc.shortcutsSharedHint,
-              hotkeyBadge(context, _currentKeyName,
-                  onTap: () => _recordHotkey('shared')),
-            ),
-      _maxDurationCard(loc),
-      if (advanced)
-        _hotkeyCard(
-          loc.shortcutsToggleTitle,
-          loc.shortcutsToggleHint,
-          hotkeyBadge(
-            context,
-            _toggleInputKeyName,
-            onTap: () => _recordHotkey('toggleInput'),
-            onClear: _toggleInputKeyName.isEmpty
-                ? null
-                : () async {
-                    await ConfigService().clearToggleInputKey();
-                    setState(() => _toggleInputKeyName = '');
-                  },
-          ),
+      _hotkeyCard(
+        loc.shortcutsPttTitle,
+        loc.shortcutsPttHint,
+        hotkeyBadge(context, _currentKeyName,
+            onTap: () => _recordHotkey('ptt')),
+      ),
+      _hotkeyCard(
+        loc.shortcutsToggleTitle,
+        loc.shortcutsToggleHint,
+        hotkeyBadge(
+          context,
+          _toggleInputKeyName,
+          onTap: () => _recordHotkey('toggleInput'),
+          onClear: _toggleInputKeyName.isEmpty
+              ? null
+              : () async {
+                  await ConfigService().clearToggleInputKey();
+                  setState(() => _toggleInputKeyName = '');
+                },
         ),
+      ),
     ];
 
     return Column(
@@ -285,24 +275,27 @@ class _GeneralTabState extends State<GeneralTab> {
     return SettingsCard(
       padding: const EdgeInsets.all(16),
       children: [
-        _labelRow(
-          loc.toggleMaxDuration,
-          'Toggle',
-          MacosPopupButton<int>(
-            value: _toggleMaxDuration,
-            items: [
-              MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
-              MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
-              MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
-              MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
-              MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
-            ],
-            onChanged: (v) async {
-              if (v != null) {
-                await ConfigService().setToggleMaxDuration(v);
-                setState(() => _toggleMaxDuration = v);
-              }
-            },
+        _settingsRow(
+          label: loc.toggleMaxDuration,
+          subtitle: loc.toggleMaxDurationDesc,
+          trailing: SizedBox(
+            width: 110,
+            child: MacosPopupButton<int>(
+              value: _toggleMaxDuration,
+              items: [
+                MacosPopupMenuItem(value: 0, child: Text(loc.toggleMaxNone)),
+                MacosPopupMenuItem(value: 60, child: Text(loc.toggleMaxMin(1))),
+                MacosPopupMenuItem(value: 180, child: Text(loc.toggleMaxMin(3))),
+                MacosPopupMenuItem(value: 300, child: Text(loc.toggleMaxMin(5))),
+                MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10))),
+              ],
+              onChanged: (v) async {
+                if (v != null) {
+                  await ConfigService().setToggleMaxDuration(v);
+                  setState(() => _toggleMaxDuration = v);
+                }
+              },
+            ),
           ),
         ),
       ],
@@ -348,6 +341,7 @@ class _GeneralTabState extends State<GeneralTab> {
         _languageCard(loc),
         _audioCard(loc, engine, isBluetooth),
         _autoOptimizeCard(loc, engine),
+        _maxDurationCard(loc),
       ],
     );
   }

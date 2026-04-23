@@ -573,6 +573,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toggleMaxDuration => 'Max Recording Duration';
 
   @override
+  String get toggleMaxDurationDesc =>
+      'Auto-stop when not manually stopped in tap-to-talk mode';
+
+  @override
   String get toggleMaxNone => 'No Limit';
 
   @override
@@ -872,7 +876,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutsPttHint => 'Hold to record, release to stop';
 
   @override
-  String get shortcutsToggleTitle => 'Toggle';
+  String get shortcutsToggleTitle => 'Tap to Talk';
 
   @override
   String get shortcutsToggleHint => 'Tap to start, tap again to stop';

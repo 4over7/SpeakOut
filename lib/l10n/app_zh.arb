@@ -174,6 +174,7 @@
   "textInjection": "文本注入（输入法）",
   "recordingProtection": "录音保护",
   "toggleMaxDuration": "最大录音时长",
+  "toggleMaxDurationDesc": "单击说话模式下，未主动停止时自动结束",
   "toggleMaxNone": "不限制",
   "toggleMaxMin": "{count} 分钟",
   "@toggleMaxMin": {
@@ -274,7 +275,7 @@
   "shortcutsSplitTitle": "录音键（PTT / Toggle 分键）",
   "shortcutsPttTitle": "长按说话 (PTT)",
   "shortcutsPttHint": "长按该键录音，松开停止",
-  "shortcutsToggleTitle": "单击切换 (Toggle)",
+  "shortcutsToggleTitle": "单击说话",
   "shortcutsToggleHint": "点一下开录、再点一下停",
   "shortcutsTip": "推荐 Right Option / Fn / F13–F19 — Cmd / Ctrl 等组合键常被系统应用占用。",
 

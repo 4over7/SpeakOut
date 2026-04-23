@@ -60,7 +60,6 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
             id: 'general',
             label: loc.tabGeneral,
             icon: CupertinoIcons.settings,
-            hasAdvanced: true,
             builder: (_) => GeneralPage(),
           ),
         ],

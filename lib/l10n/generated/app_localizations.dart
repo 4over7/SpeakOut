@@ -1148,6 +1148,12 @@ abstract class AppLocalizations {
   /// **'Max Recording Duration'**
   String get toggleMaxDuration;
 
+  /// No description provided for @toggleMaxDurationDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-stop when not manually stopped in tap-to-talk mode'**
+  String get toggleMaxDurationDesc;
+
   /// No description provided for @toggleMaxNone.
   ///
   /// In en, this message translates to:
@@ -1703,7 +1709,7 @@ abstract class AppLocalizations {
   /// No description provided for @shortcutsToggleTitle.
   ///
   /// In en, this message translates to:
-  /// **'Toggle'**
+  /// **'Tap to Talk'**
   String get shortcutsToggleTitle;
 
   /// No description provided for @shortcutsToggleHint.

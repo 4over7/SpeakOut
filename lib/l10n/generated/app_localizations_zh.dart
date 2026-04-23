@@ -551,6 +551,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toggleMaxDuration => '最大录音时长';
 
   @override
+  String get toggleMaxDurationDesc => '单击说话模式下，未主动停止时自动结束';
+
+  @override
   String get toggleMaxNone => '不限制';
 
   @override
@@ -837,7 +840,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutsPttHint => '长按该键录音，松开停止';
 
   @override
-  String get shortcutsToggleTitle => '单击切换 (Toggle)';
+  String get shortcutsToggleTitle => '单击说话';
 
   @override
   String get shortcutsToggleHint => '点一下开录、再点一下停';

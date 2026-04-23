@@ -204,6 +204,7 @@
   "textInjection": "Text Input (IME)",
   "recordingProtection": "Recording Protection",
   "toggleMaxDuration": "Max Recording Duration",
+  "toggleMaxDurationDesc": "Auto-stop when not manually stopped in tap-to-talk mode",
   "toggleMaxNone": "No Limit",
   "toggleMaxMin": "{count} min",
   "@toggleMaxMin": {
@@ -314,7 +315,7 @@
   "shortcutsSplitTitle": "Record Key (PTT / Toggle separately)",
   "shortcutsPttTitle": "Push-to-Talk (PTT)",
   "shortcutsPttHint": "Hold to record, release to stop",
-  "shortcutsToggleTitle": "Toggle",
+  "shortcutsToggleTitle": "Tap to Talk",
   "shortcutsToggleHint": "Tap to start, tap again to stop",
   "shortcutsTip": "Recommended: Right Option / Fn / F13–F19 — Cmd / Ctrl combos are often taken by system apps.",
 
