@@ -1376,6 +1376,18 @@ abstract class AppLocalizations {
   /// **'AI Debug screenshot + reading other app window titles (required on macOS 10.15+)'**
   String get permissionsScreenRecordingDesc;
 
+  /// No description provided for @aiReportScreenRecordingWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Debug requires Screen Recording permission, otherwise window titles can\'t be read (bound targets only show app name)'**
+  String get aiReportScreenRecordingWarning;
+
+  /// No description provided for @aiReportOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open System Settings'**
+  String get aiReportOpenSettings;
+
   /// No description provided for @vocabEnabledNote.
   ///
   /// In en, this message translates to:

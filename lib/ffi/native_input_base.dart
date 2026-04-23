@@ -33,6 +33,9 @@ typedef IsAudioRecordingDart = int Function();
 typedef CheckMicrophonePermissionC = Int32 Function();
 typedef CheckMicrophonePermissionDart = int Function();
 
+typedef CheckScreenRecordingPermissionC = Int32 Function();
+typedef CheckScreenRecordingPermissionDart = int Function();
+
 typedef NativeFreeC = Void Function(Pointer<Void>);
 typedef NativeFreeDart = void Function(Pointer<Void>);
 
@@ -153,6 +156,7 @@ abstract class NativeInputBase {
   void stopAudioRecording();
   bool isAudioRecording();
   bool checkMicrophonePermission();
+  bool checkScreenRecordingPermission();
   void nativeFree(Pointer<Void> ptr);
   int getAvailableAudioSamples();
   int readAudioBuffer(Pointer<Int16> outSamples, int maxSamples);

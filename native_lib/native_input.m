@@ -1090,6 +1090,13 @@ int save_recording_wav(const char *path) {
 // Check if currently recording
 int is_audio_recording() { return isRecording ? 1 : 0; }
 
+// Check Screen Recording permission (macOS 10.15+, public API in CGWindow.h)
+// AI Debug 需要此权限以读取其他 app 窗口标题 (kCGWindowName)
+// 只读检查，不触发系统弹窗
+int check_screen_recording_permission(void) {
+  return CGPreflightScreenCaptureAccess() ? 1 : 0;
+}
+
 // Check microphone permission (macOS 10.14+)
 int check_microphone_permission() {
   if (@available(macOS 10.14, *)) {

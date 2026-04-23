@@ -247,6 +247,8 @@
   "vocabEducation": "Education",
   "permissionsScreenRecording": "Screen Recording",
   "permissionsScreenRecordingDesc": "AI Debug screenshot + reading other app window titles (required on macOS 10.15+)",
+  "aiReportScreenRecordingWarning": "AI Debug requires Screen Recording permission, otherwise window titles can't be read (bound targets only show app name)",
+  "aiReportOpenSettings": "Open System Settings",
   "vocabEnabledNote": "When enabled, terminology is injected as context hints to AI Polish",
   "vocabBeta": "Beta",
   "vocabBetaNote": "Experimental — accuracy varies by LLM model, still being tuned",

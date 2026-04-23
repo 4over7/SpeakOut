@@ -29,6 +29,8 @@ class NativeInputFFI implements NativeInputBase {
   late StopAudioRecordingDart _stopAudioRecording;
   late IsAudioRecordingDart _isAudioRecording;
   late CheckMicrophonePermissionDart _checkMicPermission;
+  // 可选：macOS only。Windows/Linux dylib 可能不导出此 symbol
+  CheckScreenRecordingPermissionDart? _checkScreenRecordingPermission;
   late NativeFreeDart _nativeFree;
   late GetAvailableAudioSamplesDart _getAvailableAudioSamples;
   late ReadAudioBufferDart _readAudioBuffer;
@@ -206,6 +208,15 @@ class NativeInputFFI implements NativeInputBase {
           .asFunction();
       _audioBound = true;
       _log("Audio FFI bindings SUCCESS");
+
+      // 可选绑定（macOS only，Windows/Linux dylib 可能没有此 symbol）
+      try {
+        _checkScreenRecordingPermission = _dylib
+            .lookup<NativeFunction<CheckScreenRecordingPermissionC>>('check_screen_recording_permission')
+            .asFunction();
+      } catch (_) {
+        _checkScreenRecordingPermission = null;
+      }
     } catch (e) {
       _log("Audio FFI bindings FAILED: $e");
     }
@@ -241,6 +252,14 @@ class NativeInputFFI implements NativeInputBase {
     if (!_audioBound) return false;
     final result = _checkMicPermission();
     return result == 1;
+  }
+
+  @override
+  bool checkScreenRecordingPermission() {
+    _bindAudioFunctions();
+    final fn = _checkScreenRecordingPermission;
+    if (fn == null) return true; // 非 macOS 平台：默认允许（该平台不需要此权限）
+    return fn() == 1;
   }
 
   @override

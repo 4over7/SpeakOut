@@ -668,6 +668,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'AI 调试截屏 + 读取其他 App 窗口标题（macOS 10.15+ 必需）';
 
   @override
+  String get aiReportScreenRecordingWarning =>
+      'AI 调试需要屏幕录制权限，否则无法读取窗口标题（绑定的目标窗口只显示 App 名）';
+
+  @override
+  String get aiReportOpenSettings => '打开系统设置';
+
+  @override
   String get vocabEnabledNote => '开启后，专业术语将作为上下文提示注入 AI 润色';
 
   @override
