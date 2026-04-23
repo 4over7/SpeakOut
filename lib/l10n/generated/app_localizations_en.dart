@@ -690,6 +690,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vocabEducation => 'Education';
 
   @override
+  String get permissionsScreenRecording => 'Screen Recording';
+
+  @override
+  String get permissionsScreenRecordingDesc =>
+      'AI Debug screenshot + reading other app window titles (required on macOS 10.15+)';
+
+  @override
   String get vocabEnabledNote =>
       'When enabled, terminology is injected as context hints to AI Polish';
 

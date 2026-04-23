@@ -661,6 +661,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vocabEducation => '教育';
 
   @override
+  String get permissionsScreenRecording => '屏幕录制';
+
+  @override
+  String get permissionsScreenRecordingDesc =>
+      'AI 调试截屏 + 读取其他 App 窗口标题（macOS 10.15+ 必需）';
+
+  @override
   String get vocabEnabledNote => '开启后，专业术语将作为上下文提示注入 AI 润色';
 
   @override

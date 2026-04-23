@@ -554,6 +554,13 @@ class _GeneralTabState extends State<GeneralTab> {
               'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
               loc,
             ),
+            _permissionCard(
+              loc.permissionsScreenRecording,
+              loc.permissionsScreenRecordingDesc,
+              CupertinoIcons.camera_viewfinder,
+              'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
+              loc,
+            ),
           ],
         ),
       ],

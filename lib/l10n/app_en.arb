@@ -245,6 +245,8 @@
   "vocabLegal": "Legal",
   "vocabFinance": "Finance",
   "vocabEducation": "Education",
+  "permissionsScreenRecording": "Screen Recording",
+  "permissionsScreenRecordingDesc": "AI Debug screenshot + reading other app window titles (required on macOS 10.15+)",
   "vocabEnabledNote": "When enabled, terminology is injected as context hints to AI Polish",
   "vocabBeta": "Beta",
   "vocabBetaNote": "Experimental — accuracy varies by LLM model, still being tuned",

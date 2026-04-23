@@ -1364,6 +1364,18 @@ abstract class AppLocalizations {
   /// **'Education'**
   String get vocabEducation;
 
+  /// No description provided for @permissionsScreenRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen Recording'**
+  String get permissionsScreenRecording;
+
+  /// No description provided for @permissionsScreenRecordingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Debug screenshot + reading other app window titles (required on macOS 10.15+)'**
+  String get permissionsScreenRecordingDesc;
+
   /// No description provided for @vocabEnabledNote.
   ///
   /// In en, this message translates to:
