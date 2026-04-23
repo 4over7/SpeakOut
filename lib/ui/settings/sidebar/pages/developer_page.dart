@@ -55,37 +55,69 @@ class _DeveloperPageState extends State<DeveloperPage> {
     return '${normalized.substring(0, head)}…${normalized.substring(normalized.length - keepTail)}';
   }
 
-  /// 导出最近 10 分钟与 SpeakOut 相关的 macOS 系统日志到用户选择的文件。
-  /// 使用 `log show --process SpeakOut --last 10m`。
-  Future<void> _exportSystemLog(AppLocalizations loc) async {
+  /// 一键导出日志包：zip 内含
+  /// - syslog.log（`log show --process SpeakOut --last 10m`）
+  /// - app-logs/（ConfigService.logDirectory 下的 .log 文件，如有）
+  /// - diagnostics.txt（版本/配置/路径）
+  Future<void> _exportLogBundle(AppLocalizations loc) async {
     if (_isExportingLog) return;
     setState(() => _isExportingLog = true);
+    Directory? tempDir;
     try {
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
       final path = await FilePicker.platform.saveFile(
         dialogTitle: loc.aboutSystemLogFileTitle,
-        fileName: 'speakout-syslog-$timestamp.log',
-        allowedExtensions: ['log', 'txt'],
+        fileName: 'speakout-logs-$timestamp.zip',
+        allowedExtensions: ['zip'],
         type: FileType.custom,
       );
       if (path == null) {
         if (mounted) setState(() => _isExportingLog = false);
         return;
       }
-      final result = await Process.run('log', [
-        'show',
-        '--process', 'SpeakOut',
-        '--last', '10m',
-        '--info',
-        '--debug',
+
+      tempDir = Directory.systemTemp.createTempSync('speakout_logs_');
+
+      // 1. syslog
+      final syslogResult = await Process.run('log', [
+        'show', '--process', 'SpeakOut', '--last', '10m', '--info', '--debug',
       ]);
-      if (result.exitCode != 0) {
-        throw Exception(result.stderr.toString());
+      await File('${tempDir.path}/syslog.log').writeAsString(
+        syslogResult.exitCode == 0
+            ? syslogResult.stdout.toString()
+            : '[log show failed: ${syslogResult.stderr}]',
+      );
+
+      // 2. 应用详细日志目录（如果用户设了）
+      final logDir = ConfigService().logDirectory;
+      if (logDir.isNotEmpty && Directory(logDir).existsSync()) {
+        final appLogsDest = Directory('${tempDir.path}/app-logs');
+        appLogsDest.createSync();
+        for (final entity in Directory(logDir).listSync()) {
+          if (entity is File && entity.path.endsWith('.log')) {
+            final name = entity.uri.pathSegments.last;
+            await entity.copy('${appLogsDest.path}/$name');
+          }
+        }
       }
-      await File(path).writeAsString(result.stdout.toString());
+
+      // 3. diagnostics
+      await File('${tempDir.path}/diagnostics.txt').writeAsString(await _buildDiagnostics());
+
+      // 4. 打包
+      final zipPath = path.endsWith('.zip') ? path : '$path.zip';
+      if (File(zipPath).existsSync()) File(zipPath).deleteSync();
+      final dittoResult = await Process.run('ditto', [
+        '-c', '-k', '--sequesterRsrc', '--keepParent',
+        tempDir.path, zipPath,
+      ]);
+      if (dittoResult.exitCode != 0) {
+        throw Exception('ditto failed: ${dittoResult.stderr}');
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(loc.aboutSystemLogSuccess(path)),
+        content: Text(loc.aboutSystemLogSuccess(zipPath)),
         backgroundColor: MacosColors.systemGreenColor,
         behavior: SnackBarBehavior.floating,
       ));
@@ -96,11 +128,14 @@ class _DeveloperPageState extends State<DeveloperPage> {
         behavior: SnackBarBehavior.floating,
       ));
     } finally {
+      try {
+        tempDir?.deleteSync(recursive: true);
+      } catch (_) {}
       if (mounted) setState(() => _isExportingLog = false);
     }
   }
 
-  Future<void> _copyDiagnostics() async {
+  Future<String> _buildDiagnostics() async {
     final info = await PackageInfo.fromPlatform();
     final buf = StringBuffer();
     buf.writeln('SpeakOut Diagnostics');
@@ -122,8 +157,12 @@ class _DeveloperPageState extends State<DeveloperPage> {
     buf.writeln('Paths');
     buf.writeln('  modelsDir: $_modelsDir');
     buf.writeln('  logDir: ${ConfigService().logDirectory.isEmpty ? "(stdout only)" : ConfigService().logDirectory}');
+    return buf.toString();
+  }
 
-    await Clipboard.setData(ClipboardData(text: buf.toString()));
+  Future<void> _copyDiagnostics() async {
+    final text = await _buildDiagnostics();
+    await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     setState(() => _diagnosticsCopied = true);
     Future.delayed(const Duration(seconds: 2), () {
@@ -200,24 +239,13 @@ class _DeveloperPageState extends State<DeveloperPage> {
         ),
         const SettingsDivider(),
         SettingsTile(
-          label: loc.aboutModelsDir,
-          subtitle: _modelsDir.isEmpty ? loc.aboutLoading : _shortenPath(_modelsDir),
-          icon: CupertinoIcons.cube_box,
-          child: MacosIconButton(
-            icon: const MacosIcon(CupertinoIcons.arrow_right_square, size: 16),
-            backgroundColor: MacosColors.transparent,
-            onPressed: _modelsDir.isEmpty ? null : () => _revealInFinder(_modelsDir),
-          ),
-        ),
-        const SettingsDivider(),
-        SettingsTile(
           label: loc.aboutSystemLog,
           subtitle: loc.aboutSystemLogDesc,
           icon: CupertinoIcons.doc_text_search,
           child: PushButton(
             controlSize: ControlSize.regular,
             secondary: true,
-            onPressed: _isExportingLog ? null : () => _exportSystemLog(loc),
+            onPressed: _isExportingLog ? null : () => _exportLogBundle(loc),
             child: _isExportingLog
                 ? const SizedBox(width: 14, height: 14, child: CupertinoActivityIndicator())
                 : Text(loc.aboutSystemLogExport),
@@ -237,6 +265,17 @@ class _DeveloperPageState extends State<DeveloperPage> {
               _diagnosticsCopied ? loc.actionCopied : loc.actionCopy,
               style: TextStyle(color: _diagnosticsCopied ? Colors.white : null),
             ),
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsTile(
+          label: loc.aboutModelsDir,
+          subtitle: _modelsDir.isEmpty ? loc.aboutLoading : _shortenPath(_modelsDir),
+          icon: CupertinoIcons.cube_box,
+          child: MacosIconButton(
+            icon: const MacosIcon(CupertinoIcons.arrow_right_square, size: 16),
+            backgroundColor: MacosColors.transparent,
+            onPressed: _modelsDir.isEmpty ? null : () => _revealInFinder(_modelsDir),
           ),
         ),
       ],

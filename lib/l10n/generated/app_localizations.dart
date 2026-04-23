@@ -1967,13 +1967,13 @@ abstract class AppLocalizations {
   /// No description provided for @aboutSystemLog.
   ///
   /// In en, this message translates to:
-  /// **'System Log'**
+  /// **'Export Log Bundle'**
   String get aboutSystemLog;
 
   /// No description provided for @aboutSystemLogDesc.
   ///
   /// In en, this message translates to:
-  /// **'Export the last 10 minutes of SpeakOut-related macOS system logs (attach when reporting bugs)'**
+  /// **'Bundle last 10min system logs + app verbose logs + diagnostics into a zip (attach when reporting bugs)'**
   String get aboutSystemLogDesc;
 
   /// No description provided for @aboutSystemLogExport.
@@ -1985,7 +1985,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutSystemLogFileTitle.
   ///
   /// In en, this message translates to:
-  /// **'Export System Log'**
+  /// **'Export Log Bundle'**
   String get aboutSystemLogFileTitle;
 
   /// No description provided for @aboutSystemLogSuccess.

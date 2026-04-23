@@ -369,10 +369,10 @@
   "aiPlusNotActive": "AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.",
 
   "aboutModelsDir": "Models Directory",
-  "aboutSystemLog": "System Log",
-  "aboutSystemLogDesc": "Export the last 10 minutes of SpeakOut-related macOS system logs (attach when reporting bugs)",
+  "aboutSystemLog": "Export Log Bundle",
+  "aboutSystemLogDesc": "Bundle last 10min system logs + app verbose logs + diagnostics into a zip (attach when reporting bugs)",
   "aboutSystemLogExport": "Export",
-  "aboutSystemLogFileTitle": "Export System Log",
+  "aboutSystemLogFileTitle": "Export Log Bundle",
   "aboutSystemLogSuccess": "Exported to {path}",
   "@aboutSystemLogSuccess": {
     "placeholders": {"path": {"type": "String"}}

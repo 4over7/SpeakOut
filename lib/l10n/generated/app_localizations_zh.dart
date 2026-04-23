@@ -976,17 +976,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutModelsDir => '模型目录';
 
   @override
-  String get aboutSystemLog => '系统日志';
+  String get aboutSystemLog => '导出日志包';
 
   @override
   String get aboutSystemLogDesc =>
-      '导出最近 10 分钟 SpeakOut 相关的 macOS 系统日志（用于报 bug 时附给开发者）';
+      '打包最近 10 分钟系统日志 + 应用详细日志 + 诊断信息为 zip（报 bug 时发给我）';
 
   @override
   String get aboutSystemLogExport => '导出';
 
   @override
-  String get aboutSystemLogFileTitle => '导出系统日志';
+  String get aboutSystemLogFileTitle => '导出日志包';
 
   @override
   String aboutSystemLogSuccess(String path) {

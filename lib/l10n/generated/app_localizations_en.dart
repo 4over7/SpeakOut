@@ -1021,17 +1021,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutModelsDir => 'Models Directory';
 
   @override
-  String get aboutSystemLog => 'System Log';
+  String get aboutSystemLog => 'Export Log Bundle';
 
   @override
   String get aboutSystemLogDesc =>
-      'Export the last 10 minutes of SpeakOut-related macOS system logs (attach when reporting bugs)';
+      'Bundle last 10min system logs + app verbose logs + diagnostics into a zip (attach when reporting bugs)';
 
   @override
   String get aboutSystemLogExport => 'Export';
 
   @override
-  String get aboutSystemLogFileTitle => 'Export System Log';
+  String get aboutSystemLogFileTitle => 'Export Log Bundle';
 
   @override
   String aboutSystemLogSuccess(String path) {
