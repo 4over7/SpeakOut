@@ -216,6 +216,8 @@
   "vocabFinance": "金融",
   "vocabEducation": "教育",
   "vocabEnabledNote": "开启后，专业术语将作为上下文提示注入 AI 润色",
+  "vocabBeta": "Beta",
+  "vocabBetaNote": "试验性功能，准确率因 LLM 模型而异，正在持续优化",
   "vocabImportTsv": "导入文件",
   "vocabImportTsvDesc": "支持 TSV 或 CSV 格式，每行一条：错误形式<Tab>正确形式",
   "vocabImportSuccess": "成功导入 {count} 条词条",

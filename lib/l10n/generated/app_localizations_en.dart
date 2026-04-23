@@ -694,6 +694,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'When enabled, terminology is injected as context hints to AI Polish';
 
   @override
+  String get vocabBeta => 'Beta';
+
+  @override
+  String get vocabBetaNote =>
+      'Experimental — accuracy varies by LLM model, still being tuned';
+
+  @override
   String get vocabImportTsv => 'Import File';
 
   @override

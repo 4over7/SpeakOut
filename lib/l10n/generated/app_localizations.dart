@@ -1370,6 +1370,18 @@ abstract class AppLocalizations {
   /// **'When enabled, terminology is injected as context hints to AI Polish'**
   String get vocabEnabledNote;
 
+  /// No description provided for @vocabBeta.
+  ///
+  /// In en, this message translates to:
+  /// **'Beta'**
+  String get vocabBeta;
+
+  /// No description provided for @vocabBetaNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental — accuracy varies by LLM model, still being tuned'**
+  String get vocabBetaNote;
+
   /// No description provided for @vocabImportTsv.
   ///
   /// In en, this message translates to:

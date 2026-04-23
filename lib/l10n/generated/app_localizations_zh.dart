@@ -664,6 +664,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vocabEnabledNote => '开启后，专业术语将作为上下文提示注入 AI 润色';
 
   @override
+  String get vocabBeta => 'Beta';
+
+  @override
+  String get vocabBetaNote => '试验性功能，准确率因 LLM 模型而异，正在持续优化';
+
+  @override
   String get vocabImportTsv => '导入文件';
 
   @override

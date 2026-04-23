@@ -208,6 +208,23 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                   const Text('📚', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 6),
                   Text(loc.vocabEnhancement, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: MacosColors.systemOrangeColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      loc.vocabBeta,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: MacosColors.systemOrangeColor,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
                 ]),
                 MacosSwitch(
                   value: _vocabEnabled,
@@ -218,11 +235,13 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                 ),
               ],
             ),
-            if (_vocabEnabled)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(loc.vocabEnabledNote, style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor)),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _vocabEnabled ? loc.vocabEnabledNote : loc.vocabBetaNote,
+                style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor),
               ),
+            ),
           ],
         ),
 

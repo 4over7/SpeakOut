@@ -246,6 +246,8 @@
   "vocabFinance": "Finance",
   "vocabEducation": "Education",
   "vocabEnabledNote": "When enabled, terminology is injected as context hints to AI Polish",
+  "vocabBeta": "Beta",
+  "vocabBetaNote": "Experimental — accuracy varies by LLM model, still being tuned",
   "vocabImportTsv": "Import File",
   "vocabImportTsvDesc": "TSV or CSV format, one entry per line: wrong<Tab>correct",
   "vocabImportSuccess": "{count} entries imported",
