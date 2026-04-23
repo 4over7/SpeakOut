@@ -35,8 +35,39 @@ class UpdateService {
   Stream<UpdateState> get stateChanges => _stateController.stream;
 
   // 使用系统临时目录（沙盒兼容）
-  static String get _dmgPath => '${Directory.systemTemp.path}/SpeakOut-update.dmg';
+  // DMG 路径带版本号，避免重复下载；不同版本也不串台
+  String get _dmgPath {
+    final v = latestVersion ?? 'unknown';
+    return '${Directory.systemTemp.path}/SpeakOut-update-$v.dmg';
+  }
   static String get _helperPath => '${Directory.systemTemp.path}/speakout_update.sh';
+
+  /// 最小合理 DMG 大小（B）。低于此值视为损坏/未完成下载。
+  /// 当前 SpeakOut.dmg 约 53 MB，保守设 20 MB。
+  static const int _minValidDmgBytes = 20 * 1024 * 1024;
+
+  /// 清理旧版本的 DMG 缓存文件（保留当前 latestVersion 的）
+  void _cleanupStaleDmgs() {
+    try {
+      final tempDir = Directory(Directory.systemTemp.path);
+      final keep = latestVersion == null ? null : 'SpeakOut-update-$latestVersion.dmg';
+      for (final entity in tempDir.listSync()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        if (!name.startsWith('SpeakOut-update-') || !name.endsWith('.dmg')) continue;
+        if (keep != null && name == keep) continue;
+        try {
+          entity.deleteSync();
+          AppLog.d('UpdateService: cleaned stale DMG: $name');
+        } catch (_) {}
+      }
+      // 顺便删掉旧路径（无版本号的那个）
+      final legacy = File('${Directory.systemTemp.path}/SpeakOut-update.dmg');
+      if (legacy.existsSync()) {
+        try { legacy.deleteSync(); } catch (_) {}
+      }
+    } catch (_) {}
+  }
 
   void dispose() {
     _progressController.close();
@@ -85,8 +116,18 @@ class UpdateService {
       if (isNewer(remote.version, localVersion)) {
         hasUpdate = true;
         AppLog.d('UpdateService: new version available: ${remote.version} (local: $localVersion), dmg: ${remote.dmgUrl ?? "none"}');
+        // 清理旧版 DMG 缓存 + 检测本次版本是否已下载过
+        _cleanupStaleDmgs();
+        final cached = File(_dmgPath);
+        if (cached.existsSync() && cached.lengthSync() >= _minValidDmgBytes) {
+          AppLog.d('UpdateService: reusing cached DMG: $_dmgPath (${cached.lengthSync()} bytes)');
+          _lastProgress = 1.0;
+          _setState(UpdateState.readyToInstall);
+        }
       } else {
         AppLog.d('UpdateService: up to date ($localVersion)');
+        // 本地已是最新，清掉所有残留缓存
+        _cleanupStaleDmgs();
       }
     } catch (e) {
       AppLog.d('UpdateService: check failed: $e');
@@ -154,6 +195,21 @@ class UpdateService {
 
   /// Download the DMG update file
   Future<bool> downloadUpdate() async {
+    // 防并发：已经在下载中直接 return
+    if (_state == UpdateState.downloading) {
+      AppLog.d('UpdateService: download already in progress, skip');
+      return false;
+    }
+    // 缓存复用：DMG 已下载过且文件合理，直接跳到 readyToInstall 不重下
+    final cached = File(_dmgPath);
+    if (cached.existsSync() && cached.lengthSync() >= _minValidDmgBytes) {
+      AppLog.d('UpdateService: DMG already cached, skip download: $_dmgPath (${cached.lengthSync()} bytes)');
+      _lastProgress = 1.0;
+      _progressController.add(1.0);
+      _setState(UpdateState.readyToInstall);
+      return true;
+    }
+
     if (_dmgAssetUrl == null) {
       errorMessage = 'No DMG download URL available';
       _setState(UpdateState.failed);
