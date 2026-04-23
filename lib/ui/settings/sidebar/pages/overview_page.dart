@@ -274,7 +274,7 @@ class _OverviewPageState extends State<OverviewPage> {
           PushButton(
             controlSize: ControlSize.large,
             color: accent,
-            onPressed: () => nav?.goto('shortcuts'),
+            onPressed: () => nav?.goto('general'),
             child: Text(loc.overviewGetStarted, style: const TextStyle(color: Colors.white)),
           ),
         ],

@@ -919,7 +919,7 @@ class ModeTabState extends State<ModeTab> {
   // --- v1.8 sidebar filtered views ---
 
   /// v1.8 sidebar 识别引擎页：模式选择 + 语言 + 模型/ASR 相关
-  /// 不包含 hotkey（在 shortcuts_page）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
+  /// 不包含 hotkey（在 general_tab）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
   /// Simple：模式 + 语言 + 当前模型卡；Advanced：加 offline 模型列表 + streaming/punct。
   /// 视觉上分两区：顶部"工作模式"（模式选择+hints）+ 下方"配置"（语言/模型 双列卡）。
   Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode, bool isTranslation) {

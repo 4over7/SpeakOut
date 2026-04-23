@@ -8,7 +8,6 @@ import 'pages/developer_page.dart';
 import 'pages/general_pages.dart';
 import 'pages/overview_page.dart';
 import 'pages/recognition_engine_page.dart';
-import 'pages/shortcuts_page.dart';
 import 'pages/superpower_pages.dart';
 import 'pages/vocab_page.dart';
 import 'sidebar_item.dart';
@@ -61,20 +60,8 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
             id: 'general',
             label: loc.tabGeneral,
             icon: CupertinoIcons.settings,
-            builder: (_) => GeneralPage(),
-          ),
-          SidebarEntry(
-            id: 'shortcuts',
-            label: loc.sidebarShortcuts,
-            icon: CupertinoIcons.keyboard,
             hasAdvanced: true,
-            builder: (_) => ShortcutsPage(),
-          ),
-          SidebarEntry(
-            id: 'permissions',
-            label: loc.sidebarPermissions,
-            icon: CupertinoIcons.lock_shield,
-            builder: (_) => PermissionsPage(),
+            builder: (_) => GeneralPage(),
           ),
         ],
       ),
