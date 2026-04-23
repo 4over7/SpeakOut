@@ -211,6 +211,12 @@ class UpdateService {
     }
   }
 
+  /// Helper 日志路径，用户可在出问题时查
+  static String get helperLogPath {
+    final home = Platform.environment['HOME'] ?? '/tmp';
+    return '$home/Library/Logs/speakout-updater.log';
+  }
+
   /// Write the update helper script and return its path
   String _writeHelperScript() {
     // Get the current app's bundle path
@@ -219,56 +225,112 @@ class UpdateService {
     final appBundle = File(appPath).parent.parent.parent.path;
     final appName = appBundle.split('/').last; // e.g. "子曰 SpeakOut.app"
     final installDir = File(appBundle).parent.path; // e.g. "/Applications"
+    final logPath = helperLogPath;
 
+    // 关键修复（v1.8.2）：
+    // - 用 hdiutil -plist 输出，从 `<string>/Volumes/...</string>` 直接 grep 出 mount-point
+    //   （旧版 awk '{print $NF}' 在 mount point 含空格如 "/Volumes/SpeakOut 1" 时取错值）
+    // - 启动前先 detach 所有 /Volumes/SpeakOut* 避免占用导致系统重命名带空格
+    // - 全程详细日志写到 ~/Library/Logs/speakout-updater.log，方便排错
+    // - mount 兜底：grep 失败时从 mount 命令找新增的挂载点
     final script = '''#!/bin/bash
 # SpeakOut Auto-Update Helper
+
+LOG="$logPath"
+mkdir -p "\$(dirname "\$LOG")"
+exec >> "\$LOG" 2>&1
+
+echo ""
+echo "=========================================="
+echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper start"
+echo "DMG:  $_dmgPath"
+echo "App:  $installDir/$appName"
+echo "=========================================="
+
 # Wait for the app to exit
 sleep 2
 
-# Mount the DMG (suppress any UI)
-MOUNT_POINT=\$(hdiutil attach "$_dmgPath" -nobrowse -noverify -noautoopen 2>/dev/null | grep "/Volumes/" | awk '{print \$NF}')
+# Pre-cleanup: detach any existing SpeakOut volumes
+# 否则 hdiutil 会自动起名 "SpeakOut 1"、"SpeakOut 2"
+for mp in /Volumes/SpeakOut*; do
+  if [ -d "\$mp" ]; then
+    echo "  pre-detach: \$mp"
+    hdiutil detach "\$mp" -force 2>&1 || true
+  fi
+done
 
-if [ -z "\$MOUNT_POINT" ]; then
-  # Try reading the mount point differently (multi-word volume names)
-  MOUNT_POINT=\$(hdiutil attach "$_dmgPath" -nobrowse -noverify -noautoopen 2>/dev/null | tail -1 | sed 's/.*\\(\\/Volumes\\/.*\\)/\\1/')
+# Attach DMG with -plist for reliable parsing
+echo ">> hdiutil attach -plist"
+ATTACH_PLIST=\$(hdiutil attach "$_dmgPath" -plist -nobrowse -noverify -noautoopen 2>&1)
+ATTACH_RC=\$?
+echo "  exit=\$ATTACH_RC"
+
+if [ \$ATTACH_RC -ne 0 ]; then
+  echo "  hdiutil attach failed:"
+  echo "\$ATTACH_PLIST"
+  echo "<< fallback: open DMG for manual install"
+  open "$_dmgPath"
+  exit 1
 fi
 
+# Parse mount point from plist (主：从 <string>/Volumes/...</string> 直接 grep)
+# 这种方式天然支持空格、unicode，不依赖列/字段分隔
+MOUNT_POINT=\$(echo "\$ATTACH_PLIST" | grep -o '<string>/Volumes/[^<]*</string>' | head -1 | sed -E 's|<string>(.*)</string>|\\1|')
+
+# Fallback: 从 `mount` 命令找新挂载的 SpeakOut volume
 if [ -z "\$MOUNT_POINT" ]; then
-  echo "Failed to mount DMG"
-  # Fallback: open DMG for manual install
+  MOUNT_POINT=\$(mount | grep -E 'on /Volumes/SpeakOut' | tail -1 | sed -E 's|.*on (/Volumes/SpeakOut[^(]*) \\(.*|\\1|' | sed -E 's/[[:space:]]+\$//')
+fi
+
+echo "  mount-point: '\$MOUNT_POINT'"
+
+if [ -z "\$MOUNT_POINT" ] || [ ! -d "\$MOUNT_POINT" ]; then
+  echo "  could not determine mount point, fallback to manual"
   open "$_dmgPath"
   exit 1
 fi
 
 # Find the .app in the mounted volume
 APP_IN_DMG=\$(find "\$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit)
+echo ">> find .app: '\$APP_IN_DMG'"
 
 if [ -z "\$APP_IN_DMG" ]; then
-  echo "No .app found in DMG"
-  hdiutil detach "\$MOUNT_POINT" -quiet
+  echo "  no .app in DMG, fallback to manual"
+  hdiutil detach "\$MOUNT_POINT" -force 2>&1 || true
   open "$_dmgPath"
   exit 1
 fi
 
 # Remove old app and copy new one
+echo ">> replacing $installDir/$appName"
 rm -rf "$installDir/$appName"
 cp -R "\$APP_IN_DMG" "$installDir/"
+CP_RC=\$?
+echo "  cp exit=\$CP_RC"
 
 # Unmount DMG
-hdiutil detach "\$MOUNT_POINT" -quiet
+hdiutil detach "\$MOUNT_POINT" -force 2>&1 || true
+
+if [ \$CP_RC -ne 0 ]; then
+  echo "  cp failed, fallback to manual"
+  open "$_dmgPath"
+  exit 1
+fi
 
 # Clean up
 rm -f "$_dmgPath"
 rm -f "$_helperPath"
 
 # Relaunch
+echo ">> relaunch"
 open "$installDir/$appName"
+echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
 ''';
 
     File(_helperPath).writeAsStringSync(script);
     // Make executable
     Process.runSync('chmod', ['+x', _helperPath]);
-    AppLog.d('UpdateService: helper script written to $_helperPath');
+    AppLog.d('UpdateService: helper script written to $_helperPath, log=$logPath');
     return _helperPath;
   }
 

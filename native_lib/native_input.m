@@ -1715,11 +1715,33 @@ void launch_updater(const char *scriptPath) {
     NSTask *task = [[NSTask alloc] init];
     task.launchPath = @"/bin/bash";
     task.arguments = @[path];
-    task.standardOutput = [NSFileHandle fileHandleWithNullDevice];
-    task.standardError = [NSFileHandle fileHandleWithNullDevice];
+
+    // 把启动期 stdout/stderr 也写到日志，方便排查"helper 没跑起来"的情况
+    // （脚本内部本身用 exec >> $LOG 2>&1 接管了输出，这里只兜底启动阶段）
+    NSString *home = NSHomeDirectory();
+    NSString *logDir = [home stringByAppendingPathComponent:@"Library/Logs"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:logDir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    NSString *logPath = [logDir stringByAppendingPathComponent:@"speakout-updater.log"];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:logPath]) {
+      [[NSFileManager defaultManager] createFileAtPath:logPath contents:nil attributes:nil];
+    }
+    NSFileHandle *logFh = [NSFileHandle fileHandleForWritingAtPath:logPath];
+    if (logFh) {
+      [logFh seekToEndOfFile];
+      task.standardOutput = logFh;
+      task.standardError = logFh;
+    } else {
+      task.standardOutput = [NSFileHandle fileHandleWithNullDevice];
+      task.standardError = [NSFileHandle fileHandleWithNullDevice];
+    }
+
     @try {
       [task launch];
-      log_to_file("launch_updater: launched %s (pid=%d)", scriptPath, task.processIdentifier);
+      log_to_file("launch_updater: launched %s (pid=%d, log=%s)",
+                  scriptPath, task.processIdentifier, logPath.UTF8String);
     } @catch (NSException *e) {
       log_to_file("launch_updater: failed to launch %s: %s", scriptPath, e.reason.UTF8String);
     }

@@ -1,5 +1,18 @@
 # SpeakOut Version History
 
+## [1.8.2] - 2026-04-23
+
+### 自动更新修复
+- **修复「安装并重启」后弹出 DMG 让手动拖的 bug** — root cause: helper 脚本用 `awk '{print $NF}'` 解析 hdiutil 挂载点，遇到带空格的 mount point（如 `/Volumes/SpeakOut 1`，发生在用户已经手动开过 DMG 时）只取到 `"1"`，找不到 .app，触发 fallback 弹 DMG
+- **新逻辑**：
+  - 用 `hdiutil -plist` 输出，从 `<string>/Volumes/...</string>` 直接 grep（天然支持空格/unicode）
+  - 启动前先 detach 所有 `/Volumes/SpeakOut*` 避免占用导致系统重命名
+  - mount 命令兜底解析
+  - 全程详细日志写到 `~/Library/Logs/speakout-updater.log`，下次出问题直接看日志定位
+- **NSTask 输出**也改写到日志（之前 /dev/null，启动期失败完全看不见）
+
+> ⚠️ 老用户（v1.8.0/1.8.1）首次升级到 v1.8.2 仍可能触发 bug（修复在新版的代码里）。如果点「安装并重启」后弹出 DMG 窗口，请手动把 SpeakOut 拖到 Applications 完成。**升到 v1.8.2 之后，下次再升级就稳了。**
+
 ## [1.8.1] - 2026-04-23
 
 ### 自动更新
