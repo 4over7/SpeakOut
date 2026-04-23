@@ -1436,6 +1436,42 @@ abstract class AppLocalizations {
   /// **'Up to date'**
   String get updateUpToDate;
 
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Update'**
+  String get updateDownload;
+
+  /// No description provided for @updateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {pct}%'**
+  String updateDownloading(Object pct);
+
+  /// No description provided for @updateInstallRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Install & Restart'**
+  String get updateInstallRestart;
+
+  /// No description provided for @updateInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing...'**
+  String get updateInstalling;
+
+  /// No description provided for @updateRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get updateRetry;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get updateFailed;
+
   /// No description provided for @llmRewrite.
   ///
   /// In en, this message translates to:

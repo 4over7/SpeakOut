@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../config/distribution.dart';
+import '../../../../engine/core_engine.dart';
 import '../../../../services/update_service.dart';
 import '../../../theme.dart';
 import '../../../widgets/settings_widgets.dart';
@@ -27,10 +30,31 @@ class _OverviewPageState extends State<OverviewPage> {
   bool _isCheckingUpdate = false;
   String? _updateResult;
 
+  // Update state mirrored from UpdateService
+  UpdateState _updateState = UpdateState.idle;
+  double _downloadProgress = 0.0;
+  StreamSubscription? _updateStateSub;
+  StreamSubscription? _updateProgressSub;
+
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _updateState = UpdateService().state;
+    _downloadProgress = UpdateService().lastProgress;
+    _updateStateSub = UpdateService().stateChanges.listen((s) {
+      if (mounted) setState(() => _updateState = s);
+    });
+    _updateProgressSub = UpdateService().downloadProgress.listen((p) {
+      if (mounted) setState(() => _downloadProgress = p);
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateStateSub?.cancel();
+    _updateProgressSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadVersion() async {
@@ -56,6 +80,139 @@ class _OverviewPageState extends State<OverviewPage> {
       if (mounted) setState(() => _updateResult = loc.updateUpToDate);
     }
     if (mounted) setState(() => _isCheckingUpdate = false);
+  }
+
+  void _handleUpdateTap() {
+    final svc = UpdateService();
+    if (svc.canAutoUpdate) {
+      svc.downloadUpdate();
+    } else {
+      final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+      launchUrl(Uri.parse(url));
+    }
+  }
+
+  void _handleInstallAndRestart() {
+    final svc = UpdateService();
+    final scriptPath = svc.prepareInstall();
+    if (scriptPath.isEmpty) return;
+    CoreEngine().nativeInput?.launchUpdater(scriptPath);
+    Future.delayed(const Duration(milliseconds: 500), () => exit(0));
+  }
+
+  /// 状态化更新按钮：
+  /// - 无新版：刷新图标按钮（手动检查）
+  /// - 发现新版：橙色 pill "下载更新 vX.Y.Z"
+  /// - 下载中：蓝色 pill + 进度条
+  /// - 下载完成：绿色 pill "安装并重启"
+  /// - 安装中：绿色 pill "正在安装..."
+  /// - 失败：橙色 pill "重试"
+  Widget _buildUpdatePill(AppLocalizations loc) {
+    final svc = UpdateService();
+    final accent = AppTheme.getAccent(context);
+    final hasUpdate = svc.hasUpdate && svc.latestVersion != null;
+    final version = svc.latestVersion ?? '';
+
+    // 无新版：刷新按钮 + 可选的"已是最新"反馈
+    if (!hasUpdate) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        GestureDetector(
+          onTap: _isCheckingUpdate ? null : () => _checkUpdate(loc),
+          child: Tooltip(
+            message: loc.updateAction,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accent.withValues(alpha: 0.2)),
+              ),
+              child: _isCheckingUpdate
+                  ? const SizedBox(width: 12, height: 12, child: CupertinoActivityIndicator())
+                  : MacosIcon(CupertinoIcons.arrow_clockwise, size: 12, color: AppTheme.getTextSecondary(context)),
+            ),
+          ),
+        ),
+        if (_updateResult != null) ...[
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(_updateResult!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: MacosColors.systemGrayColor)),
+          ),
+        ],
+      ]);
+    }
+
+    // 有新版：状态化 pill
+    String label;
+    Color bgColor;
+    IconData icon;
+    VoidCallback? onTap;
+    final pct = (_downloadProgress * 100).toInt();
+
+    switch (_updateState) {
+      case UpdateState.downloading:
+        label = loc.updateDownloading(pct);
+        bgColor = MacosColors.systemBlueColor;
+        icon = CupertinoIcons.arrow_down_circle;
+        onTap = null;
+      case UpdateState.readyToInstall:
+        label = loc.updateInstallRestart;
+        bgColor = MacosColors.systemGreenColor;
+        icon = CupertinoIcons.checkmark_circle_fill;
+        onTap = _handleInstallAndRestart;
+      case UpdateState.installing:
+        label = loc.updateInstalling;
+        bgColor = MacosColors.systemGreenColor;
+        icon = CupertinoIcons.arrow_2_circlepath;
+        onTap = null;
+      case UpdateState.failed:
+        label = loc.updateRetry;
+        bgColor = MacosColors.systemOrangeColor;
+        icon = CupertinoIcons.arrow_clockwise;
+        onTap = _handleUpdateTap;
+      default:
+        label = '${loc.updateDownload} v$version';
+        bgColor = MacosColors.systemOrangeColor;
+        icon = CupertinoIcons.arrow_down_circle_fill;
+        onTap = _handleUpdateTap;
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: Colors.white),
+            const SizedBox(width: 5),
+            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+            if (_updateState == UpdateState.downloading) ...[
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 50,
+                height: 4,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: _downloadProgress,
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -228,42 +385,10 @@ class _OverviewPageState extends State<OverviewPage> {
                         ),
                       ),
                     ),
-                    // Check update
+                    // Check update / 状态化更新按钮
                     if (Distribution.supportsUpdateCheck) ...[
                       const SizedBox(width: 6),
-                      GestureDetector(
-                        onTap: _isCheckingUpdate ? null : () => _checkUpdate(loc),
-                        child: Tooltip(
-                          message: loc.updateAction,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: accent.withValues(alpha: 0.2)),
-                            ),
-                            child: _isCheckingUpdate
-                                ? const SizedBox(width: 12, height: 12, child: CupertinoActivityIndicator())
-                                : MacosIcon(CupertinoIcons.arrow_clockwise, size: 12, color: AppTheme.getTextSecondary(context)),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (_updateResult != null) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _updateResult!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _updateResult == loc.updateUpToDate
-                                ? MacosColors.systemGrayColor
-                                : MacosColors.systemOrangeColor,
-                          ),
-                        ),
-                      ),
+                      _buildUpdatePill(loc),
                     ],
                   ],
                 ),

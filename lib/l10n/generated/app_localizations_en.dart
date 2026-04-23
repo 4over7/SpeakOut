@@ -736,6 +736,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateUpToDate => 'Up to date';
 
   @override
+  String get updateDownload => 'Download Update';
+
+  @override
+  String updateDownloading(Object pct) {
+    return 'Downloading $pct%';
+  }
+
+  @override
+  String get updateInstallRestart => 'Install & Restart';
+
+  @override
+  String get updateInstalling => 'Installing...';
+
+  @override
+  String get updateRetry => 'Retry';
+
+  @override
+  String get updateFailed => 'Download failed';
+
+  @override
   String get llmRewrite => 'LLM Rewrite';
 
   @override

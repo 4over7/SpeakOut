@@ -704,6 +704,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateUpToDate => '已是最新版本';
 
   @override
+  String get updateDownload => '下载更新';
+
+  @override
+  String updateDownloading(Object pct) {
+    return '下载中 $pct%';
+  }
+
+  @override
+  String get updateInstallRestart => '安装并重启';
+
+  @override
+  String get updateInstalling => '正在安装...';
+
+  @override
+  String get updateRetry => '重试';
+
+  @override
+  String get updateFailed => '下载失败';
+
+  @override
   String get llmRewrite => 'LLM 智能改写';
 
   @override

@@ -40,7 +40,7 @@ app.get('/version', async (c) => {
 
     return c.json({
         version: '1.8.0', // @speakout-version
-        build: 229,
+        build: 230,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
         dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.8.0/SpeakOut.dmg',
         release_notes: '',
