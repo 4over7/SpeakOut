@@ -1994,6 +1994,96 @@ abstract class AppLocalizations {
   /// **'Exported to {path}'**
   String aboutSystemLogSuccess(String path);
 
+  /// No description provided for @diaryBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap shortcut to start, release to auto-save — no flow break'**
+  String get diaryBullet1;
+
+  /// No description provided for @diaryBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes named by date, saved as Markdown files for easy search'**
+  String get diaryBullet2;
+
+  /// No description provided for @diaryBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Pure local storage, syncs with Obsidian / Notion / iCloud'**
+  String get diaryBullet3;
+
+  /// No description provided for @organizeBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Select messy text, press key, LLM restructures it'**
+  String get organizeBullet1;
+
+  /// No description provided for @organizeBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Result appended below original, never overwrites'**
+  String get organizeBullet2;
+
+  /// No description provided for @organizeBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the same LLM configured in AI Plus — no duplicate setup'**
+  String get organizeBullet3;
+
+  /// No description provided for @translateBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Press key to record, auto-translate to target language'**
+  String get translateBullet1;
+
+  /// No description provided for @translateBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Result injected into current text field, no copy-paste needed'**
+  String get translateBullet2;
+
+  /// No description provided for @translateBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Supports 11 languages incl. Chinese, English, Japanese, Korean'**
+  String get translateBullet3;
+
+  /// No description provided for @correctionBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Select corrected text, submit once — ASR learns your wording'**
+  String get correctionBullet1;
+
+  /// No description provided for @correctionBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM extracts word-level diffs, auto-adds to personal vocab'**
+  String get correctionBullet2;
+
+  /// No description provided for @correctionBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'No manual dictionary editing — recognition improves over time'**
+  String get correctionBullet3;
+
+  /// No description provided for @aiReportBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot + voice description, one-tap to AI coding assistants'**
+  String get aiReportBullet1;
+
+  /// No description provided for @aiReportBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind multiple target windows (Claude Code / Cursor / ChatGPT)'**
+  String get aiReportBullet2;
+
+  /// No description provided for @aiReportBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold base key + digit to switch target window quickly'**
+  String get aiReportBullet3;
+
   /// No description provided for @aboutSystemLogFailed.
   ///
   /// In en, this message translates to:

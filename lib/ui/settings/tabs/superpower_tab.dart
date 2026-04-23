@@ -95,100 +95,96 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // Key capture（使用热键 modal）
   // ---------------------------------------------------------------------------
 
-  /// enabled 状态下的紧凑 header：小 icon + 标题 + 使用说明
-  /// 作为配置项上方的视觉锚点，避免 enabled 页面只有稀疏 rows
-  /// 旧 5-tab (viewFilter=all) 下不显示（grid 空间小）
-  Widget _buildEnabledHeader({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String hint,
-  }) {
-    if (widget.viewFilter == SuperpowerView.all) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: MacosIcon(icon, size: 18, color: iconColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.getTextPrimary(context),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hint,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.getTextSecondary(context),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// disabled 状态下的 hero 视觉：大 icon + 标题 + 说明。
-  /// 旧 5-tab (viewFilter=all) 下保持短 desc（grid 空间小）。
-  Widget _buildDisabledHero({
+  /// 统一 hero：icon + 标题 + 说明，enabled/disabled 下位置和内容都不变
+  /// disabled 下额外显示 bullets（功能介绍，引导用户尝试）
+  /// 旧 5-tab (viewFilter=all) 下保持短 desc（grid 空间小）
+  Widget _buildHeroHeader({
     required IconData icon,
     required Color iconColor,
     required String title,
     required String desc,
+    List<String> bullets = const [],
+    bool showBullets = false,
   }) {
     if (widget.viewFilter == SuperpowerView.all) {
-      return Text(desc, style: AppTheme.caption(context));
+      return Text(desc, style: AppTheme.caption(context), maxLines: 2, overflow: TextOverflow.ellipsis);
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: MacosIcon(icon, size: 32, color: iconColor),
+          // Icon + title + desc
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: MacosIcon(icon, size: 28, color: iconColor),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.getTextPrimary(context),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      desc,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.getTextSecondary(context),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.getTextPrimary(context),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            desc,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.getTextSecondary(context),
-              height: 1.6,
-            ),
-          ),
+          // Bullets（仅 disabled 显示，引导用户）
+          if (showBullets && bullets.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            for (final b in bullets)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: MacosIcon(
+                        CupertinoIcons.checkmark_circle_fill,
+                        size: 13,
+                        color: iconColor.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        b,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.getTextPrimary(context).withValues(alpha: 0.85),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -467,13 +463,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ),
       padding: const EdgeInsets.all(12),
       children: [
+        _buildHeroHeader(
+          icon: CupertinoIcons.book,
+          iconColor: AppTheme.triggerNote,
+          title: loc.diaryMode,
+          desc: loc.diaryDesc,
+          bullets: [loc.diaryBullet1, loc.diaryBullet2, loc.diaryBullet3],
+          showBullets: !config.diaryEnabled,
+        ),
         if (config.diaryEnabled) ...[
-          _buildEnabledHeader(
-            icon: CupertinoIcons.book,
-            iconColor: AppTheme.triggerNote,
-            title: loc.diaryMode,
-            hint: loc.diaryDesc,
-          ),
+          const SizedBox(height: 12),
           // Directory permission warning
           if (_diaryDirError == null || _diaryDirError!.isNotEmpty)
             Padding(
@@ -577,13 +576,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               ],
             ),
           ),
-        ] else
-          _buildDisabledHero(
-            icon: CupertinoIcons.book,
-            iconColor: AppTheme.triggerNote,
-            title: loc.diaryMode,
-            desc: loc.diaryDesc,
-          ),
+        ],
       ],
     );
   }
@@ -614,13 +607,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ),
       padding: const EdgeInsets.all(12),
       children: [
+        _buildHeroHeader(
+          icon: CupertinoIcons.text_alignleft,
+          iconColor: AppTheme.triggerOrganize,
+          title: loc.organizeEnabled,
+          desc: loc.organizeDesc,
+          bullets: [loc.organizeBullet1, loc.organizeBullet2, loc.organizeBullet3],
+          showBullets: !config.organizeEnabled,
+        ),
         if (config.organizeEnabled) ...[
-          _buildEnabledHeader(
-            icon: CupertinoIcons.text_alignleft,
-            iconColor: AppTheme.triggerOrganize,
-            title: loc.organizeEnabled,
-            hint: loc.organizeDesc,
-          ),
+          const SizedBox(height: 12),
           _compactRow(
             loc.organizeHotkey,
             _hotkeyBadge(
@@ -721,13 +717,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               ],
             ),
           ],
-        ] else
-          _buildDisabledHero(
-            icon: CupertinoIcons.text_alignleft,
-            iconColor: AppTheme.triggerOrganize,
-            title: loc.organizeEnabled,
-            desc: loc.organizeDesc,
-          ),
+        ],
       ],
     );
   }
@@ -758,13 +748,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ),
       padding: const EdgeInsets.all(12),
       children: [
+        _buildHeroHeader(
+          icon: CupertinoIcons.globe,
+          iconColor: AppTheme.triggerTranslate,
+          title: loc.quickTranslate,
+          desc: loc.quickTranslateDesc,
+          bullets: [loc.translateBullet1, loc.translateBullet2, loc.translateBullet3],
+          showBullets: !config.translateEnabled,
+        ),
         if (config.translateEnabled) ...[
-          _buildEnabledHeader(
-            icon: CupertinoIcons.globe,
-            iconColor: AppTheme.triggerTranslate,
-            title: loc.quickTranslate,
-            hint: loc.quickTranslateDesc,
-          ),
+          const SizedBox(height: 12),
           _compactRow(
             loc.translateHotkey,
             _hotkeyBadge(
@@ -824,13 +817,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               ],
             ),
           ],
-        ] else
-          _buildDisabledHero(
-            icon: CupertinoIcons.globe,
-            iconColor: AppTheme.triggerTranslate,
-            title: loc.quickTranslate,
-            desc: loc.quickTranslateDesc,
-          ),
+        ],
       ],
     );
   }
@@ -864,13 +851,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ),
       padding: const EdgeInsets.all(12),
       children: [
+        _buildHeroHeader(
+          icon: CupertinoIcons.checkmark_seal,
+          iconColor: AppTheme.triggerCorrect,
+          title: loc.sidebarCorrection,
+          desc: loc.correctionDesc,
+          bullets: [loc.correctionBullet1, loc.correctionBullet2, loc.correctionBullet3],
+          showBullets: !config.correctionEnabled,
+        ),
         if (config.correctionEnabled) ...[
-          _buildEnabledHeader(
-            icon: CupertinoIcons.checkmark_seal,
-            iconColor: AppTheme.triggerCorrect,
-            title: loc.sidebarCorrection,
-            hint: loc.correctionDesc,
-          ),
+          const SizedBox(height: 12),
           _compactRow(
             loc.correctionHotkey,
             _hotkeyBadge(
@@ -926,13 +916,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               ),
             ],
           ),
-        ] else
-          _buildDisabledHero(
-            icon: CupertinoIcons.checkmark_seal,
-            iconColor: AppTheme.triggerCorrect,
-            title: loc.sidebarCorrection,
-            desc: loc.correctionDesc,
-          ),
+        ],
       ],
     );
   }
@@ -960,13 +944,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       ),
       padding: const EdgeInsets.all(12),
       children: [
+        _buildHeroHeader(
+          icon: CupertinoIcons.camera_viewfinder,
+          iconColor: AppTheme.triggerAiReport,
+          title: loc.sidebarAiReport,
+          desc: loc.aiReportDescLong,
+          bullets: [loc.aiReportBullet1, loc.aiReportBullet2, loc.aiReportBullet3],
+          showBullets: !config.aiReportEnabled,
+        ),
         if (config.aiReportEnabled) ...[
-          _buildEnabledHeader(
-            icon: CupertinoIcons.camera_viewfinder,
-            iconColor: AppTheme.triggerAiReport,
-            title: loc.sidebarAiReport,
-            hint: loc.aiReportDescLong,
-          ),
+          const SizedBox(height: 12),
           // 基础按键
           _compactRow(
             loc.aiReportBaseKey,
@@ -1020,13 +1007,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
             loc.aiReportDescShort,
             style: AppTheme.caption(context).copyWith(fontSize: 10),
           ),
-        ] else
-          _buildDisabledHero(
-            icon: CupertinoIcons.camera_viewfinder,
-            iconColor: AppTheme.triggerAiReport,
-            title: loc.sidebarAiReport,
-            desc: loc.aiReportDescLong,
-          ),
+        ],
       ],
     );
   }

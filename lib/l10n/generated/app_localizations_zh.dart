@@ -994,6 +994,51 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get diaryBullet1 => '按快捷键一键开始，松开自动保存，不打断思考流';
+
+  @override
+  String get diaryBullet2 => '笔记按日期命名，生成 Markdown 文件，便于检索';
+
+  @override
+  String get diaryBullet3 => '纯本地存储，可与 Obsidian / Notion / iCloud 等同步';
+
+  @override
+  String get organizeBullet1 => '选中一段凌乱的文字后按键，LLM 重新组织结构';
+
+  @override
+  String get organizeBullet2 => '结果追加在原文下一行，不覆盖原稿';
+
+  @override
+  String get organizeBullet3 => '使用「AI Plus」配置的 LLM 服务，无需重复填密钥';
+
+  @override
+  String get translateBullet1 => '按键录音，语音识别后自动翻译到目标语言';
+
+  @override
+  String get translateBullet2 => '结果直接注入当前输入框，无需复制粘贴';
+
+  @override
+  String get translateBullet3 => '支持中文、英文、日文、韩文等 11 种语言互译';
+
+  @override
+  String get correctionBullet1 => '选中修正后的文字一键提交，ASR 学习你的用词习惯';
+
+  @override
+  String get correctionBullet2 => 'LLM 提取词级差异，自动加入专属词典';
+
+  @override
+  String get correctionBullet3 => '无需手动编辑词典，日常使用中持续优化识别';
+
+  @override
+  String get aiReportBullet1 => '截屏 + 语音描述，一键发送到 AI 编程助手';
+
+  @override
+  String get aiReportBullet2 => '支持绑定多个目标窗口（Claude Code / Cursor / ChatGPT）';
+
+  @override
+  String get aiReportBullet3 => '按基础键 + 数字键快速切换目标窗口';
+
+  @override
   String aboutSystemLogFailed(String err) {
     return '导出失败：$err';
   }

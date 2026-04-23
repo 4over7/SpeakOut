@@ -377,6 +377,26 @@
   "@aboutSystemLogSuccess": {
     "placeholders": {"path": {"type": "String"}}
   },
+  "diaryBullet1": "Tap shortcut to start, release to auto-save — no flow break",
+  "diaryBullet2": "Notes named by date, saved as Markdown files for easy search",
+  "diaryBullet3": "Pure local storage, syncs with Obsidian / Notion / iCloud",
+
+  "organizeBullet1": "Select messy text, press key, LLM restructures it",
+  "organizeBullet2": "Result appended below original, never overwrites",
+  "organizeBullet3": "Uses the same LLM configured in AI Plus — no duplicate setup",
+
+  "translateBullet1": "Press key to record, auto-translate to target language",
+  "translateBullet2": "Result injected into current text field, no copy-paste needed",
+  "translateBullet3": "Supports 11 languages incl. Chinese, English, Japanese, Korean",
+
+  "correctionBullet1": "Select corrected text, submit once — ASR learns your wording",
+  "correctionBullet2": "LLM extracts word-level diffs, auto-adds to personal vocab",
+  "correctionBullet3": "No manual dictionary editing — recognition improves over time",
+
+  "aiReportBullet1": "Screenshot + voice description, one-tap to AI coding assistants",
+  "aiReportBullet2": "Bind multiple target windows (Claude Code / Cursor / ChatGPT)",
+  "aiReportBullet3": "Hold base key + digit to switch target window quickly",
+
   "aboutSystemLogFailed": "Export failed: {err}",
   "@aboutSystemLogFailed": {
     "placeholders": {"err": {"type": "String"}}

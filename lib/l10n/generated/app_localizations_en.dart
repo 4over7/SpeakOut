@@ -1039,6 +1039,66 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get diaryBullet1 =>
+      'Tap shortcut to start, release to auto-save — no flow break';
+
+  @override
+  String get diaryBullet2 =>
+      'Notes named by date, saved as Markdown files for easy search';
+
+  @override
+  String get diaryBullet3 =>
+      'Pure local storage, syncs with Obsidian / Notion / iCloud';
+
+  @override
+  String get organizeBullet1 =>
+      'Select messy text, press key, LLM restructures it';
+
+  @override
+  String get organizeBullet2 =>
+      'Result appended below original, never overwrites';
+
+  @override
+  String get organizeBullet3 =>
+      'Uses the same LLM configured in AI Plus — no duplicate setup';
+
+  @override
+  String get translateBullet1 =>
+      'Press key to record, auto-translate to target language';
+
+  @override
+  String get translateBullet2 =>
+      'Result injected into current text field, no copy-paste needed';
+
+  @override
+  String get translateBullet3 =>
+      'Supports 11 languages incl. Chinese, English, Japanese, Korean';
+
+  @override
+  String get correctionBullet1 =>
+      'Select corrected text, submit once — ASR learns your wording';
+
+  @override
+  String get correctionBullet2 =>
+      'LLM extracts word-level diffs, auto-adds to personal vocab';
+
+  @override
+  String get correctionBullet3 =>
+      'No manual dictionary editing — recognition improves over time';
+
+  @override
+  String get aiReportBullet1 =>
+      'Screenshot + voice description, one-tap to AI coding assistants';
+
+  @override
+  String get aiReportBullet2 =>
+      'Bind multiple target windows (Claude Code / Cursor / ChatGPT)';
+
+  @override
+  String get aiReportBullet3 =>
+      'Hold base key + digit to switch target window quickly';
+
+  @override
   String aboutSystemLogFailed(String err) {
     return 'Export failed: $err';
   }
