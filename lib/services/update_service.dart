@@ -193,7 +193,18 @@ class UpdateService {
     }
   }
 
-  /// Download the DMG update file
+  /// Download the DMG update file，支持断点续传
+  ///
+  /// 断点续传原理：
+  /// - 已有部分文件 → 发 HTTP `Range: bytes=N-`，服务器返 206 + 从 N 开始的内容
+  /// - Azure Blob（GitHub Release 实际 CDN）原生支持 Range 请求
+  /// - append 模式打开文件继续写
+  ///
+  /// 防损坏：
+  /// - 下载完后用 Content-Range/Content-Length 校验总大小
+  /// - 总大小不匹配 → 删掉重下
+  /// - HTTPS 兜底传输完整性
+  /// - hdiutil attach 时 macOS 自动做 DMG 头部 CRC 校验
   Future<bool> downloadUpdate() async {
     // 防并发：已经在下载中直接 return
     if (_state == UpdateState.downloading) {
@@ -217,29 +228,68 @@ class UpdateService {
     }
 
     _setState(UpdateState.downloading);
-    _lastProgress = 0;
-    _progressController.add(0);
 
+    // 计算断点位置（partial file 已有字节数）
+    final file = File(_dmgPath);
+    var resumeFrom = 0;
+    if (file.existsSync()) {
+      resumeFrom = file.lengthSync();
+      AppLog.d('UpdateService: resuming from byte $resumeFrom');
+    }
+
+    final client = http.Client();
+    IOSink? sink;
     try {
-      // GitHub releases URL 返回 302 重定向，必须 followRedirects
-      final client = http.Client();
       final request = http.Request('GET', Uri.parse(_dmgAssetUrl!));
       request.followRedirects = true;
       request.maxRedirects = 5;
+      if (resumeFrom > 0) {
+        request.headers['Range'] = 'bytes=$resumeFrom-';
+      }
+
       final response = await client.send(request);
 
-      if (response.statusCode != 200) {
+      // 200 = 完整下载；206 = 断点续传成功
+      final isPartial = response.statusCode == 206;
+      if (response.statusCode != 200 && response.statusCode != 206) {
+        // 416 Range Not Satisfiable = partial file 已经等于或超过全长，删掉重来
+        if (response.statusCode == 416) {
+          AppLog.d('UpdateService: HTTP 416 (Range Not Satisfiable), partial file stale, wipe + retry');
+          try { file.deleteSync(); } catch (_) {}
+          errorMessage = 'Resume failed (file stale), please retry';
+          _setState(UpdateState.failed);
+          client.close();
+          return false;
+        }
         errorMessage = 'Download failed: HTTP ${response.statusCode}';
-        AppLog.d('UpdateService: download failed: HTTP ${response.statusCode} from $downloadUrl');
+        AppLog.d('UpdateService: download failed: HTTP ${response.statusCode} from $_dmgAssetUrl');
         _setState(UpdateState.failed);
         client.close();
         return false;
       }
 
-      final totalBytes = response.contentLength ?? 0;
-      var receivedBytes = 0;
-      final file = File(_dmgPath);
-      final sink = file.openWrite();
+      // 总大小（用于进度）：
+      // - 206: Content-Range: bytes N-M/TOTAL，取 TOTAL
+      // - 200: Content-Length
+      int totalBytes = 0;
+      if (isPartial) {
+        final contentRange = response.headers['content-range'] ?? '';
+        final match = RegExp(r'bytes\s+\d+-\d+/(\d+)').firstMatch(contentRange);
+        if (match != null) {
+          totalBytes = int.tryParse(match.group(1) ?? '') ?? 0;
+        }
+      } else {
+        totalBytes = response.contentLength ?? 0;
+        // 服务器忽略了 Range → 当作完整响应，truncate 现有 partial
+        if (resumeFrom > 0) {
+          AppLog.d('UpdateService: server ignored Range, restart from 0');
+          resumeFrom = 0;
+        }
+      }
+
+      var receivedBytes = resumeFrom;
+      // Partial: 追加；Full: 覆盖
+      sink = file.openWrite(mode: isPartial ? FileMode.append : FileMode.write);
 
       await for (final chunk in response.stream) {
         sink.add(chunk);
@@ -252,17 +302,37 @@ class UpdateService {
 
       await sink.flush();
       await sink.close();
+      sink = null;
       client.close();
 
-      AppLog.d('UpdateService: DMG downloaded to $_dmgPath ($receivedBytes bytes)');
+      // 大小校验：下载完文件大小应等于 totalBytes
+      final finalSize = file.lengthSync();
+      if (totalBytes > 0 && finalSize != totalBytes) {
+        errorMessage = 'Size mismatch: got $finalSize, expected $totalBytes';
+        AppLog.d('UpdateService: $errorMessage (retry to resume)');
+        _setState(UpdateState.failed);
+        return false;
+      }
+      if (finalSize < _minValidDmgBytes) {
+        errorMessage = 'DMG too small: $finalSize bytes';
+        AppLog.d('UpdateService: $errorMessage');
+        try { file.deleteSync(); } catch (_) {}
+        _setState(UpdateState.failed);
+        return false;
+      }
+
+      AppLog.d('UpdateService: DMG ready: $_dmgPath ($finalSize bytes)');
+      _lastProgress = 1.0;
+      _progressController.add(1.0);
       _setState(UpdateState.readyToInstall);
       return true;
     } catch (e) {
       errorMessage = 'Download error: $e';
       AppLog.d('UpdateService: download failed: $e');
+      try { await sink?.close(); } catch (_) {}
+      try { client.close(); } catch (_) {}
       _setState(UpdateState.failed);
-      // Clean up partial download
-      try { File(_dmgPath).deleteSync(); } catch (_) {}
+      // 保留 partial 文件，下次重试可续传
       return false;
     }
   }

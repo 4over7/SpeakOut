@@ -180,7 +180,7 @@ class _OverviewPageState extends State<OverviewPage> {
         onTap = _handleUpdateTap;
     }
 
-    return GestureDetector(
+    final pill = GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -213,6 +213,35 @@ class _OverviewPageState extends State<OverviewPage> {
         ),
       ),
     );
+
+    // failed 状态：pill 旁边显示错误原因截断版 + 鼠标 hover 看完整 errorMessage
+    if (_updateState == UpdateState.failed && svc.errorMessage != null) {
+      final err = svc.errorMessage!;
+      final short = err.length > 48 ? '${err.substring(0, 48)}…' : err;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(message: err, child: pill),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Tooltip(
+              message: err,
+              child: Text(
+                short,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: MacosColors.systemOrangeColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return pill;
   }
 
   @override
