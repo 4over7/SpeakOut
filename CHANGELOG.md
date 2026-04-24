@@ -1,5 +1,17 @@
 # SpeakOut Version History
 
+## [1.8.4] - 2026-04-24
+
+### 自动更新（易用性 + 稳定性大改）
+- **断点续传** — 下载中断（关电脑、断网、app 退出等）后重试会从断点继续下，不再每次从头 53 MB 重下
+  - HTTP `Range: bytes=N-` 请求，206 响应 append 写入
+  - GitHub Release DMG 走 Azure Blob CDN 原生支持 Range
+  - 服务器不认 Range 时自动 fallback 全量
+  - 416 Range Not Satisfiable（partial 文件过期）自动删除重试
+- **下载失败时保留 partial 文件** — 此前失败会 delete partial，浪费已下载的字节；现在保留供下次续传
+- **大小校验** — 下载完对比 `Content-Length`，不一致判失败；文件小于 20 MB 视为损坏自动删除
+- **failed 状态显示错误原因** — 此前只有「重试」按钮不告诉你失败原因。现在 pill 旁边显示错误摘要（HTTP 状态、异常描述），hover 看完整 `errorMessage`
+
 ## [1.8.3] - 2026-04-23
 
 ### 修复
