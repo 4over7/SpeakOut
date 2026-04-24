@@ -214,29 +214,48 @@ class _OverviewPageState extends State<OverviewPage> {
       ),
     );
 
-    // failed 状态：pill 旁边显示错误原因截断版 + 鼠标 hover 看完整 errorMessage
-    if (_updateState == UpdateState.failed && svc.errorMessage != null) {
-      final err = svc.errorMessage!;
-      final short = err.length > 48 ? '${err.substring(0, 48)}…' : err;
+    // failed 状态：pill（重试）+「去下载页」逃生链接 + 错误原因（hover 看完整）
+    if (_updateState == UpdateState.failed) {
+      final err = svc.errorMessage ?? '';
+      final short = err.length > 40 ? '${err.substring(0, 40)}…' : err;
+      final manualUrl = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Tooltip(message: err, child: pill),
+          Tooltip(message: err.isEmpty ? loc.updateFailed : err, child: pill),
           const SizedBox(width: 8),
-          Flexible(
-            child: Tooltip(
-              message: err,
+          // 兜底：手动下载页
+          GestureDetector(
+            onTap: () => launchUrl(Uri.parse(manualUrl)),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
               child: Text(
-                short,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                loc.updateManualDownload,
                 style: TextStyle(
                   fontSize: 11,
-                  color: MacosColors.systemOrangeColor,
+                  color: MacosColors.systemBlueColor,
+                  decoration: TextDecoration.underline,
                 ),
               ),
             ),
           ),
+          if (short.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Tooltip(
+                message: err,
+                child: Text(
+                  short,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: MacosColors.systemOrangeColor,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       );
     }

@@ -279,6 +279,7 @@
   "updateInstalling": "Installing...",
   "updateRetry": "Retry",
   "updateFailed": "Download failed",
+  "updateManualDownload": "Open Download Page",
   "llmRewrite": "LLM Rewrite",
   "aiPolishMatrix": "LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output",
   "tabCloudAccounts": "Cloud Accounts",

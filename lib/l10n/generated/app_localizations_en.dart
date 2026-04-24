@@ -770,6 +770,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateFailed => 'Download failed';
 
   @override
+  String get updateManualDownload => 'Open Download Page';
+
+  @override
   String get llmRewrite => 'LLM Rewrite';
 
   @override

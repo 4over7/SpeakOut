@@ -738,6 +738,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateFailed => '下载失败';
 
   @override
+  String get updateManualDownload => '去下载页';
+
+  @override
   String get llmRewrite => 'LLM 智能改写';
 
   @override

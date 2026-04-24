@@ -239,6 +239,7 @@
   "updateInstalling": "正在安装...",
   "updateRetry": "重试",
   "updateFailed": "下载失败",
+  "updateManualDownload": "去下载页",
   "llmRewrite": "LLM 智能改写",
   "aiPolishMatrix": "LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出",
   "tabCloudAccounts": "云服务账户",

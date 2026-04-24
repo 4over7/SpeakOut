@@ -1496,6 +1496,12 @@ abstract class AppLocalizations {
   /// **'Download failed'**
   String get updateFailed;
 
+  /// No description provided for @updateManualDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Download Page'**
+  String get updateManualDownload;
+
   /// No description provided for @llmRewrite.
   ///
   /// In en, this message translates to:
