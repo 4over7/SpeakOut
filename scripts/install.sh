@@ -7,17 +7,12 @@ DEST_DIR="/Applications"
 DEST_APP="${DEST_DIR}/${APP_NAME}.app"
 SIGN_IDENTITY="Developer ID Application: Lindan Wang (UB9D55S724)"
 
-# Auto-increment build number
-CURRENT_BUILD=$(grep 'version:' pubspec.yaml | sed 's/.*+//')
-NEW_BUILD=$((CURRENT_BUILD + 1))
-sed -i '' "s/+${CURRENT_BUILD}/+${NEW_BUILD}/" pubspec.yaml
-echo "📦 Build number: ${CURRENT_BUILD} → ${NEW_BUILD}"
-
-# Sync version to Gateway
-VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-sed -i '' "s|version: '[^']*', // @speakout-version|version: '${VERSION}', // @speakout-version|" gateway/src/index.js
-sed -i '' "s/build: [0-9]*/build: ${NEW_BUILD}/" gateway/src/index.js
-sed -i '' "s|download/v[0-9.]*/SpeakOut.dmg|download/v${VERSION}/SpeakOut.dmg|" gateway/src/index.js
+# 注意：此脚本仅用于日常开发实测，不升 build 号、不同步 gateway。
+# 发版打包走 ./scripts/create_styled_dmg.sh，那里才做版本号自增 + gateway sync。
+# 原因：install.sh 每次 +1 会让本地 build 超过线上 release，无法复现自动更新流程，
+#      还会污染 git 工作区（每次 install 都留下 pubspec/gateway 修改）。
+VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+echo "📦 Building current version: ${VERSION} (build number NOT auto-incremented)"
 
 # Build
 echo "🔨 Building ${APP_NAME} (Release)..."
