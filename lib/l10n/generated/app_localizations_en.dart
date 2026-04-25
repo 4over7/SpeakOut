@@ -690,6 +690,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vocabEducation => 'Education';
 
   @override
+  String get permissionsGranted => 'Granted';
+
+  @override
+  String get permissionsNotGranted => 'Not Granted';
+
+  @override
   String get permissionsScreenRecording => 'Screen Recording';
 
   @override

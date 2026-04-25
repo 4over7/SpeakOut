@@ -661,6 +661,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vocabEducation => '教育';
 
   @override
+  String get permissionsGranted => '已授权';
+
+  @override
+  String get permissionsNotGranted => '未授权';
+
+  @override
   String get permissionsScreenRecording => '屏幕录制';
 
   @override

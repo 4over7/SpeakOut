@@ -1364,6 +1364,18 @@ abstract class AppLocalizations {
   /// **'Education'**
   String get vocabEducation;
 
+  /// No description provided for @permissionsGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted'**
+  String get permissionsGranted;
+
+  /// No description provided for @permissionsNotGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Granted'**
+  String get permissionsNotGranted;
+
   /// No description provided for @permissionsScreenRecording.
   ///
   /// In en, this message translates to:

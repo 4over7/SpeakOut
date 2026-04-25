@@ -215,6 +215,8 @@
   "vocabLegal": "法律",
   "vocabFinance": "金融",
   "vocabEducation": "教育",
+  "permissionsGranted": "已授权",
+  "permissionsNotGranted": "未授权",
   "permissionsScreenRecording": "屏幕录制",
   "permissionsScreenRecordingDesc": "AI 调试截屏 + 读取其他 App 窗口标题（macOS 10.15+ 必需）",
   "aiReportScreenRecordingWarning": "AI 调试需要屏幕录制权限，否则无法读取窗口标题（绑定的目标窗口只显示 App 名）",

@@ -245,6 +245,8 @@
   "vocabLegal": "Legal",
   "vocabFinance": "Finance",
   "vocabEducation": "Education",
+  "permissionsGranted": "Granted",
+  "permissionsNotGranted": "Not Granted",
   "permissionsScreenRecording": "Screen Recording",
   "permissionsScreenRecordingDesc": "AI Debug screenshot + reading other app window titles (required on macOS 10.15+)",
   "aiReportScreenRecordingWarning": "AI Debug requires Screen Recording permission, otherwise window titles can't be read (bound targets only show app name)",

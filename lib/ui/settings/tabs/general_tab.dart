@@ -23,7 +23,7 @@ class GeneralTab extends StatefulWidget {
   State<GeneralTab> createState() => _GeneralTabState();
 }
 
-class _GeneralTabState extends State<GeneralTab> {
+class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   // Audio
   List<AudioDevice> _audioDevices = [];
   AudioDevice? _currentAudioDevice;
@@ -36,11 +36,18 @@ class _GeneralTabState extends State<GeneralTab> {
   String _toggleInputKeyName = '';
   int _toggleMaxDuration = 0;
 
+  // Permission status (refresh on lifecycle resume)
+  bool _accessibilityGranted = true;
+  bool _inputMonitoringGranted = true;
+  bool _microphoneGranted = true;
+  bool _screenRecordingGranted = true;
+
   StreamSubscription? _deviceChangeSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadAudioDevices();
     _deviceChangeSubscription =
         CoreEngine().audioDeviceService?.deviceChanges.listen((_) {
@@ -53,12 +60,31 @@ class _GeneralTabState extends State<GeneralTab> {
     _toggleInputKeyName = config.toggleInputKeyName;
     _toggleMaxDuration = config.toggleMaxDuration;
     CoreEngine().pttKeyCode = _currentKeyCode;
+    _refreshPermissions();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _deviceChangeSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 用户从系统设置切回来时刷新权限状态
+    if (state == AppLifecycleState.resumed) _refreshPermissions();
+  }
+
+  void _refreshPermissions() {
+    final ni = CoreEngine().nativeInput;
+    if (ni == null) return;
+    setState(() {
+      _accessibilityGranted = ni.checkAccessibilityPermission();
+      _inputMonitoringGranted = ni.checkInputMonitoringPermission();
+      _microphoneGranted = ni.checkMicrophonePermission();
+      _screenRecordingGranted = ni.checkScreenRecordingPermission();
+    });
   }
 
   void _loadAudioDevices() {
@@ -539,6 +565,7 @@ class _GeneralTabState extends State<GeneralTab> {
               CupertinoIcons.hand_raised,
               'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
               loc,
+              granted: _accessibilityGranted,
             ),
             _permissionCard(
               loc.permissionsInputMonitoring,
@@ -546,6 +573,7 @@ class _GeneralTabState extends State<GeneralTab> {
               CupertinoIcons.keyboard,
               'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent',
               loc,
+              granted: _inputMonitoringGranted,
             ),
             _permissionCard(
               loc.permissionsMicrophone,
@@ -553,6 +581,7 @@ class _GeneralTabState extends State<GeneralTab> {
               CupertinoIcons.mic,
               'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
               loc,
+              granted: _microphoneGranted,
             ),
             _permissionCard(
               loc.permissionsScreenRecording,
@@ -560,6 +589,7 @@ class _GeneralTabState extends State<GeneralTab> {
               CupertinoIcons.camera_viewfinder,
               'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
               loc,
+              granted: _screenRecordingGranted,
             ),
           ],
         ),
@@ -568,7 +598,14 @@ class _GeneralTabState extends State<GeneralTab> {
   }
 
   Widget _permissionCard(String label, String desc, IconData icon, String url,
-      AppLocalizations loc) {
+      AppLocalizations loc, {required bool granted}) {
+    final statusColor = granted
+        ? MacosColors.systemGreenColor
+        : MacosColors.systemOrangeColor;
+    final statusIcon = granted
+        ? CupertinoIcons.checkmark_circle_fill
+        : CupertinoIcons.exclamationmark_circle_fill;
+    final statusText = granted ? loc.permissionsGranted : loc.permissionsNotGranted;
     return SettingsCard(
       padding: const EdgeInsets.all(16),
       onTap: () => launchUrl(Uri.parse(url)),
@@ -581,11 +618,21 @@ class _GeneralTabState extends State<GeneralTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.getTextPrimary(context))),
+                  Row(children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.getTextPrimary(context))),
+                    const SizedBox(width: 8),
+                    MacosIcon(statusIcon, size: 12, color: statusColor),
+                    const SizedBox(width: 3),
+                    Text(statusText,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: statusColor)),
+                  ]),
                   const SizedBox(height: 2),
                   Text(desc,
                       style: TextStyle(
