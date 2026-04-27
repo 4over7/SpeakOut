@@ -803,6 +803,10 @@ static AudioStreamBasicDescription audioFormat;
 static int16_t ringBuffer[RING_BUFFER_SAMPLES];
 static _Atomic uint64_t ringWritePos = 0; // monotonically increasing write cursor
 static _Atomic uint64_t ringReadPos = 0;  // monotonically increasing read cursor
+// 录音起点游标：start_audio_recording 时记录当前 wp。
+// save_recording_wav 用它而不是 ringReadPos 算起点，
+// 否则 ASR 流式消费 ring buffer 后 ringReadPos 已经追上 wp，保存的 WAV 只剩残尾。
+static _Atomic uint64_t recordingStartPos = 0;
 
 // ---- Real-time Audio Level for Waveform Visualization ----
 // RMS of latest samples → single 0.0~1.0 value for UI to scale random animation.
@@ -938,6 +942,7 @@ int start_audio_recording() {
   // Reset ring buffer cursors
   atomic_store_explicit(&ringWritePos, 0, memory_order_relaxed);
   atomic_store_explicit(&ringReadPos, 0, memory_order_relaxed);
+  atomic_store_explicit(&recordingStartPos, 0, memory_order_relaxed);
 
   // Configure audio format: 16kHz, Mono, 16-bit signed integer
   memset(&audioFormat, 0, sizeof(audioFormat));
@@ -1039,11 +1044,15 @@ int save_recording_wav(const char *path) {
   if (path == NULL || path[0] == '\0') return 0;
 
   uint64_t wp = atomic_load_explicit(&ringWritePos, memory_order_relaxed);
-  uint64_t rp = atomic_load_explicit(&ringReadPos, memory_order_relaxed);
-  if (wp <= rp) return 0; // no data
+  uint64_t startPos = atomic_load_explicit(&recordingStartPos, memory_order_relaxed);
+  if (wp <= startPos) return 0; // no data
 
-  uint64_t sampleCount = wp - rp;
-  if (sampleCount > RING_BUFFER_SAMPLES) sampleCount = RING_BUFFER_SAMPLES;
+  uint64_t sampleCount = wp - startPos;
+  // Ring buffer 容量限制：录音超过 60s 时只能保存最新 60s（旧数据已被覆盖）
+  if (sampleCount > RING_BUFFER_SAMPLES) {
+    sampleCount = RING_BUFFER_SAMPLES;
+    startPos = wp - RING_BUFFER_SAMPLES;
+  }
 
   uint32_t dataSize = (uint32_t)(sampleCount * 2); // 16-bit = 2 bytes per sample
   uint32_t fileSize = 44 + dataSize;
@@ -1075,8 +1084,7 @@ int save_recording_wav(const char *path) {
   fwrite("data", 1, 4, f);
   fwrite(&dataSize, 4, 1, f);
 
-  // PCM data from ring buffer
-  uint64_t startPos = wp - sampleCount;
+  // PCM data from ring buffer (startPos 已在上面计算好)
   for (uint64_t i = 0; i < sampleCount; i++) {
     int16_t sample = ringBuffer[(startPos + i) % RING_BUFFER_SAMPLES];
     fwrite(&sample, 2, 1, f);
