@@ -856,7 +856,11 @@ class ModeTabState extends State<ModeTab> {
                             Expanded(
                               child: Column(
                                 children: [
-                                  _buildLanguageCard(loc),
+                                  Row(children: [
+                                    Expanded(child: _buildInputLanguageCard(loc)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildOutputLanguageCard(loc)),
+                                  ]),
                                   const SizedBox(height: 10),
                                   _buildHotkeyCard(loc),
                                   if (currentMode != 'cloud') ...[
@@ -929,7 +933,25 @@ class ModeTabState extends State<ModeTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 区 1: 工作模式 ---
+          // --- 区 1: 语言设置（顶部，决定后续模型/语种） ---
+          SettingsCardGrid(
+            forceDualColumn: true,
+            children: [
+              _buildInputLanguageCard(loc),
+              _buildOutputLanguageCard(loc),
+            ],
+          ),
+
+          // Section separator
+          const SizedBox(height: 20),
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            color: AppTheme.getBorder(context),
+          ),
+          const SizedBox(height: 20),
+
+          // --- 区 2: 工作模式 ---
           _buildModeSelector(loc, currentMode, isTranslation),
           ..._buildLanguageHints(loc),
           if (currentMode == 'smart') ...[
@@ -946,7 +968,10 @@ class ModeTabState extends State<ModeTab> {
           ),
           const SizedBox(height: 20),
 
-          // --- 区 2: 配置 ---
+          // --- 区 3: 模型配置 ---
+          // 云端模式：单卡 AiConfigCardCloud
+          // 非云端 + 高级关：[当前模型] + [流式 & 标点]
+          // 非云端 + 高级开：[非流式模型库] + [流式 & 标点]
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: KeyedSubtree(
@@ -954,26 +979,16 @@ class ModeTabState extends State<ModeTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SettingsCardGrid(
-                    forceDualColumn: true,
-                    children: [
-                      _buildLanguageCard(loc),
-                      if (currentMode == 'cloud')
-                        _buildAiConfigCardCloud(loc)
-                      else
-                        _buildModelInfoCard(loc),
-                    ],
-                  ),
-                  if (currentMode != 'cloud' && advanced) ...[
-                    const SizedBox(height: 12),
+                  if (currentMode == 'cloud')
+                    _buildAiConfigCardCloud(loc)
+                  else
                     SettingsCardGrid(
                       forceDualColumn: true,
                       children: [
-                        _buildOfflineModelListCard(loc),
+                        advanced ? _buildOfflineModelListCard(loc) : _buildModelInfoCard(loc),
                         _buildStreamingAndPunctCard(loc),
                       ],
                     ),
-                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -1173,14 +1188,21 @@ class ModeTabState extends State<ModeTab> {
     );
   }
 
-  // --- Language card ---
+  // --- Language cards (split: input / output) ---
 
-  Widget _buildLanguageCard(AppLocalizations loc) {
-    final inputItems = _buildInputLanguageItems(loc);
-    final inputValue = ConfigService().inputLanguage;
-    final inputLabel = inputItems[inputValue] ?? inputValue;
+  Widget _buildInputLanguageCard(AppLocalizations loc) {
+    final items = _buildInputLanguageItems(loc);
+    final value = ConfigService().inputLanguage;
+    return _buildLanguageItemCard(
+      title: loc.inputLanguage,
+      value: value,
+      items: items,
+      onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState(() {}); },
+    );
+  }
 
-    final outputItems = {
+  Widget _buildOutputLanguageCard(AppLocalizations loc) {
+    final items = {
       'auto': loc.langFollowInput,
       'zh-Hans': loc.langZhHans,
       'zh-Hant': loc.langZhHant,
@@ -1193,46 +1215,36 @@ class ModeTabState extends State<ModeTab> {
       'ru': loc.langRu,
       'pt': loc.langPt,
     };
-    final outputValue = ConfigService().outputLanguage;
-    final outputLabel = outputItems[outputValue] ?? outputValue;
+    final value = ConfigService().outputLanguage;
+    return _buildLanguageItemCard(
+      title: loc.outputLanguage,
+      value: value,
+      items: items,
+      onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState(() {}); },
+    );
+  }
 
+  Widget _buildLanguageItemCard({
+    required String title,
+    required String value,
+    required Map<String, String> items,
+    required Function(String?) onChanged,
+  }) {
+    final label = items[value] ?? value;
     return SettingsCard(
       padding: const EdgeInsets.all(14),
       children: [
-        // Title row
-        Row(
-          children: [
-            const Text('🌐', style: TextStyle(fontSize: 14)),
-            const SizedBox(width: 6),
-            Text(loc.languageSettings, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Input language
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(loc.inputLanguage, style: AppTheme.caption(context)),
-            _buildCompactDropdown(
-              value: inputValue,
-              items: inputItems,
-              onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState(() {}); },
-              label: inputLabel,
+            Row(
+              children: [
+                const Text('🌐', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(title, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        // Output language
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(loc.outputLanguage, style: AppTheme.caption(context)),
-            _buildCompactDropdown(
-              value: outputValue,
-              items: outputItems,
-              onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState(() {}); },
-              label: outputLabel,
-            ),
+            _buildCompactDropdown(value: value, items: items, onChanged: onChanged, label: label),
           ],
         ),
       ],
