@@ -10,7 +10,7 @@
   [Download](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [Changelog](CHANGELOG.md)
 
   ![Platform](https://img.shields.io/badge/platform-macOS%2013+-blue)
-  ![Version](https://img.shields.io/badge/version-1.7.1-brightgreen)
+  ![Version](https://img.shields.io/badge/version-1.8.5-brightgreen)
   ![Tests](https://img.shields.io/badge/tests-598%20passed-brightgreen)
   ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
@@ -94,10 +94,9 @@ Hotkey-driven productivity features on top of voice input:
 ## Install
 
 1. Download `SpeakOut.dmg` from [Releases](https://github.com/4over7/SpeakOut/releases/latest)
-2. Drag to `/Applications`
-3. First launch: `xattr -cr /Applications/SpeakOut.app` (required until Developer ID signing)
-4. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**
-5. Follow the onboarding wizard to download a voice model
+2. Drag to `/Applications` (DMG is signed with Developer ID + Apple Notarized — no Gatekeeper warning, no `xattr` needed)
+3. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**, **Screen Recording** (last one for AI Debug only)
+4. Follow the onboarding wizard to download a voice model
 
 ### System Requirements
 
@@ -112,19 +111,20 @@ Hotkey-driven productivity features on top of voice input:
 
 | Model | Languages | Size |
 |-------|-----------|------|
-| Zipformer Bilingual | Zh/En | ~490MB |
-| Paraformer Streaming | Zh/En | ~1GB |
+| Paraformer Bilingual Streaming | Zh/En | ~1GB |
 
-### Offline (Higher accuracy)
+### Non-streaming (Higher accuracy)
 
 | Model | Languages | Size | Notes |
 |-------|-----------|------|-------|
 | **SenseVoice 2024** | Zh/En/Ja/Ko/Yue | ~228MB | Default, built-in punctuation |
-| SenseVoice 2025 | Zh/En/Ja/Ko/Yue | ~158MB | Cantonese enhanced |
-| Paraformer Offline | Zh/En | ~217MB | Mature & stable |
-| Paraformer Dialect | Zh/En + Sichuan | ~218MB | Dialect support |
-| Whisper Large-v3 | 99 languages | ~1.0GB | Best multilingual |
-| FireRedASR Large | Zh/En + dialects | ~1.4GB | Highest capacity |
+| Paraformer Offline | Zh/En | ~217MB | Fastest decoding (70x realtime) |
+| FireRedASR v2 CTC | Zh/En + dialects | ~496MB | XiaoHongShu, dialect coverage |
+| SenseVoice + FunASR Nano | Zh/En/Ja | ~179MB | Combined encoder/decoder, compact |
+| SenseVoice 2025 | Zh/En/Ja/Ko/Yue | ~158MB | Cantonese enhanced (21.8k hrs) |
+| Paraformer Dialect 2025 | Zh/En + Sichuan/Chongqing | ~218MB | Mandarin dialect support |
+| Whisper Turbo | 99 languages | ~538MB | OpenAI, best multilingual |
+| Dolphin Base | Multilingual | ~77MB | Ultra-light CTC |
 
 ---
 
@@ -147,7 +147,7 @@ Hotkey → native_input.m (CGEventTap)
 | Native | `native_lib/` | Objective-C: CGEventTap + AudioQueue ring buffer |
 | Gateway | `gateway/` | Cloudflare Workers (Hono): license, billing, version check |
 
-**Codebase**: ~29,000 lines across 86 files. 598 tests.
+**Codebase**: ~37,000 lines across 83 files. 598 tests.
 
 ---
 
@@ -204,7 +204,7 @@ license.
 ## 功能亮点
 
 ### 语音输入
-- **完全离线可用** — 无需账号、无需联网、无需 API Key，安装即用。8 款本地模型基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，中英识别准确率媲美云端，音频不出设备
+- **完全离线可用** — 无需账号、无需联网、无需 API Key，安装即用。9 款本地模型（1 流式 + 8 非流式）基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，中英识别准确率媲美云端，音频不出设备
 - **三种工作模式** — 纯离线（隐私优先）/ 智能（离线识别 + AI 润色）/ 云端（高精度）
 - **两种触发方式** — 按住说话（PTT）或单击切换（Toggle）；PTT 和 Toggle 可共用一个键
 - **预分段识别** — 录音中检测到 3 秒停顿自动后台解码，停止时只等最后一段，显著减少等待
@@ -234,12 +234,11 @@ license.
 ## 安装
 
 1. 从 [Releases](https://github.com/4over7/SpeakOut/releases/latest) 下载 `SpeakOut.dmg`
-2. 拖到 `/Applications`
-3. 首次启动前：`xattr -cr /Applications/SpeakOut.app`
-4. 授权：**输入监控**、**辅助功能**、**麦克风**
-5. 按引导下载语音模型即可使用
+2. 拖到 `/Applications`（DMG 已 Developer ID 签名 + Apple 公证，无需 `xattr -cr`，双击即用）
+3. 授权：**输入监控**、**辅助功能**、**麦克风**、**屏幕录制**（最后一项仅 AI 一键调试需要）
+4. 按引导下载语音模型即可使用
 
-**系统要求**：macOS 13+，磁盘空间 230MB ~ 1.4GB（取决于模型选择）
+**系统要求**：macOS 13+，磁盘空间 80MB ~ 1GB（取决于模型选择）
 
 ---
 
