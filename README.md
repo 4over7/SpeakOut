@@ -14,6 +14,10 @@
   ![Tests](https://img.shields.io/badge/tests-598%20passed-brightgreen)
   ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
+  <br/>
+
+  <img src="assets/screenshots/01_main_window.png" width="720" alt="SpeakOut main window" />
+
 </div>
 
 ---
@@ -88,6 +92,24 @@ Hotkey-driven productivity features on top of voice input:
 - **Bluetooth Detection** — Auto-detects headset connect/disconnect
 - **Device Selection** — Choose preferred mic in settings
 - **Pre-segmentation** — 3s pause triggers background decoding, minimizing final wait on stop
+
+---
+
+## Glimpse
+
+Settings page after the v1.8 redesign — sidebar navigation, every feature has its own page, per-page Advanced toggle.
+
+<p align="center">
+  <img src="assets/screenshots/03_settings_overview.png" width="280" alt="Overview" />
+  <img src="assets/screenshots/04_settings_recognition.png" width="280" alt="Recognition Engine" />
+  <img src="assets/screenshots/05_settings_general.png" width="280" alt="General + Permissions" />
+</p>
+<p align="center"><sub>Overview · Recognition Engine · General + Permissions</sub></p>
+
+<p align="center">
+  <img src="assets/screenshots/02_overlay_pill.png" width="160" alt="Recording pill" />
+</p>
+<p align="center"><sub>Floating recording pill — appears anywhere on screen while you speak</sub></p>
 
 ---
 
@@ -230,6 +252,22 @@ license.
 - **行业词典 + 个人词库** — 术语注入 LLM 实现领域感知
 - **API 密钥本地存储** — SharedPreferences，不上云、不同步；导出备份含明文密钥需用户确认
 - **签名公证** — Developer ID 签名 + Apple 公证，下载双击即用，无 Gatekeeper 警告
+
+## 产品截图
+
+v1.8 设置页全面重构 — sidebar 导航，每个功能独立页面，每页支持高级开关。
+
+<p align="center">
+  <img src="assets/screenshots/03_settings_overview.png" width="280" alt="概览页" />
+  <img src="assets/screenshots/04_settings_recognition.png" width="280" alt="识别引擎页" />
+  <img src="assets/screenshots/05_settings_general.png" width="280" alt="通用 + 权限页" />
+</p>
+<p align="center"><sub>概览 · 识别引擎 · 通用（含权限授权状态徽标）</sub></p>
+
+<p align="center">
+  <img src="assets/screenshots/02_overlay_pill.png" width="160" alt="录音悬浮窗" />
+</p>
+<p align="center"><sub>录音悬浮窗 — 说话时悬浮在屏幕任意位置</sub></p>
 
 ## 安装
 
