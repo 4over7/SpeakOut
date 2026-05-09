@@ -164,6 +164,7 @@ class LLMService {
         "temperature": AppConstants.kLlmDefaultTemperature,
         "stream": true,
       };
+      _applyModelSpecificParams(body, model);
 
       final request = http.Request('POST', uri)
         ..headers.addAll({
@@ -263,6 +264,15 @@ class LLMService {
     return '<speech_text>\n$input\n</speech_text>$vocabSection';
   }
 
+  /// 模型特定参数注入。DeepSeek V4 默认开 thinking mode，会让总耗时翻 2x+
+  /// （实测 v4-flash thinking ON 总耗时 2386ms vs OFF 1050ms）。
+  /// SpeakOut 的短句润色 / 翻译 / 梳理场景都不需要思考链，强制关闭。
+  void _applyModelSpecificParams(Map<String, dynamic> body, String model) {
+    if (model.startsWith('deepseek-v4')) {
+      body['thinking'] = {'type': 'disabled'};
+    }
+  }
+
   Future<String> _correctTextCloud(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved, String? translateTo}) async {
     final r = resolved ?? _resolveLlmConfig();
     final apiKey = r.apiKey;
@@ -290,6 +300,7 @@ class LLMService {
         ],
         "temperature": AppConstants.kLlmDefaultTemperature,
       };
+      _applyModelSpecificParams(body, model);
 
       final response = await client.post(
         uri,
@@ -522,20 +533,22 @@ class LLMService {
       }
 
       // OpenAI-compatible
+      final body = <String, dynamic>{
+        "model": r.model,
+        "messages": [
+          {"role": "system", "content": systemPrompt},
+          {"role": "user", "content": input},
+        ],
+        "temperature": AppConstants.kLlmDefaultTemperature,
+      };
+      _applyModelSpecificParams(body, r.model);
       final resp = await client.post(
         Uri.parse('${r.baseUrl}/chat/completions'),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer ${r.apiKey}",
         },
-        body: jsonEncode({
-          "model": r.model,
-          "messages": [
-            {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": input},
-          ],
-          "temperature": AppConstants.kLlmDefaultTemperature,
-        }),
+        body: jsonEncode(body),
       ).timeout(AppConstants.kOrganizeTimeout);
       if (resp.statusCode == 200) {
         final content = jsonDecode(utf8.decode(resp.bodyBytes))['choices']?[0]?['message']?['content']?.toString();
@@ -646,6 +659,7 @@ Rules:
         ],
         "temperature": 0.1, // Very strict
       };
+      _applyModelSpecificParams(body, model);
 
       final response = await client.post(
         uri,
