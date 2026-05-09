@@ -898,6 +898,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarVocab => 'Vocabulary';
 
   @override
+  String get sidebarCloudAccounts => 'Cloud Accounts';
+
+  @override
   String get sidebarCorrection => 'Correction';
 
   @override

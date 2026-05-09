@@ -1311,7 +1311,7 @@ class ModeTabState extends State<ModeTab> {
           Text(loc.aliyunConfigDesc, style: AppTheme.caption(context).copyWith(fontSize: 11)),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => widget.onNavigateToTab(3),
+            onTap: () => SidebarNavigation.of(context)?.goto('cloud_accounts'),
             child: Text(loc.cloudAccountGoConfig, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
           ),
           const SizedBox(height: 10),
@@ -1404,7 +1404,7 @@ class ModeTabState extends State<ModeTab> {
         ],
         const SizedBox(height: 6),
         GestureDetector(
-          onTap: () => widget.onNavigateToTab(3),
+          onTap: () => SidebarNavigation.of(context)?.goto('cloud_accounts'),
           child: Text('${loc.manageCloudAccounts} ▸', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
         ),
       ],
@@ -1627,7 +1627,7 @@ class ModeTabState extends State<ModeTab> {
             Expanded(child: Text(loc.cloudAccountNone, style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor))),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: () => widget.onNavigateToTab(2),
+              onTap: () => SidebarNavigation.of(context)?.goto('cloud_accounts'),
               child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), decoration: TextDecoration.underline)),
             ),
           ],
@@ -1769,7 +1769,7 @@ class ModeTabState extends State<ModeTab> {
             Expanded(child: Text(loc.cloudAccountNone, style: AppTheme.caption(context).copyWith(color: MacosColors.systemOrangeColor))),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: () => widget.onNavigateToTab(2), // Navigate to Cloud Accounts tab
+              onTap: () => SidebarNavigation.of(context)?.goto('cloud_accounts'),
               child: Text(loc.cloudAccountGoConfig, style: AppTheme.caption(context).copyWith(color: AppTheme.getAccent(context), decoration: TextDecoration.underline)),
             ),
           ],

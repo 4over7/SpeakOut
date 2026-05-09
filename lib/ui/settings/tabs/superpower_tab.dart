@@ -12,6 +12,7 @@ import '../../../config/app_constants.dart';
 import '../../../config/app_log.dart';
 import '../../../engine/core_engine.dart';
 import '../../theme.dart';
+import '../sidebar/sidebar_shell.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
 import '../sidebar/hotkey_recorder_modal.dart';
@@ -707,7 +708,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 ),
                 const SizedBox(width: 4),
                 GestureDetector(
-                  onTap: () => widget.onNavigateToTab(1),
+                  onTap: () => SidebarNavigation.of(context)?.goto('ai_plus'),
                   child: Text(
                     loc.organizeGoConfig,
                     style: AppTheme.caption(context).copyWith(

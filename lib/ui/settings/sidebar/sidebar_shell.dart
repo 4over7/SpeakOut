@@ -4,6 +4,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
 import '../../theme.dart';
 import 'pages/ai_plus_page.dart';
+import 'pages/cloud_accounts_page.dart';
 import 'pages/developer_page.dart';
 import 'pages/general_pages.dart';
 import 'pages/overview_page.dart';
@@ -86,6 +87,12 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
             label: loc.sidebarVocab,
             icon: CupertinoIcons.book,
             builder: (_) => VocabPage(),
+          ),
+          SidebarEntry(
+            id: 'cloud_accounts',
+            label: loc.sidebarCloudAccounts,
+            icon: CupertinoIcons.cloud,
+            builder: (_) => const CloudAccountsPage(),
           ),
         ],
       ),

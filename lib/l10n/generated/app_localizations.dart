@@ -1742,6 +1742,12 @@ abstract class AppLocalizations {
   /// **'Vocabulary'**
   String get sidebarVocab;
 
+  /// No description provided for @sidebarCloudAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Accounts'**
+  String get sidebarCloudAccounts;
+
   /// No description provided for @sidebarCorrection.
   ///
   /// In en, this message translates to:

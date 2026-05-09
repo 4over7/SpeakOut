@@ -862,6 +862,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarVocab => '词典';
 
   @override
+  String get sidebarCloudAccounts => '云账户';
+
+  @override
   String get sidebarCorrection => '纠错反馈';
 
   @override
