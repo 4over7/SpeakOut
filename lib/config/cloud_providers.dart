@@ -150,12 +150,12 @@ class CloudProviders {
       ],
       capabilities: {CloudCapability.llm},
       llmModels: [
-        CloudLLMModel(id: 'deepseek-chat', name: 'DeepSeek V3', description: '推荐', priceHint: '0.004 元/千 token'),
-        CloudLLMModel(id: 'deepseek-reasoner', name: 'DeepSeek R1', description: '推理模型', priceHint: '0.04 元/千 token'),
+        CloudLLMModel(id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', description: '推荐 · 1M 上下文', priceHint: '约 0.002 元/千 token'),
+        CloudLLMModel(id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', description: '高级 · 1M 上下文', priceHint: '约 0.006 元/千 token（限时折扣）'),
       ],
       llmBaseUrl: 'https://api.deepseek.com/v1',
-      llmDefaultModel: 'deepseek-chat',
-      llmModelHint: '如 deepseek-chat, deepseek-reasoner',
+      llmDefaultModel: 'deepseek-v4-flash',
+      llmModelHint: '如 deepseek-v4-flash, deepseek-v4-pro',
       helpUrl: 'https://platform.deepseek.com/docs',
     ),
 

@@ -19,30 +19,37 @@ class ProviderConfig {
   final String model;
   final String apiKey;
   final bool isAnthropic;
+  /// DeepSeek V4 only: pass `{type: 'disabled'}` to turn off default thinking mode.
+  final Map<String, dynamic>? thinkingParam;
 
-  ProviderConfig({required this.name, required this.baseUrl, required this.model, required this.apiKey, this.isAnthropic = false});
+  ProviderConfig({
+    required this.name,
+    required this.baseUrl,
+    required this.model,
+    required this.apiKey,
+    this.isAnthropic = false,
+    this.thinkingParam,
+  });
 }
 
 Future<void> main() async {
-  // Read credentials from SharedPreferences plist
-  final plistResult = await Process.run('plutil', ['-p', '${Platform.environment['HOME']}/Library/Preferences/com.speakout.speakout.plist']);
-  final plist = plistResult.stdout as String;
-
-  String? getCredValue(String accountId, String key) {
-    final pattern = RegExp('flutter\\.cloud_cred_${accountId}_$key.*?=>\\s*"(.*?)"');
-    final match = pattern.firstMatch(plist);
-    return match?.group(1);
+  // Use `defaults read <bundle> <key>` per key — robust against any plist value type
+  String? readDefault(String key) {
+    final r = Process.runSync('defaults', ['read', 'com.speakout.speakout', key]);
+    if (r.exitCode != 0) return null;
+    final s = (r.stdout as String).trim();
+    return s.isEmpty ? null : s;
   }
 
-  // Parse cloud accounts
-  final accountsMatch = RegExp(r'flutter\.cloud_accounts.*?=>\s*"(.*?)"', dotAll: true).firstMatch(plist);
-  if (accountsMatch == null) {
+  String? getCredValue(String accountId, String key) =>
+      readDefault('flutter.cloud_cred_${accountId}_$key');
+
+  final accountsRaw = readDefault('flutter.cloud_accounts');
+  if (accountsRaw == null) {
     print('No cloud accounts found');
     return;
   }
-
-  final accountsJson = accountsMatch.group(1)!.replaceAll(r'\"', '"');
-  final accounts = jsonDecode(accountsJson) as List;
+  final accounts = jsonDecode(accountsRaw) as List;
 
   // Build provider configs
   final providers = <ProviderConfig>[];
@@ -73,7 +80,30 @@ Future<void> main() async {
       case 'deepseek':
         apiKey = getCredValue(accountId, 'api_key');
         baseUrl = 'https://api.deepseek.com/v1';
-        model = 'deepseek-chat';
+        model = 'deepseek-v4-flash';
+        // 多个对照组：thinking on（默认）vs off，看 thinking 对延迟的影响
+        if (apiKey != null && apiKey.isNotEmpty) {
+          providers.add(ProviderConfig(
+            name: '${account['displayName']} (v4-flash, thinking OFF)',
+            baseUrl: baseUrl,
+            model: 'deepseek-v4-flash',
+            apiKey: apiKey,
+            thinkingParam: {'type': 'disabled'},
+          ));
+          providers.add(ProviderConfig(
+            name: '${account['displayName']} (v4-pro, thinking ON)',
+            baseUrl: baseUrl,
+            model: 'deepseek-v4-pro',
+            apiKey: apiKey,
+          ));
+          providers.add(ProviderConfig(
+            name: '${account['displayName']} (v4-pro, thinking OFF)',
+            baseUrl: baseUrl,
+            model: 'deepseek-v4-pro',
+            apiKey: apiKey,
+            thinkingParam: {'type': 'disabled'},
+          ));
+        }
       case 'zhipu':
         apiKey = getCredValue(accountId, 'api_key');
         baseUrl = 'https://open.bigmodel.cn/api/paas/v4';
@@ -160,15 +190,17 @@ Future<Map<String, dynamic>> testProvider(ProviderConfig p) async {
     ],
     'stream': true,
     'temperature': 0.3,
+    if (p.thinkingParam != null) 'thinking': p.thinkingParam,
   });
 
   final sw = Stopwatch()..start();
 
   final uri = Uri.parse('${p.baseUrl}/chat/completions');
   final request = await client.postUrl(uri);
-  request.headers.set('Content-Type', 'application/json');
+  request.headers.set('Content-Type', 'application/json; charset=utf-8');
   request.headers.set('Authorization', 'Bearer ${p.apiKey}');
-  request.write(body);
+  // 用 utf8.encode 写入字节，避免 HttpClient 默认 ISO-8859-1 编码导致中文挂
+  request.add(utf8.encode(body));
 
   final response = await request.close();
 
