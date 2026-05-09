@@ -327,6 +327,18 @@ class AppDelegate: FlutterAppDelegate {
     return false  // Hide to tray instead of quitting
   }
 
+  /// Dock 图标 / Spotlight 重新打开应用时，如果主窗口被关闭了就重新打开
+  /// 没有这个方法 macOS 默认行为是"啥也不做"，导致点 Dock 图标无反应
+  override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    if !flag {
+      if let window = mainFlutterWindow {
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+      }
+    }
+    return true
+  }
+
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
   }

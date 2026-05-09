@@ -435,8 +435,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
       }),
       MenuSeparator(),
       MenuItemLabel(label: 'Quit', onClicked: (menuItem) async {
-        await windowManager.setPreventClose(false);
-        await windowManager.close();
+        exit(0);
       }),
     ]);
     
