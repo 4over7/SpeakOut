@@ -1673,9 +1673,10 @@ class ModeTabState extends State<ModeTab> {
     // 计算当前值：savedAccount 的 currentModel 是否在预设里？不在则视为 custom
     final savedAccountId = ConfigService().selectedLlmAccountId ?? '';
     final currentModelId = ConfigService().llmModelOverride ?? '';
+    // savedAccountId 失效时按推荐优先级兜底（避免回退到 llmAccounts.first 可能是豆包 lite）
     final savedAccount = llmAccounts.firstWhere(
       (a) => a.id == savedAccountId,
-      orElse: () => llmAccounts.first,
+      orElse: () => CloudAccountService().pickRecommendedLlmAccount() ?? llmAccounts.first,
     );
     final savedProvider = CloudProviders.getById(savedAccount.providerId);
     final savedModels = savedProvider?.llmModels ?? [];

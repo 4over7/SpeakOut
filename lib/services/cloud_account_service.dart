@@ -100,6 +100,38 @@ class CloudAccountService {
     return null;
   }
 
+  /// LLM 推荐优先级：质量/价格/对 prompt 约束的服从性综合排序。
+  /// 注：volcengine 豆包 lite 默认模型对元评论禁令服从性差，故排在中后段。
+  static const List<String> _kLlmRecommendationOrder = [
+    'deepseek',
+    'anthropic',
+    'openai',
+    'zhipu',
+    'dashscope',
+    'moonshot',
+    'gemini',
+    'minimax',
+    'volcengine',
+    'groq',
+    'xfyun',
+  ];
+
+  /// 按优先级挑一个 LLM 账户（已 enabled 且 api_key 已配）。
+  /// 用于 selectedLlmAccountId 为空 / 失效时的兜底——避免落到豆包 lite 这种
+  /// 对 prompt 约束服从性差的小模型上。
+  CloudAccount? pickRecommendedLlmAccount() {
+    final pool = getAccountsWithCapability(CloudCapability.llm)
+        .where((a) => (a.credentials['api_key'] ?? '').isNotEmpty)
+        .toList();
+    if (pool.isEmpty) return null;
+    for (final pid in _kLlmRecommendationOrder) {
+      for (final a in pool) {
+        if (a.providerId == pid) return a;
+      }
+    }
+    return pool.first;
+  }
+
   // ── 持久化 ──
 
   Future<void> _loadAccounts() async {

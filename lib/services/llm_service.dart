@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'config_service.dart';
 import 'cloud_account_service.dart';
+import '../models/cloud_account.dart';
 import '../config/app_constants.dart';
 import '../config/app_log.dart';
 import '../config/cloud_providers.dart';
@@ -40,22 +41,33 @@ class LLMService {
   ({String apiKey, String baseUrl, String model, bool isAnthropic}) _resolveLlmConfig() {
     // 1. Check if a CloudAccount is selected for LLM
     final accountId = ConfigService().selectedLlmAccountId;
+    CloudAccount? account;
+    bool fromRecommendation = false;
     if (accountId != null && accountId.isNotEmpty) {
-      final account = CloudAccountService().getAccountById(accountId);
-      if (account != null && account.isEnabled) {
-        final provider = CloudProviders.getById(account.providerId);
-        if (provider != null && provider.hasLLM) {
-          final apiKey = account.credentials[provider.llmApiKeyField] ?? '';
-          final baseUrl = provider.llmBaseUrl ?? '';
-          // 优先用用户选择的模型，否则回退到服务商默认
-          final savedModel = ConfigService().llmModelOverride;
-          final model = (savedModel != null && savedModel.isNotEmpty)
-              ? savedModel
-              : (provider.llmDefaultModel ?? '');
-          final isAnthropic = provider.llmApiFormat == LlmApiFormat.anthropic;
-          _log("Resolved LLM from CloudAccount: provider=${account.providerId}, keyLen=${apiKey.length}");
-          return (apiKey: apiKey, baseUrl: baseUrl, model: model, isAnthropic: isAnthropic);
-        }
+      final candidate = CloudAccountService().getAccountById(accountId);
+      if (candidate != null && candidate.isEnabled) {
+        account = candidate;
+      }
+    }
+    // selectedLlmAccountId 为空 / 失效 → 按推荐优先级兜底（避免落到豆包 lite 等弱模型）
+    if (account == null) {
+      account = CloudAccountService().pickRecommendedLlmAccount();
+      fromRecommendation = account != null;
+    }
+
+    if (account != null) {
+      final provider = CloudProviders.getById(account.providerId);
+      if (provider != null && provider.hasLLM) {
+        final apiKey = account.credentials[provider.llmApiKeyField] ?? '';
+        final baseUrl = provider.llmBaseUrl ?? '';
+        // selectedLlmAccountId 命中时尊重用户的 model 选择；推荐兜底时强制用服务商默认模型
+        final savedModel = ConfigService().llmModelOverride;
+        final model = (!fromRecommendation && savedModel != null && savedModel.isNotEmpty)
+            ? savedModel
+            : (provider.llmDefaultModel ?? '');
+        final isAnthropic = provider.llmApiFormat == LlmApiFormat.anthropic;
+        _log("Resolved LLM from CloudAccount: provider=${account.providerId}, keyLen=${apiKey.length}${fromRecommendation ? ' (recommended fallback)' : ''}");
+        return (apiKey: apiKey, baseUrl: baseUrl, model: model, isAnthropic: isAnthropic);
       }
     }
 
