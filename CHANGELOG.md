@@ -1,5 +1,21 @@
 # SpeakOut Version History
 
+## [1.8.6] - 2026-05-11
+
+### 修复
+- **LLM 默认兜底走推荐优先级，避开豆包 lite** — 此前 `selectedLlmAccountId` 失效或为空时回退到账户列表第一个，一般是火山豆包 lite。豆包 lite 对 prompt 元评论禁令服从性差，模糊语音输入下会输出"这段文本不太清晰…仅供参考…"等多余解释段落（实测一次 63 字 ASR → 342 字 LLM 输出，含 280 字元评论）。新增 `pickRecommendedLlmAccount()` helper 按 [DeepSeek > Anthropic > OpenAI > 智谱 > 阿里云百炼 > Kimi > Gemini > MiniMax > 火山 > Groq > 讯飞] 顺序兜底已配 API key 的账户
+- **LLM 模糊语音输入加禁止元评论** — system prompt 第 5 条扩写：禁止任何解释/评论/建议/追问/Markdown/标签或引号包裹；含两个 few-shot 示例（含模糊输入反例）。跨模型通用约束
+- **Dock 图标点击恢复窗口 + 托盘 Quit 真退出** — Dock 图标点击不再无响应，正确恢复主窗口；托盘 Quit 真退出（此前只 hide）
+- **DeepSeek V4 默认关 thinking mode** — V4 升级后默认开 thinking 导致 LLM 调用慢一倍，关掉恢复正常性能
+- **设置 sidebar「前往账户中心配置」跳转修复** — 此前点击无反应；sidebar 同步加云账户入口
+
+### 改进
+- **DeepSeek 升级到 V4 系列** — DeepSeek V4 Flash（推荐，1M 上下文）/ V4 Pro 双预设；测速脚本同步修复
+- **引入 AGENTS.md 文档体系（4 层结构）** — 根 AGENTS + 6 个子模块 AGENTS（lib/engine、lib/services、lib/ui、lib/ffi、native_lib、gateway）+ 5 个 ADR（不上 Sparkle / 剪贴板注入 / 云账户体系 / Context-Aware 试点策略 / V4 thinking 默认关）+ 6 个反模式归档。改代码前按层查，避免重新 Discover
+
+### 开发工具
+- **AX Probe Phase 0 探针** — `tools/ax_probe/` 独立 Swift menu bar app，全局 F19 热键 + 状态栏菜单 dump 当前焦点 AX 上下文（焦点元素 / 选区 / 周边 / 父链 / 浏览器 URL）。Context-Aware Voice (v1.9 规划中) 的 macOS Accessibility 能力探测工具
+
 ## [1.8.5] - 2026-05-01
 
 ### 改进
