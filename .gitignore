@@ -86,8 +86,12 @@ docs/wiki/vocab_*.md
 # Videos / large media
 *.mp4
 
-# Old directories (merged into scripts/)
-tools/
+# Old directories (merged into scripts/) — 例外：ax_probe Phase 0 探针保留
+tools/*
+!tools/ax_probe/
+tools/ax_probe/.build/
+tools/ax_probe/.swiftpm/
+tools/ax_probe/Package.resolved
 
 # Wiki submodule (managed via GitHub Wiki separately)
 wiki/
