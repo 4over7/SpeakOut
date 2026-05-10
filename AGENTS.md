@@ -7,7 +7,10 @@
 1. [CLAUDE.md](./CLAUDE.md) — 项目概况、Flutter 命令、原生库编译命令、核心数据流
 2. 本文件 — 模块定位 + 跨模块约束 + 反模式索引
 3. 当前任务相关的模块 AGENTS.md（见下表）
-4. 涉及到决策权衡时 → [docs/decisions/INDEX.md](./docs/decisions/) (建设中)
+4. 涉及到决策权衡时 → [docs/decisions/INDEX.md](./docs/decisions/INDEX.md)（含 5 个 ADR）
+5. 实施前先看反例 → [docs/anti-patterns/INDEX.md](./docs/anti-patterns/INDEX.md)（6 条踩过的坑）
+
+> **提示**：`docs/wiki/` 目录（gitignored，本地文档库）含 50 个历史设计/调研文档。本地有 `docs/wiki/README.md` 状态索引，按 🚀 Planning / 🟢 Active / 📜 Historical / 🔴 Archived 分类。改相关代码时先查 README 找对应 active 文档作为设计依据。
 
 ## 模块导航
 
