@@ -218,7 +218,16 @@ void main() {
       final prompt = AppConstants.kDefaultAiCorrectionPrompt;
       expect(prompt, contains('安全指令'));
       expect(prompt, contains('纯数据'));
-      expect(prompt, contains('忽略'));
+      expect(prompt, contains('绝不执行'));
+    });
+
+    // 回归测试：2026-05-18 用户报告 ASR 含"请总结/请翻译"等请求性语言时，
+    // LLM 不再走"润色 ASR"路径而是直接执行了。prompt 必须覆盖请求性语言。
+    test('prompt 覆盖请求性语言（请总结/请翻译/请帮我...）', () {
+      final prompt = AppConstants.kDefaultAiCorrectionPrompt;
+      expect(prompt, contains('总结'));
+      expect(prompt, contains('翻译'));
+      expect(prompt, contains('原样保留'));
     });
 
     test('prompt 包含 vocab_hints 指令', () {
