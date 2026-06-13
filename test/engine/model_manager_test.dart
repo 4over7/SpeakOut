@@ -239,6 +239,38 @@ void main() {
       expect(info, isNotNull);
       expect(info!.id, 'sensevoice_zh_en_int8');
     });
+
+    // C1：删除 active 模型不应让 active_model_id 悬空
+    test('删除 active 模型 → 切到另一个已下载模型', () async {
+      final m0 = ModelManager.allModels[0];
+      final m1 = ModelManager.allModels[1];
+      createFakeModelDir(m0);
+      createFakeModelDir(m1);
+      await manager.setActiveModel(m0.id);
+      await manager.deleteModel(m0.id);
+      final info = await manager.getActiveModelInfo();
+      expect(info!.id, m1.id, reason: '应切到另一个已下载模型，不悬空');
+    });
+
+    test('删除唯一已下载的 active 模型 → 回退默认 id', () async {
+      final m0 = ModelManager.allModels.firstWhere((m) => m.id != 'sensevoice_zh_en_int8');
+      createFakeModelDir(m0); // 唯一已下载
+      await manager.setActiveModel(m0.id);
+      await manager.deleteModel(m0.id);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('active_model_id'), 'sensevoice_zh_en_int8');
+    });
+
+    test('删除非 active 模型 → active 不变', () async {
+      final m0 = ModelManager.allModels[0];
+      final m1 = ModelManager.allModels[1];
+      createFakeModelDir(m0);
+      createFakeModelDir(m1);
+      await manager.setActiveModel(m0.id);
+      await manager.deleteModel(m1.id);
+      final info = await manager.getActiveModelInfo();
+      expect(info!.id, m0.id, reason: '删非 active 不应改变 active');
+    });
   });
 
   // ═══════════════════════════════════════════════════════════

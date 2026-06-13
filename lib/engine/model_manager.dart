@@ -689,6 +689,19 @@ class ModelManager {
      if (await modelDir.exists()) {
        await modelDir.delete(recursive: true);
      }
+     // 若删除的是当前 active 模型，切到另一个已下载模型，避免 active_model_id 悬空
+     // （否则下次启动 getActiveModelPath 返回 null，会静默重下默认模型，造成"为什么又下载"困惑）
+     final prefs = await SharedPreferences.getInstance();
+     final activeId = prefs.getString(AppConstants.kKeyActiveModelId) ?? AppConstants.kDefaultModelId;
+     if (activeId == id) {
+       String? next;
+       for (final m in allModels) {
+         if (m.id == id) continue;
+         if (await isModelDownloaded(m.id)) { next = m.id; break; }
+       }
+       // 有其他已下载模型则切过去；否则回退默认 id（启动逻辑再决定是否下载）
+       await prefs.setString(AppConstants.kKeyActiveModelId, next ?? AppConstants.kDefaultModelId);
+     }
   }
   
   // ============ Punctuation Model Methods ============

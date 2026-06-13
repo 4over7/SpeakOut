@@ -80,3 +80,26 @@ OpenAI/Groq HTTP 非 200/异常返回 `ASRResult.textOnly('')`，Legacy Aliyun �
 - 代码修复完成且对齐 DashScope 既有正确模式。
 - provider 网络层错误路径的真单测需要可测性重构（OpenAI 直接 new MultipartRequest 无注入点；Aliyun 走真 WebSocket），属单独工作量，未硬塞 mock，列为后续。
 
+---
+
+## 第 4 轮 — 删除 active 模型悬空（C1）
+
+### 现象
+UI 删除模型只调 `deleteModel`（仅删目录），不处理 active 状态 → 删当前 active 后 `active_model_id` 悬空，下次启动 `getActiveModelPath` 返回 null → 静默重下默认模型；且 `_refresh()` 不刷新 `_activeModelId`，UI 仍显示旧 id。
+
+### 关键确认（防止改错地方）
+- ConfigService `kKeyActiveModelId` == ModelManager 字面 `'active_model_id'`，**同一个 key**，改一处两边都生效。
+- `isModelDownloaded(id)` 已存在，直接复用。
+
+### 措施
+- `model_manager.dart` deleteModel：删除后若删的是 active，遍历 allModels 找第一个其他已下载模型切过去；无则回退 `kDefaultModelId`。
+- `mode_tab.dart` _delete：删除后 `setState(_activeModelId = ConfigService().activeModelId)` 同步 UI（_refresh 本身不刷 active）。
+- `model_manager_test.dart`：新增 3 个测试（切到另一个已下载 / 唯一已下载回退默认 / 删非 active 不变）。
+
+### 验证结果
+- `flutter analyze`（2 文件）：No issues found。
+- `flutter test test/engine/model_manager_test.dart`：78/78 通过（含新增 3）。
+
+### 复盘
+- key 一致性是关键前提，先核实再改，避免改了 ModelManager 但 UI 读 ConfigService 看不到。
+

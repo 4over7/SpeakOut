@@ -458,6 +458,9 @@ class ModeTabState extends State<ModeTab> {
 
   Future<void> _delete(ModelInfo model) async {
     await _modelManager.deleteModel(model.id);
+    if (!mounted) return;
+    // deleteModel 可能因删除的是 active 模型而切换了 active_model_id，UI 同步重读
+    setState(() => _activeModelId = ConfigService().activeModelId);
     await _refresh();
   }
 
