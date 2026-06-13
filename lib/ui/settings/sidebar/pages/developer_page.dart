@@ -295,6 +295,31 @@ class _DeveloperPageState extends State<DeveloperPage> {
             secondary: true,
             onPressed: () async {
               final messenger = ScaffoldMessenger.of(context);
+              // 导出前让用户选择是否包含密钥（默认不含，更安全）
+              final includeCreds = await showMacosAlertDialog<bool>(
+                context: context,
+                builder: (ctx) => MacosAlertDialog(
+                  appIcon: const MacosIcon(CupertinoIcons.lock_shield, size: 48),
+                  title: const Text('导出配置'),
+                  message: const Text(
+                    '是否在导出文件中包含 API 密钥/凭证？\n'
+                    '包含便于换机迁移，但文件含明文敏感信息，请妥善保管。',
+                    textAlign: TextAlign.center,
+                  ),
+                  primaryButton: PushButton(
+                    controlSize: ControlSize.large,
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('不含密钥（推荐）'),
+                  ),
+                  secondaryButton: PushButton(
+                    controlSize: ControlSize.large,
+                    secondary: true,
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('包含密钥'),
+                  ),
+                ),
+              );
+              if (includeCreds == null) return; // 用户关闭对话框
               final path = await FilePicker.platform.saveFile(
                 dialogTitle: loc.aboutExportFileTitle,
                 fileName: 'speakout_config.json',
@@ -302,7 +327,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 type: FileType.custom,
               );
               if (path != null) {
-                final result = await ConfigBackupService.exportToFile(path);
+                final result = await ConfigBackupService.exportToFile(path, includeCredentials: includeCreds);
                 messenger.showSnackBar(SnackBar(
                   content: Text(result.success
                       ? loc.aboutExportSuccess(result.message)

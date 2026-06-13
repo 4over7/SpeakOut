@@ -53,6 +53,12 @@ class CloudAccountService {
   Future<void> updateAccount(CloudAccount account) async {
     final idx = _accounts.indexWhere((a) => a.id == account.id);
     if (idx < 0) return;
+    // 清理被移除的旧凭证 key（旧 - 新 差集），避免删字段/改 schema 后残留明文 secret
+    final removed = _accounts[idx].credentials.keys.toSet()
+        .difference(account.credentials.keys.toSet());
+    if (removed.isNotEmpty) {
+      await _clearCredentials(account.id, removed);
+    }
     _accounts[idx] = account;
     await _saveAccounts();
     await _saveCredentials(account);

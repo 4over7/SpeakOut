@@ -103,3 +103,26 @@ UI 删除模型只调 `deleteModel`（仅删目录），不处理 active 状态 
 ### 复盘
 - key 一致性是关键前提，先核实再改，避免改了 ModelManager 但 UI 读 ConfigService 看不到。
 
+---
+
+## 第 5 轮 — 凭证清理 + 备份排除（A3）
+
+### 现象
+- updateAccount 纯增量写凭证，删字段/改 schema 后旧 `cloud_cred_*` 残留。
+- config_backup 全量导出所有 SharedPreferences key（含 cloud_cred_* 及残留），泄露明文 secret。
+- 额外发现：现有凭证判断（cred_/api_key/api_secret/api_password）**漏了** aliyun AK/SK（ak_id/ak_secret/app_key），全量导出会把阿里云 AK/SK 当普通设置导出。
+
+### 措施
+- `cloud_account_service.dart` updateAccount：算"旧 keys - 新 keys"差集，`_clearCredentials` 删残留。
+- `config_backup_service.dart`：新增 `_isCredentialKey()`（扩展含 ak_id/ak_secret/app_key/token）；`exportToFile` 加 `includeCredentials`（默认 false）排除凭证；类注释改为"默认不导出凭证"。
+- `developer_page.dart` 导出：先弹 MacosAlertDialog 让用户选「不含密钥（推荐）/ 包含密钥」，据此传 includeCredentials（把档位摆给用户判断，符合换机迁移需求）。
+- `config_backup_service_test.dart`（新）：验证默认排除全部凭证 key、includeCredentials=true 时包含。
+
+### 设计权衡
+- 默认排除凭证会让"导出→导入"换机后需重填密钥，但这是安全默认；用弹框把"是否带密钥"决定权交给用户，而非默默全带或全不带。
+- cloud_accounts_page 自己的 `exportToFile`（账户专用导出）基于内存 account.credentials，不读残留 cloud_cred_*，是用户显式的账户导出，未改。
+
+### 验证结果
+- `flutter analyze`（3 文件）：No issues found。
+- `flutter test test/services/config_backup_service_test.dart`：2/2 通过。
+

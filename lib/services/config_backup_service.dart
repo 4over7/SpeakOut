@@ -29,12 +29,14 @@ class BackupResult {
 /// 导出：将所有 SharedPreferences 设置导出为 JSON 文件。
 /// 导入：从 JSON 文件恢复所有设置。
 /// 不包含离线模型文件（需重新下载）。
-/// 安全性由用户自行保障（导出文件含明文凭证）。
+/// 默认不导出凭证（API key / AK·SK / token）；如需含凭证须显式 includeCredentials=true。
 class ConfigBackupService {
   static const _kBackupVersion = 1;
 
-  /// 导出所有配置到 JSON 文件
-  static Future<BackupResult> exportToFile(String filePath) async {
+  /// 导出所有配置到 JSON 文件。
+  /// [includeCredentials] 为 false（默认）时排除所有敏感凭证 key，
+  /// 避免明文密钥（含已删账户残留的 cloud_cred_*）泄露到备份文件。
+  static Future<BackupResult> exportToFile(String filePath, {bool includeCredentials = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final allKeys = prefs.getKeys();
@@ -43,10 +45,12 @@ class ConfigBackupService {
       int credentialCount = 0;
       final prefsData = <String, dynamic>{};
       for (final key in allKeys) {
+        final isCred = _isCredentialKey(key);
+        if (isCred && !includeCredentials) continue; // 默认跳过凭证
         final val = prefs.get(key);
         if (val != null) {
           prefsData[key] = {'type': _typeOf(val), 'value': val};
-          if (key.contains('cred_') || key.contains('api_key') || key.contains('api_secret') || key.contains('api_password')) {
+          if (isCred) {
             credentialCount++;
           } else {
             settingsCount++;
@@ -109,7 +113,7 @@ class ConfigBackupService {
             await prefs.setStringList(key, (value as List).cast<String>());
         }
 
-        if (key.contains('cred_') || key.contains('api_key') || key.contains('api_secret') || key.contains('api_password')) {
+        if (_isCredentialKey(key)) {
           credentialCount++;
         } else {
           settingsCount++;
@@ -136,5 +140,18 @@ class ConfigBackupService {
     if (val is bool) return 'bool';
     if (val is List<String>) return 'List<String>';
     return 'String';
+  }
+
+  /// 判断 key 是否为敏感凭证（云账户凭证 / API key / 阿里云 AK·SK·appkey / token）。
+  /// 用于导出时默认排除，避免明文密钥泄露。
+  static bool _isCredentialKey(String key) {
+    return key.contains('cred_') ||
+        key.contains('api_key') ||
+        key.contains('api_secret') ||
+        key.contains('api_password') ||
+        key.contains('ak_id') ||
+        key.contains('ak_secret') ||
+        key.contains('app_key') ||
+        key.contains('token');
   }
 }
