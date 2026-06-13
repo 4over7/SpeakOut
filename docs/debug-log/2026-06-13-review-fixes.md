@@ -58,3 +58,25 @@ helper 脚本是 best-effort 替换：`rm -rf 旧 app` → `cp 新 app`，无任
 ### 复盘
 - 都是确定性小修，无意外。D4 真实影响本就小（只一处 UI 提示），但修了消除不一致。
 
+---
+
+## 第 3 轮 — 云端 ASR 错误返回（B1）
+
+### 现象
+OpenAI/Groq HTTP 非 200/异常返回 `ASRResult.textOnly('')`，Legacy Aliyun 把错误塞进 partial text stream、stop() 不报 error → 鉴权/欠费/网络错都被表现成"无语音"，用户反复重试。
+
+### 关键判断（防止改错）
+报告称 DashScope 也吞错误——**核实为过时**：DashScope 已通过 `task-failed → _lastError → ASRResult.withError` 正确上报。本轮**只改 OpenAI/Groq + Legacy Aliyun，不动 DashScope**。
+
+### 措施
+- `openai_asr_provider.dart`：HTTP 非 200 → `withError('云端识别失败 (HTTP ...)')`；catch → `withError('云端识别请求失败: $e')`。
+- `aliyun_provider.dart`：加 `_lastError` 字段；onError/TaskFailed 改写 `_lastError`（不再 `_textController.add` 错误文字）；start() 重置 `_lastError=null`；stop() 在有错误且文本为空时 `return ASRResult.withError(_lastError!)`。
+
+### 验证结果
+- `flutter analyze`（2 provider 文件）：No issues found。
+- ASR/engine 相关测试 69/69 通过（asr_result/asr_provider/factory/core_engine）。
+
+### 复盘
+- 代码修复完成且对齐 DashScope 既有正确模式。
+- provider 网络层错误路径的真单测需要可测性重构（OpenAI 直接 new MultipartRequest 无注入点；Aliyun 走真 WebSocket），属单独工作量，未硬塞 mock，列为后续。
+

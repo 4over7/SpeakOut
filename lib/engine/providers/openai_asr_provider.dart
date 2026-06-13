@@ -99,7 +99,8 @@ class OpenAIASRProvider implements ASRProvider {
 
       if (response.statusCode != 200) {
         _log('API error ${response.statusCode}: $body');
-        return ASRResult.textOnly('');
+        // 错误通过 error 字段上报（鉴权/余额/模型名等），不要表现成"无语音"让用户反复重试
+        return ASRResult.withError('云端识别失败 (HTTP ${response.statusCode})');
       }
 
       final json = jsonDecode(body) as Map<String, dynamic>;
@@ -109,7 +110,7 @@ class OpenAIASRProvider implements ASRProvider {
       return ASRResult.textOnly(text);
     } catch (e) {
       _log('Request failed: $e');
-      return ASRResult.textOnly('');
+      return ASRResult.withError('云端识别请求失败: $e');
     }
   }
 

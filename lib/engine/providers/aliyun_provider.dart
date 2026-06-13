@@ -79,7 +79,8 @@ class AliyunProvider implements ASRProvider {
         _handleMessage(message);
       }
     }, onError: (e) {
-      _textController.add("Connection Error: $e");
+      // 错误经 _lastError 上报（stop() 转 ASRResult.error），不塞进文本流污染识别结果
+      _lastError = "连接错误: $e";
       _isConnected = false;
     }, onDone: () {
       _isConnected = false;
@@ -153,6 +154,7 @@ class AliyunProvider implements ASRProvider {
     _isHandshakeComplete = false;
     _committedText = "";
     _currentSentence = "";
+    _lastError = null;
     
     // Generate new Task ID for this recording session
     _taskId = const Uuid().v4().replaceAll('-', '');
@@ -180,6 +182,7 @@ class AliyunProvider implements ASRProvider {
 
   String _committedText = "";
   String _currentSentence = "";
+  String? _lastError; // 云端错误（鉴权/任务失败/连接错误），由 stop() 通过 ASRResult.error 上报
   
   void _handleMessage(String jsonStr) {
     try {
@@ -218,8 +221,8 @@ class AliyunProvider implements ASRProvider {
          _textController.add(_committedText + _currentSentence);
          
       } else if (name == 'TaskFailed') {
-         final errMsg = "Error: ${header['status_text']}";
-         _textController.add(errMsg);
+         // 任务失败（鉴权/参数/余额等）：记录到 _lastError，由 stop() 上报，不注入文本流
+         _lastError = "识别失败: ${header['status_text']}";
       }
     } catch (e) {
       AppLog.d("[AliyunProvider] Message parse error: $e");
@@ -289,7 +292,12 @@ class AliyunProvider implements ASRProvider {
     // Reset idle timer (connection stays open)
     _resetIdleTimer();
 
-    return ASRResult.textOnly(_committedText + _currentSentence);
+    // 有错误且无有效文本 → 通过 error 字段上报（CoreEngine 会显示，不当成"无语音"）
+    final text = _committedText + _currentSentence;
+    if (_lastError != null && text.isEmpty) {
+      return ASRResult.withError(_lastError!);
+    }
+    return ASRResult.textOnly(text);
   }
 
   @override
