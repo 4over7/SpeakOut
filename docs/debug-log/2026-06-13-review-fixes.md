@@ -190,3 +190,22 @@ A1 的 keychain 真迁移、A2 的 gateway token 中转都是涉及 entitlement/
 - `flutter analyze`（aliyun_token_service）：No issues found。
 - `flutter test aliyun_token_service_blackbox_test`：21/21 通过。
 
+---
+
+## 收尾 — 整体回归 + 范围说明
+
+### 整体验证
+- `flutter analyze`（全量）：No issues found。
+- `flutter test`（全量，排除 3GB 真网 model_full_flow）：**598/598 通过**。
+- 8 个 commit：自更新加固 / quick wins / ASR 错误 / active model / A3 凭证 / gateway / C2 LLM model / A1·A2 止血。
+
+### 本轮处理范围（对照用户原则"把事做对，不为字面消灭强改"）
+- **已修 + 测试**：A3、B1、C1、C2、C3、D1-D5、F1·F2·F4-F7·F9。
+- **止血 + 文档诚实化，大改造待用户决策**：A1（keychain 真迁移）、A2（gateway token 中转 / 下线 legacy NLS）。
+- **评估后不强改（有理由）**：F3（脚本已兜底，文案不悲观化）、F8（纯 cosmetic 改名）；B1 的 DashScope 子项（报告过时，本就正确，未动）。
+- **需用户决策、不擅自改**：E1-E4（产品 UX 方向 / 大架构重构）。
+
+### 总复盘
+- 每条 review finding 都有了结：要么修了并测，要么论证为什么不在本轮做。没有"为达成字面目标而仓促改高风险项"。
+- 安全类（A 组）真实风险已止血（导出排除凭证、差集清理、http→https、文档不再撒谎），但凭证 keychain 化是涉及签名/公证/回滚的工程，留给用户决策——这是对的边界。
+
