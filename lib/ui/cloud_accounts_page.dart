@@ -30,8 +30,9 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     _refreshAccounts();
   }
 
-  void _refreshAccounts() {
-    _ensureAllProvidersExist();
+  Future<void> _refreshAccounts() async {
+    await _ensureAllProvidersExist();
+    if (!mounted) return;
     setState(() {
       _accounts = List.of(CloudAccountService().accounts);
       // 启用的排前面，禁用的排后面
@@ -44,12 +45,13 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   }
 
   /// 确保所有服务商都有对应的账户条目（新用户首次打开时自动创建）
-  void _ensureAllProvidersExist() {
+  /// await 每次 addAccount 的持久化，避免页面快速关闭/进程退出导致预置账户未落盘
+  Future<void> _ensureAllProvidersExist() async {
     final service = CloudAccountService();
     final existingProviderIds = service.accounts.map((a) => a.providerId).toSet();
     for (final provider in CloudProviders.all) {
       if (!existingProviderIds.contains(provider.id)) {
-        service.addAccount(CloudAccount(
+        await service.addAccount(CloudAccount(
           id: const Uuid().v4(),
           providerId: provider.id,
           displayName: provider.name,

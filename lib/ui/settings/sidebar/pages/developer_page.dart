@@ -294,6 +294,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
             controlSize: ControlSize.regular,
             secondary: true,
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               final path = await FilePicker.platform.saveFile(
                 dialogTitle: loc.aboutExportFileTitle,
                 fileName: 'speakout_config.json',
@@ -302,14 +303,12 @@ class _DeveloperPageState extends State<DeveloperPage> {
               );
               if (path != null) {
                 final result = await ConfigBackupService.exportToFile(path);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(result.success
-                        ? loc.aboutExportSuccess(result.message)
-                        : loc.aboutExportFailed(result.error ?? '')),
-                    behavior: SnackBarBehavior.floating,
-                  ));
-                }
+                messenger.showSnackBar(SnackBar(
+                  content: Text(result.success
+                      ? loc.aboutExportSuccess(result.message)
+                      : loc.aboutExportFailed(result.error ?? '')),
+                  behavior: SnackBarBehavior.floating,
+                ));
               }
             },
             child: Text(loc.aboutExportAction),
@@ -324,6 +323,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
             controlSize: ControlSize.regular,
             secondary: true,
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               final result = await FilePicker.platform.pickFiles(
                 dialogTitle: loc.aboutImportFileTitle,
                 allowedExtensions: ['json'],
@@ -331,16 +331,15 @@ class _DeveloperPageState extends State<DeveloperPage> {
               );
               if (result != null && result.files.single.path != null) {
                 final importResult = await ConfigBackupService.importFromFile(result.files.single.path!);
-                if (context.mounted) {
-                  setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(importResult.success
-                        ? loc.aboutImportSuccess(importResult.message)
-                        : loc.aboutImportFailed(importResult.error ?? '')),
-                    backgroundColor: importResult.success ? MacosColors.systemGreenColor : null,
-                    behavior: SnackBarBehavior.floating,
-                  ));
-                }
+                if (!mounted) return;
+                setState(() {});
+                messenger.showSnackBar(SnackBar(
+                  content: Text(importResult.success
+                      ? loc.aboutImportSuccess(importResult.message)
+                      : loc.aboutImportFailed(importResult.error ?? '')),
+                  backgroundColor: importResult.success ? MacosColors.systemGreenColor : null,
+                  behavior: SnackBarBehavior.floating,
+                ));
               }
             },
             child: Text(loc.aboutImportAction),

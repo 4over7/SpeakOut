@@ -40,7 +40,12 @@ class AppService {
       AppLog.customLogDirectory = dir;
       engine.nativeInput?.setLogDirectory(dir);
     }
-    if (enabled) await AppLog.init();
+    if (enabled) {
+      await AppLog.init();
+    } else {
+      // 关闭 verbose：释放文件 sink + flush timer，避免句柄/定时器泄漏到应用退出
+      await AppLog.dispose();
+    }
     engine.nativeInput?.setDebugLogging(enabled);
   }
 

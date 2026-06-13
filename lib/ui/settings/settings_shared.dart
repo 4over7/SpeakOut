@@ -6,6 +6,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
 import '../../services/cloud_account_service.dart';
 import '../../models/cloud_account.dart';
+import '../../config/cloud_providers.dart';
 import '../../engine/core_engine.dart';
 import '../theme.dart';
 import '../widgets/settings_widgets.dart';
@@ -396,7 +397,10 @@ String resolveLlmApiKey() {
     final savedId = ConfigService().selectedLlmAccountId ?? '';
     final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : llmAccounts.first.id;
     final account = CloudAccountService().getAccountById(effectiveId);
-    return account?.credentials['api_key'] ?? '';
+    if (account == null) return '';
+    // 用 provider 的 llmApiKeyField（讯飞等为 api_password），不硬编码 api_key
+    final keyField = CloudProviders.getById(account.providerId)?.llmApiKeyField ?? 'api_key';
+    return account.credentials[keyField] ?? '';
   }
   return ConfigService().llmApiKey;
 }

@@ -34,3 +34,27 @@ helper 脚本是 best-effort 替换：`rm -rf 旧 app` → `cp 新 app`，无任
 - F3 文案：脚本侧已加可写兜底（失败自动 open DMG，体验闭环），故 UI 文案"安装并重启"维持不改——过度悲观文案反而吓用户。
 - F8（canAutoUpdate 改名 canDownloadInApp）：纯 cosmetic，会牵动多处调用点，价值低，不强行改。
 - 未触及 native dylib（仅改 Dart 生成的脚本字符串），无需重编译 libnative_input.dylib。
+
+---
+
+## 第 2 轮 — Dart quick wins（C3 / D3 / D4 / D5）
+
+### 现象
+- C3：关闭 verbose 时 `applyVerboseLogging` 不调 dispose，sink+500ms timer 泄漏到退出。
+- D3：`_ensureAllProvidersExist` 同步函数里裸调 `addAccount`（Future），持久化 fire-and-forget。
+- D4：`resolveLlmApiKey` 硬编码 `credentials['api_key']`，讯飞（api_password）被误判未配置（仅 superpower_tab 一处 UI 提示）。
+- D5：developer_page 导入/导出 await 后用 context，analyzer 报 2 个 info（unrelated mounted check）。
+
+### 措施
+- `app_service.dart`：`enabled==false` 时 `await AppLog.dispose()`。
+- `cloud_accounts_page.dart`：`_refreshAccounts`/`_ensureAllProvidersExist` 改 `Future<void>` 并 await，加 `if(!mounted)return`。
+- `settings_shared.dart`：`resolveLlmApiKey` 改用 `CloudProviders.getById(account.providerId)?.llmApiKeyField`（import cloud_providers）。
+- `developer_page.dart`：导入/导出 onPressed 在 await 前 `final messenger = ScaffoldMessenger.of(context)`，去掉 `context.mounted` 包裹，setState 前 `if(!mounted)return`。
+
+### 验证结果
+- `flutter analyze`：No issues found（D5 两个 info 消除）。
+- `flutter test test/services/`：350/350 通过，无回归。
+
+### 复盘
+- 都是确定性小修，无意外。D4 真实影响本就小（只一处 UI 提示），但修了消除不一致。
+
