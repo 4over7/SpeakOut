@@ -60,9 +60,14 @@ class LLMService {
       if (provider != null && provider.hasLLM) {
         final apiKey = account.credentials[provider.llmApiKeyField] ?? '';
         final baseUrl = provider.llmBaseUrl ?? '';
-        // selectedLlmAccountId 命中时尊重用户的 model 选择；推荐兜底时强制用服务商默认模型
+        // selectedLlmAccountId 命中时尊重用户的 model 选择；推荐兜底时强制用服务商默认模型。
+        // 仅当全局 model 归属当前 account 时才用，否则用 provider 默认——
+        // 防止用户为 provider A 选的 model 名被打到 provider B（C2）。
         final savedModel = ConfigService().llmModelOverride;
-        final model = (!fromRecommendation && savedModel != null && savedModel.isNotEmpty)
+        final modelOwner = ConfigService().llmModelOwnerAccountId;
+        final model = (!fromRecommendation &&
+                savedModel != null && savedModel.isNotEmpty &&
+                modelOwner == account.id)
             ? savedModel
             : (provider.llmDefaultModel ?? '');
         final isAnthropic = provider.llmApiFormat == LlmApiFormat.anthropic;
@@ -638,7 +643,10 @@ class LLMService {
     final resolved = _resolveLlmConfig();
     final apiKey = resolved.apiKey;
     final baseUrl = resolved.baseUrl;
-    final model = ConfigService().agentRouterModel; // Use dedicated router model
+    // 优先用为 router 单独配置的模型；否则用 resolve 出的（已按 account 过滤的）model，
+    // 避免 router 用到不属于当前 provider 的旧模型名（C2）
+    final routerRaw = ConfigService().agentRouterModelRaw;
+    final model = (routerRaw != null && routerRaw.isNotEmpty) ? routerRaw : resolved.model;
 
     if (apiKey.isEmpty) return null;
     

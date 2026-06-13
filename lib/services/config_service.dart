@@ -352,6 +352,21 @@ class ConfigService {
     await _prefs?.setString('work_mode', _inferWorkMode());
   }
 
+  /// One-time migration: 给历史全局 llm_model 打上当前 selectedLlmAccountId 归属标记，
+  /// 否则迁移后会被当成"无归属"而回退到 provider 默认，丢失用户已选模型。
+  Future<void> migrateLlmModelOwner() async {
+    const flag = 'llm_model_owner_migrated';
+    if (_prefs?.getBool(flag) ?? false) return;
+    final global = _prefs?.getString('llm_model');
+    final sel = selectedLlmAccountId;
+    if (global != null && global.isNotEmpty &&
+        sel != null && sel.isNotEmpty &&
+        _prefs?.getString('llm_model_owner') == null) {
+      await _prefs?.setString('llm_model_owner', sel);
+    }
+    await _prefs?.setBool(flag, true);
+  }
+
   // --- Engine Type ---
   String get asrEngineType => _prefs?.getString('asr_engine_type') ?? 'sherpa';
 
@@ -388,7 +403,14 @@ class ConfigService {
     if (key.isEmpty) { await _prefs?.remove('llm_api_key'); }
     else { await _prefs?.setString('llm_api_key', key); }
   }
-  Future<void> setLlmModel(String model) async => await _prefs?.setString('llm_model', model);
+  Future<void> setLlmModel(String model) async {
+    await _prefs?.setString('llm_model', model);
+    // 记录该 model 归属哪个 LLM 账户，避免切 provider 后旧 model 名污染新 provider（见 LLMService._resolveLlmConfig）
+    final owner = selectedLlmAccountId;
+    if (owner != null && owner.isNotEmpty) {
+      await _prefs?.setString('llm_model_owner', owner);
+    }
+  }
 
   // --- Input/Output Language ---
   // inputLanguage: 'auto' | 'zh' | 'en' | 'ja' | 'ko' | 'yue'
@@ -458,6 +480,8 @@ class ConfigService {
   String? get llmBaseUrlOverride => _prefs?.getString('llm_base_url');
   String? get llmApiKeyOverride => _cachedLlmApiKey;
   String? get llmModelOverride => _prefs?.getString('llm_model');
+  /// 全局 llm_model 归属的账户 id：用于判断该 model 是否适用于当前选中的 LLM account
+  String? get llmModelOwnerAccountId => _prefs?.getString('llm_model_owner');
 
   // --- Cloud Account Selection ---
   String? get selectedAsrAccountId => _prefs?.getString('selected_asr_account_id');
@@ -484,6 +508,8 @@ class ConfigService {
 
   // --- Agent Router Config ---
   String get agentRouterModel => _getStringWithDefault('agent_router_model', llmModel);
+  /// 用户为 router 单独配置的模型（不回退 llmModel）；为空表示未单独配置
+  String? get agentRouterModelRaw => _prefs?.getString('agent_router_model');
   Future<void> setAgentRouterModel(String model) async => await _prefs?.setString('agent_router_model', model);
 
   // --- I18n ---

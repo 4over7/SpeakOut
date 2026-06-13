@@ -146,3 +146,27 @@ UI 删除模型只调 `deleteModel`（仅删目录），不处理 active 状态 
 - `node --check gateway/src/index.js`：语法 OK。
 - gateway 无单测脚本（仅 wrangler deploy/dev）；CORS/鉴权为 hono 标准用法，改动需 `npm run deploy` 部署后生效（发版流程第 7 步）。
 
+---
+
+## 第 7 轮 — LLM model 跨 provider 污染（C2）
+
+### 现象
+`llm_model` 是单一全局 key，用户为 provider A 选的 model 名（如 gpt-4o-mini）切到 provider B 不重选时，会被打到 B（错误模型名）。Router 用全局 agentRouterModel 同理。
+
+### 方案选择（不全量 per-account）
+完整 per-account 存储要改 mode_tab 8+ 个读写点跨两套 selector，风险高、收益比不划算（报告也承认正常路径切账户会带新 model）。改用 **owner-tagging**：给全局 model 打归属账户标记，集中在 setLlmModel/resolve 两处，彻底消除"A 的 model 打到 B"。代价：切回 A 不记忆 A 旧 model（用默认），可接受。
+
+### 措施
+- `config_service.dart`：setLlmModel 写入时记 `llm_model_owner = selectedLlmAccountId`；加 `llmModelOwnerAccountId` / `agentRouterModelRaw` getter；加 `migrateLlmModelOwner()`（给历史全局 model 打当前 account 标记）。
+- `llm_service.dart`：_resolveLlmConfig 仅当 `modelOwner == account.id` 才用全局 model，否则 provider 默认；routeIntent 优先 router raw、否则用 resolved.model（已按 account 过滤）。
+- `app_service.dart`：init 调 migrateLlmModelOwner。
+- `llm_model_owner_test.dart`（新）：3 测试（记 owner / 切账户 owner 不匹配 / 迁移打标记）。
+
+### 验证结果
+- `flutter analyze`（3 文件）：No issues found。
+- `flutter test test/services/`：352/352 无回归；`llm_model_owner_test`：3/3 通过。
+
+### 复盘
+- owner 方案改动集中（2 处核心 + 迁移），无需碰 8 个 UI 点，风险远低于全量 per-account。
+- 测试用 `reload()`（总是重读 prefs）而非 `init()`（有 _initialized 守卫第二次跳过），避免 singleton 状态污染。
+
