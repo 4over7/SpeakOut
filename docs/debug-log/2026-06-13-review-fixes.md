@@ -170,3 +170,23 @@ UI 删除模型只调 `deleteModel`（仅删目录），不处理 active 状态 
 - owner 方案改动集中（2 处核心 + 迁移），无需碰 8 个 UI 点，风险远低于全量 per-account。
 - 测试用 `reload()`（总是重读 prefs）而非 `init()`（有 _initialized 守卫第二次跳过），避免 singleton 状态污染。
 
+---
+
+## 第 8 轮 — 凭证安全：止血 + 文档诚实化（A1 / A2）
+
+### 判断：大改造不顺手做
+A1 的 keychain 真迁移、A2 的 gateway token 中转都是涉及 entitlement/签名公证/凭证核心读写或后端开发的大工程，仓促做有凭证丢失风险，违背"把事做对"。本轮只做**零风险的安全改进 + 文档诚实化**，大改造明确列为需用户决策的单独项。
+
+### 措施
+- A2 止血：`aliyun_token_service.dart` endpoint `http://` → `https://`（AK/SK 本地签名请求不再走明文；blackbox 21/21 验证签名逻辑不受影响）。
+- A1 诚实化：`lib/services/AGENTS.md` §5 改为实话——凭证仍明文 SharedPreferences（更正"已迁 keychain"假声明），并记录已落地的导出排除/差集清理 + keychain 迁移 TODO。
+- A2 诚实化：`gateway/AGENTS.md` /aliyun/token 标"规划中未实现"，§4 写明"目标态 vs 现状（legacy 本地签名、endpoint 已 https）"。
+
+### 待用户决策的单独大项
+- **A1**：迁移凭证到 flutter_secure_storage（macOS keychain）——entitlement 变更 + 数据迁移 + 公证验证 + 回滚。
+- **A2**：实现 Gateway `/aliyun/token` 中转，或直接下线 legacy NLS（新用户已走 DashScope）。
+
+### 验证结果
+- `flutter analyze`（aliyun_token_service）：No issues found。
+- `flutter test aliyun_token_service_blackbox_test`：21/21 通过。
+

@@ -6,7 +6,8 @@ import 'package:uuid/uuid.dart';
 import 'package:speakout/config/app_log.dart';
 
 class AliyunTokenService {
-  static const String _endpoint = "http://nls-meta.cn-shanghai.aliyuncs.com";
+  // HTTPS：避免 AK/SK 本地签名换 token 的请求走明文（legacy NLS 路径，理想应由 Gateway 中转，见 gateway/AGENTS.md）
+  static const String _endpoint = "https://nls-meta.cn-shanghai.aliyuncs.com";
   
   /// Exchange AccessKey ID/Secret for a temporary NLS Token.
   /// Returns null if failed, logs error otherwise.

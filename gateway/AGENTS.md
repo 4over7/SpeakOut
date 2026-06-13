@@ -11,7 +11,7 @@
 
 SpeakOut 客户端不能在本地存某些云端凭据（如阿里云的 access key 不能给用户暴露）+ 需要中心化的计费/版本/统计入口。Gateway 是这层薄中介：
 - **版本/更新检查**（GET /version）— 客户端启动时拉，决定是否提示更新
-- **阿里云 NLS Token 生成**（POST /aliyun/token）— 客户端 ASR 用，每次 token 5 分钟有效
+- **阿里云 NLS Token 生成**（POST /aliyun/token）— ⚠️ 规划中、当前未实现：legacy NLS provider 仍在客户端本地用 AK/SK 签名换 token（见下「阿里云密钥」）
 - **许可证验证 + 计费**（POST /license / billing）— 收费用户的额度管理
 - **版本/活跃统计**（KV 累加器）— `stats:version:{v}` + `stats:daily:{date}`，90 天 TTL
 
@@ -36,8 +36,9 @@ Cloudflare KV 简单，符合 SpeakOut 的"键值统计 + 配置"场景。**不�
 
 发版流程必须**同步 gateway version**：`pubspec.yaml` 改 → `gateway/src/index.js` 同步 → `npm run deploy`。**写错版本号 = 用户看到旧版**。
 
-### 4. 阿里云密钥服务器侧
-阿里云 NLS Token 生成需要 `AccessKey ID/Secret`，**不能给客户端**（用户拿到后能调任意阿里云 API）。Gateway 中转：客户端发 license token，Gateway 用服务器侧密钥生成 NLS token 返回。
+### 4. 阿里云密钥（⚠️ 目标态 vs 现状）
+**目标**：`AccessKey ID/Secret` 不给客户端（用户拿到能调任意阿里云 API）；由 Gateway 中转——客户端发 license token，Gateway 用服务器侧密钥生成 NLS token 返回。
+**现状（2026-06-13 核实）**：`/aliyun/token` 路由尚未实现；legacy `AliyunProvider` 仍在客户端本地用 AK/SK 做 HMAC 签名换 token（endpoint 已从 http 改 https 止血）。这是 legacy「阿里云 NLS 旧版」路径，新用户走 DashScope/其他 provider。**TODO（需单独排期/决策）**：实现 Gateway `/aliyun/token`，或直接下线 legacy NLS。
 
 ### 5. 公证签名 + Stapled
 DMG URL 指向 GitHub Release（已签名 + Apple Notarized + Stapled）。`/version` 返回的 `dmg_url` 带版本号路径，CDN cache 友好。

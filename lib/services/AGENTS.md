@@ -52,8 +52,11 @@
 ### 4. 流式 stream 在 dispose() 时必须关
 所有 service 用 `StreamController` 暴露状态变化。`dispose()` 不关 stream → 内存泄漏 + 单元测试 hang。
 
-### 5. 云账户凭证迁移
-`flutter.cloud_cred_secure_migrated` 标记凭证已从明文迁移到 keychain（2026-03-17 引入）。新账户直接进 keychain。**不要再写明文凭证到 SharedPreferences**。
+### 5. 云账户凭证存储（⚠️ 当前为明文 SharedPreferences）
+**现状（2026-06-13 核实）**：云账户凭证（`cloud_cred_*`）、阿里云 AK/SK、LLM key 实际**仍明文存 SharedPreferences**（见 `cloud_account_service.dart`、`config_service._preloadSecureKeys`）。早期文档曾声称"已迁 keychain"，与实现不符，现更正为实话。
+- 配置导出默认排除凭证（`ConfigBackupService.exportToFile` 的 `includeCredentials` 默认 false）。
+- updateAccount 会清理被移除的旧凭证 key（差集），避免残留 secret。
+- **TODO（需单独排期，不可顺手做）**：迁移到 `flutter_secure_storage`（macOS keychain）。涉及 entitlement 变更 + 现有明文数据迁移 + 公证签名验证，需专门测试与回滚方案。
 
 ### 6. ChatService metadata 字段扩展
 聊天气泡可携带 `metadata` map，用于 dictation 气泡折叠展开 ASR 原文（v1.6.x 起）。新增类似功能时复用此字段，**不要扩 message 主表 schema**。
