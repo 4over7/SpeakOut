@@ -126,3 +126,23 @@ UI 删除模型只调 `deleteModel`（仅删目录），不处理 active 状态 
 - `flutter analyze`（3 文件）：No issues found。
 - `flutter test test/services/config_backup_service_test.dart`：2/2 通过。
 
+---
+
+## 第 6 轮 — Gateway /stats 鉴权 + CORS（D1 / D2）
+
+### 现象
+- D1：/stats 无鉴权公开版本分布/日活；/version 的 KV 计数 get→put 非原子，高并发丢增量。
+- D2：CORS middleware 是空壳（只 await next()，OPTIONS 只回 204），名不副实。
+
+### 措施（gateway/src/index.js）
+- D1：/stats 加 `Admin-Key` 校验（复用 /admin/generate 模式）；/version 计数处加注释标注"KV 非原子、计数仅粗略估计"。
+- D2：定义 `CORS_HEADERS`，middleware 在 next() 后统一附加 Access-Control-* header，OPTIONS 返回带 CORS 头的 204。
+
+### 设计权衡
+- KV 竞态：报告也承认是统计误差、不影响主流程；改 Analytics Engine/Durable Object 是大改，本轮只加注释如实标注，不强行重构。
+- CORS：当前 Flutter 客户端非浏览器、不受 CORS 限制，本不是 bug；选择"实现真 CORS"而非删注释，消除误导并为未来 web 管理页铺路。
+
+### 验证结果
+- `node --check gateway/src/index.js`：语法 OK。
+- gateway 无单测脚本（仅 wrangler deploy/dev）；CORS/鉴权为 hono 标准用法，改动需 `npm run deploy` 部署后生效（发版流程第 7 步）。
+

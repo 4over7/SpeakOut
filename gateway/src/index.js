@@ -15,16 +15,23 @@ const PLANS = {
 // ═══════════════════════════════════════════════════════════
 // CORS & 预检
 // ═══════════════════════════════════════════════════════════
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Admin-Key',
+};
 app.use('*', async (c, next) => {
     await next();
+    for (const [k, v] of Object.entries(CORS_HEADERS)) c.header(k, v);
 });
-app.options('*', (c) => c.body(null, 204));
+app.options('*', (c) => c.body(null, 204, CORS_HEADERS));
 
 // ═══════════════════════════════════════════════════════════
 // 0. 版本检查
 // ═══════════════════════════════════════════════════════════
 app.get('/version', async (c) => {
-    // 记录客户端版本统计（fire-and-forget）
+    // 记录客户端版本统计（fire-and-forget）。
+    // 注意：KV 非原子计数器，get→put 在高并发下会丢增量，此处计数仅为粗略估计。
     const clientVersion = c.req.query('v') || 'unknown';
     const clientBuild = c.req.query('b') || '0';
     try {
@@ -51,6 +58,9 @@ app.get('/version', async (c) => {
 // 0.5 版本统计查询
 // ═══════════════════════════════════════════════════════════
 app.get('/stats', async (c) => {
+    // 运营数据（版本分布/日活）需管理员鉴权，避免公开泄露
+    const adminKey = c.req.header('Admin-Key');
+    if (adminKey !== c.env.ADMIN_SECRET) return c.json({ error: 'Unauthorized' }, 401);
     const versions = {};
     const list = await c.env.SPEAKOUT_DB.list({ prefix: 'stats:version:' });
     for (const key of list.keys) {
