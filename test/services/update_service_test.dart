@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/services/update_service.dart';
 
@@ -37,6 +38,37 @@ void main() {
 
     test('非数字段回退为 0', () {
       expect(UpdateService.isNewer('1.5.abc', '1.5.0'), false);
+    });
+  });
+
+  group('UpdateService helper 脚本安全保护', () {
+    test('prepareInstall 生成的脚本含签名校验 + 原子安装，且不先删旧 app', () {
+      final scriptPath = UpdateService().prepareInstall();
+      expect(scriptPath, isNotEmpty, reason: 'github 渠道应生成 helper 脚本');
+      final script = File(scriptPath).readAsStringSync();
+
+      // F2：签名 / TeamIdentifier / BundleIdentifier 校验
+      expect(script, contains('codesign --verify'));
+      expect(script, contains('TeamIdentifier'));
+      expect(script, contains('CFBundleIdentifier'));
+      expect(script, contains('UB9D55S724'), reason: '预期 Team ID');
+      expect(script, contains('com.speakout.speakout'), reason: '预期 bundle id');
+      // F2：去掉 -noverify，让 macOS 校验 DMG 完整性
+      expect(script, isNot(contains('-noverify')));
+
+      // F1：原子安装 — staging + backup + 回滚
+      expect(script, contains(r'$APP_NAME.new'));
+      expect(script, contains(r'$APP_NAME.backup'));
+      expect(script, contains('rolling back'));
+
+      // F3：安装目录可写性兜底
+      expect(script, contains(r'-w "$INSTALL_DIR"'));
+
+      // F1：不再"先删旧 app 再直接复制到安装目录"——复制目标必须是 staging
+      expect(script, isNot(contains(r'cp -R "$APP_IN_DMG" "$INSTALL_DIR/"')));
+      expect(script, contains(r'cp -R "$APP_IN_DMG" "$STAGING"'));
+
+      try { File(scriptPath).deleteSync(); } catch (_) {}
     });
   });
 }

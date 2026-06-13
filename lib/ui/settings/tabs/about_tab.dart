@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,11 +33,33 @@ class _AboutTabState extends State<AboutTab> {
   String _modelsDir = '';
   bool _diagnosticsCopied = false;
 
+  // Update state mirrored from UpdateService（让 About 页更新按钮也能进入"安装并重启"闭环）
+  UpdateState _updateState = UpdateState.idle;
+  StreamSubscription? _updateStateSub;
+
   @override
   void initState() {
     super.initState();
     _loadVersion();
     _loadModelsDir();
+    _updateState = UpdateService().state;
+    _updateStateSub = UpdateService().stateChanges.listen((s) {
+      if (mounted) setState(() => _updateState = s);
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateStateSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleInstallAndRestart() {
+    final svc = UpdateService();
+    final scriptPath = svc.prepareInstall();
+    if (scriptPath.isEmpty) return;
+    AppService().engine.nativeInput?.launchUpdater(scriptPath);
+    Future.delayed(const Duration(milliseconds: 500), () => exit(0));
   }
 
   Future<void> _loadVersion() async {
@@ -239,28 +262,47 @@ class _AboutTabState extends State<AboutTab> {
                               children: [
                                 Text(_updateResult!, style: AppTheme.caption(context).copyWith(fontSize: 11, color: MacosColors.systemOrangeColor)),
                                 const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () {
-                                    final svc = UpdateService();
-                                    if (svc.canAutoUpdate) {
-                                      svc.downloadUpdate();
-                                    } else {
-                                      final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
-                                      launchUrl(Uri.parse(url));
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.getAccent(context),
-                                      borderRadius: BorderRadius.circular(10),
+                                Builder(builder: (context) {
+                                  final svc = UpdateService();
+                                  final isReady = _updateState == UpdateState.readyToInstall;
+                                  final isDownloading = _updateState == UpdateState.downloading;
+                                  final isInstalling = _updateState == UpdateState.installing;
+                                  String btnLabel;
+                                  if (isReady) {
+                                    btnLabel = '安装并重启';
+                                  } else if (isDownloading) {
+                                    btnLabel = '${(svc.lastProgress * 100).toInt()}%';
+                                  } else if (isInstalling) {
+                                    btnLabel = '安装中...';
+                                  } else {
+                                    btnLabel = svc.canAutoUpdate ? loc.aboutUpdateDownload : loc.updateAction;
+                                  }
+                                  return GestureDetector(
+                                    onTap: (isDownloading || isInstalling)
+                                        ? null
+                                        : () {
+                                            if (isReady) {
+                                              _handleInstallAndRestart();
+                                            } else if (svc.canAutoUpdate) {
+                                              svc.downloadUpdate();
+                                            } else {
+                                              final url = svc.downloadUrl ?? 'https://github.com/4over7/SpeakOut/releases/latest';
+                                              launchUrl(Uri.parse(url));
+                                            }
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: isReady ? MacosColors.systemGreenColor : AppTheme.getAccent(context),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        btnLabel,
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                      ),
                                     ),
-                                    child: Text(
-                                      UpdateService().canAutoUpdate ? loc.aboutUpdateDownload : loc.updateAction,
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
-                                    ),
-                                  ),
-                                ),
+                                  );
+                                }),
                               ],
                             ),
                     )

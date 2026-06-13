@@ -951,6 +951,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   void _handleInstallAndRestart() {
     final svc = UpdateService();
     final scriptPath = svc.prepareInstall();
+    // 空路径 = 当前渠道不支持自动安装（如 App Store）；不要在没有 helper 的情况下退出 app
+    if (scriptPath.isEmpty) return;
     _appService.engine.nativeInput?.launchUpdater(scriptPath);
     Future.delayed(const Duration(milliseconds: 500), () {
       exit(0);

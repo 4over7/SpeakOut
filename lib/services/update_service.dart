@@ -247,7 +247,10 @@ class UpdateService {
         request.headers['Range'] = 'bytes=$resumeFrom-';
       }
 
-      final response = await client.send(request);
+      // 连接建立超时：30s 内拿不到响应头视为失败
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 30));
 
       // 200 = 完整下载；206 = 断点续传成功
       final isPartial = response.statusCode == 206;
@@ -353,12 +356,19 @@ class UpdateService {
     final installDir = File(appBundle).parent.path; // e.g. "/Applications"
     final logPath = helperLogPath;
 
-    // 关键修复（v1.8.2）：
-    // - 用 hdiutil -plist 输出，从 `<string>/Volumes/...</string>` 直接 grep 出 mount-point
-    //   （旧版 awk '{print $NF}' 在 mount point 含空格如 "/Volumes/SpeakOut 1" 时取错值）
-    // - 启动前先 detach 所有 /Volumes/SpeakOut* 避免占用导致系统重命名带空格
-    // - 全程详细日志写到 ~/Library/Logs/speakout-updater.log，方便排错
-    // - mount 兜底：grep 失败时从 mount 命令找新增的挂载点
+    // 预期签名身份（用于校验更新包，防止 DMG 来源被替换/配置错误）
+    // 这些是公开信息（包含在已签名 app 的 codesign 输出里），硬编码校验是标准做法。
+    const expectedTeamId = 'UB9D55S724';
+    const expectedBundleId = 'com.speakout.speakout';
+
+    // 安全自更新流程（v1.8.7）：
+    // - 原子安装 + 回滚：先 copy-to-staging（.new），验证通过后才把旧 app mv 到 .backup、
+    //   staging mv 成正式名；任一步失败回滚旧 app。新 app 验证前绝不删除旧 app（修 F1）。
+    // - 签名校验：挂载后去掉 -noverify，并对 DMG 内 app 与复制后的 staging 双重校验
+    //   codesign --verify + TeamIdentifier + CFBundleIdentifier（修 F2）。
+    // - 名字归一：staging 最终 mv 成当前 appName，无论 DMG 内 app 叫什么，relaunch 永远一致（修 F7）。
+    // - 可写性兜底：安装目录不可写直接打开 DMG 手动安装（修 F3 脚本侧）。
+    // - mount-point 解析沿用 v1.8.2 的 -plist grep + mount 兜底（支持空格/unicode）。
     final script = '''#!/bin/bash
 # SpeakOut Auto-Update Helper
 
@@ -366,15 +376,54 @@ LOG="$logPath"
 mkdir -p "\$(dirname "\$LOG")"
 exec >> "\$LOG" 2>&1
 
+EXPECTED_TEAM="$expectedTeamId"
+EXPECTED_BUNDLE="$expectedBundleId"
+DMG="$_dmgPath"
+INSTALL_DIR="$installDir"
+APP_NAME="$appName"
+TARGET="\$INSTALL_DIR/\$APP_NAME"
+STAGING="\$INSTALL_DIR/\$APP_NAME.new"
+BACKUP="\$INSTALL_DIR/\$APP_NAME.backup"
+
 echo ""
 echo "=========================================="
 echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper start"
-echo "DMG:  $_dmgPath"
-echo "App:  $installDir/$appName"
+echo "DMG:    \$DMG"
+echo "Target: \$TARGET"
 echo "=========================================="
 
 # Wait for the app to exit
 sleep 2
+
+# Install dir 可写性检查：不可写直接走手动安装（避免进入删除/复制流程）
+if [ ! -w "\$INSTALL_DIR" ]; then
+  echo "  install dir not writable: \$INSTALL_DIR, fallback to manual"
+  open "\$DMG"
+  exit 1
+fi
+
+# 校验 app 签名 + TeamIdentifier + CFBundleIdentifier
+verify_app() {
+  local app="\$1"
+  if ! codesign --verify --deep --strict "\$app"; then
+    echo "  codesign --verify failed: \$app"
+    return 1
+  fi
+  local team
+  team=\$(codesign -dv "\$app" 2>&1 | grep -E '^TeamIdentifier=' | cut -d= -f2)
+  if [ "\$team" != "\$EXPECTED_TEAM" ]; then
+    echo "  team mismatch: got '\$team' expected '\$EXPECTED_TEAM'"
+    return 1
+  fi
+  local bid
+  bid=\$(defaults read "\$app/Contents/Info" CFBundleIdentifier 2>/dev/null)
+  if [ "\$bid" != "\$EXPECTED_BUNDLE" ]; then
+    echo "  bundle id mismatch: got '\$bid' expected '\$EXPECTED_BUNDLE'"
+    return 1
+  fi
+  echo "  verify ok: team=\$team bundle=\$bid"
+  return 0
+}
 
 # Pre-cleanup: detach any existing SpeakOut volumes
 # 否则 hdiutil 会自动起名 "SpeakOut 1"、"SpeakOut 2"
@@ -385,9 +434,9 @@ for mp in /Volumes/SpeakOut*; do
   fi
 done
 
-# Attach DMG with -plist for reliable parsing
+# Attach DMG with -plist for reliable parsing（不再跳过校验，让 macOS 校验 DMG 完整性）
 echo ">> hdiutil attach -plist"
-ATTACH_PLIST=\$(hdiutil attach "$_dmgPath" -plist -nobrowse -noverify -noautoopen 2>&1)
+ATTACH_PLIST=\$(hdiutil attach "\$DMG" -plist -nobrowse -noautoopen 2>&1)
 ATTACH_RC=\$?
 echo "  exit=\$ATTACH_RC"
 
@@ -395,7 +444,7 @@ if [ \$ATTACH_RC -ne 0 ]; then
   echo "  hdiutil attach failed:"
   echo "\$ATTACH_PLIST"
   echo "<< fallback: open DMG for manual install"
-  open "$_dmgPath"
+  open "\$DMG"
   exit 1
 fi
 
@@ -412,7 +461,7 @@ echo "  mount-point: '\$MOUNT_POINT'"
 
 if [ -z "\$MOUNT_POINT" ] || [ ! -d "\$MOUNT_POINT" ]; then
   echo "  could not determine mount point, fallback to manual"
-  open "$_dmgPath"
+  open "\$DMG"
   exit 1
 fi
 
@@ -423,33 +472,75 @@ echo ">> find .app: '\$APP_IN_DMG'"
 if [ -z "\$APP_IN_DMG" ]; then
   echo "  no .app in DMG, fallback to manual"
   hdiutil detach "\$MOUNT_POINT" -force 2>&1 || true
-  open "$_dmgPath"
+  open "\$DMG"
   exit 1
 fi
 
-# Remove old app and copy new one
-echo ">> replacing $installDir/$appName"
-rm -rf "$installDir/$appName"
-cp -R "\$APP_IN_DMG" "$installDir/"
+# 校验 DMG 内 app（签名 + team + bundle id），失败直接放弃自动安装
+echo ">> verify source app"
+if ! verify_app "\$APP_IN_DMG"; then
+  echo "  source app verification failed, abort auto-install"
+  hdiutil detach "\$MOUNT_POINT" -force 2>&1 || true
+  open "\$DMG"
+  exit 1
+fi
+
+# 原子安装第 1 步：copy-to-staging（不动旧 app）
+echo ">> copy to staging: \$STAGING"
+rm -rf "\$STAGING"
+cp -R "\$APP_IN_DMG" "\$STAGING"
 CP_RC=\$?
 echo "  cp exit=\$CP_RC"
 
-# Unmount DMG
+# Unmount DMG（复制完即可卸载）
 hdiutil detach "\$MOUNT_POINT" -force 2>&1 || true
 
 if [ \$CP_RC -ne 0 ]; then
-  echo "  cp failed, fallback to manual"
-  open "$_dmgPath"
+  echo "  copy to staging failed, fallback to manual"
+  rm -rf "\$STAGING"
+  open "\$DMG"
   exit 1
 fi
 
-# Clean up
-rm -f "$_dmgPath"
+# 复制后再校验一次 staging（防复制过程损坏）
+echo ">> verify staged app"
+if ! verify_app "\$STAGING"; then
+  echo "  staged app verification failed, fallback to manual"
+  rm -rf "\$STAGING"
+  open "\$DMG"
+  exit 1
+fi
+
+# 原子安装第 2 步：swap。旧 app -> backup（mv，可回滚），staging -> 正式名
+if [ -e "\$TARGET" ]; then
+  rm -rf "\$BACKUP"
+  if ! mv "\$TARGET" "\$BACKUP"; then
+    echo "  backup old app failed, fallback to manual"
+    rm -rf "\$STAGING"
+    open "\$DMG"
+    exit 1
+  fi
+fi
+
+if ! mv "\$STAGING" "\$TARGET"; then
+  echo "  promote staging failed, rolling back"
+  rm -rf "\$STAGING"
+  if [ -e "\$BACKUP" ]; then
+    mv "\$BACKUP" "\$TARGET" || echo "  ROLLBACK FAILED, backup at \$BACKUP"
+  fi
+  open "\$DMG"
+  exit 1
+fi
+
+# 成功：清理 backup + DMG + helper
+echo ">> install ok, cleanup"
+rm -rf "\$BACKUP"
+rm -f "\$DMG"
 rm -f "$_helperPath"
 
 # Relaunch
 echo ">> relaunch"
-open "$installDir/$appName"
+open "\$TARGET"
 echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
 ''';
 
