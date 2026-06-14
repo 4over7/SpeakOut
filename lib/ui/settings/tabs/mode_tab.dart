@@ -663,22 +663,15 @@ class ModeTabState extends State<ModeTab> {
     final inputLang = ConfigService().inputLanguage;
     final modelId = ConfigService().activeModelId;
 
-    // 1. Translation mode + wrong work mode
+    // 1. 翻译需要 AI 润色（LLM 翻译），与本地/云端识别模式无关
     if (isTranslation) {
-      if (workMode == 'offline') {
+      if (!ConfigService().aiCorrectionEnabled) {
         hints.add(_languageHintBanner(
           loc.translationNeedsSmartMode,
           color: MacosColors.systemOrangeColor,
           icon: CupertinoIcons.exclamationmark_triangle,
         ));
-      } else if (workMode == 'cloud') {
-        hints.add(_languageHintBanner(
-          loc.translationCloudLimited,
-          color: MacosColors.systemOrangeColor,
-          icon: CupertinoIcons.exclamationmark_triangle,
-        ));
       } else {
-        // Smart mode — just show blue info
         hints.add(_languageHintBanner(
           loc.translationModeHint,
           color: MacosColors.systemBlueColor,

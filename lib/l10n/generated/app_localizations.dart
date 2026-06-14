@@ -245,7 +245,7 @@ abstract class AppLocalizations {
   /// No description provided for @translationNeedsSmartMode.
   ///
   /// In en, this message translates to:
-  /// **'Translation requires AI polish. Please switch to Smart Mode to enable it.'**
+  /// **'Translation requires AI Polish. Please turn on the \"AI Polish\" switch above to enable it.'**
   String get translationNeedsSmartMode;
 
   /// No description provided for @translationCloudLimited.
@@ -2045,7 +2045,7 @@ abstract class AppLocalizations {
   /// No description provided for @smartNeedsAiPlusConfig.
   ///
   /// In en, this message translates to:
-  /// **'Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won\'t apply.'**
+  /// **'AI Polish needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise it won\'t apply.'**
   String get smartNeedsAiPlusConfig;
 
   /// No description provided for @gotoAiPlus.
@@ -2057,7 +2057,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiPlusNotActive.
   ///
   /// In en, this message translates to:
-  /// **'AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.'**
+  /// **'AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.'**
   String get aiPlusNotActive;
 
   /// No description provided for @aboutModelsDir.

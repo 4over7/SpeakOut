@@ -82,7 +82,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get translationNeedsSmartMode =>
-      '口译需要 AI 润色，当前为离线/云端模式。请切换到「智能模式」以启用翻译。';
+      '口译/翻译需要 AI 润色支持，请打开上方的「AI 润色」开关以启用翻译。';
 
   @override
   String get translationCloudLimited => '云端模式不含 AI 润色，口译效果有限。推荐切换到「智能模式」。';
@@ -1018,14 +1018,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get smartNeedsAiPlusConfig =>
-      'Smart 模式需在「AI Plus」页配置 LLM（服务商 / 模型 / API Key），否则 AI 润色不生效。';
+      'AI 润色需在「AI Plus」页配置 LLM（服务商 / 模型 / API Key），否则不生效。';
 
   @override
   String get gotoAiPlus => '前往 AI Plus';
 
   @override
   String get aiPlusNotActive =>
-      'AI 润色当前不生效：需在「识别引擎」页把工作模式切为 Smart（离线 + 云端 AI）。LLM 配置仍可在此编辑。';
+      'AI 润色当前未开启：在「识别引擎」页打开「AI 润色」开关即可生效。LLM 配置仍可在此编辑。';
 
   @override
   String get aboutModelsDir => '模型目录';

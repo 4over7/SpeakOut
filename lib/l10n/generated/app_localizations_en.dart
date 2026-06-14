@@ -83,7 +83,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get translationNeedsSmartMode =>
-      'Translation requires AI polish. Please switch to Smart Mode to enable it.';
+      'Translation requires AI Polish. Please turn on the \"AI Polish\" switch above to enable it.';
 
   @override
   String get translationCloudLimited =>
@@ -1065,14 +1065,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get smartNeedsAiPlusConfig =>
-      'Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won\'t apply.';
+      'AI Polish needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise it won\'t apply.';
 
   @override
   String get gotoAiPlus => 'Go to AI Plus';
 
   @override
   String get aiPlusNotActive =>
-      'AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.';
+      'AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.';
 
   @override
   String get aboutModelsDir => 'Models Directory';

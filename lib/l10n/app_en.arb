@@ -23,7 +23,7 @@
   "langRu": "Russian",
   "langPt": "Portuguese",
   "translationModeHint": "Translation Mode",
-  "translationNeedsSmartMode": "Translation requires AI polish. Please switch to Smart Mode to enable it.",
+  "translationNeedsSmartMode": "Translation requires AI Polish. Please turn on the \"AI Polish\" switch above to enable it.",
   "translationCloudLimited": "Cloud mode has no AI polish. Translation quality will be limited. Recommend Smart Mode.",
   "inputLangModelHint": "Current model has limited support for {lang}. Consider switching to Whisper Large-v3 for better recognition.",
   "audioInput": "Audio Input Device",
@@ -382,7 +382,7 @@
   "linkFeedback": "Feedback · 4over7@gmail.com",
   "linkGithubIssues": "GitHub Issues",
 
-  "smartNeedsAiPlusConfig": "Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won't apply.",
+  "smartNeedsAiPlusConfig": "AI Polish needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise it won't apply.",
   "gotoAiPlus": "Go to AI Plus",
   "aiPlusNotActive": "AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.",
 
