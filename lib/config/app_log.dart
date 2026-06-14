@@ -25,6 +25,11 @@ class AppLog {
   /// Runtime switch — set via AppService.applyVerboseLogging()
   static bool enabled = AppConstants.kVerboseLogging;
 
+  /// 是否在日志中记录完整敏感内容（语音原文 / LLM 输入输出 / 错误响应体）。
+  /// 默认 false：仅记长度 + 短 hash，避免 speakout.log 与导出日志包泄露邮件/账号/会议等隐私。
+  /// 需用户在「开发者选项」显式开启。由 AppService.applyVerboseLogging() 同步。
+  static bool logSensitive = false;
+
   static IOSink? _sink;
   static bool _initAttempted = false;
   static String? _activeLogDirectory; // 当前生效的日志目录
@@ -43,6 +48,9 @@ class AppLog {
       try { await _sink!.flush(); _sink!.close(); } catch (_) {}
       _sink = null;
     }
+    // 取消旧 flush timer（切换日志目录重建时避免 timer 泄漏 + 重复 flush）
+    _flushTimer?.cancel();
+    _flushTimer = null;
     _initAttempted = true;
     _activeLogDirectory = customLogDirectory;
     try {
@@ -91,6 +99,14 @@ class AppLog {
       _sink = null;
     }
     _initAttempted = false;
+  }
+
+  /// 脱敏包装：logSensitive=true 时返回原文，否则返回 `<N字 #hash>` 形式的摘要。
+  /// 用于语音原文 / LLM 输入输出 / 错误体等敏感字段的日志。
+  static String redact(String text) {
+    if (logSensitive) return "'$text'";
+    if (text.isEmpty) return '<空>';
+    return '<${text.length}字 #${(text.hashCode & 0xffffff).toRadixString(16)}>';
   }
 
   static void d(String message) {

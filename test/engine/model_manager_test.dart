@@ -4,6 +4,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakout/engine/model_manager.dart';
+import 'package:speakout/services/config_service.dart';
 
 /// Mock path_provider: getApplicationSupportPath → 临时目录
 class MockPathProviderPlatform extends Fake
@@ -23,10 +24,11 @@ void main() {
   late Directory tmpDir;
   late ModelManager manager;
 
-  setUp(() {
+  setUp(() async {
     tmpDir = Directory.systemTemp.createTempSync('speakout_model_test_');
     PathProviderPlatform.instance = MockPathProviderPlatform(tmpDir.path);
     SharedPreferences.setMockInitialValues({});
+    await ConfigService().reload(); // ModelManager 现经 ConfigService 读写 active_model_id
     manager = ModelManager();
   });
 
@@ -144,6 +146,7 @@ void main() {
         createFakeModelDir(model, tokenFileName: tokenName);
 
         SharedPreferences.setMockInitialValues({'active_model_id': model.id});
+        await ConfigService().reload();
         final path = await manager.getActiveModelPath();
         expect(path, isNotNull, reason: '${model.id} getActiveModelPath 返回 null');
 
@@ -154,6 +157,7 @@ void main() {
 
     test('模型目录不存在 → null', () async {
       SharedPreferences.setMockInitialValues({'active_model_id': 'sensevoice_zh_en_int8'});
+      await ConfigService().reload();
       expect(await manager.getActiveModelPath(), isNull);
     });
 
@@ -168,6 +172,7 @@ void main() {
       File('${subDir.path}/tokens.txt').writeAsStringSync('dummy');
 
       SharedPreferences.setMockInitialValues({'active_model_id': model.id});
+      await ConfigService().reload();
       final path = await manager.getActiveModelPath();
       expect(path, isNotNull, reason: '嵌套子目录下的 tokens.txt 应该能找到');
       expect(path, endsWith(dirName));

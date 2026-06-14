@@ -1428,7 +1428,7 @@ class CoreEngine {
       } catch (e) {
         _log("Provider Stop Error: $e");
       }
-      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned (${asrResult.text.length}字): '${asrResult.text}'");
+      _log("[PERF] +${sw.elapsedMilliseconds}ms — ASR stop() returned (${asrResult.text.length}字): ${AppLog.redact(asrResult.text)}");
 
       // 云端 ASR 错误（鉴权失败、配额超限等）
       if (asrResult.error != null) {
@@ -1529,14 +1529,14 @@ class CoreEngine {
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
               return finalText;
             });
-            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): '$finalText'");
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): ${AppLog.redact(finalText)}");
           } else {
             // Diary mode: non-streaming (need complete text for file save)
             finalText = await LLMService().correctText(finalText, vocabHints: vocabHints, translateTo: _translateOverride).timeout(llmTimeout, onTimeout: () {
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish TIMEOUT (${llmTimeout.inSeconds}s), using raw ASR text");
               return finalText;
             });
-            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): '$finalText'");
+            _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish done (${finalText.length}字): ${AppLog.redact(finalText)}");
           }
         } catch (e) {
           _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");
@@ -1547,7 +1547,7 @@ class CoreEngine {
         }
         lastLlmSuccess = LLMService().lastCallSucceeded;
       } else if (finalText.isNotEmpty && ConfigService().aiCorrectionEnabled && trimmedForCheck.length <= 2) {
-        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: '$finalText')");
+        _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish skipped (trivial input: ${AppLog.redact(finalText)})");
       } else if (finalText.isNotEmpty && ConfigService().vocabEnabled) {
         // Offline fallback: direct replacement when AI is disabled
         finalText = VocabService().applyReplacements(finalText);

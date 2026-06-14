@@ -396,6 +396,8 @@
 
   "aboutDeveloper": "开发者",
   "aboutVerboseLogging": "详细日志",
+  "aboutLogSensitive": "日志含语音内容",
+  "aboutLogSensitiveDesc": "默认仅记长度与摘要。开启后日志会包含完整语音原文与 AI 输入输出，仅排障时临时开启",
   "aboutLogDir": "日志输出目录",
   "aboutLogDirUnset": "未设置（仅输出到控制台）",
   "aboutLoading": "加载中…",

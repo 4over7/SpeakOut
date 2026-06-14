@@ -2,6 +2,7 @@ import '../engine/core_engine.dart';
 // import 'billing_service.dart'; // 暂时隐藏
 import 'config_service.dart';
 import 'chat_service.dart';
+import 'llm_service.dart';
 import 'cloud_account_service.dart';
 import 'notification_service.dart';
 import 'update_service.dart';
@@ -24,9 +25,10 @@ class AppService {
   /// 释放所有资源，应用退出时调用
   Future<void> dispose() async {
     engine.dispose();
-    ChatService().dispose();
+    await ChatService().dispose(); // 等待待写队列 flush，避免退出丢最后一条
     NotificationService().dispose();
     UpdateService().dispose();
+    LLMService().dispose();
     await AppLog.dispose();
   }
 
@@ -35,6 +37,7 @@ class AppService {
   Future<void> applyVerboseLogging() async {
     final enabled = ConfigService().verboseLogging;
     AppLog.enabled = enabled;
+    AppLog.logSensitive = ConfigService().logSensitiveContent;
     final dir = ConfigService().logDirectory;
     if (dir.isNotEmpty) {
       AppLog.customLogDirectory = dir;

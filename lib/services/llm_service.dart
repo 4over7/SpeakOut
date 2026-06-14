@@ -28,6 +28,12 @@ class LLMService {
     return _defaultClient!;
   }
 
+  /// 释放默认 client（应用退出时调用）。注入的 _client 由注入方负责。
+  void dispose() {
+    _defaultClient?.close();
+    _defaultClient = null;
+  }
+
   /// 最近一次 correctText / correctTextStream 调用是否成功
   /// true = LLM 成功返回（无论是否有修改）
   /// false = 调用失败（API 错误、超时、空响应、Key 缺失等）
@@ -165,7 +171,7 @@ class LLMService {
       return;
     }
 
-    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("RAW INPUT (${input.length}字): ${AppLog.redact(input)}");
     _log("Calling Cloud LLM (stream): $baseUrl, model=$model");
 
     try {
@@ -194,7 +200,7 @@ class LLMService {
 
       if (streamedResponse.statusCode != 200) {
         final respBody = await streamedResponse.stream.bytesToString();
-        _log("LLM STREAM ERROR: ${streamedResponse.statusCode} - $respBody");
+        _log("LLM STREAM ERROR: ${streamedResponse.statusCode} - ${AppLog.redact(respBody)}");
         yield input;
         return;
       }
@@ -229,7 +235,7 @@ class LLMService {
       if (result.isNotEmpty) {
         lastCallSucceeded = true;
       }
-      _log("LLM STREAM SUCCESS (${result.length}字, differs=${result != input}): '$result'");
+      _log("LLM STREAM SUCCESS (${result.length}字, differs=${result != input}): ${AppLog.redact(result)}");
     } catch (e) {
       _log("LLM STREAM EXCEPTION: $e");
       yield input;
@@ -302,7 +308,7 @@ class LLMService {
       return input;
     }
 
-    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("RAW INPUT (${input.length}字): ${AppLog.redact(input)}");
     _log("Calling Cloud LLM: $baseUrl, model=$model");
 
     try {
@@ -332,7 +338,7 @@ class LLMService {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
         final content = json['choices']?[0]?['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
-          _log("LLM SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
+          _log("LLM SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): ${AppLog.redact(content.trim())}");
           lastCallSucceeded = true;
           return content.trim();
         }
@@ -359,7 +365,7 @@ class LLMService {
       return input;
     }
 
-    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("RAW INPUT (${input.length}字): ${AppLog.redact(input)}");
     _log("Calling Anthropic: $baseUrl, model=$model");
 
     try {
@@ -412,7 +418,7 @@ class LLMService {
     final model = ConfigService().ollamaModel;
     final systemPrompt = _buildSystemPrompt(translateTo: translateTo);
 
-    _log("RAW INPUT (${input.length}字): '$input'");
+    _log("RAW INPUT (${input.length}字): ${AppLog.redact(input)}");
     _log("Calling Ollama: $baseUrl, model=$model");
 
     try {

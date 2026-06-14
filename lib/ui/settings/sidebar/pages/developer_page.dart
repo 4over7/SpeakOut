@@ -204,6 +204,20 @@ class _DeveloperPageState extends State<DeveloperPage> {
         ),
         const SettingsDivider(),
         SettingsTile(
+          label: loc.aboutLogSensitive,
+          subtitle: loc.aboutLogSensitiveDesc,
+          icon: CupertinoIcons.exclamationmark_shield,
+          child: MacosSwitch(
+            value: ConfigService().logSensitiveContent,
+            onChanged: (v) async {
+              await ConfigService().setLogSensitiveContent(v);
+              AppService().applyVerboseLogging();
+              setState(() {});
+            },
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsTile(
           label: loc.aboutLogDir,
           subtitle: ConfigService().logDirectory.isEmpty
               ? loc.aboutLogDirUnset

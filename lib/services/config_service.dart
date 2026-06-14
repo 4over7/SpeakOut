@@ -485,6 +485,10 @@ class ConfigService {
   String get logDirectory => _prefs?.getString('log_directory') ?? '';
   Future<void> setLogDirectory(String dir) async => await _prefs?.setString('log_directory', dir);
 
+  // 日志含敏感内容（语音原文/LLM 输入输出）— 默认 false，仅记长度+hash，避免日志泄露隐私
+  bool get logSensitiveContent => _prefs?.getBool('log_sensitive_content') ?? false;
+  Future<void> setLogSensitiveContent(bool enabled) async => await _prefs?.setBool('log_sensitive_content', enabled);
+
   String? get llmBaseUrlOverride => _prefs?.getString('llm_base_url');
   String? get llmApiKeyOverride => _cachedLlmApiKey;
   String? get llmModelOverride => _prefs?.getString('llm_model');

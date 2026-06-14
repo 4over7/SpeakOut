@@ -19,8 +19,9 @@ class ChatService {
   Stream<List<ChatMessage>> get messageStream => _streamController.stream;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
 
-  void dispose() {
-    _streamController.close();
+  Future<void> dispose() async {
+    await _pendingSave; // 等待待写队列 flush，避免退出时丢最后一条 dictation/chat
+    if (!_streamController.isClosed) await _streamController.close();
   }
 
   bool _isInit = false;
@@ -133,7 +134,7 @@ class ChatService {
       // Keep last 100 messages to avoid bloat
       if (_messages.length > 100) {
         _messages.removeRange(0, _messages.length - 100);
-        _streamController.add(_messages); // Notify UI of truncation
+        if (!_streamController.isClosed) _streamController.add(_messages); // Notify UI of truncation
       }
       
       final dir = await _getChatDir();

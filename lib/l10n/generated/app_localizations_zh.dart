@@ -1144,6 +1144,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutVerboseLogging => '详细日志';
 
   @override
+  String get aboutLogSensitive => '日志含语音内容';
+
+  @override
+  String get aboutLogSensitiveDesc =>
+      '默认仅记长度与摘要。开启后日志会包含完整语音原文与 AI 输入输出，仅排障时临时开启';
+
+  @override
   String get aboutLogDir => '日志输出目录';
 
   @override

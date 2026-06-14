@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive_io.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:speakout/config/app_constants.dart';
+import 'package:speakout/services/config_service.dart';
 import 'package:speakout/config/app_log.dart';
 
 /// 模型架构分类，用于确定 Phase 2 置信度支持能力
@@ -264,8 +264,7 @@ class ModelManager {
   }
 
   Future<ModelInfo?> getActiveModelInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    String activeId = prefs.getString('active_model_id') ?? AppConstants.kDefaultModelId;
+    String activeId = ConfigService().activeModelId;
     try {
       return allModels.firstWhere((m) => m.id == activeId);
     } catch (_) {
@@ -281,10 +280,9 @@ class ModelManager {
 
   Future<String?> getActiveModelPath() async {
     final modelsRoot = await _getModelsRoot();
-    final prefs = await SharedPreferences.getInstance();
 
     // Default to bilingual if not set
-    String activeId = prefs.getString('active_model_id') ?? AppConstants.kDefaultModelId;
+    String activeId = ConfigService().activeModelId;
 
     // Check if valid
     ModelInfo? model;
@@ -315,8 +313,7 @@ class ModelManager {
   }
 
   Future<void> setActiveModel(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('active_model_id', id);
+    await ConfigService().setActiveModelId(id);
   }
 
   /// 检查目录下是否有 tokens 文件 (tokens.txt / *-tokens.txt / tokenizer.json)
@@ -691,8 +688,7 @@ class ModelManager {
      }
      // 若删除的是当前 active 模型，切到另一个已下载模型，避免 active_model_id 悬空
      // （否则下次启动 getActiveModelPath 返回 null，会静默重下默认模型，造成"为什么又下载"困惑）
-     final prefs = await SharedPreferences.getInstance();
-     final activeId = prefs.getString(AppConstants.kKeyActiveModelId) ?? AppConstants.kDefaultModelId;
+     final activeId = ConfigService().activeModelId;
      if (activeId == id) {
        String? next;
        for (final m in allModels) {
@@ -700,7 +696,7 @@ class ModelManager {
          if (await isModelDownloaded(m.id)) { next = m.id; break; }
        }
        // 有其他已下载模型则切过去；否则回退默认 id（启动逻辑再决定是否下载）
-       await prefs.setString(AppConstants.kKeyActiveModelId, next ?? AppConstants.kDefaultModelId);
+       await ConfigService().setActiveModelId(next ?? AppConstants.kDefaultModelId);
      }
   }
   

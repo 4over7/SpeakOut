@@ -436,6 +436,8 @@
 
   "aboutDeveloper": "Developer",
   "aboutVerboseLogging": "Verbose Logging",
+  "aboutLogSensitive": "Log Voice Content",
+  "aboutLogSensitiveDesc": "By default only length and a digest are logged. When on, logs include full voice transcripts and AI input/output — enable only temporarily for troubleshooting",
   "aboutLogDir": "Log Directory",
   "aboutLogDirUnset": "Not set (console only)",
   "aboutLoading": "Loading…",

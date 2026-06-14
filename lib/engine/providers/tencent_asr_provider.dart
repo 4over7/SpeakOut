@@ -163,13 +163,14 @@ class TencentASRProvider implements ASRProvider {
       final voiceText = result['voice_text_str'] as String? ?? '';
 
       if (sliceType == 2) {
-        // 段结束（稳定结果）
-        _finalText = voiceText;
-        _textController.add(voiceText);
-        _log('Final segment: ${voiceText.length} chars');
+        // 段结束（稳定结果）— 累加各段：腾讯每个 slice_type==2 只含当前段文本，
+        // 长句被 VAD 切多段时覆盖会丢前半，必须拼接（见腾讯实时 ASR 协议 index 语义）
+        _finalText += voiceText;
+        _textController.add(_finalText);
+        _log('Final segment: ${voiceText.length} chars, total: ${_finalText.length}');
       } else {
-        // 临时结果
-        _textController.add(voiceText);
+        // 临时结果 — 已稳定段 + 当前段预览
+        _textController.add(_finalText + voiceText);
       }
 
       // 检查是否结束

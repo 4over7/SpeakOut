@@ -217,13 +217,17 @@ app.post('/billing/usage', async (c) => {
 
     const { seconds } = await c.req.json();
     if (typeof seconds !== 'number' || seconds <= 0) return c.json({ success: true, secondsRemaining: 0 });
+    // 防篡改：单次上报封顶（单次录音不可能超过 1h），挡住客户端伪造/异常大值灌爆配额统计。
+    // 注意：deviceId 是客户端自生成的 bearer、可伪造，usage 为软计费统计而非授权边界；
+    // 真正的防绕过（注册下发签名 token + 强一致计数）待 billing 正式上线（支付通道接通）再做。
+    const reportSeconds = Math.min(seconds, 3600);
 
     const key = `device:${deviceId}`;
     const device = await c.env.SPEAKOUT_DB.get(key, { type: 'json' });
     if (!device) return c.json({ error: 'Device not registered' }, 404);
 
     lazyReset(device);
-    device.secondsUsed += seconds;
+    device.secondsUsed += reportSeconds;
     await c.env.SPEAKOUT_DB.put(key, JSON.stringify(device));
 
     return c.json({
@@ -420,6 +424,9 @@ function lazyReset(device) {
 
 /** 充值额度 */
 async function topUpQuota(env, deviceId, secondsToAdd, planId, amountPaid) {
+    // 幂等主防线在调用方：order.status==='paid' 检查（payment/alipay + payment/stripe）。
+    // 残留竞态：KV 非强一致事务，理论上两个并发支付回调可能都读到 pending → double credit。
+    // 该窗口待 billing 正式上线时迁 Durable Object / D1 强一致消除（当前支付通道未接通，不提前上 DO）。
     const key = `device:${deviceId}`;
     const device = await env.SPEAKOUT_DB.get(key, { type: 'json' });
     if (!device) return;

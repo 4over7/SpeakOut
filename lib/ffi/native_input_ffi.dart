@@ -675,8 +675,8 @@ class NativeInputFFI implements NativeInputBase {
     final ptr = _getFrontmostAppInfo();
     if (ptr == nullptr) return '{}';
     final result = ptr.toDartString();
-    // get_frontmost_app_info returns strdup'd memory, need to free
-    calloc.free(ptr);
+    // get_frontmost_app_info 返回 strdup(malloc) 内存，用配对的 native_free 释放（而非 ffi calloc.free）
+    nativeFree(ptr.cast<Void>());
     return result;
   }
 }

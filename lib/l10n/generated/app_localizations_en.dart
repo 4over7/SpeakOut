@@ -1208,6 +1208,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutVerboseLogging => 'Verbose Logging';
 
   @override
+  String get aboutLogSensitive => 'Log Voice Content';
+
+  @override
+  String get aboutLogSensitiveDesc =>
+      'By default only length and a digest are logged. When on, logs include full voice transcripts and AI input/output — enable only temporarily for troubleshooting';
+
+  @override
   String get aboutLogDir => 'Log Directory';
 
   @override

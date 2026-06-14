@@ -2282,6 +2282,18 @@ abstract class AppLocalizations {
   /// **'Verbose Logging'**
   String get aboutVerboseLogging;
 
+  /// No description provided for @aboutLogSensitive.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Voice Content'**
+  String get aboutLogSensitive;
+
+  /// No description provided for @aboutLogSensitiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'By default only length and a digest are logged. When on, logs include full voice transcripts and AI input/output — enable only temporarily for troubleshooting'**
+  String get aboutLogSensitiveDesc;
+
   /// No description provided for @aboutLogDir.
   ///
   /// In en, this message translates to:
