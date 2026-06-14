@@ -60,7 +60,8 @@ app.get('/version', async (c) => {
 app.get('/stats', async (c) => {
     // 运营数据（版本分布/日活）需管理员鉴权，避免公开泄露
     const adminKey = c.req.header('Admin-Key');
-    if (adminKey !== c.env.ADMIN_SECRET) return c.json({ error: 'Unauthorized' }, 401);
+    // fail-closed：ADMIN_SECRET 未配置时一律拒绝，绝不放行（防止 undefined!==undefined 漏洞）
+    if (!c.env.ADMIN_SECRET || adminKey !== c.env.ADMIN_SECRET) return c.json({ error: 'Unauthorized' }, 401);
     const versions = {};
     const list = await c.env.SPEAKOUT_DB.list({ prefix: 'stats:version:' });
     for (const key of list.keys) {
@@ -128,7 +129,8 @@ app.post('/redeem', async (c) => {
 // ═══════════════════════════════════════════════════════════
 app.post('/admin/generate', async (c) => {
     const adminKey = c.req.header('Admin-Key');
-    if (adminKey !== c.env.ADMIN_SECRET) return c.json({ error: 'Unauthorized' }, 401);
+    // fail-closed：ADMIN_SECRET 未配置时一律拒绝，绝不放行（防止 undefined!==undefined 漏洞）
+    if (!c.env.ADMIN_SECRET || adminKey !== c.env.ADMIN_SECRET) return c.json({ error: 'Unauthorized' }, 401);
     const { amount, count, prefix } = await c.req.json();
     if (typeof amount !== 'number' || amount <= 0) return c.json({ error: 'Invalid amount' }, 400);
     if (typeof count !== 'number' || count <= 0 || count > 100) return c.json({ error: 'Invalid count (1-100)' }, 400);
