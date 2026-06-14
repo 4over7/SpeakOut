@@ -1,4 +1,5 @@
 import '../engine/core_engine.dart';
+import '../ffi/native_input_base.dart';
 // import 'billing_service.dart'; // 暂时隐藏
 import 'config_service.dart';
 import 'chat_service.dart';
@@ -6,6 +7,7 @@ import 'llm_service.dart';
 import 'cloud_account_service.dart';
 import 'notification_service.dart';
 import 'update_service.dart';
+import 'audio_device_service.dart';
 import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
@@ -21,6 +23,54 @@ class AppService {
   final ModelManager modelManager = ModelManager();
 
   bool _isPunctuationInitialized = false;
+
+  // ════════════════════════════════════════════════════════════
+  // Engine facade — UI 层经此访问 engine 能力，避免直接 import lib/engine/
+  // （三层架构：UI → Service → Engine。详见 lib/ui/AGENTS.md）
+  // ════════════════════════════════════════════════════════════
+
+  // ── Streams ──
+  Stream<String> get statusStream => engine.statusStream;
+  Stream<(int keyCode, int modifierFlags)> get rawKeyEventStream => engine.rawKeyEventStream;
+
+  // ── Getters / setter ──
+  NativeInputBase? get nativeInput => engine.nativeInput;
+  AudioDeviceService? get audioDeviceService => engine.audioDeviceService;
+  bool get isPunctuationEnabled => engine.isPunctuationEnabled;
+  int get pttKeyCode => engine.pttKeyCode;
+  set pttKeyCode(int v) => engine.pttKeyCode = v;
+  void updateStatus(String msg) => engine.updateStatus(msg);
+  static int ownModifierMask(int keyCode) => CoreEngine.ownModifierMask(keyCode);
+
+  // ── 权限检查 ──
+  bool checkInputMonitoringPermission() => engine.nativeInput?.checkInputMonitoringPermission() ?? false;
+  bool checkAccessibilityPermission() => engine.nativeInput?.checkAccessibilityPermission() ?? false;
+  bool checkMicrophonePermission() => engine.nativeInput?.checkMicrophonePermission() ?? false;
+
+  // ── 标点初始化 ──
+  Future<void> initPunctuation(String modelPath, {String activeModelName = ''}) =>
+      engine.initPunctuation(modelPath, activeModelName: activeModelName);
+
+  // ── 模型管理（转发 ModelManager）──
+  static List<ModelInfo> get offlineModels => ModelManager.offlineModels;
+  static List<ModelInfo> get availableModels => ModelManager.availableModels;
+  static List<ModelInfo> get allModels => ModelManager.allModels;
+  static String get punctuationModelId => ModelManager.punctuationModelId;
+  ModelInfo? getModelById(String id) => modelManager.getModelById(id);
+  Future<ModelInfo?> getActiveModelInfo() => modelManager.getActiveModelInfo();
+  Future<String?> getActiveModelPath() => modelManager.getActiveModelPath();
+  Future<void> setActiveModel(String id) => modelManager.setActiveModel(id);
+  Future<bool> isModelDownloaded(String id) => modelManager.isModelDownloaded(id);
+  Future<bool> isPunctuationModelDownloaded() => modelManager.isPunctuationModelDownloaded();
+  Future<String?> getPunctuationModelPath() => modelManager.getPunctuationModelPath();
+  Future<void> deleteModel(String id) => modelManager.deleteModel(id);
+  Future<void> deletePunctuationModel() => modelManager.deletePunctuationModel();
+  Future<String> downloadAndExtractModel(String id, {Function(String)? onStatus, Function(double)? onProgress}) =>
+      modelManager.downloadAndExtractModel(id, onStatus: onStatus, onProgress: onProgress);
+  Future<String> importModel(String id, String sourcePath, {Function(String)? onStatus, Function(double)? onProgress}) =>
+      modelManager.importModel(id, sourcePath, onStatus: onStatus, onProgress: onProgress);
+  Future<void> downloadPunctuationModel({Function(String)? onStatus, Function(double)? onProgress}) =>
+      modelManager.downloadPunctuationModel(onStatus: onStatus, onProgress: onProgress);
 
   /// 释放所有资源，应用退出时调用
   Future<void> dispose() async {

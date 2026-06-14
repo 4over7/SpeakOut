@@ -10,8 +10,8 @@ import '../../../services/cloud_account_service.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/cloud_providers.dart';
 import '../../../models/cloud_account.dart';
-import '../../../engine/model_manager.dart';
-import '../../../engine/core_engine.dart';
+import '../../../services/app_service.dart';
+import '../../../services/engine_types.dart';
 import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../../vocab_settings_page.dart';
@@ -39,8 +39,7 @@ class ModeTab extends StatefulWidget {
 }
 
 class ModeTabState extends State<ModeTab> {
-  final ModelManager _modelManager = ModelManager();
-  final CoreEngine _engine = CoreEngine();
+  final AppService _app = AppService();
 
   // Model management
   final Map<String, bool> _downloadedStatus = {};
@@ -151,7 +150,7 @@ class ModeTabState extends State<ModeTab> {
       _toggleInputKeyName = service.toggleInputKeyName;
       _toggleMaxDuration = service.toggleMaxDuration;
     });
-    CoreEngine().pttKeyCode = _currentKeyCode;
+    AppService().pttKeyCode = _currentKeyCode;
   }
 
   void _startKeyCapture([String target = 'ptt']) {
@@ -167,7 +166,7 @@ class ModeTabState extends State<ModeTab> {
     });
 
     _keyCapturer = HotkeyCapturer(
-      keyStream: _engine.rawKeyEventStream,
+      keyStream: _app.rawKeyEventStream,
       onCaptured: (keyCode, modifierFlags) {
         final keyName = mapKeyCodeToString(keyCode);
         _saveHotkeyConfig(keyCode, keyName, modifierFlags: modifierFlags);
@@ -240,7 +239,7 @@ class ModeTabState extends State<ModeTab> {
     } else {
       // PTT key
       await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
-      CoreEngine().pttKeyCode = keyCode;
+      AppService().pttKeyCode = keyCode;
       setState(() {
         _currentKeyCode = keyCode;
         _currentKeyName = displayName;
@@ -324,10 +323,10 @@ class ModeTabState extends State<ModeTab> {
   }
 
   Future<void> _refresh() async {
-    for (var m in ModelManager.allModels) {
-      _downloadedStatus[m.id] = await _modelManager.isModelDownloaded(m.id);
+    for (var m in AppService.allModels) {
+      _downloadedStatus[m.id] = await _app.isModelDownloaded(m.id);
     }
-    _downloadedStatus[ModelManager.punctuationModelId] = await _modelManager.isPunctuationModelDownloaded();
+    _downloadedStatus[AppService.punctuationModelId] = await _app.isPunctuationModelDownloaded();
     setState(() {});
   }
 
@@ -342,7 +341,7 @@ class ModeTabState extends State<ModeTab> {
     });
 
     try {
-      await _modelManager.downloadAndExtractModel(model.id,
+      await _app.downloadAndExtractModel(model.id,
         onProgress: (p) {
           if (mounted) {
             setState(() {
@@ -366,7 +365,7 @@ class ModeTabState extends State<ModeTab> {
 
   Future<void> _activate(ModelInfo model) async {
     // Check if switching between streaming <-> offline mode
-    final currentModel = _modelManager.getModelById(_activeModelId ?? '');
+    final currentModel = _app.getModelById(_activeModelId ?? '');
     final isCrossModeSwitch = currentModel != null && currentModel.isOffline != model.isOffline;
 
     if (isCrossModeSwitch && mounted) {
@@ -400,15 +399,15 @@ class ModeTabState extends State<ModeTab> {
 
     final previousModelId = _activeModelId;
     setState(() => _activatingId = model.id);
-    await _modelManager.setActiveModel(model.id);
-    final path = await _modelManager.getActiveModelPath();
+    await _app.setActiveModel(model.id);
+    final path = await _app.getActiveModelPath();
     if (path != null) {
       try {
-        await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+        await _app.initASR(modelPath: path, type: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
       } catch (e) {
         // Init failed -> rollback
         if (previousModelId != null) {
-          await _modelManager.setActiveModel(previousModelId);
+          await _app.setActiveModel(previousModelId);
           await ConfigService().setActiveModelId(previousModelId);
         }
         setState(() { _activatingId = null; });
@@ -420,9 +419,9 @@ class ModeTabState extends State<ModeTab> {
       }
       // Model has no built-in punctuation -> prompt user + auto-load punctuation model
       if (!model.hasPunctuation) {
-        final punctPath = await _modelManager.getPunctuationModelPath();
+        final punctPath = await _app.getPunctuationModelPath();
         if (punctPath != null) {
-          await _engine.initPunctuation(punctPath, activeModelName: model.name);
+          await _app.initPunctuation(punctPath, activeModelName: model.name);
           if (mounted) {
             showSettingsInfo(AppLocalizations.of(context)!.punctAutoLoaded);
           }
@@ -457,7 +456,7 @@ class ModeTabState extends State<ModeTab> {
   }
 
   Future<void> _delete(ModelInfo model) async {
-    await _modelManager.deleteModel(model.id);
+    await _app.deleteModel(model.id);
     if (!mounted) return;
     // deleteModel 可能因删除的是 active 模型而切换了 active_model_id，UI 同步重读
     setState(() => _activeModelId = ConfigService().activeModelId);
@@ -477,7 +476,7 @@ class ModeTabState extends State<ModeTab> {
         _downloadStatusMap[model.id] = loc.importing;
       });
 
-      await _modelManager.importModel(model.id, result,
+      await _app.importModel(model.id, result,
         onProgress: (p) {
           if (mounted) {
             setState(() {
@@ -502,7 +501,7 @@ class ModeTabState extends State<ModeTab> {
 
   Future<void> _downloadPunctuation() async {
     final loc = AppLocalizations.of(context)!;
-    final punctId = ModelManager.punctuationModelId;
+    final punctId = AppService.punctuationModelId;
 
     setState(() {
       _downloadingIds.add(punctId);
@@ -511,7 +510,7 @@ class ModeTabState extends State<ModeTab> {
     });
 
     try {
-      await _modelManager.downloadPunctuationModel(
+      await _app.downloadPunctuationModel(
         onProgress: (p) {
           if (mounted) {
             setState(() {
@@ -527,8 +526,8 @@ class ModeTabState extends State<ModeTab> {
         },
       );
       await _refresh();
-      final path = await _modelManager.getPunctuationModelPath();
-      if (path != null) await _engine.initPunctuation(path);
+      final path = await _app.getPunctuationModelPath();
+      if (path != null) await _app.initPunctuation(path);
     } catch (e) {
       if (!mounted) return;
       if (!context.mounted) return;
@@ -539,7 +538,7 @@ class ModeTabState extends State<ModeTab> {
   }
 
   Future<void> _deletePunctuation() async {
-    await _modelManager.deletePunctuationModel();
+    await _app.deletePunctuationModel();
     await _refresh();
   }
 
@@ -561,17 +560,17 @@ class ModeTabState extends State<ModeTab> {
 
     // Re-init ASR when switching between sherpa <-> aliyun
     if (mode == 'cloud' && oldMode != 'cloud') {
-      await _engine.initASR('', modelType: 'aliyun');
+      await _app.initASR(modelPath: '', type: 'aliyun');
     } else if (mode != 'cloud' && oldMode == 'cloud') {
-      final path = await _modelManager.getActiveModelPath();
-      final model = _modelManager.getModelById(_activeModelId ?? '');
+      final path = await _app.getActiveModelPath();
+      final model = _app.getModelById(_activeModelId ?? '');
       if (path != null && model != null) {
-        await _engine.initASR(path, modelType: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+        await _app.initASR(modelPath: path, type: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
         // Model has no built-in punctuation -> auto-load punctuation model
-        if (!model.hasPunctuation && !_engine.isPunctuationEnabled) {
-          final punctPath = await _modelManager.getPunctuationModelPath();
+        if (!model.hasPunctuation && !_app.isPunctuationEnabled) {
+          final punctPath = await _app.getPunctuationModelPath();
           if (punctPath != null) {
-            await _engine.initPunctuation(punctPath, activeModelName: model.name);
+            await _app.initPunctuation(punctPath, activeModelName: model.name);
           }
         }
       }
@@ -682,7 +681,7 @@ class ModeTabState extends State<ModeTab> {
 
     // 2. Input language not supported by current offline model
     if (inputLang != 'auto' && workMode != 'cloud') {
-      final model = ModelManager.allModels.where((m) => m.id == modelId).firstOrNull;
+      final model = AppService.allModels.where((m) => m.id == modelId).firstOrNull;
       if (model != null && !model.supportsLanguage(inputLang)) {
         final langName = _langDisplayName(inputLang, loc);
         hints.add(_languageHintBanner(
@@ -1397,7 +1396,7 @@ class ModeTabState extends State<ModeTab> {
             final prov = CloudProviders.getById(acc.providerId);
             final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
             await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
-            await _engine.initASR('', modelType: 'aliyun');
+            await _app.initASR(modelPath: '', type: 'aliyun');
             setState(() {});
           },
         )),
@@ -1418,7 +1417,7 @@ class ModeTabState extends State<ModeTab> {
             onChanged: (v) async {
               if (v == null) return;
               await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
-              await _engine.initASR('', modelType: 'aliyun');
+              await _app.initASR(modelPath: '', type: 'aliyun');
               setState(() {});
             },
           )),
@@ -1542,7 +1541,7 @@ class ModeTabState extends State<ModeTab> {
   // --- Model info card ---
 
   Widget _buildModelInfoCard(AppLocalizations loc) {
-    final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+    final activeModel = _app.getModelById(_activeModelId ?? '');
     final modelName = activeModel != null ? _localizedModelName(activeModel, loc) : loc.notSet;
 
     // Build language tags
@@ -2084,7 +2083,7 @@ class ModeTabState extends State<ModeTab> {
 
   Widget _buildOfflineModelListCard(AppLocalizations loc) {
     final inputLang = ConfigService().inputLanguage;
-    final filteredOffline = ModelManager.offlineModels
+    final filteredOffline = AppService.offlineModels
         .where((m) => m.supportsLanguage(inputLang)).toList();
     return SettingsCard(
       padding: const EdgeInsets.all(12),
@@ -2105,10 +2104,10 @@ class ModeTabState extends State<ModeTab> {
   // --- Streaming + Punctuation card (advanced) ---
 
   Widget _buildStreamingAndPunctCard(AppLocalizations loc) {
-    final activeModel = _modelManager.getModelById(_activeModelId ?? '');
+    final activeModel = _app.getModelById(_activeModelId ?? '');
     final modelHasPunct = activeModel?.hasPunctuation ?? false;
     final inputLang = ConfigService().inputLanguage;
-    final filteredStreaming = ModelManager.availableModels
+    final filteredStreaming = AppService.availableModels
         .where((m) => m.supportsLanguage(inputLang)).toList();
 
     return SettingsCard(
@@ -2128,10 +2127,10 @@ class ModeTabState extends State<ModeTab> {
             Text(loc.punctuationModelDesc, style: AppTheme.caption(context).copyWith(fontSize: 10)),
             const Spacer(),
             buildActionBtn(context,
-              isDownloaded: _downloadedStatus[ModelManager.punctuationModelId] ?? false,
-              isLoading: _downloadingIds.contains(ModelManager.punctuationModelId),
-              progress: _downloadProgressMap[ModelManager.punctuationModelId],
-              statusText: _downloadStatusMap[ModelManager.punctuationModelId],
+              isDownloaded: _downloadedStatus[AppService.punctuationModelId] ?? false,
+              isLoading: _downloadingIds.contains(AppService.punctuationModelId),
+              progress: _downloadProgressMap[AppService.punctuationModelId],
+              statusText: _downloadStatusMap[AppService.punctuationModelId],
               isActive: true, onDownload: _downloadPunctuation,
               onDelete: _deletePunctuation, onActivate: () {},
             ),

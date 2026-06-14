@@ -2,8 +2,8 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
-import '../../engine/model_manager.dart';
-import '../../engine/core_engine.dart';
+import '../../services/app_service.dart';
+import '../../services/engine_types.dart';
 import '../../config/app_constants.dart';
 
 /// Windows 首次启动引导页
@@ -21,8 +21,7 @@ class WindowsOnboardingPage extends StatefulWidget {
 
 class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
   int _currentStep = 0;
-  final ModelManager _modelManager = ModelManager();
-  final CoreEngine _engine = CoreEngine();
+  final AppService _app = AppService();
 
   // Model selection
   String _selectedModelId = AppConstants.kDefaultModelId;
@@ -46,7 +45,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
     });
 
     try {
-      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
       final needsPunctuation = !selectedModel.hasPunctuation;
@@ -54,7 +53,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
       // Step 1: Download punctuation model if needed
       if (needsPunctuation) {
         setState(() => _downloadStatus = _l10n.onboardingDownloadPunct);
-        await _modelManager.downloadPunctuationModel(
+        await _app.downloadPunctuationModel(
           onProgress: (p) {
             if (mounted) {
               setState(() {
@@ -77,7 +76,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
         _downloadProgress = asrStart;
       });
 
-      await _modelManager.downloadAndExtractModel(
+      await _app.downloadAndExtractModel(
         selectedModel.id,
         onProgress: (p) {
           if (mounted) {
@@ -95,18 +94,18 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
 
       // Step 3: Activate model
       setState(() => _downloadStatus = _l10n.onboardingActivating);
-      await _modelManager.setActiveModel(selectedModel.id);
-      final path = await _modelManager.getActiveModelPath();
+      await _app.setActiveModel(selectedModel.id);
+      final path = await _app.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+        await _app.initASR(modelPath: path, type: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
       // Initialize punctuation if downloaded
       if (needsPunctuation) {
-        final punctPath = await _modelManager.getPunctuationModelPath();
+        final punctPath = await _app.getPunctuationModelPath();
         if (punctPath != null) {
-          await _engine.initPunctuation(punctPath, activeModelName: selectedModel.name);
+          await _app.initPunctuation(punctPath, activeModelName: selectedModel.name);
         }
       }
 
@@ -135,7 +134,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
       if (result == null || result.files.single.path == null) return;
 
       final filePath = result.files.single.path!;
-      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
       setState(() {
@@ -145,7 +144,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
         _downloadError = null;
       });
 
-      await _modelManager.importModel(
+      await _app.importModel(
         selectedModel.id,
         filePath,
         onProgress: (p) {
@@ -166,10 +165,10 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
 
       // Activate model
       setState(() => _downloadStatus = _l10n.onboardingActivating);
-      await _modelManager.setActiveModel(selectedModel.id);
-      final path = await _modelManager.getActiveModelPath();
+      await _app.setActiveModel(selectedModel.id);
+      final path = await _app.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+        await _app.initASR(modelPath: path, type: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
@@ -298,7 +297,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
             icon: FluentIcons.slider_thumb,
             iconColor: Colors.grey[120],
             title: _l10n.onboardingCustomSelect,
-            subtitle: _l10n.onboardingBrowseModels(ModelManager.offlineModels.length.toString()),
+            subtitle: _l10n.onboardingBrowseModels(AppService.offlineModels.length.toString()),
             highlighted: false,
             onTap: () => setState(() {
               _showCustomModels = true;
@@ -309,7 +308,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
           Flexible(
             child: SingleChildScrollView(
               child: Column(
-                children: ModelManager.offlineModels
+                children: AppService.offlineModels
                     .map((model) => _buildModelOption(model))
                     .toList(),
               ),
@@ -549,7 +548,7 @@ class _WindowsOnboardingPageState extends State<WindowsOnboardingPage> {
   // Step 2: Download
   Widget _buildDownloadStep() {
     final theme = FluentTheme.of(context);
-    final selectedModel = _modelManager.getModelById(_selectedModelId);
+    final selectedModel = _app.getModelById(_selectedModelId);
     final modelName = selectedModel != null
         ? _localizedModelName(selectedModel)
         : _selectedModelId;

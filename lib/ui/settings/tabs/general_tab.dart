@@ -7,7 +7,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../config/app_constants.dart';
 import '../../../services/config_service.dart';
 import '../../../services/audio_device_service.dart';
-import '../../../engine/core_engine.dart';
+import '../../../services/app_service.dart';
 import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
@@ -50,7 +50,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _loadAudioDevices();
     _deviceChangeSubscription =
-        CoreEngine().audioDeviceService?.deviceChanges.listen((_) {
+        AppService().audioDeviceService?.deviceChanges.listen((_) {
       if (mounted) _loadAudioDevices();
     });
 
@@ -59,7 +59,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     _currentKeyName = config.pttKeyName;
     _toggleInputKeyName = config.toggleInputKeyName;
     _toggleMaxDuration = config.toggleMaxDuration;
-    CoreEngine().pttKeyCode = _currentKeyCode;
+    AppService().pttKeyCode = _currentKeyCode;
     _refreshPermissions();
   }
 
@@ -77,7 +77,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   }
 
   void _refreshPermissions() {
-    final ni = CoreEngine().nativeInput;
+    final ni = AppService().nativeInput;
     if (ni == null) return;
     setState(() {
       _accessibilityGranted = ni.checkAccessibilityPermission();
@@ -88,7 +88,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   }
 
   void _loadAudioDevices() {
-    final service = CoreEngine().audioDeviceService;
+    final service = AppService().audioDeviceService;
     if (service == null) return;
     service.refreshDevices();
     setState(() {
@@ -106,7 +106,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final engine = CoreEngine();
+    final engine = AppService();
     final isBluetooth =
         _useSystemDefaultAudio && (_currentAudioDevice?.isBluetooth ?? false);
 
@@ -269,7 +269,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
             modifiers: result.modifiers);
         await config.setToggleInputKey(result.keyCode, result.displayName,
             modifiers: result.modifiers);
-        CoreEngine().pttKeyCode = result.keyCode;
+        AppService().pttKeyCode = result.keyCode;
         setState(() {
           _currentKeyCode = result.keyCode;
           _currentKeyName = result.displayName;
@@ -282,7 +282,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
       default:
         await config.setPttKey(result.keyCode, result.displayName,
             modifiers: result.modifiers);
-        CoreEngine().pttKeyCode = result.keyCode;
+        AppService().pttKeyCode = result.keyCode;
         setState(() {
           _currentKeyCode = result.keyCode;
           _currentKeyName = result.displayName;
@@ -360,7 +360,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Widget _buildBasicsSection(
-      AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
+      AppLocalizations loc, AppService engine, bool isBluetooth) {
     return SettingsCardGrid(
       forceDualColumn: true,
       children: [
@@ -402,7 +402,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   }
 
   Widget _audioCard(
-      AppLocalizations loc, CoreEngine engine, bool isBluetooth) {
+      AppLocalizations loc, AppService engine, bool isBluetooth) {
     final audioDropdown = SizedBox(
       width: 160,
       child: MacosPopupButton<String>(
@@ -495,7 +495,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     );
   }
 
-  Widget _autoOptimizeCard(AppLocalizations loc, CoreEngine engine) {
+  Widget _autoOptimizeCard(AppLocalizations loc, AppService engine) {
     return SettingsCard(
       padding: const EdgeInsets.all(16),
       children: [

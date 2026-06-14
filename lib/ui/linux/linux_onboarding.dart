@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
-import '../../engine/model_manager.dart';
-import '../../engine/core_engine.dart';
+import '../../services/app_service.dart';
+import '../../services/engine_types.dart';
 import '../../config/app_constants.dart';
 
 /// Linux 首次启动引导页
@@ -21,8 +21,7 @@ class LinuxOnboardingPage extends StatefulWidget {
 
 class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
   int _currentStep = 0;
-  final ModelManager _modelManager = ModelManager();
-  final CoreEngine _engine = CoreEngine();
+  final AppService _app = AppService();
 
   // Model selection
   String _selectedModelId = AppConstants.kDefaultModelId;
@@ -46,14 +45,14 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
     });
 
     try {
-      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
       final needsPunctuation = !selectedModel.hasPunctuation;
 
       if (needsPunctuation) {
         setState(() => _downloadStatus = _l10n.onboardingDownloadPunct);
-        await _modelManager.downloadPunctuationModel(
+        await _app.downloadPunctuationModel(
           onProgress: (p) {
             if (mounted) {
               setState(() {
@@ -75,7 +74,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
         _downloadProgress = asrStart;
       });
 
-      await _modelManager.downloadAndExtractModel(
+      await _app.downloadAndExtractModel(
         selectedModel.id,
         onProgress: (p) {
           if (mounted) {
@@ -92,17 +91,17 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
       );
 
       setState(() => _downloadStatus = _l10n.onboardingActivating);
-      await _modelManager.setActiveModel(selectedModel.id);
-      final path = await _modelManager.getActiveModelPath();
+      await _app.setActiveModel(selectedModel.id);
+      final path = await _app.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+        await _app.initASR(modelPath: path, type: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
       if (needsPunctuation) {
-        final punctPath = await _modelManager.getPunctuationModelPath();
+        final punctPath = await _app.getPunctuationModelPath();
         if (punctPath != null) {
-          await _engine.initPunctuation(punctPath, activeModelName: selectedModel.name);
+          await _app.initPunctuation(punctPath, activeModelName: selectedModel.name);
         }
       }
 
@@ -131,7 +130,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
       if (result == null || result.files.single.path == null) return;
 
       final filePath = result.files.single.path!;
-      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
       setState(() {
@@ -141,7 +140,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
         _downloadError = null;
       });
 
-      await _modelManager.importModel(
+      await _app.importModel(
         selectedModel.id,
         filePath,
         onProgress: (p) {
@@ -161,10 +160,10 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
       );
 
       setState(() => _downloadStatus = _l10n.onboardingActivating);
-      await _modelManager.setActiveModel(selectedModel.id);
-      final path = await _modelManager.getActiveModelPath();
+      await _app.setActiveModel(selectedModel.id);
+      final path = await _app.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+        await _app.initASR(modelPath: path, type: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
@@ -280,7 +279,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
             icon: Icons.tune,
             iconColor: Colors.grey,
             title: _l10n.onboardingCustomSelect,
-            subtitle: _l10n.onboardingBrowseModels(ModelManager.offlineModels.length.toString()),
+            subtitle: _l10n.onboardingBrowseModels(AppService.offlineModels.length.toString()),
             highlighted: false,
             onTap: () => setState(() {
               _showCustomModels = true;
@@ -291,7 +290,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
           Flexible(
             child: SingleChildScrollView(
               child: Column(
-                children: ModelManager.offlineModels
+                children: AppService.offlineModels
                     .map((model) => _buildModelOption(model))
                     .toList(),
               ),
@@ -515,7 +514,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
 
   Widget _buildDownloadStep() {
     final theme = Theme.of(context);
-    final selectedModel = _modelManager.getModelById(_selectedModelId);
+    final selectedModel = _app.getModelById(_selectedModelId);
     final modelName = selectedModel != null
         ? _localizedModelName(selectedModel)
         : _selectedModelId;

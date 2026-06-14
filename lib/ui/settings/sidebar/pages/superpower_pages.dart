@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../engine/core_engine.dart';
+import '../../../../services/app_service.dart';
 import '../../../theme.dart';
 import '../../tabs/superpower_tab.dart';
 
@@ -99,7 +99,7 @@ class _AiReportPageState extends State<AiReportPage> with WidgetsBindingObserver
   }
 
   void _checkPermission() {
-    final granted = CoreEngine().nativeInput?.checkScreenRecordingPermission() ?? true;
+    final granted = AppService().nativeInput?.checkScreenRecordingPermission() ?? true;
     if (mounted && granted != _screenRecordingGranted) {
       setState(() => _screenRecordingGranted = granted);
     } else if (mounted) {

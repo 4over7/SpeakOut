@@ -97,7 +97,7 @@ class AiPlusPage extends StatelessWidget {
 
 ## 不要做什么
 
-- ❌ **不要 `import 'lib/engine/...'`** — 走 Service 层
+- ❌ **不要 `import 'lib/engine/...'`** — 走 Service 层：engine 能力（ASR/模型/权限/热键流等）经 `AppService()` 的 facade 调用；需要 `ModelInfo`/`ModelArch` 等数据类型时 `import '../services/engine_types.dart'`（已落实，UI 层零 engine import）
 - ❌ **不要硬编码颜色** — 用 `AppTheme.getXxx(context)` 或 `Theme.of(context)`
 - ❌ **不要直接 `SharedPreferences`** — 用 `ConfigService()`
 - ❌ **不要用 `widget.onNavigateToTab(N)` 跨页跳转**（旧 dead 路径）— 用 `SidebarNavigation.of(context)?.goto(id)`

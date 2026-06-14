@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/config_service.dart';
-import '../engine/model_manager.dart';
-import '../engine/core_engine.dart';
+import '../services/app_service.dart';
+import '../services/engine_types.dart';
 import '../config/app_constants.dart';
 import 'theme.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
@@ -23,8 +23,7 @@ class OnboardingPage extends StatefulWidget {
 
 class _OnboardingPageState extends State<OnboardingPage> {
   int _currentStep = 0;
-  final ModelManager _modelManager = ModelManager();
-  final CoreEngine _engine = CoreEngine();
+  final AppService _app = AppService();
 
   // Permission state
   bool _inputMonitoringGranted = false;
@@ -55,9 +54,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Future<void> _checkPermissions() async {
     setState(() => _checkingPermissions = true);
-    _inputMonitoringGranted = _engine.checkInputMonitoringPermission();
-    _accessibilityGranted = _engine.checkAccessibilityPermission();
-    _microphoneGranted = _engine.checkMicPermission();
+    _inputMonitoringGranted = _app.checkInputMonitoringPermission();
+    _accessibilityGranted = _app.checkAccessibilityPermission();
+    _microphoneGranted = _app.checkMicrophonePermission();
     setState(() => _checkingPermissions = false);
   }
 
@@ -105,7 +104,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     });
 
     try {
-      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
       final needsPunctuation = !selectedModel.hasPunctuation;
@@ -113,7 +112,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       // Step 1: Download punctuation model if needed
       if (needsPunctuation) {
         setState(() => _downloadStatus = _l10n.onboardingDownloadPunct);
-        await _modelManager.downloadPunctuationModel(
+        await _app.downloadPunctuationModel(
           onProgress: (p) {
             if (mounted) {
               setState(() {
@@ -136,7 +135,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _downloadProgress = asrStart;
       });
 
-      await _modelManager.downloadAndExtractModel(
+      await _app.downloadAndExtractModel(
         selectedModel.id,
         onProgress: (p) {
           if (mounted) {
@@ -154,18 +153,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
       // Step 3: Activate model
       setState(() => _downloadStatus = _l10n.onboardingActivating);
-      await _modelManager.setActiveModel(selectedModel.id);
-      final path = await _modelManager.getActiveModelPath();
+      await _app.setActiveModel(selectedModel.id);
+      final path = await _app.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+        await _app.initASR(modelPath: path, type: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
       // Initialize punctuation if downloaded
       if (needsPunctuation) {
-        final punctPath = await _modelManager.getPunctuationModelPath();
+        final punctPath = await _app.getPunctuationModelPath();
         if (punctPath != null) {
-          await _engine.initPunctuation(punctPath, activeModelName: selectedModel.name);
+          await _app.initPunctuation(punctPath, activeModelName: selectedModel.name);
         }
       }
 
@@ -190,7 +189,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           .invokeMethod<String>('pickFile');
       if (result == null || result.isEmpty) return;
 
-      final selectedModel = _modelManager.getModelById(_selectedModelId);
+      final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
       setState(() {
@@ -200,7 +199,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _downloadError = null;
       });
 
-      await _modelManager.importModel(
+      await _app.importModel(
         selectedModel.id,
         result,
         onProgress: (p) {
@@ -221,10 +220,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
       // Activate model
       setState(() => _downloadStatus = _l10n.onboardingActivating);
-      await _modelManager.setActiveModel(selectedModel.id);
-      final path = await _modelManager.getActiveModelPath();
+      await _app.setActiveModel(selectedModel.id);
+      final path = await _app.getActiveModelPath();
       if (path != null) {
-        await _engine.initASR(path, modelType: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
+        await _app.initASR(modelPath: path, type: selectedModel.type, modelName: selectedModel.name, hasPunctuation: selectedModel.hasPunctuation);
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
@@ -517,7 +516,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             icon: CupertinoIcons.slider_horizontal_3,
             iconColor: MacosColors.systemGrayColor,
             title: l10n.onboardingCustomSelect,
-            subtitle: l10n.onboardingBrowseModels(ModelManager.offlineModels.length.toString()),
+            subtitle: l10n.onboardingBrowseModels(AppService.offlineModels.length.toString()),
             highlighted: false,
             onTap: () => setState(() {
               _showCustomModels = true;
@@ -529,7 +528,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           Flexible(
             child: SingleChildScrollView(
               child: Column(
-                children: ModelManager.offlineModels
+                children: AppService.offlineModels
                     .map((model) => _buildModelOption(model, l10n))
                     .toList(),
               ),
@@ -797,7 +796,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   // Step 3: Download
   Widget _buildDownloadStep() {
-    final selectedModel = _modelManager.getModelById(_selectedModelId);
+    final selectedModel = _app.getModelById(_selectedModelId);
     final modelName = selectedModel != null
         ? _localizedModelName(selectedModel, _l10n)
         : _selectedModelId;
@@ -890,7 +889,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () {
-                  final model = _modelManager.getModelById(_selectedModelId);
+                  final model = _app.getModelById(_selectedModelId);
                   if (model != null) launchUrl(Uri.parse(model.url));
                 },
                 child: Text(

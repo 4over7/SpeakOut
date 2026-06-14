@@ -7,7 +7,7 @@ import '../../services/config_service.dart';
 import '../../services/cloud_account_service.dart';
 import '../../models/cloud_account.dart';
 import '../../config/cloud_providers.dart';
-import '../../engine/core_engine.dart';
+import '../../services/app_service.dart';
 import '../theme.dart';
 import '../widgets/settings_widgets.dart';
 
@@ -58,7 +58,7 @@ class HotkeyCapturer {
   void _handle((int, int) event) {
     if (_completed) return;
     final (keyCode, mods) = event;
-    final isModifier = CoreEngine.ownModifierMask(keyCode) != 0;
+    final isModifier = AppService.ownModifierMask(keyCode) != 0;
 
     if (!isModifier) {
       // 非修饰键 → 立即提交（即使之前有 pending modifier，非修饰键的事件已经包含正确的 modifier flags）
@@ -323,7 +323,7 @@ void showSettingsError(BuildContext context, String msg) {
 
 /// Show info via engine status
 void showSettingsInfo(String msg) {
-  CoreEngine().updateStatus('ℹ️ $msg');
+  AppService().updateStatus('ℹ️ $msg');
 }
 
 /// Shared dropdown builder

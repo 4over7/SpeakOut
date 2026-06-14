@@ -8,7 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../config/distribution.dart';
-import '../../../../engine/core_engine.dart';
+import '../../../../services/app_service.dart';
 import '../../../../services/update_service.dart';
 import '../../../theme.dart';
 import '../../../widgets/settings_widgets.dart';
@@ -96,7 +96,7 @@ class _OverviewPageState extends State<OverviewPage> {
     final svc = UpdateService();
     final scriptPath = svc.prepareInstall();
     if (scriptPath.isEmpty) return;
-    CoreEngine().nativeInput?.launchUpdater(scriptPath);
+    AppService().nativeInput?.launchUpdater(scriptPath);
     Future.delayed(const Duration(milliseconds: 500), () => exit(0));
   }
 

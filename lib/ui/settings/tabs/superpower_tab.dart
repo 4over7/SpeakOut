@@ -10,7 +10,7 @@ import '../../../services/config_service.dart';
 import '../../../services/correction_service.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/app_log.dart';
-import '../../../engine/core_engine.dart';
+import '../../../services/app_service.dart';
 import '../../theme.dart';
 import '../sidebar/sidebar_shell.dart';
 import '../../widgets/settings_widgets.dart';
@@ -55,7 +55,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // AI Report
   int _bindingAiReportSlot = -1; // -1 = not binding
 
-  final CoreEngine _engine = CoreEngine();
+  final AppService _engine = AppService();
 
   // ---------------------------------------------------------------------------
   // Lifecycle

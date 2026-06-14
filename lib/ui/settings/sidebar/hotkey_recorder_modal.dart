@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 
-import '../../../engine/core_engine.dart';
+import '../../../services/app_service.dart';
 import '../../theme.dart';
 import '../settings_shared.dart';
 
@@ -69,14 +69,14 @@ class _HotkeyRecorderModalState extends State<HotkeyRecorderModal> {
 
   void _start() {
     _capturer = HotkeyCapturer(
-      keyStream: CoreEngine().rawKeyEventStream,
+      keyStream: AppService().rawKeyEventStream,
       timeout: const Duration(seconds: _totalSeconds),
       onCaptured: _onCaptured,
       onTimeout: _onTimeout,
     )..start();
 
     // 实时按键预览（独立订阅，只看不拦截）
-    _previewSub = CoreEngine().rawKeyEventStream.listen((event) {
+    _previewSub = AppService().rawKeyEventStream.listen((event) {
       if (!mounted) return;
       final (keyCode, mods) = event;
       if (keyCode == 53) return; // ESC
