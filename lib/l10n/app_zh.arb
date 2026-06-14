@@ -344,7 +344,7 @@
 
   "smartNeedsAiPlusConfig": "Smart 模式需在「AI Plus」页配置 LLM（服务商 / 模型 / API Key），否则 AI 润色不生效。",
   "gotoAiPlus": "前往 AI Plus",
-  "aiPlusNotActive": "AI 润色当前不生效：需在「识别引擎」页把工作模式切为 Smart（离线 + 云端 AI）。LLM 配置仍可在此编辑。",
+  "aiPlusNotActive": "AI 润色当前未开启：在「识别引擎」页打开「AI 润色」开关即可生效。LLM 配置仍可在此编辑。",
 
   "aboutModelsDir": "模型目录",
   "aboutSystemLog": "导出日志包",

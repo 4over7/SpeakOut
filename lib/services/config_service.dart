@@ -321,28 +321,23 @@ class ConfigService {
   }
   
   // --- Work Mode ---
-  // 'offline' | 'smart' | 'cloud'
+  // 'offline' | 'cloud'（'smart' 已降级为 AI 润色独立开关 aiCorrectionEnabled，见 migrateSmartModeToToggle）
   String get workMode => _prefs?.getString('work_mode') ?? _inferWorkMode();
 
   Future<void> setWorkMode(String mode) async {
     await _prefs?.setString('work_mode', mode);
+    // 模式只决定 ASR 引擎；AI 润色是独立开关（aiCorrectionEnabled），切模式不再强制开关它
     switch (mode) {
       case 'offline':
         await setAsrEngineType('sherpa');
-        await setAiCorrectionEnabled(false);
-      case 'smart':
-        await setAsrEngineType('sherpa');
-        await setAiCorrectionEnabled(true);
       case 'cloud':
         await setAsrEngineType('aliyun');
-        await setAiCorrectionEnabled(false);
     }
   }
 
   /// Backward compat: infer workMode from legacy config
   String _inferWorkMode() {
     if (asrEngineType == 'aliyun') return 'cloud';
-    if (aiCorrectionEnabled) return 'smart';
     return 'offline';
   }
 
@@ -363,6 +358,19 @@ class ConfigService {
         sel != null && sel.isNotEmpty &&
         _prefs?.getString('llm_model_owner') == null) {
       await _prefs?.setString('llm_model_owner', sel);
+    }
+    await _prefs?.setBool(flag, true);
+  }
+
+  /// One-time migration: Smart 模式降级为"AI 润色"独立开关。
+  /// 原 smart = 本地离线 + AI 润色 → 迁移为 work_mode=offline + aiCorrectionEnabled=true（行为不变）。
+  Future<void> migrateSmartModeToToggle() async {
+    const flag = 'smart_mode_migrated';
+    if (_prefs?.getBool(flag) ?? false) return;
+    if (_prefs?.getString('work_mode') == 'smart') {
+      await _prefs?.setString('work_mode', 'offline');
+      await setAsrEngineType('sherpa');
+      await setAiCorrectionEnabled(true);
     }
     await _prefs?.setBool(flag, true);
   }

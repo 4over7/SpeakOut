@@ -384,7 +384,7 @@
 
   "smartNeedsAiPlusConfig": "Smart mode needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise AI polish won't apply.",
   "gotoAiPlus": "Go to AI Plus",
-  "aiPlusNotActive": "AI Polish is not active: switch work mode to Smart (offline + cloud AI) in \"Recognition\". You can still edit LLM config here.",
+  "aiPlusNotActive": "AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.",
 
   "aboutModelsDir": "Models Directory",
   "aboutSystemLog": "Export Log Bundle",

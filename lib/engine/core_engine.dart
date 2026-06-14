@@ -37,7 +37,7 @@ enum RecordingMode { ptt, diary, aiReport }
 
 /// 最后一次录音的完整 pipeline trace（供纠错反馈使用）
 class LastRecordingTrace {
-  final String workMode;        // 'offline' | 'smart' | 'cloud'
+  final String workMode;        // 'offline' | 'cloud'
   final String asrEngine;       // 'sherpa' | 'dashscope' 等
   final String asrModelName;    // 具体模型名
   final String asrRawText;      // ASR 原始输出
@@ -1653,8 +1653,9 @@ class CoreEngine {
       // Report usage for billing (only when cloud services were consumed)
       if (_recordingStartTime != null) {
         final recordingSeconds = DateTime.now().difference(_recordingStartTime!).inSeconds;
+        // 云端 ASR，或 AI 润色（走云端 LLM）任一开启即消耗云服务
         final usedCloud = ConfigService().workMode == 'cloud' ||
-            (ConfigService().workMode == 'smart' && ConfigService().aiCorrectionEnabled);
+            ConfigService().aiCorrectionEnabled;
         if (usedCloud && recordingSeconds > 0) {
           BillingService().reportUsage(recordingSeconds);
         }

@@ -209,3 +209,29 @@ A1 的 keychain 真迁移、A2 的 gateway token 中转都是涉及 entitlement/
 - 每条 review finding 都有了结：要么修了并测，要么论证为什么不在本轮做。没有"为达成字面目标而仓促改高风险项"。
 - 安全类（A 组）真实风险已止血（导出排除凭证、差集清理、http→https、文档不再撒谎），但凭证 keychain 化是涉及签名/公证/回滚的工程，留给用户决策——这是对的边界。
 
+---
+
+## 第 9 轮 — Smart 模式降级（E1，用户 2026-06-14 决策做）
+
+### 用户决策
+就剩余 [~] 项询问后：A1 暂不迁移 keychain / A2 保持现状（均为确认终态）；E 组选"含产品改动 E1/E4"。本轮做 E1，E4 待分组方案确认。
+
+### 措施
+- `config_service.dart`：setWorkMode 移除 'smart' 分支、只设 ASR 引擎（不再强制开关 aiCorrection）；_inferWorkMode 移除 smart；加 migrateSmartModeToToggle（smart→offline+aiCorrection on，行为不变）。
+- `app_service.dart`：init 调 migrateSmartModeToToggle。
+- `core_engine.dart`：billing `usedCloud` 改 `cloud || aiCorrectionEnabled`（原 `cloud || (smart && 润色)`，降级后 smart 不存在会漏判）；workMode 注释更新。
+- `mode_tab.dart`：模式卡 3→2（本地/云端）+ 新增独立「AI 润色」MacosSwitch（loc.aiCorrection）；8 处 `currentMode=='smart'` 改判 `aiCorrectionEnabled`（warning banner / AiPlusHint / aiPlusNotActive / AiConfigCard 分发 / polish matrix）。
+- l10n：aiPlusNotActive 文案去掉"切为 Smart"（zh+en）。
+- `workmode_smart_downgrade_test.dart`（新）：迁移 / setWorkMode 不碰润色 / inferWorkMode 不推断 smart，4 测试。
+
+### 关键发现（差点漏的功能 bug）
+core_engine:1657 billing 用 `workMode=='smart'` 判断是否消耗云——降级后 smart 永不成立，会漏算 AI 润色（云 LLM）的计费。已改为 `aiCorrectionEnabled`。grep 全仓库确认这是唯一逻辑残留（其余 smart 引用是 UI 已改 / l10n 保留 / 注释）。
+
+### 验证结果
+- `flutter analyze`（全量）：No issues found。
+- `flutter test test/services/`：359/359；core_engine + E1：44/44。
+- UI 视觉（模式卡 2 张 + AI 润色开关）需在 app 内验证，文案/布局可微调。
+
+### E4 状态
+sidebar 收敛（12→4）是信息架构重构、v1.8 刚重构过，分组主观，待用户确认分组方案后再做。
+

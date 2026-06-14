@@ -880,8 +880,8 @@ class ModeTabState extends State<ModeTab> {
                         ),
                       ),
 
-                      // Smart mode warning banner (full-width below row 2)
-                      if (currentMode == 'smart') ...[
+                      // AI 润色警告 banner（开启 AI 润色时显示）
+                      if (ConfigService().aiCorrectionEnabled) ...[
                         const SizedBox(height: 10),
                         Container(
                           width: double.infinity,
@@ -957,7 +957,7 @@ class ModeTabState extends State<ModeTab> {
           // --- 区 2: 工作模式 ---
           _buildModeSelector(loc, currentMode, isTranslation),
           ..._buildLanguageHints(loc),
-          if (currentMode == 'smart') ...[
+          if (ConfigService().aiCorrectionEnabled) ...[
             const SizedBox(height: 10),
             _buildSmartModeAiPlusHint(),
           ],
@@ -1043,13 +1043,12 @@ class ModeTabState extends State<ModeTab> {
   /// v1.8 sidebar AI Plus 页：只渲染 LLM 配置，独立于 workMode
   /// （与原 _buildAiConfigCardSmart 同内容）
   Widget _buildAiPlusOnlyView(AppLocalizations loc) {
-    final currentMode = ConfigService().workMode;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (currentMode != 'smart')
+          if (!ConfigService().aiCorrectionEnabled)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Container(
@@ -1085,37 +1084,67 @@ class ModeTabState extends State<ModeTab> {
   Widget _buildModeSelector(AppLocalizations loc, String currentMode, bool isTranslation) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(child: _buildModeCard(
-            value: 'offline',
-            groupValue: currentMode,
-            emoji: '🔒',
-            label: loc.workModeOffline,
-            subtitle: loc.workModeOfflineDesc,
-            enabled: !isTranslation,
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: _buildModeCard(
-            value: 'smart',
-            groupValue: currentMode,
-            emoji: '✦',
-            label: loc.workModeSmart,
-            subtitle: loc.workModeSmartDesc,
-            enabled: true,
-            badge: loc.recommended,
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: _buildModeCard(
-            value: 'cloud',
-            groupValue: currentMode,
-            emoji: '☁️',
-            label: loc.workModeCloud,
-            subtitle: loc.workModeCloudDesc,
-            enabled: !isTranslation,
-          )),
+          Row(
+            children: [
+              Expanded(child: _buildModeCard(
+                value: 'offline',
+                groupValue: currentMode,
+                emoji: '🔒',
+                label: loc.workModeOffline,
+                subtitle: loc.workModeOfflineDesc,
+                enabled: !isTranslation,
+              )),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModeCard(
+                value: 'cloud',
+                groupValue: currentMode,
+                emoji: '☁️',
+                label: loc.workModeCloud,
+                subtitle: loc.workModeCloudDesc,
+                enabled: !isTranslation,
+              )),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildAiPolishToggle(loc),
         ],
       ),
+    );
+  }
+
+  /// AI 润色独立开关（原 Smart 模式降级而来）：可叠加在本地/云端任一模式上
+  Widget _buildAiPolishToggle(AppLocalizations loc) {
+    final enabled = ConfigService().aiCorrectionEnabled;
+    return SettingsCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      children: [
+        Row(
+          children: [
+            const Text('✦', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(loc.aiCorrection, style: AppTheme.body(context).copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 2),
+                  Text(loc.aiCorrectionDesc, style: AppTheme.caption(context).copyWith(fontSize: 11, height: 1.3)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            MacosSwitch(
+              value: enabled,
+              onChanged: (v) async {
+                await ConfigService().setAiCorrectionEnabled(v);
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1258,14 +1287,10 @@ class ModeTabState extends State<ModeTab> {
 
   Widget _buildAiConfigCard(AppLocalizations loc) {
     final currentMode = ConfigService().workMode;
-    switch (currentMode) {
-      case 'smart':
-        return _buildAiConfigCardSmart(loc);
-      case 'cloud':
-        return _buildAiConfigCardCloud(loc);
-      default:
-        return _buildAiConfigCardOffline(loc);
-    }
+    if (currentMode == 'cloud') return _buildAiConfigCardCloud(loc);
+    // 非云端：开了 AI 润色 → smart 卡（含 LLM 配置入口）；否则纯离线卡
+    if (ConfigService().aiCorrectionEnabled) return _buildAiConfigCardSmart(loc);
+    return _buildAiConfigCardOffline(loc);
   }
 
   Widget _buildAiConfigCardOffline(AppLocalizations loc) {
@@ -2041,8 +2066,8 @@ class ModeTabState extends State<ModeTab> {
           // Full-width: Vocab settings
           const VocabSettingsView(),
 
-          // AI polish matrix info
-          if (currentMode == 'smart' || currentMode == 'offline') ...[
+          // AI polish matrix info（非云端模式下展示离线/润色矩阵）
+          if (currentMode != 'cloud') ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
