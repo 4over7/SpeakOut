@@ -46,10 +46,10 @@ app.get('/version', async (c) => {
     } catch (_) {}
 
     return c.json({
-        version: '1.8.6', // @speakout-version
-        build: 237,
+        version: '1.9.0', // @speakout-version
+        build: 238,
         download_url: 'https://github.com/4over7/SpeakOut/releases/latest',
-        dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.8.6/SpeakOut.dmg',
+        dmg_url: 'https://github.com/4over7/SpeakOut/releases/download/v1.9.0/SpeakOut.dmg',
         release_notes: '',
     });
 });
