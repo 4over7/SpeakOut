@@ -100,34 +100,10 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
         title: loc.sidebarSectionSuperpower,
         entries: [
           SidebarEntry(
-            id: 'diary',
-            label: loc.diaryMode,
-            icon: CupertinoIcons.lightbulb,
-            builder: (_) => DiaryPage(),
-          ),
-          SidebarEntry(
-            id: 'organize',
-            label: loc.organizeEnabled,
-            icon: CupertinoIcons.wand_stars,
-            builder: (_) => OrganizePage(),
-          ),
-          SidebarEntry(
-            id: 'translate',
-            label: loc.quickTranslate,
-            icon: CupertinoIcons.globe,
-            builder: (_) => TranslatePage(),
-          ),
-          SidebarEntry(
-            id: 'correction',
-            label: loc.sidebarCorrection,
-            icon: CupertinoIcons.pencil_circle,
-            builder: (_) => CorrectionPage(),
-          ),
-          SidebarEntry(
-            id: 'debug',
-            label: loc.sidebarAiReport,
-            icon: CupertinoIcons.ant,
-            builder: (_) => AiReportPage(),
+            id: 'superpower',
+            label: loc.sidebarSectionSuperpower,
+            icon: CupertinoIcons.bolt_fill,
+            builder: (_) => SuperpowerHubPage(),
           ),
         ],
       ),

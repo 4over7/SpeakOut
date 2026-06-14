@@ -235,3 +235,30 @@ core_engine:1657 billing 用 `workMode=='smart'` 判断是否消耗云——降�
 ### E4 状态
 sidebar 收敛（12→4）是信息架构重构、v1.8 刚重构过，分组主观，待用户确认分组方案后再做。
 
+---
+
+## 第 10 轮 — sidebar 超能力合并（E4，用户 2026-06-14 决策）
+
+### 用户决策
+就 E4 分组方式询问（合并超能力 / 高级折叠 / 保持现状），用户选「合并超能力为单一入口」。
+
+### 关键发现（让实施极简）
+`SuperpowerView.all`（superpower_tab.dart:23）已存在——是旧 5-tab 时代「一页展示全部 5 个超能力卡片」的视图。所以合并无需自建 tab 导航，直接复用。
+
+### 措施
+- `superpower_pages.dart`：新增 `SuperpowerHubPage` = `SuperpowerTab(viewFilter: SuperpowerView.all)`（对称于其他 5 个 page）。
+- `sidebar_shell.dart`：超能力 section 的 5 个 entry（diary/organize/translate/correction/debug）合并为 1 个 `superpower` entry（⚡ bolt 图标）→ SuperpowerHubPage。sidebar 12→8 入口。
+- `overview_page.dart`：超能力 feature card 的 `goto('diary')` → `goto('superpower')`（diary entry 已不存在）。
+
+### 验证（含一个差点漏的跳转 bug）
+- grep 确认 overview hero 有 `goto('diary')` 指向已删 entry——已修为 `goto('superpower')`，否则点超能力卡会 fallback 到 overview。
+- `flutter analyze`（全量）：No issues found。
+- `flutter test`（全量，排除 model_full_flow）：**602/602 通过**。
+
+### 范围说明
+- 只做 sidebar 收敛（超能力合并）；报告 E4 还提的「ConfigService 过大」拆分是另一大重构，用户未选，保留为长期技术债。
+- E2（facade）/E3（asrEngineType 改名）：用户在 E 组选项选了「含产品改动 E1/E4」、未选「技术重构 E2/E3」，故不做，保留为长期技术债（文档已标 [x] + 决策理由）。
+
+### 全部 review 项最终状态
+A1/A2 止血+文档（用户确认终态）｜A3·B1·C1·C2·C3·D1-D5·F1·F2·F4-F7·F9 已修+测试｜F3·F8 评估确认不改｜E1·E4 已做｜E2·E3 用户决策不做。docs/review/fix_tracking_2026_06_13.md 全部条目均为终态（[x] 或确认不做）。
+

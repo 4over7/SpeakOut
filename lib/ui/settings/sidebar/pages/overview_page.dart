@@ -301,7 +301,7 @@ class _OverviewPageState extends State<OverviewPage> {
               iconColor: MacosColors.systemYellowColor,
               title: loc.featureSuperpowerTitle,
               desc: loc.featureSuperpowerDesc,
-              onTap: () => nav?.goto('diary'),
+              onTap: () => nav?.goto('superpower'),
             ),
             _FeatureCard(
               icon: CupertinoIcons.book,

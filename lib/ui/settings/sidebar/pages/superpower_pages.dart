@@ -12,6 +12,18 @@ import '../../tabs/superpower_tab.dart';
 /// 当前策略：wrap SuperpowerTab with 对应 viewFilter.
 /// Phase 6 清理旧 5-tab 后再做真正的文件级拆分。
 
+/// E4：超能力合并入口 —— 单页展示全部 5 个超能力功能（复用旧 5-tab 的 all 视图）
+class SuperpowerHubPage extends StatelessWidget {
+  final ValueChanged<int>? onNavigateToTab;
+  const SuperpowerHubPage({super.key, this.onNavigateToTab});
+
+  @override
+  Widget build(BuildContext context) => SuperpowerTab(
+        onNavigateToTab: onNavigateToTab ?? (_) {},
+        viewFilter: SuperpowerView.all,
+      );
+}
+
 class DiaryPage extends StatelessWidget {
   final ValueChanged<int>? onNavigateToTab;
   const DiaryPage({super.key, this.onNavigateToTab});
