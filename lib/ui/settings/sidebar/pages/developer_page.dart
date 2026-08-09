@@ -78,10 +78,11 @@ class _DeveloperPageState extends State<DeveloperPage> {
     setState(() => _cleaningRedundant = true);
     final freed = await AppService().cleanupRedundantBundledCopies();
     if (!mounted) return;
-    setState(() {
-      _cleaningRedundant = false;
-      _redundantBytes = 0;
-    });
+    setState(() => _cleaningRedundant = false);
+    // 重新检测而不是假设归零：删除可能部分失败，
+    // 直接置 0 会让条目消失、用户没法重试
+    await _loadRedundant();
+    if (!mounted) return;
     showSettingsInfo(freed > 0
         ? loc.devRedundantDone(_fmtSize(freed))
         : loc.devRedundantNone);

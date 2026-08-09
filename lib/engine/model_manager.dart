@@ -296,7 +296,13 @@ class ModelManager {
     try {
       final contents = File(Platform.resolvedExecutable).parent.parent.path;
       final dir = Directory('$contents/Resources/models/${_getDirNameFromUrl(model.url)}');
-      result = dir.existsSync() ? dir.path : null;
+      // 只判目录存在不够：打包出错可能留下空目录/残缺文件，
+      // 那样会被误判为"已内置"，最终静默失败在 initASR。
+      // 命名与 _hasTokensFile 保持一致（不同模型家族 tokens 文件名不同）。
+      bool hasTokens(String p) =>
+          File('$p/tokens.txt').existsSync() ||
+          File('$p/tokenizer.json').existsSync();
+      result = (dir.existsSync() && hasTokens(dir.path)) ? dir.path : null;
     } catch (_) {
       result = null;
     }
@@ -333,17 +339,25 @@ class ModelManager {
   }
 
   /// 删除上面找出的冗余副本。内置那份在 app bundle 内，不受影响。
+  /// 返回**实际释放**的字节数（不是检测到的总量）——
+  /// 删除可能因权限/占用失败，返回 total 会让 UI 谎报「已释放 229MB」。
   Future<int> cleanupRedundantBundledCopies() async {
-    final (total, dirs) = await findRedundantBundledCopies();
+    final (_, dirs) = await findRedundantBundledCopies();
+    int freed = 0;
     for (final d in dirs) {
+      int size = 0;
       try {
+        await for (final e in d.list(recursive: true, followLinks: false)) {
+          if (e is File) size += await e.length();
+        }
         await d.delete(recursive: true);
+        freed += size; // 只在删除确实成功后计入
         AppLog.d('[Model] 已清理冗余副本: ${d.path}');
       } catch (e) {
         AppLog.d('[Model] 清理失败 ${d.path}: $e');
       }
     }
-    return total;
+    return freed;
   }
 
   Future<String?> getActiveModelPath() async {

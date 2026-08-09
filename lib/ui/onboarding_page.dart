@@ -135,13 +135,16 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
     try {
       await _app.setActiveModel(model.id);
       final path = await _app.getActiveModelPath();
-      if (path != null) {
-        await _app.initASR(
-            modelPath: path,
-            type: model.type,
-            modelName: model.name,
-            hasPunctuation: model.hasPunctuation);
+      // path 为空时绝不能往下走 —— 否则会显示「设置完成」但 ASR 根本没初始化，
+      // 用户按快捷键毫无反应。统一抛出去走下面的回退分支。
+      if (path == null) {
+        throw StateError('内置模型路径解析失败');
       }
+      await _app.initASR(
+          modelPath: path,
+          type: model.type,
+          modelName: model.name,
+          hasPunctuation: model.hasPunctuation);
     } catch (e) {
       AppLog.d('[Onboarding] 内置模型激活失败，回退到下载流程: $e');
       if (!mounted) return;
