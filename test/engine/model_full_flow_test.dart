@@ -6,6 +6,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakout/engine/model_manager.dart';
+import 'package:speakout/services/config_service.dart';
 
 /// Mock path_provider
 class MockPathProvider extends Fake
@@ -28,10 +29,13 @@ void main() {
   late Directory tmpDir;
   late ModelManager manager;
 
-  setUp(() {
+  setUp(() async {
     tmpDir = Directory.systemTemp.createTempSync('speakout_model_flow_');
     PathProviderPlatform.instance = MockPathProvider(tmpDir.path);
     SharedPreferences.setMockInitialValues({});
+    // 必须 init：ConfigService 未 init 时 _prefs 为 null，setActiveModelId 会静默 no-op
+    // （await _prefs?.setString(...)），导致 getActiveModelPath 读回默认模型 id 而非本次测试的模型
+    await ConfigService().init();
     manager = ModelManager();
   });
 

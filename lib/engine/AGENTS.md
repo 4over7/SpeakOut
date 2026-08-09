@@ -101,7 +101,11 @@ CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——�
 ## 测试
 
 - `test/engine/core_engine_test.dart` — CoreEngine 状态机
-- `test/engine/model_full_flow_test.dart` — 模型下载+解压+激活全流程（**真实网络下载**，CI 偶发因网络抖动失败，可重跑）
+- `test/engine/model_full_flow_test.dart` — 模型下载+解压+激活全流程（**真实网络下载**，跑一次约 3GB）。
+  > ⚠️ 2026-08-10 更正：此前标注为「CI 偶发因网络抖动失败，可重跑」，**该归因是错的**。
+  > 真因是 `setUp` 未调 `ConfigService().init()` —— `_prefs` 为 null 时 `setActiveModelId` 会
+  > **静默 no-op**（`await _prefs?.setString(...)`），于是 `getActiveModelPath()` 读回默认模型 id，
+  > 查向未下载的目录返回 null，稳定失败 8 个（9 个模型里只有 id 撞上 `kDefaultModelId` 的 SenseVoice 能过）。已修。
 - `test/engine/hotkey_matching_test.dart` — 修饰键精确匹配规则
 - 新增 Provider 时：mock WebSocket，验证 protocol 序列（run-task → task-started → result-generated → task-finished/task-failed）
 
