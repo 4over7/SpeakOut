@@ -313,6 +313,18 @@ class ModelManager {
   /// 该模型是否随包内置（内置即视为已就绪，无需下载）
   bool isModelBundled(String modelId) => bundledModelDir(modelId) != null;
 
+  /// 用户目录里是否存在该模型的本地副本（下载或导入而来）。
+  /// 与 isModelBundled 区分：内置＋有副本时删除按钮应当保留（删副本、回落内置），
+  /// 只有「纯内置」才该隐藏删除，否则等于剥夺了用户删除自己下载内容的能力。
+  Future<bool> hasLocalCopy(String modelId) async {
+    final model = allModels.where((m) => m.id == modelId).firstOrNull;
+    if (model == null) return false;
+    final modelsRoot = await _getModelsRoot();
+    final dir = Directory('${modelsRoot.path}/${_getDirNameFromUrl(model.url)}');
+    if (!await dir.exists()) return false;
+    return _hasTokensFile(dir.path);
+  }
+
   /// 找出「随包内置、同时又在用户目录留了一份下载副本」的冗余占用。
   ///
   /// 老用户升级到内置版本后，之前下载的那份就纯属冗余（同一 URL、同一目录、同一内容），

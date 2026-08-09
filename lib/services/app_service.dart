@@ -64,6 +64,7 @@ class AppService {
   Future<bool> isModelDownloaded(String id) => modelManager.isModelDownloaded(id);
   /// 该模型是否随包内置（内置则无需下载，首启即可用）
   bool isModelBundled(String id) => modelManager.isModelBundled(id);
+  Future<bool> hasLocalCopy(String id) => modelManager.hasLocalCopy(id);
   Future<(int, List<Directory>)> findRedundantBundledCopies() =>
       modelManager.findRedundantBundledCopies();
   Future<int> cleanupRedundantBundledCopies() =>

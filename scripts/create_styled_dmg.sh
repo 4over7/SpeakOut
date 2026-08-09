@@ -59,12 +59,14 @@ BUNDLED_MODEL_DIR="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
 BUNDLED_MODEL_CACHE="build/bundled-models/${BUNDLED_MODEL_DIR}"
 BUNDLED_MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${BUNDLED_MODEL_DIR}.tar.bz2"
 
-# 校验缓存完整性：只判存在会让「半截下载」被打进包，用户拿到坏包
-MODEL_MIN_BYTES=200000000   # 正常约 228MB，低于 200MB 视为不完整
+# 校验缓存完整性：只判存在会让「半截下载」被打进包，用户拿到坏包。
+# 判据是「两个必需文件都在且 onnx 非空」，不用绝对大小阈值 ——
+# 否则将来换成小模型（如 77MB 的 Dolphin）会永远判定不完整、每次重下。
+MODEL_MIN_BYTES=10000000   # 仅用于排除 0 字节/截断文件，不是模型实际大小
 CACHE_OK=0
 if [ -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ] && [ -f "${BUNDLED_MODEL_CACHE}/tokens.txt" ]; then
     CACHE_SIZE=$(stat -f%z "${BUNDLED_MODEL_CACHE}/model.int8.onnx")
-    [ "$CACHE_SIZE" -ge "$MODEL_MIN_BYTES" ] && CACHE_OK=1 || echo "⚠️  缓存模型不完整（${CACHE_SIZE} bytes），重新下载"
+    [ "$CACHE_SIZE" -ge "$MODEL_MIN_BYTES" ] && CACHE_OK=1 || echo "⚠️  缓存模型疑似截断（${CACHE_SIZE} bytes），重新下载"
 fi
 
 if [ "$CACHE_OK" -eq 0 ]; then

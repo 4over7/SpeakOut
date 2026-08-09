@@ -43,6 +43,7 @@ class ModeTabState extends State<ModeTab> {
 
   // Model management
   final Map<String, bool> _downloadedStatus = {};
+  final Map<String, bool> _hasLocalCopy = {};
   final Set<String> _downloadingIds = {};
   final Map<String, double?> _downloadProgressMap = {};
   final Map<String, String> _downloadStatusMap = {};
@@ -325,6 +326,7 @@ class ModeTabState extends State<ModeTab> {
   Future<void> _refresh() async {
     for (var m in AppService.allModels) {
       _downloadedStatus[m.id] = await _app.isModelDownloaded(m.id);
+      _hasLocalCopy[m.id] = await _app.hasLocalCopy(m.id);
     }
     _downloadedStatus[AppService.punctuationModelId] = await _app.isPunctuationModelDownloaded();
     setState(() {});
@@ -2197,7 +2199,8 @@ class ModeTabState extends State<ModeTab> {
             onActivate: () => _activate(m),
             modelUrl: m.url,
             onImport: () => _importModel(m),
-            isBundled: _app.isModelBundled(m.id),
+            // 仅「纯内置（无本地副本）」隐藏删除；有副本时保留按钮用于删副本
+            isBundled: _app.isModelBundled(m.id) && !(_hasLocalCopy[m.id] ?? false),
           ),
         ],
       ),

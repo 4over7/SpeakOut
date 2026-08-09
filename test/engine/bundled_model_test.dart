@@ -59,4 +59,15 @@ void main() {
     final freed = await manager.cleanupRedundantBundledCopies();
     expect(freed, 0);
   });
+
+  test('hasLocalCopy：目录不存在时为 false', () async {
+    expect(await manager.hasLocalCopy(ModelManager.offlineModels.first.id), isFalse);
+  });
+
+  test('hasLocalCopy：有目录但缺 tokens 文件仍为 false（残缺不算可用副本）', () async {
+    final m = ModelManager.offlineModels.first;
+    final dirName = m.url.split('/').last.replaceAll('.tar.bz2', '');
+    Directory('${tmpDir.path}/Models/$dirName').createSync(recursive: true);
+    expect(await manager.hasLocalCopy(m.id), isFalse);
+  });
 }

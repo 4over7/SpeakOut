@@ -24,8 +24,8 @@ cp "$NATIVE_LIB" "$NATIVE_LIB_DEST/"
 # 必须在 codesign 之前，否则签名不覆盖新文件。
 BUNDLED_MODEL_DIR="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
 BUNDLED_MODEL_CACHE="build/bundled-models/${BUNDLED_MODEL_DIR}"
-MODEL_MIN_BYTES=200000000
-if [ ! -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ] || \
+MODEL_MIN_BYTES=10000000   # 仅排除 0 字节/截断，不绑定具体模型大小
+if [ ! -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ] || [ ! -f "${BUNDLED_MODEL_CACHE}/tokens.txt" ] || \
    [ "$(stat -f%z "${BUNDLED_MODEL_CACHE}/model.int8.onnx" 2>/dev/null || echo 0)" -lt "$MODEL_MIN_BYTES" ]; then
     echo "❌ 内置模型缓存缺失或不完整：先跑一次 ./scripts/create_styled_dmg.sh 生成 build/bundled-models 缓存"
     exit 1
