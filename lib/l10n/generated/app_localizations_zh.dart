@@ -1304,7 +1304,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get devRedundantModels => '清理冗余模型副本';
 
   @override
-  String get devRedundantModelsDesc => '默认模型已随包内置，这份下载副本可安全删除';
+  String get devRedundantModelsDesc => '删除本地副本，改用随包内置的版本';
 
   @override
   String get devRedundantNone => '没有可清理的冗余副本';
@@ -1313,4 +1313,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String devRedundantDone(String size) {
     return '已释放 $size';
   }
+
+  @override
+  String devRedundantConfirm(String size) {
+    return '将删除本地模型副本（$size），之后使用随包内置的默认模型。\n\n注意：如果你曾手动「导入」过自定义模型，它也在这个目录里，会一并删除。';
+  }
+
+  @override
+  String get devRedundantCancel => '取消';
+
+  @override
+  String get devRedundantConfirmBtn => '删除副本';
 }

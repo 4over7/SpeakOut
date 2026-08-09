@@ -581,8 +581,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                               PushButton(
                                 controlSize: ControlSize.small,
                                 onPressed: () async {
+                                  // 跳到「实际缺失」的那个面板。固定跳输入监控的话，
+                                  // 缺的是辅助功能时用户会跳过去看到已授权、完全摸不着头脑。
+                                  // 两个都缺时先引导输入监控（listener 能起来的前提）。
+                                  final needInput = !_appService.engine
+                                      .checkInputMonitoringPermission();
+                                  final frag = needInput
+                                      ? 'Privacy_ListenEvent'
+                                      : 'Privacy_Accessibility';
                                   final uri = Uri.parse(
-                                      'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
+                                      'x-apple.systempreferences:com.apple.preference.security?$frag');
                                   if (await canLaunchUrl(uri)) await launchUrl(uri);
                                 },
                                 child: Text(AppLocalizations.of(context)!.permGrant),

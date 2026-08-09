@@ -83,7 +83,7 @@ fi
 # 只装 sherpa 真正需要的两个文件，省掉 README / test_wavs（约 1MB 冗余）
 # 先清空 models 目录：flutter build 是增量的，不会清掉上一次注入的残留
 # （换模型版本时会留下两份，包体积翻倍）
-rm -rf "${STAGING_DIR}/${APP_NAME}.app/Contents/Resources/models"
+rm -rf "${STAGING_DIR:?}/${APP_NAME:?}.app/Contents/Resources/models"
 MODEL_DEST="${STAGING_DIR}/${APP_NAME}.app/Contents/Resources/models/${BUNDLED_MODEL_DIR}"
 mkdir -p "${MODEL_DEST}"
 cp "${BUNDLED_MODEL_CACHE}/model.int8.onnx" "${MODEL_DEST}/"

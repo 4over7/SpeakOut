@@ -550,10 +550,20 @@
   "onboardingTryItPlaceholder": "Say something…",
   "onboardingTryItNeedPerm": "Permissions not granted yet — you can grant them later in Settings → General.",
   "devRedundantModels": "Clean up redundant model copies",
-  "devRedundantModelsDesc": "The default model ships with the app — this downloaded copy can be safely removed",
+  "devRedundantModelsDesc": "Remove the local copy and use the bundled version instead",
   "devRedundantNone": "No redundant copies found",
   "devRedundantDone": "Freed {size}",
   "@devRedundantDone": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "devRedundantConfirm": "This removes the local model copy ({size}); the bundled default will be used instead.\n\nNote: if you ever imported a custom model, it lives in the same folder and will also be removed.",
+  "devRedundantCancel": "Cancel",
+  "devRedundantConfirmBtn": "Remove copy",
+  "@devRedundantConfirm": {
     "placeholders": {
       "size": {
         "type": "String"

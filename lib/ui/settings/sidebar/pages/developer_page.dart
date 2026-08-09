@@ -51,6 +51,30 @@ class _DeveloperPageState extends State<DeveloperPage> {
       : '${(b / 1048576).toStringAsFixed(0)} MB';
 
   Future<void> _cleanRedundant(AppLocalizations loc) async {
+    // 必须确认：这个目录同时也是「导入模型」的落盘位置，
+    // 用户手动导入过的自定义模型就在里面，不能不问就删。
+    final ok = await showMacosAlertDialog<bool>(
+      context: context,
+      builder: (ctx) => MacosAlertDialog(
+        appIcon: const MacosIcon(CupertinoIcons.exclamationmark_triangle,
+            size: 48, color: Colors.orange),
+        title: Text(loc.devRedundantModels),
+        message: Text(loc.devRedundantConfirm(_fmtSize(_redundantBytes)),
+            textAlign: TextAlign.center),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(loc.devRedundantConfirmBtn),
+        ),
+        secondaryButton: PushButton(
+          controlSize: ControlSize.large,
+          secondary: true,
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(loc.devRedundantCancel),
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
     setState(() => _cleaningRedundant = true);
     final freed = await AppService().cleanupRedundantBundledCopies();
     if (!mounted) return;

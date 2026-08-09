@@ -2579,7 +2579,7 @@ abstract class AppLocalizations {
   /// No description provided for @devRedundantModelsDesc.
   ///
   /// In en, this message translates to:
-  /// **'The default model ships with the app — this downloaded copy can be safely removed'**
+  /// **'Remove the local copy and use the bundled version instead'**
   String get devRedundantModelsDesc;
 
   /// No description provided for @devRedundantNone.
@@ -2593,6 +2593,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Freed {size}'**
   String devRedundantDone(String size);
+
+  /// No description provided for @devRedundantConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the local model copy ({size}); the bundled default will be used instead.\n\nNote: if you ever imported a custom model, it lives in the same folder and will also be removed.'**
+  String devRedundantConfirm(String size);
+
+  /// No description provided for @devRedundantCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get devRedundantCancel;
+
+  /// No description provided for @devRedundantConfirmBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove copy'**
+  String get devRedundantConfirmBtn;
 }
 
 class _AppLocalizationsDelegate

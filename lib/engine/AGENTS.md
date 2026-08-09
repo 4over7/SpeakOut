@@ -61,7 +61,14 @@ CoreEngine 调 ASR `stop()` 时设 6 秒超时（云端识别需要 wait task-fi
 `SpeakOut.app/Contents/Resources/models/<dirFromUrl>/`（只放 `model.int8.onnx` + `tokens.txt`）。
 
 - `ModelManager.bundledModelDir(id)` 由 `Platform.resolvedExecutable` 反推 `Contents/Resources/...` 并 `existsSync` 判定
-- `getActiveModelPath()` **优先返回内置路径**；`isModelDownloaded()` 对内置模型直接返回 true
+- **优先级：用户副本 > 内置**。`getActiveModelPath()` 先查 Application Support 里下载/导入的副本，
+  都没有才回落到 bundle —— 反过来会让「导入」按钮对内置模型完全失效（导入了却仍在用 bundle 那份）
+- `isModelDownloaded()` 对内置模型返回 true（内置即就绪，列表显示「激活」而非「下载」）
+- 内置模型**不显示删除按钮**（`buildActionBtn(isBundled:)`）—— bundle 内的文件删不掉，
+  显示删除只会让用户点了没反应
+- `AppService._initASR()` 回退时也先查内置，避免 activeModelId 失效时白下载一份 bundle 里已有的模型
+- 升级用户的冗余副本：`findRedundantBundledCopies()` 检测 + 开发者选项手动清理。
+  ⚠️ **不自动删** —— 该目录同时是「导入模型」的落盘位置，用户的自定义模型也在里面，删前必须确认
 - onboarding 检测到内置则跳过整个下载步骤（`_activateBundledModel`）
 - **模型不入 git**（228MB 会让仓库永久膨胀）：打包时下载到 `build/bundled-models/` 缓存，已 gitignore
 - 开发期 `flutter run` 下 bundle 内没有该目录 → 自动回退原下载流程，行为不变

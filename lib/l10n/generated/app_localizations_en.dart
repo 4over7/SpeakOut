@@ -1374,7 +1374,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devRedundantModelsDesc =>
-      'The default model ships with the app — this downloaded copy can be safely removed';
+      'Remove the local copy and use the bundled version instead';
 
   @override
   String get devRedundantNone => 'No redundant copies found';
@@ -1383,4 +1383,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String devRedundantDone(String size) {
     return 'Freed $size';
   }
+
+  @override
+  String devRedundantConfirm(String size) {
+    return 'This removes the local model copy ($size); the bundled default will be used instead.\n\nNote: if you ever imported a custom model, it lives in the same folder and will also be removed.';
+  }
+
+  @override
+  String get devRedundantCancel => 'Cancel';
+
+  @override
+  String get devRedundantConfirmBtn => 'Remove copy';
 }
