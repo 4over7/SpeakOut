@@ -21,8 +21,29 @@ class CloudAccountsPage extends StatefulWidget {
   State<CloudAccountsPage> createState() => _CloudAccountsPageState();
 }
 
+/// 默认展开的推荐服务商。
+///
+/// 页面会为全部 15 个服务商预置条目，一次铺开对新用户是纯噪音。
+/// 这里只挑覆盖典型场景的少数几家默认可见，其余收进「更多服务商」：
+/// - `dashscope` 中文 ASR + LLM 双能力，国内首选
+/// - `deepseek`  LLM 兜底第一优先级（见 memory: LLM 推荐优先级）
+/// - `openai`    国际用户的 ASR + LLM
+/// - `groq`      速度最快的非流式 ASR
+///
+/// **不影响能力**：折叠区随时可展开，已配置或已启用的账户永远在主区。
+const Set<String> _kRecommendedProviderIds = {
+  'dashscope', 'deepseek', 'openai', 'groq',
+};
+
 class _CloudAccountsPageState extends State<CloudAccountsPage> {
   List<CloudAccount> _accounts = [];
+  bool _showMoreProviders = false;
+
+  /// 主区：已启用 / 已填凭证 / 推荐名单内
+  bool _isPrimary(CloudAccount a) =>
+      a.isEnabled ||
+      a.credentials.isNotEmpty ||
+      _kRecommendedProviderIds.contains(a.providerId);
 
   @override
   void initState() {
@@ -103,13 +124,59 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           ),
           const SizedBox(height: 12),
 
-          // 账户列表（所有服务商预置，填 key 才能启用）
+          // 账户列表：推荐/已配置在主区，其余折叠（所有服务商均已预置，填 key 才能启用）
           SettingsCardGrid(
             spacing: 8,
             runSpacing: 8,
-            children: _accounts.map((a) => _buildAccountCard(a, loc)).toList(),
+            children: _primaryAccounts.map((a) => _buildAccountCard(a, loc)).toList(),
           ),
+
+          if (_otherAccounts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildMoreProvidersToggle(),
+            if (_showMoreProviders) ...[
+              const SizedBox(height: 8),
+              SettingsCardGrid(
+                spacing: 8,
+                runSpacing: 8,
+                children: _otherAccounts.map((a) => _buildAccountCard(a, loc)).toList(),
+              ),
+            ],
+          ],
         ],
+      ),
+    );
+  }
+
+  List<CloudAccount> get _primaryAccounts =>
+      _accounts.where(_isPrimary).toList();
+
+  List<CloudAccount> get _otherAccounts =>
+      _accounts.where((a) => !_isPrimary(a)).toList();
+
+  Widget _buildMoreProvidersToggle() {
+    final n = _otherAccounts.length;
+    return GestureDetector(
+      onTap: () => setState(() => _showMoreProviders = !_showMoreProviders),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MacosIcon(
+              _showMoreProviders
+                  ? CupertinoIcons.chevron_down
+                  : CupertinoIcons.chevron_right,
+              size: 12,
+              color: AppTheme.getAccent(context),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _showMoreProviders ? '收起其他服务商' : '更多服务商（$n）',
+              style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context)),
+            ),
+          ],
+        ),
       ),
     );
   }
