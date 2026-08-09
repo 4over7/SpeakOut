@@ -2197,6 +2197,7 @@ class ModeTabState extends State<ModeTab> {
             onActivate: () => _activate(m),
             modelUrl: m.url,
             onImport: () => _importModel(m),
+            isBundled: _app.isModelBundled(m.id),
           ),
         ],
       ),

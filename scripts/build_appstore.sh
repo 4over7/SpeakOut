@@ -20,6 +20,21 @@ NATIVE_LIB_DEST="$SOURCE_APP/Contents/MacOS/native_lib"
 mkdir -p "$NATIVE_LIB_DEST"
 cp "$NATIVE_LIB" "$NATIVE_LIB_DEST/"
 
+# 2.5 Inject bundled ASR model（与 DMG 渠道保持一致：装完即用，无需首启下载）
+# 必须在 codesign 之前，否则签名不覆盖新文件。
+BUNDLED_MODEL_DIR="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+BUNDLED_MODEL_CACHE="build/bundled-models/${BUNDLED_MODEL_DIR}"
+MODEL_MIN_BYTES=200000000
+if [ ! -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ] || \
+   [ "$(stat -f%z "${BUNDLED_MODEL_CACHE}/model.int8.onnx" 2>/dev/null || echo 0)" -lt "$MODEL_MIN_BYTES" ]; then
+    echo "❌ 内置模型缓存缺失或不完整：先跑一次 ./scripts/create_styled_dmg.sh 生成 build/bundled-models 缓存"
+    exit 1
+fi
+MODEL_DEST="$SOURCE_APP/Contents/Resources/models/${BUNDLED_MODEL_DIR}"
+mkdir -p "$MODEL_DEST"
+cp "${BUNDLED_MODEL_CACHE}/model.int8.onnx" "${BUNDLED_MODEL_CACHE}/tokens.txt" "$MODEL_DEST/"
+echo "📦 已内置模型: $(du -sh "$MODEL_DEST" | cut -f1)"
+
 # 3. Sign
 echo "Signing with: $SIGN_IDENTITY"
 codesign -f -s "$SIGN_IDENTITY" "$NATIVE_LIB_DEST/libnative_input.dylib"

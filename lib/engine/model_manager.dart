@@ -283,17 +283,25 @@ class ModelManager {
   /// 路径推算：`.../SpeakOut.app/Contents/MacOS/SpeakOut` → `.../Contents/Resources/models/<dir>`
   /// 开发期 `flutter run` 下不存在，一切自动回退到原有的下载流程。
   /// 仅 macOS 有此机制。
+  /// 缓存探测结果 —— bundle 内容在进程生命周期内不会变，
+  /// 而模型列表 UI 会对每个模型反复调用（每次都 existsSync 是浪费）。
+  static final Map<String, String?> _bundledDirCache = {};
+
   String? bundledModelDir(String modelId) {
     if (!Platform.isMacOS) return null;
+    if (_bundledDirCache.containsKey(modelId)) return _bundledDirCache[modelId];
     final model = allModels.where((m) => m.id == modelId).firstOrNull;
     if (model == null) return null;
+    String? result;
     try {
       final contents = File(Platform.resolvedExecutable).parent.parent.path;
       final dir = Directory('$contents/Resources/models/${_getDirNameFromUrl(model.url)}');
-      return dir.existsSync() ? dir.path : null;
+      result = dir.existsSync() ? dir.path : null;
     } catch (_) {
-      return null;
+      result = null;
     }
+    _bundledDirCache[modelId] = result;
+    return result;
   }
 
   /// 该模型是否随包内置（内置即视为已就绪，无需下载）

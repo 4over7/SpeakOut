@@ -405,6 +405,8 @@ Widget buildActionBtn(BuildContext context, {
   required VoidCallback onDownload, required VoidCallback onDelete, required VoidCallback onActivate,
   double? progress, String? statusText, bool isOffline = false,
   String? modelUrl, VoidCallback? onImport,
+  /// 随包内置的模型删不掉（文件在 app bundle 内），显示删除按钮只会让用户点了没反应
+  bool isBundled = false,
 }) {
   final loc = AppLocalizations.of(context)!;
   if (isLoading) {
@@ -489,11 +491,13 @@ Widget buildActionBtn(BuildContext context, {
           onPressed: onActivate,
           child: Text(loc.activate),
         ),
-      const SizedBox(width: 12),
-      MacosIconButton(
-        icon: const MacosIcon(CupertinoIcons.trash, color: AppTheme.errorColor, size: 18),
-        onPressed: onDelete,
-      ),
+      if (!isBundled) ...[
+        const SizedBox(width: 12),
+        MacosIconButton(
+          icon: const MacosIcon(CupertinoIcons.trash, color: AppTheme.errorColor, size: 18),
+          onPressed: onDelete,
+        ),
+      ],
     ],
   );
 }

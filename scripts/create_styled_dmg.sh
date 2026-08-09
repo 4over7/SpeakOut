@@ -59,13 +59,25 @@ BUNDLED_MODEL_DIR="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
 BUNDLED_MODEL_CACHE="build/bundled-models/${BUNDLED_MODEL_DIR}"
 BUNDLED_MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${BUNDLED_MODEL_DIR}.tar.bz2"
 
-if [ ! -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ]; then
+# 校验缓存完整性：只判存在会让「半截下载」被打进包，用户拿到坏包
+MODEL_MIN_BYTES=200000000   # 正常约 228MB，低于 200MB 视为不完整
+CACHE_OK=0
+if [ -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ] && [ -f "${BUNDLED_MODEL_CACHE}/tokens.txt" ]; then
+    CACHE_SIZE=$(stat -f%z "${BUNDLED_MODEL_CACHE}/model.int8.onnx")
+    [ "$CACHE_SIZE" -ge "$MODEL_MIN_BYTES" ] && CACHE_OK=1 || echo "⚠️  缓存模型不完整（${CACHE_SIZE} bytes），重新下载"
+fi
+
+if [ "$CACHE_OK" -eq 0 ]; then
     echo "📥 首次打包：下载内置模型 ${BUNDLED_MODEL_DIR}..."
     mkdir -p build/bundled-models
     curl -L --fail -o "build/bundled-models/model.tar.bz2" "${BUNDLED_MODEL_URL}" || {
         echo "❌ 内置模型下载失败，中止打包（避免产出无模型的包）"; exit 1; }
     tar xjf "build/bundled-models/model.tar.bz2" -C build/bundled-models
     rm -f "build/bundled-models/model.tar.bz2"
+    DL_SIZE=$(stat -f%z "${BUNDLED_MODEL_CACHE}/model.int8.onnx" 2>/dev/null || echo 0)
+    if [ "$DL_SIZE" -lt "$MODEL_MIN_BYTES" ]; then
+        echo "❌ 下载后模型仍不完整（${DL_SIZE} bytes），中止打包"; exit 1
+    fi
 fi
 
 # 只装 sherpa 真正需要的两个文件，省掉 README / test_wavs（约 1MB 冗余）

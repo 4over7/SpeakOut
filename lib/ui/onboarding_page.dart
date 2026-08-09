@@ -304,14 +304,13 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
 
   void _nextStep() {
     if (_currentStep < 4) {
-      setState(() => _currentStep++);
-      ConfigService().setOnboardingStep(_currentStep);
-
-      // 到达下载步骤(3)时：随包内置的模型直接就绪，跳过整步
-      if (_currentStep == 3 && _app.isModelBundled(_selectedModelId)) {
+      // 内置模型：从选模型(2)直接进完成(4)，不经过下载页，避免闪一下进度条
+      if (_currentStep == 2 && _app.isModelBundled(_selectedModelId)) {
         _activateBundledModel();
         return;
       }
+      setState(() => _currentStep++);
+      ConfigService().setOnboardingStep(_currentStep);
 
       // Auto-start download when reaching download step (step 3)
       if (_currentStep == 3 && !_downloadComplete && !_isDownloading) {
