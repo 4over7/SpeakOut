@@ -9,12 +9,12 @@
 
 ## 文件清单
 
-| 文件 | 行 | 职责 |
-|---|---|---|
-| `app_constants.dart` | 284 | 全局常量：默认值、超时、URL、Prompt 模板、模型列表（不在 model_manager 里的部分） |
-| `cloud_providers.dart` | 342 | **云服务商注册表** — `CloudProviders.all` 里每个 provider 的 metadata（base URL / 凭证字段 / 模型清单 / 鉴权方式） |
-| `app_log.dart` | 105 | 全局日志：`AppLog.d/i/w/e`，写文件 + verbose 控制台输出，`flush_timer` 异步刷盘 |
-| `distribution.dart` | 19 | 渠道开关：`DISTRIBUTION=appstore` 时禁用更新检查、隐藏内购等 |
+| 文件 | 职责 |
+|---|---|
+| `app_constants.dart` | 全局常量：默认值、超时、URL、Prompt 模板、模型列表（不在 model_manager 里的部分）+ 枚举 `LlmApiFormat` |
+| `cloud_providers.dart` | **云服务商注册表** — `CloudProviders.all` 里每个 provider 的 metadata（base URL / 凭证字段 / 模型清单 / 鉴权方式），取用走 `CloudProviders.getById(id)` |
+| `app_log.dart` | 全局日志：`AppLog.d/i/w/e`，写文件 + verbose 控制台输出，`flush_timer` 异步刷盘 |
+| `distribution.dart` | 渠道开关：`DISTRIBUTION=appstore` 时禁用更新检查、隐藏内购等 |
 
 ## 关键设计决策
 
@@ -45,10 +45,10 @@
 
 ## cloud_providers 分组顺序（用户看到的顺序）
 
-1. 流式 ASR + LLM：阿里云百炼、火山、讯飞
-2. 非流式 ASR + LLM：Groq、OpenAI
-3. 纯 LLM：DeepSeek、智谱、Kimi、MiniMax、Gemini、Anthropic
-4. 纯流式 ASR：腾讯云
-5. Legacy：阿里云 NLS（旧版）
+1. 流式 ASR + LLM：`dashscope`(阿里云百炼)、`volcengine`(火山)、`xfyun`(讯飞)
+2. 非流式 ASR + LLM：`groq`、`openai`
+3. 纯 LLM：`deepseek`、`zhipu`、`moonshot`(Kimi)、`moonshot_global`、`minimax`、`minimax_global`、`gemini`、`anthropic`
+4. 纯流式 ASR：`tencent`
+5. Legacy：`aliyun_nls`（阿里云 NLS 旧版）
 
-新增 provider 时按这个分组找位置插入。
+新增 provider 时按这个分组找位置插入。注意 Kimi / MiniMax 各有**国内 + 国际两个条目**，别只改一个。

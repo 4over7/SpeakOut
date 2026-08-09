@@ -8,11 +8,11 @@
 
 ## 文件清单
 
-| 文件 | 行 | 职责 |
-|---|---|---|
-| `cloud_account.dart` | 182 | 云账户：`CloudAccount` / `CloudProvider` / `CloudLLMModel` / `CloudASRModel` / `CredentialField` / 枚举 `CloudCapability` `LlmApiFormat` |
-| `chat_model.dart` | 46 | 聊天消息：`ChatMessage`（含 `metadata: Map` 用于 dictation 气泡折叠原文等扩展字段） |
-| `billing_model.dart` | 109 | 计费：`Balance` / `TokenUsage` / `LicenseInfo`（与 Cloudflare Workers Gateway 对接） |
+| 文件 | 声明的类型 |
+|---|---|
+| `cloud_account.dart` | `CloudAccount` / `CloudProvider` / `CloudLLMModel` / `CloudASRModel` / `CredentialField` + 枚举 `CloudCapability`。<br>⚠️ 枚举 `LlmApiFormat` **不在这里**，在 `lib/config/app_constants.dart` |
+| `chat_model.dart` | `ChatMessage`（含 `metadata: Map` 承载 dictation 气泡折叠原文等扩展字段）+ 枚举 `ChatRole` |
+| `billing_model.dart` | `BillingStatus` / `BillingPlan` / `BillingOrder`（与 Cloudflare Workers Gateway 对接） |
 
 ## 关键设计决策
 
@@ -25,11 +25,16 @@
 ### 3. 不写 `equals` / `hashCode`（除非必要）
 Dart 默认引用相等。如果一定要值相等（如 set / map key），手写或用 `equatable`，**不要混着用**。
 
-### 4. 枚举用 String 序列化
-`CloudCapability.asrStreaming` 序列化成 `"asr_streaming"`（String）而不是 int。原因：枚举顺序变化不会破坏 JSON 兼容。
+### 4. 枚举不进 JSON
+`CloudCapability` 只出现在 `CloudProvider` 静态注册表（`CloudProviders.all`，const，不做 JSON 往返），`CloudAccount.toJson()` 也不序列化它。
+**新增需要持久化的枚举时用 String（不是 index）**，否则枚举顺序一变就破坏旧数据兼容。
 
-### 5. credentialKeys 是冗余字段
-`CloudAccount.credentialKeys` 列出该账户已设置的凭证字段名（不存值，只存 key 列表）。便于 UI 快速判断"账户配置完整"，避免每次都遍历整个 keychain。
+### 5. 凭证值不进 model JSON
+`CloudAccount.toJson()` 只写 `credentialKeys`（凭证字段名列表，**不含值**），值单独存储、`fromJson` 时 `credentials: {}` 由上层回填。
+便于 UI 快速判断"账户配置是否完整"而不碰密文。
+
+> ⚠️ **凭证目前存在 SharedPreferences 明文**，不是 Keychain —— `config_service.dart` / `cloud_account_service.dart`
+> 里的 `TODO: 拿到苹果开发者账号后迁移到 Keychain` 尚未做。代码里若干注释写着 "loaded from Keychain"，是超前描述，别当真。
 
 ## 不要做什么
 

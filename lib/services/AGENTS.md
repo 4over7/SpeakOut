@@ -71,7 +71,7 @@ UI 触发动作（如「保存设置」）
   → 必要时 broadcast 到订阅者（如 AudioDeviceService.deviceChanges）
 
 CoreEngine 录音结束
-  → 调 LLMService.correctText(rawAsr, vocabHints: VocabService.getHints())
+  → 调 LLMService.correctText(rawAsr, vocabHints: VocabService().getVocabHints())
   → LLMService 内部 _resolveLlmConfig() 选 provider/account/model
   → HTTP/WS 到云端
   → 返回润色文本

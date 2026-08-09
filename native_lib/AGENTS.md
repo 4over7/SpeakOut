@@ -1,6 +1,8 @@
 # native_lib/ — 原生 C/Objective-C 层（macOS）
 
-> macOS 原生能力实现：CGEventTap 键盘监听、AudioQueue 音频采集、Accessibility 文本注入、剪贴板注入、屏幕截图、应用激活。**单一文件 `native_input.m`**（800+ 行，按段分组）+ Linux/Windows 子目录的同名实现。
+> macOS 原生能力实现：CGEventTap 键盘监听、AudioQueue 音频采集、Accessibility 文本注入、剪贴板注入、应用激活、权限检查。**单一大文件 `native_input.m`**（近 1800 行，按段分组）+ Linux/Windows 子目录的同名实现。
+>
+> ⚠️ **截屏不在这一层** —— `screencapture` 是 Dart 侧 `lib/engine/core_engine.dart` 用 `Process.run` 调的；本层只有权限检查 `check_screen_recording_permission`。
 
 ## 必读
 
@@ -24,7 +26,7 @@ cd native_lib && clang -dynamiclib \
 ## 关键设计决策
 
 ### 1. Ring Buffer 而非回调
-AudioQueue 回调里写入 C 静态 ring buffer（16kHz mono PCM），Dart 端 FFI 轮询 `get_audio_chunk`。**不用 Dart 回调**——跨 isolate 触发 SIGABRT。
+AudioQueue 回调里写入 C 静态 ring buffer（16kHz mono PCM），Dart 端 FFI 轮询 `get_available_audio_samples` + `read_audio_buffer` 取走。**不用 Dart 回调**——跨 isolate 触发 SIGABRT。
 
 ### 2. 录音独立 startPos
 `save_recording_wav` 用 `recordingStartPos` 记录录音开始位置，**不用 `ringReadPos`**——后者会被 ASR 流式消费追到 `ringWritePos`，导致 save 出来只剩最后一个 chunk（v1.8.5 之前的 0.2s 残尾 bug）。
@@ -32,9 +34,11 @@ AudioQueue 回调里写入 C 静态 ring buffer（16kHz mono PCM），Dart 端 F
 ### 3. Globe/Fn 键映射
 macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑制重复。
 
-### 4. 文本注入双路径
-- **GUI 应用**：CGEvent keyboard injection（`inject_via_keyboard`）— `kCGEventSourceStatePrivate` + 每 chunk 独立 event 对象。**快速多次调用天然不可靠**（HID 队列异步竞争）。
-- **所有应用**：剪贴板 Cmd+V（`inject_via_clipboard`）— 200ms 后恢复原剪贴板。**v1.5.13 起统一使用**，替代 CGEvent keyboard。
+### 4. 文本注入只剩剪贴板一条路
+- FFI 入口是 `inject_text`，内部**直接调 `inject_via_clipboard`**（Cmd+V，200ms 后恢复原剪贴板），没有分流判断。
+- **v1.5.13 起统一走剪贴板**，替代 CGEvent keyboard（HID 队列异步竞争会丢字）。决策见 ADR-002。
+- ⚠️ `inject_via_keyboard`（`native_input.m` 内 `static`）**仍在文件里但零调用点** —— 历史遗留 dead code。
+  别照它推断"GUI 应用走 keyboard、其他走剪贴板"，那套分流早就没有了。
 - **打字机效果**（Alpha）：流式 LLM + 剪贴板批量注入（`inject_clipboard_begin/chunk/end`），120ms 批量。
 
 ### 5. 偏好设备而非系统默认
@@ -44,10 +48,12 @@ macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑
 自动更新 install 时 `launch_updater` 用 NSTask 启动独立 bash 脚本，输出写到 `~/Library/Logs/speakout-updater.log`（不写 /dev/null，否则启动期失败完全看不见）。
 
 ### 7. CGEventTap 权限
-需要 **Input Monitoring** 权限。未授权时 `init_listener` 直接返回 false，不尝试启动（避免后续失败消息覆盖正确的"未授权"提示）。
+需要 **Input Monitoring** 权限。未授权时 `start_keyboard_listener` 直接返回 0，不尝试启动（避免后续失败消息覆盖正确的"未授权"提示）。
 
-### 8. screencapture 走 shell
-`capture_screen` 调 `screencapture -x` 命令，**不用 CGImage API**——后者依赖 Screen Recording 权限的 entitlement，shell 命令更稳。
+### 8. 截屏走 shell，且不在本层
+AI 一键调试的截屏用 `screencapture -x` 命令而非 CGImage API（后者依赖 Screen Recording entitlement，shell 更稳）。
+**但这段逻辑在 Dart 侧** `lib/engine/core_engine.dart`（`Process.run('screencapture', ...)` → `~/.speakout/screenshots/`）。
+本层只提供 `check_screen_recording_permission` 做权限探测。
 
 ## 文件结构（按段分组）
 
@@ -55,12 +61,13 @@ macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑
 native_input.m
 ├── Imports & forward declarations
 ├── Ring buffer 全局状态（ringBuffer / ringWritePos / ringReadPos / recordingStartPos）
-├── 键盘监听（CGEventTap callback + start/stop/poll）
-├── 音频采集（AudioQueue callback + start/stop/get_chunk/get_level）
-├── 设备枚举（AudioObjectGetPropertyData ...）
+├── 键盘监听（CGEventTap callback + start_keyboard_listener / stop_keyboard_listener）
+├── 音频采集（AudioQueue callback + start/stop_audio_recording
+│              + get_available_audio_samples / read_audio_buffer / get_audio_level / get_audio_spectrum）
+├── 设备枚举（AudioObjectGetPropertyData + start/stop_device_change_listener）
 ├── 文本注入（keyboard + clipboard 两套）
-├── 应用控制（activate / get frontmost / press_key / copy_selection）
-├── 截屏（screencapture shell）
+├── 应用控制（activate_app / get_frontmost_app_info / press_key / copy_selection）
+├── 权限检查（check_screen_recording_permission 等）
 ├── 自动更新 helper（launch_updater）
 └── 录音 WAV 保存（save_recording_wav）
 ```
@@ -75,7 +82,7 @@ native_input.m
 
 ## Linux / Windows 子目录
 
-`native_lib/linux/` 和 `native_lib/windows/` 提供其他平台的同名 `libnative_input` 实现（多数 stub）。CI 三平台编译。详见各自 README。
+`native_lib/linux/`（`native_input.c`）和 `native_lib/windows/`（`native_input.cpp`）提供同名 `libnative_input` 实现（多数 stub），各带 `CMakeLists.txt`。CI 三平台编译（Windows 测试目前未全绿，见根 AGENTS.md）。
 
 ## 调试技巧
 

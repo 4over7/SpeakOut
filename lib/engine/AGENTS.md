@@ -23,10 +23,10 @@
 
 | 类 | 文件 | 职责 |
 |---|---|---|
-| `CoreEngine` (singleton) | `core_engine.dart` (1679) | 主编排：键盘监听循环、音频管道、ASR 状态机、模式分发、超时/Watchdog |
+| `CoreEngine` (singleton) | `core_engine.dart`（~1700 行，最大文件）| 主编排：键盘监听循环、音频管道、ASR 状态机、模式分发、超时/Watchdog |
 | `ASRProvider` | `asr_provider.dart` | 抽象基类：`init() / start() / stop() / dispose()` + Stream<ASRResult> |
 | `ASRResult` | `asr_result.dart` | 结果载荷 `{text, isFinal, error?}`（错误走 `error` 字段不走异常）|
-| `ModelManager` | `model_manager.dart` (817) | 离线模型下载/解压/校验/激活 + 注册表（9 可见 + 8 隐藏）|
+| `ModelManager` | `model_manager.dart`（~830 行）| 离线模型下载/解压/校验/激活 + 注册表（9 可见 + 8 隐藏）|
 | `ASRProviderFactory` | `providers/asr_provider_factory.dart` | 按工作模式 + 账户配置选 Provider |
 
 ## ASR Provider 实现矩阵
@@ -40,6 +40,9 @@
 | 讯飞 | `xfyun_asr_provider.dart` | 云端实时 | WebSocket |
 | 腾讯云 | `tencent_asr_provider.dart` | 云端实时 | WebSocket |
 | OpenAI | `openai_asr_provider.dart` | 云端非流式 | HTTP |
+| Groq | **复用 `openai_asr_provider.dart`** | 云端非流式 | HTTP（OpenAI 兼容，仅 baseUrl 不同）|
+
+`ASRProviderFactory` 里 `case 'openai': case 'groq':` 落到同一实现 —— 加 OpenAI 兼容的新家族时照此扩展，不要新建重复 provider。
 
 ## 关键设计决策
 

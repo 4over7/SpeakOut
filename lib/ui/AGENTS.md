@@ -73,7 +73,7 @@ SidebarNavigation.of(context)?.goto('cloud_accounts')
 **不要**用旧的 `widget.onNavigateToTab(int)` 数字索引——v1.8 sidebar 已无 5-tab 概念，旧代码视为待清理。
 
 ### 2. viewFilter wrapper 而非文件级拆分（v1.8 过渡方案）
-`mode_tab.dart` / `superpower_tab.dart` 是大文件，里面用 `enum ModeTabView` / `enum SuperpowerTabView` 控制渲染哪部分。Sidebar 的每个 page 只是简单 wrap：
+`mode_tab.dart` / `superpower_tab.dart` 是大文件，里面用 `enum ModeTabView { all, recognition, aiPlus }` / `enum SuperpowerView { all, diary, organize, translate, correction, aiReport }`（注意后者叫 `SuperpowerView`，不是 `SuperpowerTabView`）控制渲染哪部分。Sidebar 的每个 page 只是简单 wrap：
 ```dart
 class AiPlusPage extends StatelessWidget {
   Widget build(_) => ModeTab(viewFilter: ModeTabView.aiPlus);

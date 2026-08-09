@@ -11,11 +11,12 @@
 
 | 文件 | 职责 |
 |---|---|
-| `AppDelegate.swift` | **自定义重点**：MethodChannel `com.SpeakOut/overlay`（show/update/hide 录音浮窗 + pickDirectory/pickFile）+ 应用生命周期（保留 tray + Dock 重激活） |
+| `AppDelegate.swift` | **自定义重点**：MethodChannel `com.SpeakOut/overlay`（`showRecording` / `updateStatus` / `hideRecording` / `showSilenceHint` / `hideSilenceHint` / `pickDirectory` / `pickFile`）+ 应用生命周期（保留 tray + Dock 重激活） |
 | `MainFlutterWindow.swift` | Flutter window 标准包装，最小代码 |
-| `Info.plist` | Bundle ID / 权限声明（`NSAccessibilityUsageDescription` / `NSMicrophoneUsageDescription` / `NSScreenCaptureUsageDescription` 等） |
-| `DebugProfile.entitlements` / `Release.entitlements` | 调试 / 发布 entitlements（`com.apple.security.cs.disable-library-validation` 允许加载 dylib） |
-| `AppStore.entitlements` | App Store 沙盒 entitlements（沙盒=true）|
+| `Info.plist` | Bundle ID / 权限声明。**只有两条**：`NSMicrophoneUsageDescription` + `NSAccessibilityUsageDescription`（截屏走 `screencapture` 子进程，不需要本 App 声明 ScreenCapture） |
+| `Release.entitlements` | 发布（Developer ID / DMG）—— **`app-sandbox = false`**，因此能加载 dylib、跑子进程 |
+| `DebugProfile.entitlements` | 调试 —— `app-sandbox = true` + `cs.allow-jit` + `network.server` |
+| `AppStore.entitlements` | App Store —— `app-sandbox = true` + audio-input + network.client |
 | `Configs/`, `Base.lproj/`, `Resources/`, `Assets.xcassets/` | 标准 Xcode 资源目录（图标 / Info.plist 配置文件） |
 
 ## 关键设计决策
@@ -55,7 +56,7 @@ AppDelegate `loadAudioLevelFunction()` 用 `dlopen` + `dlsym` 拿到原生 `get_
 `flutter build macos --release` 自动调 Xcode build。签名脚本在 `scripts/create_styled_dmg.sh`：
 - 递归签所有 framework / dylib（`--timestamp --options runtime`）
 - 最后签 app bundle
-- 公证（`xcrun notarytool submit ... --keychain-profile notarytool`）
+- 公证（`xcrun notarytool submit ... --keychain-profile notarytool-profile` —— profile 名带 `-profile` 后缀，写错会直接失败）
 - Stapler（`xcrun stapler staple`）
 
 ## 调试

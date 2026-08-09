@@ -1,6 +1,6 @@
 # gateway/ — Cloudflare Workers 后端
 
-> 单文件 `src/index.js`（616 行，Hono 框架）+ KV 存储。处理：版本检查、阿里云 NLS Token 中转、计费/许可、统计上报。
+> 单文件 `src/index.js`（Hono 框架，~600 行）+ KV 存储。处理：版本检查、许可证、设备注册、计费与支付（支付宝 / Stripe）、统计上报。
 
 ## 必读
 
@@ -9,11 +9,20 @@
 
 ## 这是干什么的
 
-SpeakOut 客户端不能在本地存某些云端凭据（如阿里云的 access key 不能给用户暴露）+ 需要中心化的计费/版本/统计入口。Gateway 是这层薄中介：
-- **版本/更新检查**（GET /version）— 客户端启动时拉，决定是否提示更新
-- **阿里云 NLS Token 生成**（POST /aliyun/token）— ⚠️ 规划中、当前未实现：legacy NLS provider 仍在客户端本地用 AK/SK 签名换 token（见下「阿里云密钥」）
-- **许可证验证 + 计费**（POST /license / billing）— 收费用户的额度管理
-- **版本/活跃统计**（KV 累加器）— `stats:version:{v}` + `stats:daily:{date}`，90 天 TTL
+SpeakOut 客户端不能在本地存某些云端凭据（如阿里云的 access key 不能给用户暴露）+ 需要中心化的计费/版本/统计入口。Gateway 是这层薄中介。
+
+**实际路由全集**（以 `src/index.js` 里的 `app.get/post` 为准）：
+
+| 分组 | 路由 |
+|---|---|
+| 版本 / 统计 | `GET /version`（客户端启动拉取，决定是否提示更新）、`GET /stats` |
+| 许可证 | `POST /verify`、`POST /redeem`、`POST /admin/generate`（管理端，鉴权 fail-closed） |
+| 设备 | `POST /device/register` |
+| 计费 | `GET /billing/status`、`POST /billing/usage`、`POST /billing/order`、`GET /billing/order/:orderId`、`GET /billing/plans` |
+| 支付 | `POST /payment/alipay`、`POST /payment/stripe`、`GET /payment/stripe/success`、`GET /payment/stripe/cancel` |
+
+> ⚠️ 没有 `/license` 路由（旧文档写过，实为 `/verify` + `/redeem`）。
+> ⚠️ 没有 `/aliyun/token` 路由 —— 规划中未实现，详见下「阿里云密钥」。
 
 ## 文件清单
 
@@ -54,7 +63,8 @@ npm run deploy   # 部署到 Cloudflare
 部署后**必须验证** `/version` 返回值：
 ```bash
 curl https://<your-worker>/version | jq
-# 期望：{"version":"1.8.5", "build":235, "dmg_url":"...v1.8.5..."}
+# 期望 version/build 与 pubspec.yaml 完全一致，例如 {"version":"1.9.1","build":239,"dmg_url":"...v1.9.1..."}
+# index.js 里版本行带 `// @speakout-version` 标记，sed 替换时认这个锚点
 ```
 
 ## 不要做什么

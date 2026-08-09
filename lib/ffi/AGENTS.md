@@ -9,7 +9,9 @@
 
 ## 这层是干什么的
 
-Engine 层（特别是 CoreEngine）需要原生能力：键盘事件监听（CGEventTap）、音频采集（AudioQueue）、文本注入（Accessibility / 剪贴板）、屏幕截图、应用激活等。**FFI 层把这些原生 C API 包装成 Dart 调用**。
+Engine 层（特别是 CoreEngine）需要原生能力：键盘事件监听（CGEventTap）、音频采集（AudioQueue）、文本注入（剪贴板）、应用激活、权限探测等。**FFI 层把这些原生 C API 包装成 Dart 调用**。
+
+> 截屏**不经过本层** —— Dart 侧 `core_engine.dart` 直接 `Process.run('screencapture', ...)`；本层只有 `checkScreenRecordingPermission`。
 
 ## 文件清单
 
@@ -28,10 +30,15 @@ Engine 层（特别是 CoreEngine）需要原生能力：键盘事件监听（CG
 `NativeInputBase` 是抽象类，三平台各有实现。Engine 层只 depend on Base，不知道具体平台。新增能力先在 Base 加抽象方法，再补三平台实现（macOS 必须实现，其他可 stub）。
 
 ### 2. 命名约定
-原生函数 `snake_case`（如 `inject_via_clipboard`），Dart 包装 `camelCase`（如 `injectViaClipboard`）。**Dart 端不暴露 `Pointer<NativeFunction>`，只暴露语义方法**。
+原生函数 `snake_case`（如 `inject_text`），Dart 包装 `camelCase`（如 `injectText`）。除键盘监听外，**Dart 端不暴露裸指针，只暴露语义方法**。
 
-### 3. 不用回调
-跨 isolate 回调容易触发 SIGABRT。用 **C Ring Buffer 轮询**（音频）或 **方法返回值**（键事件）。详见 `native_lib/AGENTS.md`。
+### 3. 音频轮询、键盘回调（两种不同策略）
+- **音频**：高频数据流，走 **C Ring Buffer 轮询**（`get_available_audio_samples` + `read_audio_buffer`）。
+  **不能**用跨 isolate 回调 —— 在 macOS 上反复触发 SIGABRT。
+- **键盘**：低频事件，走 **native → Dart 函数指针回调**。`startListener(Pointer<NativeFunction<KeyCallbackC>> callback)`
+  是本层唯一暴露 `Pointer<NativeFunction>` 的接口（native 侧签名 `start_keyboard_listener(DartKeyCallback)`）。
+
+详见 [`native_lib/AGENTS.md`](../../native_lib/AGENTS.md)。
 
 ### 4. dylib 路径
 运行时通过 `Bundle.main.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib"` 加载。**不能 hardcode 绝对路径**——会破坏跨设备运行。
@@ -51,13 +58,17 @@ Engine 层（特别是 CoreEngine）需要原生能力：键盘事件监听（CG
 
 主要分组（具体见 `native_input_ffi.dart`）：
 
-- **键盘**：`init_listener / start_listener / stop_listener / poll_event`
-- **音频**：`start_audio_recording / stop_audio_recording / get_audio_chunk / get_audio_level / save_recording_wav`
-- **设备**：`list_audio_devices / set_input_device`
-- **文本注入**：`inject_via_keyboard / inject_via_clipboard / inject_clipboard_begin/chunk/end`
-- **应用控制**：`activate_app / get_frontmost_app_info / press_key / copy_selection`
-- **截屏**：`capture_screen` (AI 调试用)
+- **键盘**：`start_keyboard_listener`（传入 Dart callback，**不是轮询**）/ `stop_keyboard_listener` / `check_key_pressed`
+- **音频采集**：`start_audio_recording` / `stop_audio_recording` / `is_audio_recording` / `get_available_audio_samples` + `read_audio_buffer`（**轮询 ring buffer**）/ `get_audio_level` / `get_audio_spectrum` / `save_recording_wav`
+- **音频质量**：`analyze_audio_quality` / `is_likely_telephone_quality`
+- **设备**：`get_audio_input_devices` / `get_current_input_device` / `set_input_device` / `get_preferred_device_uid` / `set_preferred_device_uid` / `is_device_available` / `is_current_input_bluetooth` / `switch_to_builtin_mic` / `start_device_change_listener` / `stop_device_change_listener`
+- **文本注入**：`inject_text`（**唯一入口**，内部走剪贴板）/ `inject_clipboard_begin` / `inject_clipboard_chunk` / `inject_clipboard_end`（打字机）
+- **应用控制**：`activate_app` / `get_frontmost_app_info` / `press_key` / `copy_selection` / `check_is_terminal_app`
+- **权限**：`check_accessibility_permission` / `check_input_monitoring_permission` / `check_microphone_permission` / `check_screen_recording_permission` / `check_permission_silent`
+- **日志 / 内存**：`set_debug_logging` / `set_log_directory` / `native_free`
 - **更新**：`launch_updater`（启动 helper bash 脚本）
+
+> 截屏**不在 FFI 层** —— Dart 侧 `core_engine.dart` 用 `Process.run('screencapture', ...)`；本层只有权限探测。
 
 ## 测试
 
