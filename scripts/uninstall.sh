@@ -5,6 +5,29 @@
 APP_NAME="SpeakOut"
 APP_PATH="/Applications/${APP_NAME}.app"
 
+# --- 安全确认 ---
+# install.sh 与 uninstall.sh 只差两个字母，Tab 补全打错的代价是不可恢复的数据丢失。
+# 自动化场景用 -y / --yes 跳过。
+case "${1:-}" in
+  -y|--yes) FORCE=1 ;;
+  *)        FORCE=0 ;;
+esac
+
+if [ "$FORCE" -ne 1 ]; then
+    echo ""
+    echo "⚠️  即将删除（不可恢复）："
+    echo "   • /Applications/SpeakOut.app"
+    echo "   • 全部用户配置（快捷键 / 云账户凭证 / 词典）"
+    echo "   • Application Support 下已下载的模型"
+    echo ""
+    printf "确认请输入 yes: "
+    read -r _ans
+    if [ "$_ans" != "yes" ]; then
+        echo "已取消。"
+        exit 0
+    fi
+fi
+
 echo "🗑️  开始卸载 ${APP_NAME}..."
 
 # 1. 如果正在运行，先退出

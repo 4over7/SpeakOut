@@ -4,26 +4,29 @@ set -e
 APP_NAME="SpeakOut"
 
 # Auto-increment build number
-CURRENT_BUILD=$(grep 'version:' pubspec.yaml | sed 's/.*+//')
+CURRENT_BUILD=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
 NEW_BUILD=$((CURRENT_BUILD + 1))
 sed -i '' "s/+${CURRENT_BUILD}/+${NEW_BUILD}/" pubspec.yaml
 echo "📦 Build number: ${CURRENT_BUILD} → ${NEW_BUILD}"
 
 # Sync version to Gateway
-VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
 # 只替换 /version 端点的版本号（第一个匹配），不影响支付宝等其他 version 字段
 sed -i '' "s|version: '[^']*', // @speakout-version|version: '${VERSION}', // @speakout-version|" gateway/src/index.js
 sed -i '' "s/build: [0-9]*/build: ${NEW_BUILD}/" gateway/src/index.js
 sed -i '' "s|download/v[0-9.]*/SpeakOut.dmg|download/v${VERSION}/SpeakOut.dmg|" gateway/src/index.js
 echo "🔄 Gateway synced: v${VERSION}+${NEW_BUILD}"
 
+# 版本号与 gateway 已在上面被改写。若后续步骤失败，工作区会留下这些改动 ——
+# set -e 退出时提示一下，避免带着「已声明但未发布」的 gateway 版本号继续操作。
+trap 'code=$?; [ $code -ne 0 ] && echo "
+⚠️  打包中断（exit $code）。pubspec.yaml 与 gateway/src/index.js 的版本号已改为 ${VERSION}+${NEW_BUILD}，
+   但 DMG 未成功发布。请先 git checkout 这两个文件，或修复后重跑本脚本。"; exit $code' EXIT
+
 # Build
 echo "🔨 Building ${APP_NAME} (Release)..."
+# set -e 已保证构建失败即退出，无需再判 $?
 flutter build macos --release
-if [ $? -ne 0 ]; then
-    echo "❌ Build failed!"
-    exit 1
-fi
 
 DMG_NAME="SpeakOut.dmg"
 DMG_TEMP="SpeakOut_temp.dmg"
@@ -31,9 +34,9 @@ VOLUME_NAME="SpeakOut"
 STAGING_DIR="build/dmg_staging"
 SIGN_IDENTITY="Developer ID Application: Lindan Wang (UB9D55S724)"
 
-PWD=$(pwd)
-DMG_TEMP_PATH="${PWD}/${DMG_TEMP}"
-DMG_FINAL_PATH="${PWD}/${DMG_NAME}"
+REPO_ROOT=$(pwd)   # 不用 PWD：那是 bash 内置变量，覆盖它会让后续 cd 行为异常
+DMG_TEMP_PATH="${REPO_ROOT}/${DMG_TEMP}"
+DMG_FINAL_PATH="${REPO_ROOT}/${DMG_NAME}"
 
 # 1. Cleanup — close Finder windows and eject ALL mounted SpeakOut volumes
 echo "Cleaning up..."
@@ -189,9 +192,13 @@ if echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
     echo "✅ Notarization accepted, stapling ticket..."
     xcrun stapler staple "${DMG_FINAL_PATH}"
 else
-    echo "⚠️  Notarization not accepted — check log with:"
+    echo "❌ 公证未通过 —— 这个 DMG 不能发布（用户机器上会被 Gatekeeper 拦截）"
     SUBMISSION_ID=$(echo "$NOTARIZE_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
-    echo "   xcrun notarytool log $SUBMISSION_ID --keychain-profile notarytool-profile"
+    echo "   查看日志: xcrun notarytool log $SUBMISSION_ID --keychain-profile notarytool-profile"
+    echo "   DMG 仍保留在 ${DMG_FINAL_PATH}，仅供本地测试"
+    # 必须非零退出：此前只打印警告后继续走到 "Done"，
+    # 很容易让人以为打包成功、把未公证的包发出去
+    exit 1
 fi
 
 # 6. Close old Finder windows, eject all SpeakOut volumes, then mount new DMG
