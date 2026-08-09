@@ -548,5 +548,16 @@
   "shortcutsAndDuration": "Shortcuts & Duration",
   "onboardingTryItHint": "Try it below — hold the hotkey, speak, and release. Your text lands here.",
   "onboardingTryItPlaceholder": "Say something…",
-  "onboardingTryItNeedPerm": "Permissions not granted yet — you can grant them later in Settings → General."
+  "onboardingTryItNeedPerm": "Permissions not granted yet — you can grant them later in Settings → General.",
+  "devRedundantModels": "Clean up redundant model copies",
+  "devRedundantModelsDesc": "The default model ships with the app — this downloaded copy can be safely removed",
+  "devRedundantNone": "No redundant copies found",
+  "devRedundantDone": "Freed {size}",
+  "@devRedundantDone": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  }
 }

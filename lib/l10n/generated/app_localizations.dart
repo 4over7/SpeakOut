@@ -2569,6 +2569,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Permissions not granted yet — you can grant them later in Settings → General.'**
   String get onboardingTryItNeedPerm;
+
+  /// No description provided for @devRedundantModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean up redundant model copies'**
+  String get devRedundantModels;
+
+  /// No description provided for @devRedundantModelsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The default model ships with the app — this downloaded copy can be safely removed'**
+  String get devRedundantModelsDesc;
+
+  /// No description provided for @devRedundantNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No redundant copies found'**
+  String get devRedundantNone;
+
+  /// No description provided for @devRedundantDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Freed {size}'**
+  String devRedundantDone(String size);
 }
 
 class _AppLocalizationsDelegate

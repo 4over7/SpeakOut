@@ -30,6 +30,9 @@ if [ ! -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ] || \
     echo "❌ 内置模型缓存缺失或不完整：先跑一次 ./scripts/create_styled_dmg.sh 生成 build/bundled-models 缓存"
     exit 1
 fi
+# 先清空 models 目录：flutter build 是增量的，不会清掉上一次注入的残留
+# （换模型版本时会留下两份，包体积翻倍）
+rm -rf "$SOURCE_APP/Contents/Resources/models"
 MODEL_DEST="$SOURCE_APP/Contents/Resources/models/${BUNDLED_MODEL_DIR}"
 mkdir -p "$MODEL_DEST"
 cp "${BUNDLED_MODEL_CACHE}/model.int8.onnx" "${BUNDLED_MODEL_CACHE}/tokens.txt" "$MODEL_DEST/"

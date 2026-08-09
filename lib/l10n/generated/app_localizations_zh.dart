@@ -1299,4 +1299,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onboardingTryItNeedPerm => '权限未授予，暂时无法试用。稍后可在「设置 → 通用」中补授权';
+
+  @override
+  String get devRedundantModels => '清理冗余模型副本';
+
+  @override
+  String get devRedundantModelsDesc => '默认模型已随包内置，这份下载副本可安全删除';
+
+  @override
+  String get devRedundantNone => '没有可清理的冗余副本';
+
+  @override
+  String devRedundantDone(String size) {
+    return '已释放 $size';
+  }
 }

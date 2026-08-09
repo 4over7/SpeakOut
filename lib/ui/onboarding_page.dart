@@ -144,7 +144,12 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       }
     } catch (e) {
       AppLog.d('[Onboarding] 内置模型激活失败，回退到下载流程: $e');
-      if (mounted) _downloadSelectedModel();
+      if (!mounted) return;
+      // 必须先切到下载步骤(3)，否则进度条渲染在 step3 的 UI 里、
+      // 而界面还停在选模型页(2)，用户会看到「点了没反应」
+      setState(() => _currentStep = 3);
+      ConfigService().setOnboardingStep(3);
+      _downloadSelectedModel();
       return;
     }
     if (!mounted) return;

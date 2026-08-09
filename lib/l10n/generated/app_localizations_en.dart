@@ -1368,4 +1368,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get onboardingTryItNeedPerm =>
       'Permissions not granted yet — you can grant them later in Settings → General.';
+
+  @override
+  String get devRedundantModels => 'Clean up redundant model copies';
+
+  @override
+  String get devRedundantModelsDesc =>
+      'The default model ships with the app — this downloaded copy can be safely removed';
+
+  @override
+  String get devRedundantNone => 'No redundant copies found';
+
+  @override
+  String devRedundantDone(String size) {
+    return 'Freed $size';
+  }
 }

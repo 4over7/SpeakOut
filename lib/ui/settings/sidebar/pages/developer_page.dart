@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../../config/distribution.dart';
+import '../../settings_shared.dart';
 import '../../../../services/app_service.dart';
 import '../../../../services/config_backup_service.dart';
 import '../../../../services/config_service.dart';
@@ -26,6 +27,8 @@ class DeveloperPage extends StatefulWidget {
 
 class _DeveloperPageState extends State<DeveloperPage> {
   String _modelsDir = '';
+  int _redundantBytes = 0;
+  bool _cleaningRedundant = false;
   bool _diagnosticsCopied = false;
   bool _isExportingLog = false;
 
@@ -33,6 +36,31 @@ class _DeveloperPageState extends State<DeveloperPage> {
   void initState() {
     super.initState();
     _loadModelsDir();
+    _loadRedundant();
+  }
+
+  Future<void> _loadRedundant() async {
+    try {
+      final (total, _) = await AppService().findRedundantBundledCopies();
+      if (mounted) setState(() => _redundantBytes = total);
+    } catch (_) {}
+  }
+
+  String _fmtSize(int b) => b >= 1073741824
+      ? '${(b / 1073741824).toStringAsFixed(1)} GB'
+      : '${(b / 1048576).toStringAsFixed(0)} MB';
+
+  Future<void> _cleanRedundant(AppLocalizations loc) async {
+    setState(() => _cleaningRedundant = true);
+    final freed = await AppService().cleanupRedundantBundledCopies();
+    if (!mounted) return;
+    setState(() {
+      _cleaningRedundant = false;
+      _redundantBytes = 0;
+    });
+    showSettingsInfo(freed > 0
+        ? loc.devRedundantDone(_fmtSize(freed))
+        : loc.devRedundantNone);
   }
 
   Future<void> _loadModelsDir() async {
@@ -281,6 +309,19 @@ class _DeveloperPageState extends State<DeveloperPage> {
             ),
           ),
         ),
+        if (_redundantBytes > 0) ...[
+          const SettingsDivider(),
+          SettingsTile(
+            label: loc.devRedundantModels,
+            subtitle: '${loc.devRedundantModelsDesc} · ${_fmtSize(_redundantBytes)}',
+            icon: CupertinoIcons.trash,
+            child: PushButton(
+              controlSize: ControlSize.regular,
+              onPressed: _cleaningRedundant ? null : () => _cleanRedundant(loc),
+              child: Text(_cleaningRedundant ? loc.aboutLoading : loc.devRedundantModels),
+            ),
+          ),
+        ],
         const SettingsDivider(),
         SettingsTile(
           label: loc.aboutModelsDir,

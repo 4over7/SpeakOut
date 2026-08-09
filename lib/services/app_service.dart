@@ -1,3 +1,4 @@
+import 'dart:io';
 import '../engine/core_engine.dart';
 import '../ffi/native_input_base.dart';
 // import 'billing_service.dart'; // 暂时隐藏
@@ -63,6 +64,10 @@ class AppService {
   Future<bool> isModelDownloaded(String id) => modelManager.isModelDownloaded(id);
   /// 该模型是否随包内置（内置则无需下载，首启即可用）
   bool isModelBundled(String id) => modelManager.isModelBundled(id);
+  Future<(int, List<Directory>)> findRedundantBundledCopies() =>
+      modelManager.findRedundantBundledCopies();
+  Future<int> cleanupRedundantBundledCopies() =>
+      modelManager.cleanupRedundantBundledCopies();
   Future<bool> isPunctuationModelDownloaded() => modelManager.isPunctuationModelDownloaded();
   Future<String?> getPunctuationModelPath() => modelManager.getPunctuationModelPath();
   Future<void> deleteModel(String id) => modelManager.deleteModel(id);
@@ -178,18 +183,27 @@ class AppService {
       // Check active model
       String? path = await modelManager.getActiveModelPath();
       
-      // If no model, download default
+      // If no model, fall back to default
       if (path == null) {
-        AppLog.d("AppService: Downloading default model...");
-        try {
-          final defaultId = AppConstants.kDefaultModelId;
-          // We can't easily show progress in UI here unless we expose stream.
-          // For now, blocking wait or rely on engine status updates if hooked.
-          path = await modelManager.downloadAndExtractModel(defaultId);
-          // Update Config
-           await ConfigService().setActiveModelId(defaultId);
-        } catch (e) {
-          AppLog.d("AppService: Default download failed: $e");
+        final defaultId = AppConstants.kDefaultModelId;
+        // 默认模型随包内置时直接用 —— 否则 activeModelId 指向一个已被删除/失效的模型时，
+        // 这里会去下载一份 bundle 里已经有的 229MB
+        final bundledDefault = modelManager.bundledModelDir(defaultId);
+        if (bundledDefault != null) {
+          AppLog.d("AppService: 回退到随包内置的默认模型");
+          path = bundledDefault;
+          await ConfigService().setActiveModelId(defaultId);
+        } else {
+          AppLog.d("AppService: Downloading default model...");
+          try {
+            // We can't easily show progress in UI here unless we expose stream.
+            // For now, blocking wait or rely on engine status updates if hooked.
+            path = await modelManager.downloadAndExtractModel(defaultId);
+            // Update Config
+            await ConfigService().setActiveModelId(defaultId);
+          } catch (e) {
+            AppLog.d("AppService: Default download failed: $e");
+          }
         }
       }
       

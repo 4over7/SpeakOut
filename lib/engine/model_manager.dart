@@ -307,15 +307,50 @@ class ModelManager {
   /// 该模型是否随包内置（内置即视为已就绪，无需下载）
   bool isModelBundled(String modelId) => bundledModelDir(modelId) != null;
 
+  /// 找出「随包内置、同时又在用户目录留了一份下载副本」的冗余占用。
+  ///
+  /// 老用户升级到内置版本后，之前下载的那份就纯属冗余（同一 URL、同一目录、同一内容），
+  /// 但不会自动删 —— 删用户数据目录得由用户自己点。返回总字节数与目录列表。
+  Future<(int, List<Directory>)> findRedundantBundledCopies() async {
+    final dirs = <Directory>[];
+    int total = 0;
+    final modelsRoot = await _getModelsRoot();
+    if (!await modelsRoot.exists()) return (0, dirs);
+    for (final m in allModels) {
+      if (bundledModelDir(m.id) == null) continue; // 没内置就谈不上冗余
+      final dup = Directory('${modelsRoot.path}/${_getDirNameFromUrl(m.url)}');
+      if (!await dup.exists()) continue;
+      int size = 0;
+      try {
+        await for (final e in dup.list(recursive: true, followLinks: false)) {
+          if (e is File) size += await e.length();
+        }
+      } catch (_) {}
+      dirs.add(dup);
+      total += size;
+    }
+    return (total, dirs);
+  }
+
+  /// 删除上面找出的冗余副本。内置那份在 app bundle 内，不受影响。
+  Future<int> cleanupRedundantBundledCopies() async {
+    final (total, dirs) = await findRedundantBundledCopies();
+    for (final d in dirs) {
+      try {
+        await d.delete(recursive: true);
+        AppLog.d('[Model] 已清理冗余副本: ${d.path}');
+      } catch (e) {
+        AppLog.d('[Model] 清理失败 ${d.path}: $e');
+      }
+    }
+    return total;
+  }
+
   Future<String?> getActiveModelPath() async {
     final modelsRoot = await _getModelsRoot();
 
     // Default to bilingual if not set
     String activeId = ConfigService().activeModelId;
-
-    // 内置模型优先：随包资源直接可用，省掉首次启动的下载
-    final bundled = bundledModelDir(activeId);
-    if (bundled != null) return bundled;
 
     // Check if valid
     ModelInfo? model;
@@ -341,6 +376,12 @@ class ModelManager {
         }
       } catch (_) {}
     }
+
+    // 3. 兜底：随包内置的模型。
+    //    放最后而非最前 —— 用户主动下载/导入的副本必须优先，
+    //    否则「导入」按钮对内置模型完全失效（导入了却仍在用 bundle 里那份）。
+    final bundled = bundledModelDir(activeId);
+    if (bundled != null) return bundled;
 
     return null;
   }
