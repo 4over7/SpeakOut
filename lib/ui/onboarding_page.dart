@@ -43,6 +43,10 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
   /// 「现在试一次」输入框 —— 引导内完成第一次成功
   final TextEditingController _tryItController = TextEditingController();
 
+  /// 防止快速双击「继续」并发触发两次内置激活 ——
+  /// initASR 会 dispose 上一个 provider，并发调用有竞态
+  bool _activatingBundled = false;
+
   // Download state
   bool _isDownloading = false;
   double _downloadProgress = 0;
@@ -130,8 +134,13 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
 
   /// 内置模型无需下载：直接激活并跳到完成页
   Future<void> _activateBundledModel() async {
+    if (_activatingBundled) return;
+    _activatingBundled = true;
     final model = _app.getModelById(_selectedModelId);
-    if (model == null) return;
+    if (model == null) {
+      _activatingBundled = false;
+      return;
+    }
     try {
       await _app.setActiveModel(model.id);
       final path = await _app.getActiveModelPath();
@@ -152,9 +161,11 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       // 而界面还停在选模型页(2)，用户会看到「点了没反应」
       setState(() => _currentStep = 3);
       ConfigService().setOnboardingStep(3);
+      _activatingBundled = false;
       _downloadSelectedModel();
       return;
     }
+    _activatingBundled = false;
     if (!mounted) return;
     setState(() {
       _downloadComplete = true;
