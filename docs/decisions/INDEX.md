@@ -27,6 +27,7 @@
 | [ADR-003](./adr-003-cloud-account-system.md) | 云服务账户体系：多账户 + 凭证分组 | 2026-03-17 | ✅ Accepted |
 | [ADR-004](./adr-004-context-aware-pilot-strategy.md) | Context-Aware Voice 试点用 Generic + Browser 双层而非单 App | 2026-05-07 | ✅ Accepted |
 | [ADR-005](./adr-005-v4-thinking-off-by-default.md) | DeepSeek V4 默认关 thinking mode | 2026-05-09 | ✅ Accepted |
+| [ADR-006](./adr-006-apple-speechtranscriber-as-default.md) | 离线 ASR 不改用 Apple SpeechTranscriber（实测中文与速度均劣于 SenseVoice） | 2026-08-09 | ❌ Rejected |
 
 ## ADR 状态语义
 
@@ -34,6 +35,7 @@
 - 🟡 **Proposed** — 草拟中，等评审
 - 🔵 **Superseded by ADR-XXX** — 被新 ADR 取代（保留历史）
 - 🔴 **Deprecated** — 不再适用但未被 ADR 替代（如功能下线）
+- ❌ **Rejected** — 提案经验证后否决，保留以记录「为什么不走这条路」
 
 ## ADR 文件模板
 

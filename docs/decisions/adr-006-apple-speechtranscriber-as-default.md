@@ -1,8 +1,34 @@
 # ADR-006: 离线 ASR 默认引擎改用 Apple SpeechTranscriber，Sherpa 降为兜底
 
 **日期**: 2026-08-09
-**状态**: 🟡 Proposed（待中文准确率实测验证后转 Accepted）
+**状态**: ❌ **Rejected**（2026-08-09 同日，前置验证未通过 —— 实测中文准确率与速度均劣于现有 SenseVoice）
 **决策者**: 项目所有者 + AI agent 调研
+
+> ## ❌ 否决结论（先读这段）
+>
+> 本 ADR 提出的「Apple SpeechTranscriber 作为离线默认引擎」**未通过里程碑 0 的前置验证，不予实施**。
+>
+> 实测（macOS 26.5.1，同一批中文语料，详见 `docs/wiki/product_simplification_plan_2026_08_09.md`）：
+>
+> | 维度 | Apple | SenseVoice（现网在用） |
+> |---|---|---|
+> | 中文技术词 | 声纹→**升文**、润色→**论色**、嘈杂→**朝朝**、方案→**发案** | 声纹识别 ✅、润色 ✅、嘈杂 ✅、方案 ✅ |
+> | 速度 | 0.15~0.31s（~25x 实时） | **0.064~0.110s（~55x，快约 2 倍）** |
+> | 英语 | 近乎完美 | — |
+>
+> **两条被证伪的原始论据**：
+> 1. ~~「零模型下载」~~ → 中文非出厂自带，需 21.4 秒下载语言包（虽仍优于 228MB，但不是零）
+> 2. ~~「比 Whisper Large V3 Turbo 快 55%」~~ → 该对比对象不是 SenseVoice。**SenseVoice 实测比 Apple 还快 2 倍**，属错误类比
+>
+> **保留本文的原因**：记录「为什么不走 Apple 原生 ASR」，避免未来重复调研。Apple 若更新中文模型，可新建 ADR 重新评估（复测需用真人语音，TTS 语料对中英混说无效）。
+>
+> **仍然有效的调研产出**（未来可复用）：
+> - macOS 26 采用率 86%、SpeechTranscriber **不依赖 Apple Intelligence**
+> - 兼容音频格式 **16kHz mono**，与现有 ring buffer 天然对齐
+> - API 陷阱：`supportedLocale(equivalentTo:)` 对不支持的语言也返回非 nil，判断支持性必须查 `supportedLocales`
+> - `AssetInventory` 有 `maximumReservedLocales` 配额上限
+>
+> 以下为否决前的原始提案，原文保留。
 
 ## 背景
 
