@@ -19,7 +19,7 @@
 | `settings_page.dart` | 11 行 shell，直接渲染 `SettingsSidebarShell`（v1.8 后旧 5-tab 已不可达）|
 | `chat/` | 聊天页：时间线布局 + dictation 气泡（含 ASR 原文折叠展开） |
 | `settings/` | 设置页（**重要，看下文**）|
-| `cloud_accounts_page.dart` | 云账户管理（多账户 + 凭证分组卡）|
+| `cloud_accounts_page.dart` | 云账户管理（多账户 + 凭证分组卡）。**v1.10 起分层展示**：已启用/已填凭证/`_kRecommendedProviderIds` 内的进主区，其余折叠进「更多服务商」——15 家 provider 一个没删，只是默认不铺开 |
 | `vocab_settings_page.dart` | 词典页（行业词典 + 个人词库）+ Beta 徽章 |
 | `onboarding_page.dart` | 首次启动引导 |
 | `billing_page.dart` | 余额 / 订阅 / Token 历史 |
