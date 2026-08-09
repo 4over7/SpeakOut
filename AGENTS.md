@@ -1,30 +1,51 @@
-# SpeakOut — Agent 导航
+# SpeakOut — Agent 指南
 
-> 这个文件给 AI agent 看，是一份**入口索引**。项目级的 build / test / 业务概述见 [CLAUDE.md](./CLAUDE.md)。
+> **本文是唯一真源**。`CLAUDE.md` 是指向本文的软链接（symlink）——两个文件名、同一份内容，改这里就够。
+> 本文是 **L1 入口**：只放全局刚需 + 导航。模块内部知识不写在这里，按下表下钻。
 
-## 必读（按顺序）
+## 文档体系（渐进披露 4 层）
 
-1. [CLAUDE.md](./CLAUDE.md) — 项目概况、Flutter 命令、原生库编译命令、核心数据流
-2. 本文件 — 模块定位 + 跨模块约束 + 反模式索引
-3. 当前任务相关的模块 AGENTS.md（见下表）
-4. 涉及到决策权衡时 → [docs/decisions/INDEX.md](./docs/decisions/INDEX.md)（含 5 个 ADR）
-5. 实施前先看反例 → [docs/anti-patterns/INDEX.md](./docs/anti-patterns/INDEX.md)（6 条踩过的坑）
+| 层 | 位置 | 什么时候读 |
+|---|---|---|
+| **L1** | 本文 | 每次任务开始。项目概况 + 命令 + 架构铁律 + 导航 |
+| **L2** | `<module>/AGENTS.md` | 动某个模块的代码前，只读那一个（见[模块导航](#模块导航l2)） |
+| **L3** | [`docs/decisions/INDEX.md`](./docs/decisions/INDEX.md)（5 个 ADR）<br>[`docs/anti-patterns/INDEX.md`](./docs/anti-patterns/INDEX.md)（6 条踩坑） | 做技术选型时查 ADR；动手实施前扫一眼反模式 |
+| **L4** | `docs/wiki/README.md` | 需要历史设计依据时。gitignored 本地文档库，50 个文档，按 🚀 Planning / 🟢 Active / 📜 Historical / 🔴 Archived 分类 |
 
-> **提示**：`docs/wiki/` 目录（gitignored，本地文档库）含 50 个历史设计/调研文档。本地有 `docs/wiki/README.md` 状态索引，按 🚀 Planning / 🟢 Active / 📜 Historical / 🔴 Archived 分类。改相关代码时先查 README 找对应 active 文档作为设计依据。
+> **铁律：一个事实只写在一个层。** L1 不复制 L2 的命令和细节——曾经因为两处都抄，原生库编译命令在 L1 漂移成了缺 framework 的过期版本。
 
-## 模块导航
+## 项目概况
 
-| 模块 | 路径 | 职责 | 详细文档 |
-|---|---|---|---|
-| **Engine** | `lib/engine/` | 核心编排器、ASR Provider 抽象、模型管理 | [lib/engine/AGENTS.md](./lib/engine/AGENTS.md) |
-| **Services** | `lib/services/` | 业务服务（配置/LLM/笔记/聊天/音频/账户/计费/更新） | [lib/services/AGENTS.md](./lib/services/AGENTS.md) |
-| **UI** | `lib/ui/` | 界面（macos_ui，sidebar shell + 各页面） | [lib/ui/AGENTS.md](./lib/ui/AGENTS.md) |
-| FFI | `lib/ffi/` | Dart ↔ 原生 dylib 绑定 | (待补) |
-| Config | `lib/config/` | 静态常量、云服务商注册表、日志 | (待补) |
-| Models | `lib/models/` | 数据模型（cloud_account / chat / billing） | (待补) |
-| Native | `native_lib/` | Objective-C：CGEventTap + AudioQueue + 文本注入 | (待补) |
-| Gateway | `gateway/` | Cloudflare Workers 后端：许可证 + 计费 + 版本 | (待补) |
-| macOS 集成 | `macos/Runner/` | AppDelegate + 录音浮窗 + Method Channel | (待补) |
+**子曰 SpeakOut** — macOS 离线优先 AI 语音输入系统。Flutter/Dart 构建，通过 FFI 调用原生 Objective-C 实现低延迟键盘监听和音频采集，支持离线 (Sherpa-ONNX) 和云端 (阿里云) ASR，集成 LLM 纠错和 MCP Agent 平台。
+
+## 命令速查
+
+```bash
+# 依赖
+flutter pub get
+
+# 静态分析
+flutter analyze
+
+# 测试
+flutter test                                       # 全部
+flutter test test/services/llm_service_test.dart   # 单文件
+
+# 构建
+flutter build macos --release
+
+# 编译并安装到 /Applications
+./scripts/install.sh
+
+# 生成 DMG 安装程序
+./scripts/create_styled_dmg.sh
+
+# Gateway 后端 (Cloudflare Workers)
+cd gateway && npm run dev      # 本地开发
+cd gateway && npm run deploy   # 部署
+```
+
+**原生库编译**（改 `native_input.m` 后必做）：命令见 [`native_lib/AGENTS.md`](./native_lib/AGENTS.md) §编译。不在这里复制——漏 framework 或漏 `-fobjc-arc` 会导致内存管理崩。
 
 ## 三层架构铁律
 
@@ -37,6 +58,31 @@ UI 层  ──depends on──▶ Service 层  ──depends on──▶ Engine 
 - **UI 层不能直接 `import 'lib/engine/...'`** — 必须通过 Service 层
 - **Service 层不能 `import 'package:flutter/material.dart'`** — UI 无关
 - **Engine 层不能 `import 'package:flutter/material.dart'`** — 无 UI 依赖，可单独测试
+
+## 核心数据流
+
+```
+快捷键触发 → native_input.m (CGEventTap)
+  → C Ring Buffer 采集 16kHz PCM 音频
+  → CoreEngine FFI 轮询 → VAD/AGC 处理
+  → ASR (Sherpa 离线 / Aliyun 云端)
+  → LLM 纠错 (可选)
+  → 模式分发: 文本注入 | 闪念笔记 | MCP Agent
+```
+
+## 模块导航（L2）
+
+| 模块 | 路径 | 职责 | 文档 |
+|---|---|---|---|
+| **Engine** | `lib/engine/` | 核心编排器 `CoreEngine`、ASR Provider 抽象、模型下载管理 | [AGENTS.md](./lib/engine/AGENTS.md) |
+| **Services** | `lib/services/` | 业务服务（配置/LLM/笔记/聊天/音频/账户/计费/更新） | [AGENTS.md](./lib/services/AGENTS.md) |
+| **UI** | `lib/ui/` | 界面（macos_ui，sidebar shell + 各页面） | [AGENTS.md](./lib/ui/AGENTS.md) |
+| **FFI** | `lib/ffi/` | Dart ↔ 原生 dylib 绑定（`NativeInputBase` 抽象 + 平台分发） | [AGENTS.md](./lib/ffi/AGENTS.md) |
+| **Config** | `lib/config/` | 静态常量、云服务商注册表、日志 | [AGENTS.md](./lib/config/AGENTS.md) |
+| **Models** | `lib/models/` | 数据模型（cloud_account / chat / billing） | [AGENTS.md](./lib/models/AGENTS.md) |
+| **Native** | `native_lib/` | Objective-C：CGEventTap + AudioQueue Ring Buffer + 文本注入 | [AGENTS.md](./native_lib/AGENTS.md) |
+| **Gateway** | `gateway/` | Cloudflare Workers 后端：许可证 + Token + 计费 + 版本 | [AGENTS.md](./gateway/AGENTS.md) |
+| **macOS 集成** | `macos/Runner/` | AppDelegate + 录音浮窗 + Method Channel | [AGENTS.md](./macos/Runner/AGENTS.md) |
 
 ## 全局约定
 
@@ -55,20 +101,45 @@ ASR 实时结果、UpdateService 进度、AudioDeviceService 设备变化等都�
 ### LLM 调用
 **唯一入口** `LLMService()`。不要在 UI / Engine 直接发 HTTP。新增模型特定参数（如 thinking off）走 `_applyModelSpecificParams()`。
 
+### 敏感配置
+`aliyun_config.json` 和 `llm_config.json` 已 gitignore，凭证存储于 SharedPreferences。**不要把密钥写进任何入库文件**，配置导出功能须排除密钥字段。
+
 ### i18n
 所有用户可见字符串走 `loc.xxx`（`AppLocalizations.of(context)`）。改 ARB 后跑 `flutter gen-l10n` 同步 generated。
 
 ### 跨页 navigation（v1.8 sidebar 后）
 sidebar 内部跳转用 `SidebarNavigation.of(context)?.goto('page_id')`，**不要**用旧的 `onNavigateToTab(int)` 数字索引（已 deprecated，残留代码视为待清理）。
 
-## 反模式（不要做什么）
+## 反模式（L3）
 
-待 `docs/anti-patterns/` 完善后链接。当前已知（详见 memory 中 `feedback_*.md`）：
-- ❌ 选 dogfood 试点 App 时按"技术友好性"而非"用户实际频率"
-- ❌ 发版默认跳过 `flutter test`
-- ❌ pre-commit hook 失败后用 `git commit --amend` 修（应新建 commit）
-- ❌ feature creep — 修 bug 时顺手 refactor 不相关代码
-- ❌ 测试 mock 真实网络/数据库（model_full_flow_test 是有意走真网，但其他不该）
+实施前扫一眼 [`docs/anti-patterns/INDEX.md`](./docs/anti-patterns/INDEX.md)，每条都源自真实事件：
+
+| 反模式 | 一句话 |
+|---|---|
+| [`dont-feature-creep-in-bug-fix`](./docs/anti-patterns/dont-feature-creep-in-bug-fix.md) | 修 bug 时不要顺手 refactor 不相关代码 |
+| [`dont-skip-full-test-on-release`](./docs/anti-patterns/dont-skip-full-test-on-release.md) | 发版必跑完整 `flutter test`，不要问"是否跳过" |
+| [`dont-amend-after-hook-failure`](./docs/anti-patterns/dont-amend-after-hook-failure.md) | pre-commit hook 失败后用新 commit 修，不要 `--amend` |
+| [`dont-bypass-configservice`](./docs/anti-patterns/dont-bypass-configservice.md) | 不要直接 `SharedPreferences.getInstance()` |
+| [`dont-onnavigatetotab-int`](./docs/anti-patterns/dont-onnavigatetotab-int.md) | 跨页跳转不要用 `onNavigateToTab(int)` |
+| [`dont-pick-pilot-by-tech-friendliness`](./docs/anti-patterns/dont-pick-pilot-by-tech-friendliness.md) | 选试点 App：用户实际高频 > 技术友好性 |
+
+## 架构决策（L3）
+
+涉及选型权衡时先查 [`docs/decisions/INDEX.md`](./docs/decisions/INDEX.md)：ADR-001 不走 Sparkle / ADR-002 剪贴板注入 / ADR-003 云账户体系 / ADR-004 Context-Aware 试点策略 / ADR-005 V4 默认关 thinking。
+
+新决策满足「影响长期架构 / 有明确备选被否决 / 违反直觉」任一条时，按 INDEX 里的模板新增 ADR。**已 Accepted 的 ADR 不修改**，只能新建 ADR Supersede。
+
+## 测试
+
+测试位于 `test/`，用 `flutter_test` + `mockito`：
+
+- `test/services/` — 服务层单元测试
+- `test/engine/` — 引擎层单元测试
+- `test/integration_test.dart` — 集成测试
+- `test/goldens/llm_correction_prompt.txt` — Golden 测试锁定 LLM prompt
+- `test/helpers/` — 共享基础设施（`test_helpers.dart`, `mock_services.dart`）
+
+`ConfigService` 是 singleton，测试中需用 setter 注入。手动冒烟清单见 `docs/release_checklist.md`。
 
 ## 跨平台状态（Phase）
 
@@ -91,7 +162,7 @@ sidebar 内部跳转用 `SidebarNavigation.of(context)?.goto('page_id')`，**不
 - **个性化 ASR**（待启动）— 词汇增强 → LoRA → speaker-conditioned
 - **iOS 兄弟项目 FlashNote**（独立仓库 `~/Apps/FlashNote/`）
 
-## 代码风格快速一览
+## 代码风格
 
 - 文件名：`snake_case.dart`
 - 类名：`PascalCase`

@@ -44,7 +44,7 @@
 ## 关键设计决策
 
 ### 1. C Ring Buffer 而非 Dart 回调
-原生层（`native_lib/`）采集 16kHz PCM 写入 C Ring Buffer，Dart 端轮询读取。**不用跨 isolate 回调** — 那种方式在 macOS 上反复触发 SIGABRT。详见 CLAUDE.md「FFI 音频采集」。
+原生层（`native_lib/`）采集 16kHz PCM 写入 C Ring Buffer，Dart 端轮询读取。**不用跨 isolate 回调** — 那种方式在 macOS 上反复触发 SIGABRT。原生侧实现见 [`native_lib/AGENTS.md`](../../native_lib/AGENTS.md)。
 
 ### 2. 错误用 ASRResult.error 字段，不抛异常
 云端 ASR 失败时走 `result.error` 字段返回，CoreEngine 收到后在录音浮窗显示 4 秒。**不要 throw**——会让 stop() 卡死。

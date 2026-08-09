@@ -45,7 +45,7 @@ Engine 层（特别是 CoreEngine）需要原生能力：键盘事件监听（CG
 - ❌ **不要在 FFI 层加业务逻辑** — 这层只做"原生能力 → Dart 接口"，业务判断放 Engine 层
 - ❌ **不要直接 `dart:ffi` 在 Engine 调用** — 走 `NativeInputFactory.create()` 拿实例
 - ❌ **不要在 stub 实现里 throw** — 跨平台 fallback 要 silent 安全失败
-- ❌ **修改 `native_input.m` 后必须重新编译 dylib**（命令见 CLAUDE.md「编译命令」），否则旧 dylib 会被加载
+- ❌ **修改 `native_input.m` 后必须重新编译 dylib**（命令见 [`native_lib/AGENTS.md`](../../native_lib/AGENTS.md) §编译），否则旧 dylib 会被加载
 
 ## 关键 FFI 函数
 

@@ -30,7 +30,7 @@ AudioQueue 回调里写入 C 静态 ring buffer（16kHz mono PCM），Dart 端 F
 `save_recording_wav` 用 `recordingStartPos` 记录录音开始位置，**不用 `ringReadPos`**——后者会被 ASR 流式消费追到 `ringWritePos`，导致 save 出来只剩最后一个 chunk（v1.8.5 之前的 0.2s 残尾 bug）。
 
 ### 3. Globe/Fn 键映射
-macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑制重复（CLAUDE.md「macOS 26 兼容」）。
+macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑制重复。
 
 ### 4. 文本注入双路径
 - **GUI 应用**：CGEvent keyboard injection（`inject_via_keyboard`）— `kCGEventSourceStatePrivate` + 每 chunk 独立 event 对象。**快速多次调用天然不可靠**（HID 队列异步竞争）。
