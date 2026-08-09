@@ -77,5 +77,7 @@ stats:daily:{YYYY-MM-DD}     → 当日活跃，90 天 TTL
 
 无单元测试（业务量 + Cloudflare Workers 测试基础设施成本不平衡）。靠：
 - `curl` 验证 `/version` 等只读端点
-- 客户端集成测试间接覆盖（`test/services/billing_service_test.dart`）
 - 部署后人工冒烟
+
+> **注意：客户端侧也没有兜底** —— `BillingService` 同样无单测。改计费/许可证逻辑时
+> 两端都没有自动化安全网，必须手动验证。

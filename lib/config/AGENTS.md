@@ -12,7 +12,7 @@
 | 文件 | 行 | 职责 |
 |---|---|---|
 | `app_constants.dart` | 284 | 全局常量：默认值、超时、URL、Prompt 模板、模型列表（不在 model_manager 里的部分） |
-| `cloud_providers.dart` | 342 | **云服务商注册表** — 14 个 provider 的 metadata（base URL / 凭证字段 / 模型清单 / 鉴权方式） |
+| `cloud_providers.dart` | 342 | **云服务商注册表** — `CloudProviders.all` 里每个 provider 的 metadata（base URL / 凭证字段 / 模型清单 / 鉴权方式） |
 | `app_log.dart` | 105 | 全局日志：`AppLog.d/i/w/e`，写文件 + verbose 控制台输出，`flush_timer` 异步刷盘 |
 | `distribution.dart` | 19 | 渠道开关：`DISTRIBUTION=appstore` 时禁用更新检查、隐藏内购等 |
 
@@ -22,7 +22,7 @@
 所有"用户偏好的默认值"（`kDefault*`）+ "全局调谐参数"（`kPause*`、`kLlm*Timeout`、`kAnthropicMax*`）必须在 `app_constants.dart`。**禁止**散落在 service / engine 内的局部 const。
 
 ### 2. cloud_providers 是 SSoT
-14 个 provider 的所有元数据（包括默认模型、凭证字段定义、API 格式枚举）在这一份注册表里。新增 provider 只改这一份文件。**禁止**在 UI 或 LLMService 写死特定 provider 的 baseUrl / 字段名。
+所有 provider 的元数据（默认模型、凭证字段定义、API 格式枚举）集中在 `CloudProviders.all` 这一份列表里。新增 provider 只改这一份文件。**禁止**在 UI 或 LLMService 写死特定 provider 的 baseUrl / 字段名。
 
 ### 3. 凭证字段 scope
 `CredentialField.scope: Set<CloudCapability>` 定义这个字段属于哪种能力（asrStreaming / asrBatch / llm 或通用）。UI 据此分组渲染（通用灰 / ASR 蓝 / LLM 橙）。新增 provider 时**必须正确标 scope**。

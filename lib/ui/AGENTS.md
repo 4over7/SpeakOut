@@ -41,21 +41,27 @@ lib/ui/settings/
 └── sidebar/
     ├── sidebar_shell.dart  ← 左侧导航 shell + SidebarNavigation InheritedWidget
     ├── sidebar_item.dart   ← 单条导航项
-    └── pages/              ← 12 个独立页面，每个 wrap mode_tab/superpower_tab 的对应 viewFilter
+    └── pages/              ← 各 sidebar 页面实现，多数 wrap mode_tab/superpower_tab 的对应 viewFilter
 ```
 
-### sidebar 12 个 entry
+### sidebar 导航结构
 
 ```
-【概览】overview          — 应用信息 + 4 张 feature 卡 + 帮助支持
+【概览】overview          — 应用信息 + feature 卡 + 帮助支持
 【基础】general           — 快捷键 + 基础设置 + 权限三合一
 【语音】recognition       — 模式选择 + 语言两卡 + 模型卡
         ai_plus           — AI 润色配置 + 打字机效果 + 系统提示词
         vocab             — 词典（Beta）
         cloud_accounts    — 云账户管理（v1.8.6 起，之前漏了）
-【超能力】diary / organize / translate / correction / debug — 5 个独立页
+【超能力】superpower      — 单个 hub 页（`SuperpowerHubPage`），内部聚合
+                            diary / organize / translate / correction / debug
 【其他】developer         — 详细日志 / 模型目录 / 配置导入导出 / 系统日志导出
 ```
+
+entry 定义在 `sidebar_shell.dart`，改导航只动这一处。
+
+> **v1.9.0 变更**：超能力从 5 个独立 sidebar entry **合并为 1 个 hub 页**。若在旧文档/旧代码里看到
+> `diary` / `organize` / `translate` / `correction` / `debug` 各自作为 sidebar entry，那是合并前的残留。
 
 ## 关键设计决策
 

@@ -99,7 +99,7 @@ CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——�
 
 - `test/engine/core_engine_test.dart` — CoreEngine 状态机
 - `test/engine/model_full_flow_test.dart` — 模型下载+解压+激活全流程（**真实网络下载**，CI 偶发因网络抖动失败，可重跑）
-- `test/engine/hotkey_matching_test.dart` — 修饰键精确匹配规则（30 个用例）
+- `test/engine/hotkey_matching_test.dart` — 修饰键精确匹配规则
 - 新增 Provider 时：mock WebSocket，验证 protocol 序列（run-task → task-started → result-generated → task-finished/task-failed）
 
 ## 与外部依赖

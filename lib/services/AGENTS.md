@@ -13,23 +13,24 @@
 
 ## 服务全清单（14 个）
 
-| Service | 文件 | 行数 | 职责 |
+> 规模列是**量级**不是精确行数（精确值必然漂移）。`engine_types.dart` 是共享类型定义，不是 service。
+
+| Service | 文件 | 规模 | 职责 |
 |---|---|---|---|
-| **`ConfigService`** | `config_service.dart` | 569 | **唯一**配置读写入口（包装 SharedPreferences），所有偏好/凭证/状态都过它 |
-| **`LLMService`** | `llm_service.dart` | 700 | **唯一** LLM 调用入口，支持 OpenAI/Anthropic/Ollama 三种 API 格式 + 流式 + 翻译 + 梳理 |
-| `AppService` | `app_service.dart` | 178 | 应用生命周期总控：启动时调 init()，关闭时 dispose() 全部子服务 |
-| `CloudAccountService` | `cloud_account_service.dart` | 255 | 云账户 CRUD（多账户管理 + 凭证安全存储） |
-| `AudioDeviceService` | `audio_device_service.dart` | 298 | 麦克风设备枚举、用户偏好、蓝牙检测、设备变化 Stream |
-| `UpdateService` | `update_service.dart` | 499 | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
-| `ChatService` | `chat_service.dart` | 150 | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
-| `BillingService` | `billing_service.dart` | 225 | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
-| `AudioDeviceService` | `audio_device_service.dart` | 298 | 设备列表、首选设备、蓝牙检测 |
-| `CorrectionService` | `correction_service.dart` | 217 | 纠错反馈：LLM 提取词级差异 → 自动追加用户词典 |
-| `VocabService` | `vocab_service.dart` | 184 | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
-| `DiaryService` | `diary_service.dart` | 48 | 闪念笔记 Markdown 文件按天追加 |
-| `OverlayController` | `overlay_controller.dart` | 77 | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
-| `NotificationService` | `notification_service.dart` | 66 | macOS 系统通知（应用内 + 横幅消息）|
-| `ConfigBackupService` | `config_backup_service.dart` | 140 | 配置导入/导出（JSON 文件，含云账户凭证）|
+| **`ConfigService`** | `config_service.dart` | ~600 | **唯一**配置读写入口（包装 SharedPreferences），所有偏好/凭证/状态都过它 |
+| **`LLMService`** | `llm_service.dart` | ~730 | **唯一** LLM 调用入口，支持 OpenAI/Anthropic/Ollama 三种 API 格式 + 流式 + 翻译 + 梳理 |
+| `AppService` | `app_service.dart` | ~240 | 应用生命周期总控：启动时调 init()，关闭时 dispose() 全部子服务 |
+| `CloudAccountService` | `cloud_account_service.dart` | ~290 | 云账户 CRUD（多账户管理 + 凭证安全存储） |
+| `AudioDeviceService` | `audio_device_service.dart` | ~300 | 麦克风设备枚举、用户偏好、蓝牙检测、设备变化 Stream |
+| `UpdateService` | `update_service.dart` | ~590 | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
+| `ChatService` | `chat_service.dart` | ~150 | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
+| `BillingService` | `billing_service.dart` | ~230 | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
+| `CorrectionService` | `correction_service.dart` | ~220 | 纠错反馈：LLM 提取词级差异 → 自动追加用户词典 |
+| `VocabService` | `vocab_service.dart` | ~180 | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
+| `DiaryService` | `diary_service.dart` | ~50 | 闪念笔记 Markdown 文件按天追加 |
+| `OverlayController` | `overlay_controller.dart` | ~80 | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
+| `NotificationService` | `notification_service.dart` | ~66 | macOS 系统通知（应用内 + 横幅消息）|
+| `ConfigBackupService` | `config_backup_service.dart` | ~160 | 配置导入/导出（JSON）。**默认不导出凭证** — 须显式 `includeCredentials=true` 才含密钥（v1.9.0 加固）|
 
 ## 关键设计决策
 
@@ -90,9 +91,12 @@ CoreEngine 录音结束
 
 - `test/services/llm_service_test.dart` — Golden + 流式协议 + 三种 API 格式
 - `test/services/config_service_test.dart` — 默认值 + setter 行为
-- `test/services/correction_service_test.dart` — 词级 diff 提取
 - `test/services/diary_service_test.dart` — Markdown 追加
 - 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）
+
+> **无单测的 service**（改动时没有安全网，靠手动验证）：`CorrectionService`、`BillingService`、
+> `CloudAccountService`、`AudioDeviceService`、`AppService`、`OverlayController`。
+> 完整覆盖情况以 `test/services/` 目录实际文件为准。
 
 ## 隐藏的雷区
 
