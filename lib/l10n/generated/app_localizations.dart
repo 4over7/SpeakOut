@@ -1376,30 +1376,6 @@ abstract class AppLocalizations {
   /// **'Not Granted'**
   String get permissionsNotGranted;
 
-  /// No description provided for @permissionsScreenRecording.
-  ///
-  /// In en, this message translates to:
-  /// **'Screen Recording'**
-  String get permissionsScreenRecording;
-
-  /// No description provided for @permissionsScreenRecordingDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'AI Debug screenshot + reading other app window titles (required on macOS 10.15+)'**
-  String get permissionsScreenRecordingDesc;
-
-  /// No description provided for @aiReportScreenRecordingWarning.
-  ///
-  /// In en, this message translates to:
-  /// **'AI Debug requires Screen Recording permission, otherwise window titles can\'t be read (bound targets only show app name)'**
-  String get aiReportScreenRecordingWarning;
-
-  /// No description provided for @aiReportOpenSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Open System Settings'**
-  String get aiReportOpenSettings;
-
   /// No description provided for @vocabEnabledNote.
   ///
   /// In en, this message translates to:
@@ -1748,18 +1724,6 @@ abstract class AppLocalizations {
   /// **'Cloud Accounts'**
   String get sidebarCloudAccounts;
 
-  /// No description provided for @sidebarCorrection.
-  ///
-  /// In en, this message translates to:
-  /// **'Correction'**
-  String get sidebarCorrection;
-
-  /// No description provided for @sidebarAiReport.
-  ///
-  /// In en, this message translates to:
-  /// **'AI Debug'**
-  String get sidebarAiReport;
-
   /// No description provided for @sidebarDeveloper.
   ///
   /// In en, this message translates to:
@@ -1915,30 +1879,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'After selecting text, press to translate'**
   String get hotkeyRecordTranslateHint;
-
-  /// No description provided for @hotkeyRecordCorrection.
-  ///
-  /// In en, this message translates to:
-  /// **'Record Correction Key'**
-  String get hotkeyRecordCorrection;
-
-  /// No description provided for @hotkeyRecordCorrectionHint.
-  ///
-  /// In en, this message translates to:
-  /// **'After selecting text, press to submit correction'**
-  String get hotkeyRecordCorrectionHint;
-
-  /// No description provided for @hotkeyRecordAiReport.
-  ///
-  /// In en, this message translates to:
-  /// **'Record AI Debug Base Key'**
-  String get hotkeyRecordAiReport;
-
-  /// No description provided for @hotkeyRecordAiReportHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold + digit 1-5 to activate'**
-  String get hotkeyRecordAiReportHint;
 
   /// No description provided for @overviewWelcome.
   ///
@@ -2149,42 +2089,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Supports 11 languages incl. Chinese, English, Japanese, Korean'**
   String get translateBullet3;
-
-  /// No description provided for @correctionBullet1.
-  ///
-  /// In en, this message translates to:
-  /// **'Select corrected text, submit once — ASR learns your wording'**
-  String get correctionBullet1;
-
-  /// No description provided for @correctionBullet2.
-  ///
-  /// In en, this message translates to:
-  /// **'LLM extracts word-level diffs, auto-adds to personal vocab'**
-  String get correctionBullet2;
-
-  /// No description provided for @correctionBullet3.
-  ///
-  /// In en, this message translates to:
-  /// **'No manual dictionary editing — recognition improves over time'**
-  String get correctionBullet3;
-
-  /// No description provided for @aiReportBullet1.
-  ///
-  /// In en, this message translates to:
-  /// **'Screenshot + voice description, one-tap to AI coding assistants'**
-  String get aiReportBullet1;
-
-  /// No description provided for @aiReportBullet2.
-  ///
-  /// In en, this message translates to:
-  /// **'Bind multiple target windows (Claude Code / Cursor / ChatGPT)'**
-  String get aiReportBullet2;
-
-  /// No description provided for @aiReportBullet3.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold base key + digit to switch target window quickly'**
-  String get aiReportBullet3;
 
   /// No description provided for @aboutSystemLogFailed.
   ///
@@ -2600,132 +2504,6 @@ abstract class AppLocalizations {
   /// **'Edit Prompt'**
   String get organizeEditInstruction;
 
-  /// No description provided for @correctionHotkey.
-  ///
-  /// In en, this message translates to:
-  /// **'Correction Hotkey'**
-  String get correctionHotkey;
-
-  /// No description provided for @correctionExportDialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Export Correction Data'**
-  String get correctionExportDialog;
-
-  /// No description provided for @correctionImportDialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Import Correction Data'**
-  String get correctionImportDialog;
-
-  /// No description provided for @correctionExportSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Export successful'**
-  String get correctionExportSuccess;
-
-  /// No description provided for @correctionExportFailedEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Export failed: no data'**
-  String get correctionExportFailedEmpty;
-
-  /// No description provided for @correctionImportSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Imported {count} entries (vocab synced)'**
-  String correctionImportSuccess(int count);
-
-  /// No description provided for @correctionExportBtn.
-  ///
-  /// In en, this message translates to:
-  /// **'Export'**
-  String get correctionExportBtn;
-
-  /// No description provided for @correctionImportBtn.
-  ///
-  /// In en, this message translates to:
-  /// **'Import'**
-  String get correctionImportBtn;
-
-  /// No description provided for @correctionDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Select the corrected text and submit. ASR learns your wording over time.'**
-  String get correctionDesc;
-
-  /// No description provided for @aiReportBaseKey.
-  ///
-  /// In en, this message translates to:
-  /// **'Base Key'**
-  String get aiReportBaseKey;
-
-  /// No description provided for @aiReportBaseKeyDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold {baseKeyName} + digit (1–{slotCount}) to pick target window'**
-  String aiReportBaseKeyDesc(String baseKeyName, int slotCount);
-
-  /// No description provided for @aiReportAddFirstWindow.
-  ///
-  /// In en, this message translates to:
-  /// **'Add First Window'**
-  String get aiReportAddFirstWindow;
-
-  /// No description provided for @aiReportAddWindow.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Window'**
-  String get aiReportAddWindow;
-
-  /// No description provided for @aiReportDescShort.
-  ///
-  /// In en, this message translates to:
-  /// **'Built for AI Coding — screenshot + voice auto-sent to bound window'**
-  String get aiReportDescShort;
-
-  /// No description provided for @aiReportDescLong.
-  ///
-  /// In en, this message translates to:
-  /// **'Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.'**
-  String get aiReportDescLong;
-
-  /// No description provided for @aiReportSwitchWindow.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to target window...'**
-  String get aiReportSwitchWindow;
-
-  /// No description provided for @aiReportUnbound.
-  ///
-  /// In en, this message translates to:
-  /// **'Unbound'**
-  String get aiReportUnbound;
-
-  /// No description provided for @aiReportBindTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Bind AI Tool Window'**
-  String get aiReportBindTitle;
-
-  /// No description provided for @aiReportBindMsg.
-  ///
-  /// In en, this message translates to:
-  /// **'After clicking \"Start\", you have 3 seconds to switch to the target window.'**
-  String get aiReportBindMsg;
-
-  /// No description provided for @aiReportStart.
-  ///
-  /// In en, this message translates to:
-  /// **'Start'**
-  String get aiReportStart;
-
-  /// No description provided for @aiReportCancel.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get aiReportCancel;
-
   /// No description provided for @activeHotkeys.
   ///
   /// In en, this message translates to:
@@ -2767,18 +2545,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear hotkey'**
   String get clearHotkey;
-
-  /// No description provided for @featureCorrection.
-  ///
-  /// In en, this message translates to:
-  /// **'Correction'**
-  String get featureCorrection;
-
-  /// No description provided for @featureAiReport.
-  ///
-  /// In en, this message translates to:
-  /// **'AI Debug'**
-  String get featureAiReport;
 
   /// No description provided for @shortcutsAndDuration.
   ///

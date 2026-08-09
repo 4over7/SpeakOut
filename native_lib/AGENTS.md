@@ -2,7 +2,7 @@
 
 > macOS 原生能力实现：CGEventTap 键盘监听、AudioQueue 音频采集、Accessibility 文本注入、剪贴板注入、应用激活、权限检查。**单一大文件 `native_input.m`**（近 1800 行，按段分组）+ Linux/Windows 子目录的同名实现。
 >
-> ⚠️ **截屏不在这一层** —— `screencapture` 是 Dart 侧 `lib/engine/core_engine.dart` 用 `Process.run` 调的；本层只有权限检查 `check_screen_recording_permission`。
+> ⚠️ **本层没有截屏能力** —— 只有权限探测 `check_screen_recording_permission`，且它已无业务调用（详见设计决策 8）。
 
 ## 必读
 
@@ -50,10 +50,10 @@ macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑
 ### 7. CGEventTap 权限
 需要 **Input Monitoring** 权限。未授权时 `start_keyboard_listener` 直接返回 0，不尝试启动（避免后续失败消息覆盖正确的"未授权"提示）。
 
-### 8. 截屏走 shell，且不在本层
-AI 一键调试的截屏用 `screencapture -x` 命令而非 CGImage API（后者依赖 Screen Recording entitlement，shell 更稳）。
-**但这段逻辑在 Dart 侧** `lib/engine/core_engine.dart`（`Process.run('screencapture', ...)` → `~/.speakout/screenshots/`）。
-本层只提供 `check_screen_recording_permission` 做权限探测。
+### 8. 屏幕录制：只剩权限探测函数
+本层有 `check_screen_recording_permission`，但**已无业务调用**。
+唯一用到截屏的「AI 一键调试」功能在 v1.10 整体移除，连带屏幕录制权限项也从设置页删掉了。
+函数保留（删它要重编 dylib，收益不成比例），新代码不要以为这里还有截屏能力。
 
 ## 文件结构（按段分组）
 

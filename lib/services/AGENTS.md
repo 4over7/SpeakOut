@@ -11,7 +11,7 @@
 
 把"业务规则 + 持久化 + 副作用"从 Engine 和 UI 隔离出来。每个服务有清晰职责，singleton 模式，全局可用。
 
-## 服务全清单（14 个）
+## 服务全清单（13 个）
 
 > 规模列是**量级**不是精确行数（精确值必然漂移）。`engine_types.dart` 是共享类型定义，不是 service。
 
@@ -25,7 +25,6 @@
 | `UpdateService` | `update_service.dart` | ~590 | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
 | `ChatService` | `chat_service.dart` | ~150 | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
 | `BillingService` | `billing_service.dart` | ~230 | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
-| `CorrectionService` | `correction_service.dart` | ~220 | 纠错反馈：LLM 提取词级差异 → 自动追加用户词典 |
 | `VocabService` | `vocab_service.dart` | ~180 | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
 | `DiaryService` | `diary_service.dart` | ~50 | 闪念笔记 Markdown 文件按天追加 |
 | `OverlayController` | `overlay_controller.dart` | ~80 | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
@@ -96,7 +95,7 @@ CoreEngine 录音结束
 - `test/services/diary_service_test.dart` — Markdown 追加
 - 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）
 
-> **无单测的 service**（改动时没有安全网，靠手动验证）：`CorrectionService`、`BillingService`、
+> **无单测的 service**（改动时没有安全网，靠手动验证）：`BillingService`、
 > `CloudAccountService`、`AudioDeviceService`、`AppService`、`OverlayController`。
 > 完整覆盖情况以 `test/services/` 目录实际文件为准。
 

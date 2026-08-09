@@ -109,7 +109,6 @@ class AppService {
     // 1. Config
     await ConfigService().init();
     await ConfigService().migrateToWorkMode();
-    await ConfigService().migrateAiReportSlots();
     await ConfigService().migrateLlmModelOwner();
     await ConfigService().migrateSmartModeToToggle();
     await applyVerboseLogging(); // Apply debug logging as early as possible

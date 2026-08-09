@@ -54,14 +54,15 @@ lib/ui/settings/
         vocab             — 词典（Beta）
         cloud_accounts    — 云账户管理（v1.8.6 起，之前漏了）
 【超能力】superpower      — 单个 hub 页（`SuperpowerHubPage`），内部聚合
-                            diary / organize / translate / correction / debug
+                            diary / organize / translate（v1.10 砍掉纠错反馈与 AI 一键调试）
 【其他】developer         — 详细日志 / 模型目录 / 配置导入导出 / 系统日志导出
 ```
 
 entry 定义在 `sidebar_shell.dart`，改导航只动这一处。
 
-> **v1.9.0 变更**：超能力从 5 个独立 sidebar entry **合并为 1 个 hub 页**。若在旧文档/旧代码里看到
-> `diary` / `organize` / `translate` / `correction` / `debug` 各自作为 sidebar entry，那是合并前的残留。
+> **v1.9.0**：超能力从 5 个独立 sidebar entry **合并为 1 个 hub 页**。
+> **v1.10**：功能本身砍到 3 个 —— **纠错反馈（correction）与 AI 一键调试（aiReport）已整体移除**。
+> 若在旧文档/旧代码里看到 `correction` / `debug` / `aiReport`，那是移除前的残留，不要照着复原。
 
 ## 关键设计决策
 
@@ -73,7 +74,7 @@ SidebarNavigation.of(context)?.goto('cloud_accounts')
 **不要**用旧的 `widget.onNavigateToTab(int)` 数字索引——v1.8 sidebar 已无 5-tab 概念，旧代码视为待清理。
 
 ### 2. viewFilter wrapper 而非文件级拆分（v1.8 过渡方案）
-`mode_tab.dart` / `superpower_tab.dart` 是大文件，里面用 `enum ModeTabView { all, recognition, aiPlus }` / `enum SuperpowerView { all, diary, organize, translate, correction, aiReport }`（注意后者叫 `SuperpowerView`，不是 `SuperpowerTabView`）控制渲染哪部分。Sidebar 的每个 page 只是简单 wrap：
+`mode_tab.dart` / `superpower_tab.dart` 是大文件，里面用 `enum ModeTabView { all, recognition, aiPlus }` / `enum SuperpowerView { all, diary, organize, translate }`（注意后者叫 `SuperpowerView`，不是 `SuperpowerTabView`）控制渲染哪部分。Sidebar 的每个 page 只是简单 wrap：
 ```dart
 class AiPlusPage extends StatelessWidget {
   Widget build(_) => ModeTab(viewFilter: ModeTabView.aiPlus);

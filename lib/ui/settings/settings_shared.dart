@@ -290,12 +290,6 @@ Map<HotkeyId, String> getActiveHotkeys(BuildContext context, {String? excludeFea
   if (config.translateEnabled && config.translateKeyCode != 0 && excludeFeature != 'translate') {
     map[(config.translateKeyCode, config.translateModifiers)] = loc.quickTranslate;
   }
-  if (config.correctionEnabled && config.correctionKeyCode != 0 && excludeFeature != 'correction') {
-    map[(config.correctionKeyCode, config.correctionModifiers)] = loc.featureCorrection;
-  }
-  if (config.aiReportEnabled && config.aiReportBaseKeyCode != 0 && excludeFeature != 'aiReport') {
-    map[(config.aiReportBaseKeyCode, 0)] = loc.featureAiReport;
-  }
   return map;
 }
 

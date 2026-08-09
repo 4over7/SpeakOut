@@ -25,13 +25,12 @@
 
 Flutter/Dart 构建，通过 FFI 调用原生 Objective-C 实现低延迟键盘监听和音频采集。ASR 双引擎：Sherpa-ONNX（离线，默认）/ 云端（阿里云百炼等）。LLM 润色纠错为独立可选开关。
 
-三种录音模式（`RecordingMode`，定义在 `lib/engine/core_engine.dart`）：
+两种录音模式（`RecordingMode`，定义在 `lib/engine/core_engine.dart`）：
 
 | 模式 | 行为 |
 |---|---|
 | `ptt` | 默认。识别结果注入当前 App 输入框 |
 | `diary` | 闪念笔记。写入本地目录，不注入 |
-| `aiReport` | AI 一键调试 |
 
 ### 目录结构
 
@@ -118,7 +117,7 @@ UI 层  ──depends on──▶ Service 层  ──depends on──▶ Engine 
   → CoreEngine FFI 轮询 → VAD/AGC 处理
   → ASR (Sherpa 离线 / Aliyun 云端)
   → LLM 润色纠错 (可选)
-  → 模式分发: ptt 文本注入 | diary 闪念笔记 | aiReport AI 调试
+  → 模式分发: ptt 文本注入 | diary 闪念笔记
 ```
 
 ## 模块导航（L2）

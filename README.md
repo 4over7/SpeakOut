@@ -86,8 +86,6 @@ Hotkey-driven productivity features on top of voice input:
 - **Flash Notes** — Dedicated hotkey, speak and auto-save as timestamped Markdown to any folder
 - **AI Organize** — Select any text, press hotkey, LLM restructures logic and appends below the original (keeps source intact)
 - **Instant Translation** — Speak source language, output target language in real time (works with any AI Polish LLM)
-- **Correction Feedback** — Spot an ASR/LLM mistake? Fix it inline, press the feedback hotkey — LLM diffs against the last recording trace and auto-learns the term into your vocabulary
-- **AI Debug** — Hold hotkey to capture screenshot + voice description of a bug, auto-sent to Claude Code / Cursor / bound AI coding windows (up to 5 slots)
 
 ### Smart Audio
 
@@ -119,7 +117,7 @@ Settings page after the v1.8 redesign — sidebar navigation, every feature has 
 
 1. Download `SpeakOut.dmg` from [Releases](https://github.com/4over7/SpeakOut/releases/latest)
 2. Drag to `/Applications` (DMG is signed with Developer ID + Apple Notarized — no Gatekeeper warning, no `xattr` needed)
-3. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**, **Screen Recording** (last one for AI Debug only)
+3. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**
 4. Follow the onboarding wizard to download a voice model
 
 ### System Requirements
@@ -241,8 +239,6 @@ license.
 - **闪念笔记** — 独立热键，语音直接保存为 Markdown，按天归档到自定义目录
 - **AI 梳理** — 选中文字按快捷键，LLM 深度重组逻辑结构并追加在原文下一行
 - **即时翻译** — 按住说话自动翻译为目标语言，不影响正常录音
-- **纠错反馈** — 发现识别错误，改完按反馈键，LLM 对比最近录音自动学入词汇表
-- **AI 一键调试** — 按住截屏+语音描述 bug，自动发送到绑定的 Claude Code / Cursor 窗口（最多 5 槽位）
 
 ### 云端服务（可选增强）
 - **6 家云端 ASR** — 阿里云百炼（DashScope 实时）、Groq、OpenAI、火山引擎、讯飞、腾讯云
@@ -275,7 +271,7 @@ v1.8 设置页全面重构 — sidebar 导航，每个功能独立页面，每�
 
 1. 从 [Releases](https://github.com/4over7/SpeakOut/releases/latest) 下载 `SpeakOut.dmg`
 2. 拖到 `/Applications`（DMG 已 Developer ID 签名 + Apple 公证，无需 `xattr -cr`，双击即用）
-3. 授权：**输入监控**、**辅助功能**、**麦克风**、**屏幕录制**（最后一项仅 AI 一键调试需要）
+3. 授权：**输入监控**、**辅助功能**、**麦克风**
 4. 按引导下载语音模型即可使用
 
 **系统要求**：macOS 13+，磁盘空间 80MB ~ 1GB（取决于模型选择）

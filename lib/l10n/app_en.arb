@@ -50,7 +50,7 @@
   "downloading": "Downloading... {percent}%",
   "@downloading": {
     "placeholders": {
-        "percent": {}
+      "percent": {}
     }
   },
   "preparing": "Preparing...",
@@ -62,7 +62,7 @@
   "readyTip": "Hold {key} to speak",
   "@readyTip": {
     "placeholders": {
-        "key": {}
+      "key": {}
     }
   },
   "recording": "Recording...",
@@ -247,10 +247,6 @@
   "vocabEducation": "Education",
   "permissionsGranted": "Granted",
   "permissionsNotGranted": "Not Granted",
-  "permissionsScreenRecording": "Screen Recording",
-  "permissionsScreenRecordingDesc": "AI Debug screenshot + reading other app window titles (required on macOS 10.15+)",
-  "aiReportScreenRecordingWarning": "AI Debug requires Screen Recording permission, otherwise window titles can't be read (bound targets only show app name)",
-  "aiReportOpenSettings": "Open System Settings",
   "vocabEnabledNote": "When enabled, terminology is injected as context hints to AI Polish",
   "vocabBeta": "Beta",
   "vocabBetaNote": "Experimental — accuracy varies by LLM model, still being tuned",
@@ -271,12 +267,20 @@
   "vocabExportTsv": "Export File",
   "aiPolishWarning": "AI Polish may alter meaning or introduce errors. Verify important text against the original. With AI off, raw ASR output is used — accuracy depends on the voice model.",
   "updateAvailable": "New version {version} available",
-  "@updateAvailable": { "placeholders": { "version": {} } },
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {}
+    }
+  },
   "updateAction": "View Update",
   "updateUpToDate": "Up to date",
   "updateDownload": "Download Update",
   "updateDownloading": "Downloading {pct}%",
-  "@updateDownloading": { "placeholders": { "pct": {} } },
+  "@updateDownloading": {
+    "placeholders": {
+      "pct": {}
+    }
+  },
   "updateInstallRestart": "Install & Restart",
   "updateInstalling": "Installing...",
   "updateRetry": "Retry",
@@ -309,7 +313,6 @@
   "translateTargetLanguage": "Target Language",
   "translateHotkey": "Translate Hotkey",
   "translateNoLlm": "Quick Translate requires an LLM service. Please add one in Cloud Accounts.",
-
   "settingsV18PreviewTitle": "Settings",
   "sidebarSectionBasic": "Basic",
   "sidebarSectionVoice": "Voice",
@@ -322,11 +325,8 @@
   "sidebarAiPlus": "AI Plus",
   "sidebarVocab": "Vocabulary",
   "sidebarCloudAccounts": "Cloud Accounts",
-  "sidebarCorrection": "Correction",
-  "sidebarAiReport": "AI Debug",
   "sidebarDeveloper": "Developer",
   "showAdvanced": "Advanced",
-
   "shortcutsRecordKey": "Record Key",
   "shortcutsSharedHint": "Tap = toggle recording, Hold = push-to-talk",
   "shortcutsSplitTitle": "Record Key (PTT / Toggle separately)",
@@ -335,22 +335,31 @@
   "shortcutsToggleTitle": "Tap to Talk",
   "shortcutsToggleHint": "Tap to start, tap again to stop",
   "shortcutsTip": "Recommended: Right Option / Fn / F13–F19 — Cmd / Ctrl combos are often taken by system apps.",
-
   "hotkeyModalTitle": "Record Hotkey",
   "hotkeyModalSubtitle": "Press the key or combination you want to set",
   "hotkeyModalCountdown": "Cancels in {seconds}s · Press ESC to exit",
   "@hotkeyModalCountdown": {
-    "placeholders": {"seconds": {"type": "int"}}
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
   },
   "hotkeyModalRecommend": "Recommended",
   "hotkeyModalAvoid": "Avoid Cmd / Ctrl combinations (often taken by system apps)",
   "hotkeyInUseTitle": "{keyName} is already used by \"{feature}\"",
   "@hotkeyInUseTitle": {
-    "placeholders": {"keyName": {"type": "String"}, "feature": {"type": "String"}}
+    "placeholders": {
+      "keyName": {
+        "type": "String"
+      },
+      "feature": {
+        "type": "String"
+      }
+    }
   },
   "hotkeyInUseMessage": "That key is taken. Please choose another.",
   "hotkeyInUseOk": "OK",
-
   "hotkeyRecordDiary": "Record Flash Note Key",
   "hotkeyRecordDiaryHint": "Hold to start recording a note",
   "hotkeyRecordToggleDiary": "Record Note Toggle Key",
@@ -359,11 +368,6 @@
   "hotkeyRecordOrganizeHint": "After selecting text, press to reorganize",
   "hotkeyRecordTranslate": "Record Quick Translate Key",
   "hotkeyRecordTranslateHint": "After selecting text, press to translate",
-  "hotkeyRecordCorrection": "Record Correction Key",
-  "hotkeyRecordCorrectionHint": "After selecting text, press to submit correction",
-  "hotkeyRecordAiReport": "Record AI Debug Base Key",
-  "hotkeyRecordAiReportHint": "Hold + digit 1-5 to activate",
-
   "overviewWelcome": "Welcome to SpeakOut",
   "overviewTagline": "macOS offline-first AI dictation · Private · Free & Open",
   "overviewGetStarted": "Get Started",
@@ -381,11 +385,9 @@
   "linkXHandle": "X · @4over7",
   "linkFeedback": "Feedback · 4over7@gmail.com",
   "linkGithubIssues": "GitHub Issues",
-
   "smartNeedsAiPlusConfig": "AI Polish needs LLM configured in \"AI Plus\" (provider / model / API key), otherwise it won't apply.",
   "gotoAiPlus": "Go to AI Plus",
   "aiPlusNotActive": "AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.",
-
   "aboutModelsDir": "Models Directory",
   "aboutSystemLog": "Export Log Bundle",
   "aboutSystemLogDesc": "Bundle last 10min system logs + app verbose logs + diagnostics into a zip (attach when reporting bugs)",
@@ -393,37 +395,33 @@
   "aboutSystemLogFileTitle": "Export Log Bundle",
   "aboutSystemLogSuccess": "Exported to {path}",
   "@aboutSystemLogSuccess": {
-    "placeholders": {"path": {"type": "String"}}
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
   },
   "diaryBullet1": "Tap shortcut to start, release to auto-save — no flow break",
   "diaryBullet2": "Notes named by date, saved as Markdown files for easy search",
   "diaryBullet3": "Pure local storage, syncs with Obsidian / Notion / iCloud",
-
   "organizeBullet1": "Select messy text, press key, LLM restructures it",
   "organizeBullet2": "Result appended below original, never overwrites",
   "organizeBullet3": "Uses the same LLM configured in AI Plus — no duplicate setup",
-
   "translateBullet1": "Press key to record, auto-translate to target language",
   "translateBullet2": "Result injected into current text field, no copy-paste needed",
   "translateBullet3": "Supports 11 languages incl. Chinese, English, Japanese, Korean",
-
-  "correctionBullet1": "Select corrected text, submit once — ASR learns your wording",
-  "correctionBullet2": "LLM extracts word-level diffs, auto-adds to personal vocab",
-  "correctionBullet3": "No manual dictionary editing — recognition improves over time",
-
-  "aiReportBullet1": "Screenshot + voice description, one-tap to AI coding assistants",
-  "aiReportBullet2": "Bind multiple target windows (Claude Code / Cursor / ChatGPT)",
-  "aiReportBullet3": "Hold base key + digit to switch target window quickly",
-
   "aboutSystemLogFailed": "Export failed: {err}",
   "@aboutSystemLogFailed": {
-    "placeholders": {"err": {"type": "String"}}
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
   },
   "aboutDiagnostics": "Diagnostics",
   "aboutDiagnosticsDesc": "Copy version / config / paths to clipboard (paste when reporting bugs)",
   "actionCopy": "Copy",
   "actionCopied": "Copied",
-
   "permissionsSectionTitle": "System Permissions",
   "permissionsReauthTip": "If shortcuts stop working after a code-signing change, re-grant each permission below.",
   "permissionsAccessibility": "Accessibility",
@@ -433,7 +431,6 @@
   "permissionsMicrophone": "Microphone",
   "permissionsMicrophoneDesc": "Audio capture",
   "permissionsOpen": "Open",
-
   "aboutDeveloper": "Developer",
   "aboutVerboseLogging": "Verbose Logging",
   "aboutLogSensitive": "Log Voice Content",
@@ -452,47 +449,74 @@
   "aboutImportFileTitle": "Choose Config File",
   "aboutExportSuccess": "Exported: {msg}",
   "@aboutExportSuccess": {
-    "placeholders": {"msg": {"type": "String"}}
+    "placeholders": {
+      "msg": {
+        "type": "String"
+      }
+    }
   },
   "aboutExportFailed": "Export failed: {err}",
   "@aboutExportFailed": {
-    "placeholders": {"err": {"type": "String"}}
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
   },
   "aboutImportSuccess": "{msg}, config applied",
   "@aboutImportSuccess": {
-    "placeholders": {"msg": {"type": "String"}}
+    "placeholders": {
+      "msg": {
+        "type": "String"
+      }
+    }
   },
   "aboutImportFailed": "Import failed: {err}",
   "@aboutImportFailed": {
-    "placeholders": {"err": {"type": "String"}}
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
   },
-
   "audioDeviceCurrent": "Current: {name}",
   "@audioDeviceCurrent": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "bluetoothMicWarning": "Bluetooth mic may reduce quality",
   "switchToBuiltin": "Switch to built-in",
   "autoOptimizeAudio": "Auto-optimize audio",
   "autoOptimizeAudioDesc": "Auto-switch to higher-quality mic when Bluetooth headset is connected",
-
   "hotkeyConflictTaken": "That key is taken. Please choose another.",
   "hotkeyConflictAutoClearTitle": "{keyName} is taken by \"{feature}\"",
   "@hotkeyConflictAutoClearTitle": {
-    "placeholders": {"keyName": {"type": "String"}, "feature": {"type": "String"}}
+    "placeholders": {
+      "keyName": {
+        "type": "String"
+      },
+      "feature": {
+        "type": "String"
+      }
+    }
   },
   "hotkeyConflictAutoClearMsg": "The hotkey has been cleared. Please set a new one.",
-
   "modelActivateFailed": "Model activation failed: {err}",
   "@modelActivateFailed": {
-    "placeholders": {"err": {"type": "String"}}
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
   },
   "punctAutoLoaded": "Punctuation model auto-loaded",
   "punctMissingTitle": "This model has no punctuation",
   "punctMissingMsg": "This model outputs text without punctuation. Consider downloading the punctuation model for better readability.\n\nDownload now?",
   "punctDownload": "Download",
   "punctSkip": "Not now",
-
   "offlineDataLocal": "All data is processed locally; nothing is uploaded",
   "asrModel": "ASR Model",
   "manageCloudAccounts": "Manage Cloud Accounts",
@@ -508,53 +532,18 @@
   "llmModelField": "Model",
   "llmModelCustom": "Custom...",
   "llmModelNamePlaceholder": "Model name",
-
   "diaryDirNotSet": "No save directory set",
   "diaryDirCannotWrite": "Cannot write to this directory, please reselect (macOS requires re-authorization)",
   "diaryDirPick": "Please select a save directory to grant access",
   "diaryDesc": "Record ideas anywhere with voice, auto-saved as Markdown diary.",
-
   "organizeCollapse": "Collapse",
   "organizeEditInstruction": "Edit Prompt",
-
-  "correctionHotkey": "Correction Hotkey",
-  "correctionExportDialog": "Export Correction Data",
-  "correctionImportDialog": "Import Correction Data",
-  "correctionExportSuccess": "Export successful",
-  "correctionExportFailedEmpty": "Export failed: no data",
-  "correctionImportSuccess": "Imported {count} entries (vocab synced)",
-  "@correctionImportSuccess": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "correctionExportBtn": "Export",
-  "correctionImportBtn": "Import",
-  "correctionDesc": "Select the corrected text and submit. ASR learns your wording over time.",
-
-  "aiReportBaseKey": "Base Key",
-  "aiReportBaseKeyDesc": "Hold {baseKeyName} + digit (1–{slotCount}) to pick target window",
-  "@aiReportBaseKeyDesc": {
-    "placeholders": {"baseKeyName": {"type": "String"}, "slotCount": {"type": "int"}}
-  },
-  "aiReportAddFirstWindow": "Add First Window",
-  "aiReportAddWindow": "Add Window",
-  "aiReportDescShort": "Built for AI Coding — screenshot + voice auto-sent to bound window",
-  "aiReportDescLong": "Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.",
-  "aiReportSwitchWindow": "Switch to target window...",
-  "aiReportUnbound": "Unbound",
-  "aiReportBindTitle": "Bind AI Tool Window",
-  "aiReportBindMsg": "After clicking \"Start\", you have 3 seconds to switch to the target window.",
-  "aiReportStart": "Start",
-  "aiReportCancel": "Cancel",
   "activeHotkeys": "Active Hotkeys",
-
   "appProductName": "SpeakOut · 子曰",
   "aboutVersionCopyTip": "Double-click to copy version",
   "aboutVersionCopied": "Copied",
   "aboutUpdateDownload": "Download Update",
   "aboutPrivacyPolicy": "Privacy Policy",
-
   "clearHotkey": "Clear hotkey",
-  "featureCorrection": "Correction",
-  "featureAiReport": "AI Debug",
   "shortcutsAndDuration": "Shortcuts & Duration"
 }

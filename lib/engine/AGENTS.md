@@ -16,7 +16,7 @@
   → CoreEngine 编排
   → ASR Provider 选型 (sherpa 离线 / 阿里云/火山/讯飞/腾讯/OpenAI/Groq 云端)
   → 文本流回吐 → LLM 润色（可选）
-  → 模式分发：注入 / 闪念笔记 / 翻译 / AI 梳理 / AI 调试
+  → 模式分发：注入 / 闪念笔记 / 翻译 / AI 梳理
 ```
 
 ## 核心抽象
@@ -62,7 +62,7 @@ CoreEngine 调 ASR `stop()` 时设 6 秒超时（云端识别需要 wait task-fi
 录音中检测 3 秒停顿 + 累计 ≥30s 后台触发 ASR 解码。`kPauseSegmentThresholdCount=15`、`kPreSegmentMinDurationSec=30.0`（在 `core_engine.dart`）。停止时只需等最后一段，体感快。
 
 ### 6. activeHotkeyCode 而非 pttKeyCode
-CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——因为可能是闪念笔记键、AI 梳理键、翻译键、调试键。Watchdog 检查的是 `activeHotkeyCode`。
+CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——因为可能是闪念笔记键、AI 梳理键、翻译键。Watchdog 检查的是 `activeHotkeyCode`。
 
 ### 7. translateOverride 单次覆盖
 即时翻译键按下时设 `_translateOverride`，处理完自动清除。即使 AI 润色全局关闭，翻译键也强制启用 LLM。

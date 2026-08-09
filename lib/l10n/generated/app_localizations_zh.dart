@@ -667,20 +667,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get permissionsNotGranted => '未授权';
 
   @override
-  String get permissionsScreenRecording => '屏幕录制';
-
-  @override
-  String get permissionsScreenRecordingDesc =>
-      'AI 调试截屏 + 读取其他 App 窗口标题（macOS 10.15+ 必需）';
-
-  @override
-  String get aiReportScreenRecordingWarning =>
-      'AI 调试需要屏幕录制权限，否则无法读取窗口标题（绑定的目标窗口只显示 App 名）';
-
-  @override
-  String get aiReportOpenSettings => '打开系统设置';
-
-  @override
   String get vocabEnabledNote => '开启后，专业术语将作为上下文提示注入 AI 润色';
 
   @override
@@ -865,12 +851,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarCloudAccounts => '云账户';
 
   @override
-  String get sidebarCorrection => '纠错反馈';
-
-  @override
-  String get sidebarAiReport => 'AI 调试';
-
-  @override
   String get sidebarDeveloper => '开发者选项';
 
   @override
@@ -952,18 +932,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hotkeyRecordTranslateHint => '选中文字后按此键翻译';
-
-  @override
-  String get hotkeyRecordCorrection => '录制纠错反馈快捷键';
-
-  @override
-  String get hotkeyRecordCorrectionHint => '选中文字后按此键提交纠错';
-
-  @override
-  String get hotkeyRecordAiReport => '录制 AI 调试基础键';
-
-  @override
-  String get hotkeyRecordAiReportHint => '长按此键 + 数字 1-5 激活';
 
   @override
   String get overviewWelcome => '欢迎使用 SpeakOut';
@@ -1074,24 +1042,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get translateBullet3 => '支持中文、英文、日文、韩文等 11 种语言互译';
-
-  @override
-  String get correctionBullet1 => '选中修正后的文字一键提交，ASR 学习你的用词习惯';
-
-  @override
-  String get correctionBullet2 => 'LLM 提取词级差异，自动加入专属词典';
-
-  @override
-  String get correctionBullet3 => '无需手动编辑词典，日常使用中持续优化识别';
-
-  @override
-  String get aiReportBullet1 => '截屏 + 语音描述，一键发送到 AI 编程助手';
-
-  @override
-  String get aiReportBullet2 => '支持绑定多个目标窗口（Claude Code / Cursor / ChatGPT）';
-
-  @override
-  String get aiReportBullet3 => '按基础键 + 数字键快速切换目标窗口';
 
   @override
   String aboutSystemLogFailed(String err) {
@@ -1318,74 +1268,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get organizeEditInstruction => '编辑指令';
 
   @override
-  String get correctionHotkey => '纠错快捷键';
-
-  @override
-  String get correctionExportDialog => '导出纠错数据';
-
-  @override
-  String get correctionImportDialog => '导入纠错数据';
-
-  @override
-  String get correctionExportSuccess => '导出成功';
-
-  @override
-  String get correctionExportFailedEmpty => '导出失败：无数据';
-
-  @override
-  String correctionImportSuccess(int count) {
-    return '导入 $count 条记录（词汇已同步）';
-  }
-
-  @override
-  String get correctionExportBtn => '导出';
-
-  @override
-  String get correctionImportBtn => '导入';
-
-  @override
-  String get correctionDesc => '选中修正后的文字，一键提交纠错。ASR 自动学习你的用词习惯。';
-
-  @override
-  String get aiReportBaseKey => '基础按键';
-
-  @override
-  String aiReportBaseKeyDesc(String baseKeyName, int slotCount) {
-    return '按住 $baseKeyName + 数字键（1–$slotCount）选择目标窗口';
-  }
-
-  @override
-  String get aiReportAddFirstWindow => '添加第一个窗口';
-
-  @override
-  String get aiReportAddWindow => '添加窗口';
-
-  @override
-  String get aiReportDescShort => '为 AI Coding 而生 — 截屏+语音自动发送到绑定窗口';
-
-  @override
-  String get aiReportDescLong =>
-      '为 AI Coding 而生 — 截屏+语音描述，一键发送到 Claude Code / Cursor。';
-
-  @override
-  String get aiReportSwitchWindow => '请切换到目标窗口...';
-
-  @override
-  String get aiReportUnbound => '未绑定';
-
-  @override
-  String get aiReportBindTitle => '绑定 AI 工具窗口';
-
-  @override
-  String get aiReportBindMsg => '点击「开始」后，你有 3 秒时间切换到目标窗口。';
-
-  @override
-  String get aiReportStart => '开始';
-
-  @override
-  String get aiReportCancel => '取消';
-
-  @override
   String get activeHotkeys => '已启用的快捷键';
 
   @override
@@ -1405,12 +1287,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get clearHotkey => '清除快捷键';
-
-  @override
-  String get featureCorrection => '纠错反馈';
-
-  @override
-  String get featureAiReport => 'AI 一键调试';
 
   @override
   String get shortcutsAndDuration => '快捷键与时长';

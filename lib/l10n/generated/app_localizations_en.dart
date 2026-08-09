@@ -696,20 +696,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get permissionsNotGranted => 'Not Granted';
 
   @override
-  String get permissionsScreenRecording => 'Screen Recording';
-
-  @override
-  String get permissionsScreenRecordingDesc =>
-      'AI Debug screenshot + reading other app window titles (required on macOS 10.15+)';
-
-  @override
-  String get aiReportScreenRecordingWarning =>
-      'AI Debug requires Screen Recording permission, otherwise window titles can\'t be read (bound targets only show app name)';
-
-  @override
-  String get aiReportOpenSettings => 'Open System Settings';
-
-  @override
   String get vocabEnabledNote =>
       'When enabled, terminology is injected as context hints to AI Polish';
 
@@ -901,12 +887,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarCloudAccounts => 'Cloud Accounts';
 
   @override
-  String get sidebarCorrection => 'Correction';
-
-  @override
-  String get sidebarAiReport => 'AI Debug';
-
-  @override
   String get sidebarDeveloper => 'Developer';
 
   @override
@@ -993,19 +973,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hotkeyRecordTranslateHint =>
       'After selecting text, press to translate';
-
-  @override
-  String get hotkeyRecordCorrection => 'Record Correction Key';
-
-  @override
-  String get hotkeyRecordCorrectionHint =>
-      'After selecting text, press to submit correction';
-
-  @override
-  String get hotkeyRecordAiReport => 'Record AI Debug Base Key';
-
-  @override
-  String get hotkeyRecordAiReportHint => 'Hold + digit 1-5 to activate';
 
   @override
   String get overviewWelcome => 'Welcome to SpeakOut';
@@ -1130,30 +1097,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get translateBullet3 =>
       'Supports 11 languages incl. Chinese, English, Japanese, Korean';
-
-  @override
-  String get correctionBullet1 =>
-      'Select corrected text, submit once — ASR learns your wording';
-
-  @override
-  String get correctionBullet2 =>
-      'LLM extracts word-level diffs, auto-adds to personal vocab';
-
-  @override
-  String get correctionBullet3 =>
-      'No manual dictionary editing — recognition improves over time';
-
-  @override
-  String get aiReportBullet1 =>
-      'Screenshot + voice description, one-tap to AI coding assistants';
-
-  @override
-  String get aiReportBullet2 =>
-      'Bind multiple target windows (Claude Code / Cursor / ChatGPT)';
-
-  @override
-  String get aiReportBullet3 =>
-      'Hold base key + digit to switch target window quickly';
 
   @override
   String aboutSystemLogFailed(String err) {
@@ -1392,77 +1335,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get organizeEditInstruction => 'Edit Prompt';
 
   @override
-  String get correctionHotkey => 'Correction Hotkey';
-
-  @override
-  String get correctionExportDialog => 'Export Correction Data';
-
-  @override
-  String get correctionImportDialog => 'Import Correction Data';
-
-  @override
-  String get correctionExportSuccess => 'Export successful';
-
-  @override
-  String get correctionExportFailedEmpty => 'Export failed: no data';
-
-  @override
-  String correctionImportSuccess(int count) {
-    return 'Imported $count entries (vocab synced)';
-  }
-
-  @override
-  String get correctionExportBtn => 'Export';
-
-  @override
-  String get correctionImportBtn => 'Import';
-
-  @override
-  String get correctionDesc =>
-      'Select the corrected text and submit. ASR learns your wording over time.';
-
-  @override
-  String get aiReportBaseKey => 'Base Key';
-
-  @override
-  String aiReportBaseKeyDesc(String baseKeyName, int slotCount) {
-    return 'Hold $baseKeyName + digit (1–$slotCount) to pick target window';
-  }
-
-  @override
-  String get aiReportAddFirstWindow => 'Add First Window';
-
-  @override
-  String get aiReportAddWindow => 'Add Window';
-
-  @override
-  String get aiReportDescShort =>
-      'Built for AI Coding — screenshot + voice auto-sent to bound window';
-
-  @override
-  String get aiReportDescLong =>
-      'Built for AI Coding — screenshot + voice description, one-tap send to Claude Code / Cursor.';
-
-  @override
-  String get aiReportSwitchWindow => 'Switch to target window...';
-
-  @override
-  String get aiReportUnbound => 'Unbound';
-
-  @override
-  String get aiReportBindTitle => 'Bind AI Tool Window';
-
-  @override
-  String get aiReportBindMsg =>
-      'After clicking \"Start\", you have 3 seconds to switch to the target window.';
-
-  @override
-  String get aiReportStart => 'Start';
-
-  @override
-  String get aiReportCancel => 'Cancel';
-
-  @override
   String get activeHotkeys => 'Active Hotkeys';
 
   @override
@@ -1482,12 +1354,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clearHotkey => 'Clear hotkey';
-
-  @override
-  String get featureCorrection => 'Correction';
-
-  @override
-  String get featureAiReport => 'AI Debug';
 
   @override
   String get shortcutsAndDuration => 'Shortcuts & Duration';

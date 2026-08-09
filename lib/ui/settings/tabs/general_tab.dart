@@ -40,7 +40,6 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
   bool _accessibilityGranted = true;
   bool _inputMonitoringGranted = true;
   bool _microphoneGranted = true;
-  bool _screenRecordingGranted = true;
 
   StreamSubscription? _deviceChangeSubscription;
 
@@ -83,7 +82,6 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
       _accessibilityGranted = ni.checkAccessibilityPermission();
       _inputMonitoringGranted = ni.checkInputMonitoringPermission();
       _microphoneGranted = ni.checkMicrophonePermission();
-      _screenRecordingGranted = ni.checkScreenRecordingPermission();
     });
   }
 
@@ -582,14 +580,6 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
               'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
               loc,
               granted: _microphoneGranted,
-            ),
-            _permissionCard(
-              loc.permissionsScreenRecording,
-              loc.permissionsScreenRecordingDesc,
-              CupertinoIcons.camera_viewfinder,
-              'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
-              loc,
-              granted: _screenRecordingGranted,
             ),
           ],
         ),

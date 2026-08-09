@@ -1,16 +1,13 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
-import '../../../services/correction_service.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/app_log.dart';
-import '../../../services/app_service.dart';
 import '../../theme.dart';
 import '../sidebar/sidebar_shell.dart';
 import '../../widgets/settings_widgets.dart';
@@ -18,12 +15,12 @@ import '../settings_shared.dart';
 import '../sidebar/hotkey_recorder_modal.dart';
 
 /// Which subset of superpower_tab to render.
-/// `all` — legacy 5-tab settings page (默认, 5 卡 + hotkey overview).
+/// `all` — 超能力合并页（3 卡 + hotkey overview）.
 /// 其余 — v1.8 sidebar 下的单个超能力独立页.
-enum SuperpowerView { all, diary, organize, translate, correction, aiReport }
+enum SuperpowerView { all, diary, organize, translate }
 
-/// "超能力" tab — 4 independent features as a dual-column card grid:
-/// 闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈
+/// "超能力" tab — 3 independent features as a dual-column card grid:
+/// 闪念笔记 / AI 梳理 / 即时翻译
 class SuperpowerTab extends StatefulWidget {
   final ValueChanged<int> onNavigateToTab;
   final SuperpowerView viewFilter;
@@ -52,10 +49,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   late final TextEditingController _organizePromptController;
   bool _showOrganizePrompt = false;
 
-  // AI Report
-  int _bindingAiReportSlot = -1; // -1 = not binding
-
-  final AppService _engine = AppService();
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -201,10 +194,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         return (loc.hotkeyRecordOrganize, loc.hotkeyRecordOrganizeHint);
       case 'translate':
         return (loc.hotkeyRecordTranslate, loc.hotkeyRecordTranslateHint);
-      case 'correction':
-        return (loc.hotkeyRecordCorrection, loc.hotkeyRecordCorrectionHint);
-      case 'aiReport':
-        return (loc.hotkeyRecordAiReport, loc.hotkeyRecordAiReportHint);
       default:
         return (loc.hotkeyModalTitle, loc.hotkeyModalSubtitle);
     }
@@ -220,8 +209,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     final keyCode = result.keyCode;
     final mods = result.modifiers;
     final displayName = result.displayName;
-    // aiReport 存储为裸键（忽略修饰键），其他都带修饰键
-    final keyName = mapKeyCodeToString(keyCode);
 
     // 冲突检查
     final activeKeys = getActiveHotkeys(context, excludeFeature: target);
@@ -230,7 +217,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       if (target == 'diary') activeKeys.remove((config.toggleDiaryKeyCode, config.toggleDiaryModifiers));
       if (target == 'toggleDiary') activeKeys.remove((config.diaryKeyCode, config.diaryModifiers));
     }
-    final hotkeyId = target == 'aiReport' ? (keyCode, 0) : (keyCode, mods);
+    final hotkeyId = (keyCode, mods);
     final conflict = findHotkeyConflict(activeKeys, hotkeyId);
     if (conflict != null) {
       if (mounted) _showHotkeyInUseDialog(displayName, conflict);
@@ -239,10 +226,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
 
     // Feature-specific saving
     switch (target) {
-      case 'aiReport':
-        await config.setAiReportBaseKey(keyCode, keyName);
-      case 'correction':
-        await config.setCorrectionKey(keyCode, displayName, modifiers: mods);
       case 'translate':
         await config.setTranslateKey(keyCode, displayName, modifiers: mods);
       case 'organize':
@@ -397,10 +380,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         single = _buildOrganizeCard(loc);
       case SuperpowerView.translate:
         single = _buildTranslateCard(loc);
-      case SuperpowerView.correction:
-        single = _buildCorrectionCard(loc);
-      case SuperpowerView.aiReport:
-        single = _buildAiReportCard(loc);
       case SuperpowerView.all:
         single = null;
     }
@@ -422,8 +401,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               _buildDiaryCard(loc),
               _buildOrganizeCard(loc),
               _buildTranslateCard(loc),
-              _buildCorrectionCard(loc),
-              _buildAiReportCard(loc),
             ],
           ),
           const SizedBox(height: 12),
@@ -824,317 +801,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 4. 纠错反馈
-  // ---------------------------------------------------------------------------
-
-  Widget _buildCorrectionCard(AppLocalizations loc) {
-    final config = ConfigService();
-    final showTitle = widget.viewFilter == SuperpowerView.all;
-    return SettingsCard(
-      minHeight: showTitle ? 100 : null,
-      title: showTitle ? loc.sidebarCorrection : null,
-      titleIcon: showTitle ? CupertinoIcons.checkmark_seal : null,
-      accentColor: AppTheme.triggerCorrect,
-      trailing: MacosSwitch(
-        value: config.correctionEnabled,
-        onChanged: (v) async {
-          await config.setCorrectionEnabled(v);
-          if (v) {
-            await _checkConflictOnEnable(
-                'correction',
-                config.correctionKeyCode,
-                config.correctionKeyName,
-                config.clearCorrectionKey,
-                modifiers: config.correctionModifiers);
-          }
-          setState(() {});
-        },
-      ),
-      padding: const EdgeInsets.all(12),
-      children: [
-        _buildHeroHeader(
-          icon: CupertinoIcons.checkmark_seal,
-          iconColor: AppTheme.triggerCorrect,
-          title: loc.sidebarCorrection,
-          desc: loc.correctionDesc,
-          bullets: [loc.correctionBullet1, loc.correctionBullet2, loc.correctionBullet3],
-          showBullets: !config.correctionEnabled,
-        ),
-        if (config.correctionEnabled) ...[
-          const SizedBox(height: 12),
-          _compactRow(
-            loc.correctionHotkey,
-            _hotkeyBadge(
-              config.correctionKeyName,
-              isCapturing: false,
-              onTap: () => _startKeyCapture('correction'),
-              onClear: config.correctionKeyName.isEmpty ? null : () async {
-                await config.clearCorrectionKey();
-                setState(() {});
-              },
-            ),
-          ),
-          _compactDivider(),
-          Row(
-            children: [
-              PushButton(
-                controlSize: ControlSize.mini,
-                secondary: true,
-                onPressed: () async {
-                  final result = await FilePicker.platform.saveFile(
-                    dialogTitle: loc.correctionExportDialog,
-                    fileName: 'speakout_corrections.jsonl',
-                  );
-                  if (result != null) {
-                    final ok = await CorrectionService().exportData(result);
-                    if (mounted) {
-                      showSettingsInfo(ok ? loc.correctionExportSuccess : loc.correctionExportFailedEmpty);
-                    }
-                  }
-                },
-                child: Text(loc.correctionExportBtn, style: const TextStyle(fontSize: 11)),
-              ),
-              const SizedBox(width: 6),
-              PushButton(
-                controlSize: ControlSize.mini,
-                secondary: true,
-                onPressed: () async {
-                  final result = await FilePicker.platform.pickFiles(
-                    dialogTitle: loc.correctionImportDialog,
-                    type: FileType.custom,
-                    allowedExtensions: ['jsonl', 'json'],
-                  );
-                  if (result != null &&
-                      result.files.single.path != null) {
-                    final count = await CorrectionService()
-                        .importData(result.files.single.path!);
-                    if (mounted) {
-                      showSettingsInfo(loc.correctionImportSuccess(count));
-                    }
-                  }
-                },
-                child: Text(loc.correctionImportBtn, style: const TextStyle(fontSize: 11)),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 5. AI 报告
-  // ---------------------------------------------------------------------------
-
-  Widget _buildAiReportCard(AppLocalizations loc) {
-    final config = ConfigService();
-    final slotCount = config.aiReportSlotCount;
-    final baseKeyName = config.aiReportBaseKeyName;
-    final showTitle = widget.viewFilter == SuperpowerView.all;
-    return SettingsCard(
-      minHeight: showTitle ? 100 : null,
-      title: showTitle ? loc.sidebarAiReport : null,
-      titleIcon: showTitle ? CupertinoIcons.camera_viewfinder : null,
-      accentColor: AppTheme.triggerAiReport,
-      trailing: MacosSwitch(
-        value: config.aiReportEnabled,
-        onChanged: (v) async {
-          await config.setAiReportEnabled(v);
-          setState(() {});
-        },
-      ),
-      padding: const EdgeInsets.all(12),
-      children: [
-        _buildHeroHeader(
-          icon: CupertinoIcons.camera_viewfinder,
-          iconColor: AppTheme.triggerAiReport,
-          title: loc.sidebarAiReport,
-          desc: loc.aiReportDescLong,
-          bullets: [loc.aiReportBullet1, loc.aiReportBullet2, loc.aiReportBullet3],
-          showBullets: !config.aiReportEnabled,
-        ),
-        if (config.aiReportEnabled) ...[
-          const SizedBox(height: 12),
-          // 基础按键
-          _compactRow(
-            loc.aiReportBaseKey,
-            _hotkeyBadge(
-              baseKeyName,
-              isCapturing: false,
-              onTap: () => _startKeyCapture('aiReport'),
-              onClear: baseKeyName.isEmpty ? null : () async {
-                await config.clearAiReportBaseKey();
-                setState(() {});
-              },
-            ),
-          ),
-          if (slotCount > 1)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                loc.aiReportBaseKeyDesc(baseKeyName, slotCount),
-                style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor),
-              ),
-            ),
-          _compactDivider(),
-          // 窗口槽位列表
-          for (int i = 0; i < slotCount; i++) ...[
-            if (i > 0) const SizedBox(height: 4),
-            _buildAiReportSlotRow(i),
-          ],
-          // 添加窗口
-          if (slotCount < ConfigService.kMaxAiReportSlots) ...[
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () async {
-                await config.setAiReportSlotCount(slotCount + 1);
-                setState(() {});
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  MacosIcon(CupertinoIcons.plus_circle, size: 13, color: AppTheme.triggerAiReport),
-                  const SizedBox(width: 4),
-                  Text(
-                    slotCount == 0 ? loc.aiReportAddFirstWindow : loc.aiReportAddWindow,
-                    style: AppTheme.caption(context).copyWith(color: AppTheme.triggerAiReport, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 6),
-          Text(
-            loc.aiReportDescShort,
-            style: AppTheme.caption(context).copyWith(fontSize: 10),
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// 单个槽位行：[#N] App名 — 窗口标题 [绑定] [删除]
-  Widget _buildAiReportSlotRow(int index) {
-    final loc = AppLocalizations.of(context)!;
-    final config = ConfigService();
-    final appName = config.aiReportSlotAppName(index);
-    final windowTitle = config.aiReportSlotWindowTitle(index);
-    final isBinding = _bindingAiReportSlot == index;
-    final slotCount = config.aiReportSlotCount;
-
-    // 显示文本：App名 — 窗口标题
-    String displayText;
-    if (isBinding) {
-      displayText = loc.aiReportSwitchWindow;
-    } else if (appName != null && appName.isNotEmpty) {
-      displayText = appName;
-      if (windowTitle != null && windowTitle.isNotEmpty) {
-        displayText += ' — $windowTitle';
-      }
-    } else {
-      displayText = loc.aiReportUnbound;
-    }
-
-    return Row(
-      children: [
-        // 槽位编号（多槽位时显示）
-        if (slotCount > 1) ...[
-          Container(
-            width: 18, height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppTheme.triggerAiReport.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text('${index + 1}', style: AppTheme.mono(context).copyWith(fontSize: 10, color: AppTheme.triggerAiReport)),
-          ),
-          const SizedBox(width: 6),
-        ],
-        // 目标窗口
-        Expanded(
-          child: Text(
-            displayText,
-            style: AppTheme.caption(context).copyWith(
-              fontSize: 11,
-              color: (appName == null || appName.isEmpty) && !isBinding ? MacosColors.systemGrayColor : null,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(width: 4),
-        // 绑定按钮
-        GestureDetector(
-          onTap: isBinding ? null : () => _bindSlotTargetWindow(index),
-          child: MacosIcon(CupertinoIcons.scope, size: 14, color: isBinding ? MacosColors.systemGrayColor : AppTheme.triggerAiReport),
-        ),
-        const SizedBox(width: 6),
-        // 删除按钮
-        GestureDetector(
-          onTap: () async {
-            await config.removeAiReportSlot(index);
-            setState(() {});
-          },
-          child: MacosIcon(CupertinoIcons.minus_circle, size: 14, color: MacosColors.systemGrayColor),
-        ),
-      ],
-    );
-  }
-
-  /// 绑定槽位目标窗口：3秒倒计时 → 读取前台 App
-  Future<void> _bindSlotTargetWindow(int slotIndex) async {
-    setState(() => _bindingAiReportSlot = slotIndex);
-    final loc = AppLocalizations.of(context)!;
-
-    showMacosAlertDialog(
-      context: context,
-      builder: (_) => MacosAlertDialog(
-        appIcon: const Icon(CupertinoIcons.camera_viewfinder,
-            size: 48, color: Color(0xFFE74C3C)),
-        title: Text(loc.aiReportBindTitle,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        message: Text(loc.aiReportBindMsg),
-        primaryButton: PushButton(
-          controlSize: ControlSize.large,
-          child: Text(loc.aiReportStart),
-          onPressed: () {
-            Navigator.of(context).pop();
-            _doSlotBind(slotIndex);
-          },
-        ),
-        secondaryButton: PushButton(
-          controlSize: ControlSize.large,
-          secondary: true,
-          child: Text(loc.aiReportCancel),
-          onPressed: () {
-            Navigator.of(context).pop();
-            setState(() => _bindingAiReportSlot = -1);
-          },
-        ),
-      ),
-    );
-  }
-
-  Future<void> _doSlotBind(int slotIndex) async {
-    await Future.delayed(const Duration(seconds: 3));
-    try {
-      final infoJson = _engine.nativeInput?.getFrontmostAppInfo() ?? '{}';
-      final bundleIdMatch = RegExp(r'"bundleId":"([^"]*)"').firstMatch(infoJson);
-      final nameMatch = RegExp(r'"name":"([^"]*)"').firstMatch(infoJson);
-      final titleMatch = RegExp(r'"windowTitle":"((?:[^"\\]|\\.)*)"').firstMatch(infoJson);
-      final bundleId = bundleIdMatch?.group(1) ?? '';
-      final name = nameMatch?.group(1) ?? '';
-      final title = titleMatch?.group(1) ?? '';
-      if (bundleId.isNotEmpty && bundleId != 'com.speakout.speakout') {
-        await ConfigService().setAiReportSlotTarget(slotIndex, bundleId, name, windowTitle: title);
-        AppLog.d('[AIReport] Slot $slotIndex bound to: $name ($bundleId) "$title"');
-      }
-    } catch (e) {
-      AppLog.d('[AIReport] Bind error: $e');
-    }
-    if (mounted) setState(() => _bindingAiReportSlot = -1);
-  }
-
-  // ---------------------------------------------------------------------------
   // Hotkey overview helpers
   // ---------------------------------------------------------------------------
 
@@ -1176,9 +842,6 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
           config.diaryEnabled && config.toggleDiaryEnabled),
       (loc.quickTranslate, config.translateKeyName, config.translateEnabled),
       (loc.organizeEnabled, config.organizeKeyName, config.organizeEnabled),
-      (loc.featureCorrection, config.correctionKeyName, config.correctionEnabled),
-      if (config.aiReportSlotCount > 0)
-        (loc.featureAiReport, config.aiReportBaseKeyName, config.aiReportEnabled),
     ];
 
     final activeEntries = entries.where((e) => e.$3 && e.$2.isNotEmpty).toList();
