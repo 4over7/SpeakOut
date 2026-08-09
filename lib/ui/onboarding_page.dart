@@ -7,6 +7,7 @@ import '../services/config_service.dart';
 import '../services/app_service.dart';
 import '../services/engine_types.dart';
 import '../config/app_constants.dart';
+import '../config/app_log.dart';
 import 'theme.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 
@@ -126,6 +127,33 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
   }
 
   AppLocalizations get _l10n => AppLocalizations.of(context)!;
+
+  /// 内置模型无需下载：直接激活并跳到完成页
+  Future<void> _activateBundledModel() async {
+    final model = _app.getModelById(_selectedModelId);
+    if (model == null) return;
+    try {
+      await _app.setActiveModel(model.id);
+      final path = await _app.getActiveModelPath();
+      if (path != null) {
+        await _app.initASR(
+            modelPath: path,
+            type: model.type,
+            modelName: model.name,
+            hasPunctuation: model.hasPunctuation);
+      }
+    } catch (e) {
+      AppLog.d('[Onboarding] 内置模型激活失败，回退到下载流程: $e');
+      if (mounted) _downloadSelectedModel();
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _downloadComplete = true;
+      _currentStep = 4;
+    });
+    ConfigService().setOnboardingStep(4);
+  }
 
   Future<void> _downloadSelectedModel() async {
     setState(() {
@@ -278,6 +306,12 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
     if (_currentStep < 4) {
       setState(() => _currentStep++);
       ConfigService().setOnboardingStep(_currentStep);
+
+      // 到达下载步骤(3)时：随包内置的模型直接就绪，跳过整步
+      if (_currentStep == 3 && _app.isModelBundled(_selectedModelId)) {
+        _activateBundledModel();
+        return;
+      }
 
       // Auto-start download when reaching download step (step 3)
       if (_currentStep == 3 && !_downloadComplete && !_isDownloading) {

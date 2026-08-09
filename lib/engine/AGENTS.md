@@ -55,16 +55,28 @@
 ### 3. Provider 抽象 stop() 必须可超时
 CoreEngine 调 ASR `stop()` 时设 6 秒超时（云端识别需要 wait task-finished）。Provider 实现里发 `finish-task` 后等 flag，最多 4s。
 
-### 4. 模型激活失败回滚
+### 4. 默认模型随包内置（v1.10）
+
+打包脚本 `create_styled_dmg.sh` 在 **codesign 之前**把 SenseVoice 注入到
+`SpeakOut.app/Contents/Resources/models/<dirFromUrl>/`（只放 `model.int8.onnx` + `tokens.txt`）。
+
+- `ModelManager.bundledModelDir(id)` 由 `Platform.resolvedExecutable` 反推 `Contents/Resources/...` 并 `existsSync` 判定
+- `getActiveModelPath()` **优先返回内置路径**；`isModelDownloaded()` 对内置模型直接返回 true
+- onboarding 检测到内置则跳过整个下载步骤（`_activateBundledModel`）
+- **模型不入 git**（228MB 会让仓库永久膨胀）：打包时下载到 `build/bundled-models/` 缓存，已 gitignore
+- 开发期 `flutter run` 下 bundle 内没有该目录 → 自动回退原下载流程，行为不变
+- ⚠️ 注入必须在 codesign 之前，否则签名不覆盖新文件会导致公证失败
+
+### 5. 模型激活失败回滚
 `ModelManager.initASR()` 抛异常时 CoreEngine 回滚到之前的模型 ID（防止用户卡在"无可用模型"状态）。
 
-### 5. 预分段识别（pre-segmentation）
+### 6. 预分段识别（pre-segmentation）
 录音中检测 3 秒停顿 + 累计 ≥30s 后台触发 ASR 解码。`kPauseSegmentThresholdCount=15`、`kPreSegmentMinDurationSec=30.0`（在 `core_engine.dart`）。停止时只需等最后一段，体感快。
 
-### 6. activeHotkeyCode 而非 pttKeyCode
+### 7. activeHotkeyCode 而非 pttKeyCode
 CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——因为可能是闪念笔记键、AI 梳理键、翻译键。Watchdog 检查的是 `activeHotkeyCode`。
 
-### 7. translateOverride 单次覆盖
+### 8. translateOverride 单次覆盖
 即时翻译键按下时设 `_translateOverride`，处理完自动清除。即使 AI 润色全局关闭，翻译键也强制启用 LLM。
 
 ## 数据流（细节）

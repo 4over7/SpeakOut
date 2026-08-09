@@ -278,11 +278,36 @@ class ModelManager {
     return Directory('${appSupportDir.path}/Models');
   }
 
+  /// 随包内置模型的目录（打包脚本在 codesign 前注入到 app bundle 的 Resources 下）。
+  ///
+  /// 路径推算：`.../SpeakOut.app/Contents/MacOS/SpeakOut` → `.../Contents/Resources/models/<dir>`
+  /// 开发期 `flutter run` 下不存在，一切自动回退到原有的下载流程。
+  /// 仅 macOS 有此机制。
+  String? bundledModelDir(String modelId) {
+    if (!Platform.isMacOS) return null;
+    final model = allModels.where((m) => m.id == modelId).firstOrNull;
+    if (model == null) return null;
+    try {
+      final contents = File(Platform.resolvedExecutable).parent.parent.path;
+      final dir = Directory('$contents/Resources/models/${_getDirNameFromUrl(model.url)}');
+      return dir.existsSync() ? dir.path : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 该模型是否随包内置（内置即视为已就绪，无需下载）
+  bool isModelBundled(String modelId) => bundledModelDir(modelId) != null;
+
   Future<String?> getActiveModelPath() async {
     final modelsRoot = await _getModelsRoot();
 
     // Default to bilingual if not set
     String activeId = ConfigService().activeModelId;
+
+    // 内置模型优先：随包资源直接可用，省掉首次启动的下载
+    final bundled = bundledModelDir(activeId);
+    if (bundled != null) return bundled;
 
     // Check if valid
     ModelInfo? model;
@@ -342,6 +367,7 @@ class ModelManager {
   Future<bool> isModelDownloaded(String id) async {
     final model = allModels.where((m) => m.id == id).firstOrNull;
     if (model == null) return false;
+    if (isModelBundled(id)) return true; // 随包内置 = 已就绪
     final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(model.url);
     final finalModelDir = Directory('${modelsRoot.path}/$dirName');

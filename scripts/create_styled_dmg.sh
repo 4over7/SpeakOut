@@ -52,6 +52,29 @@ cp -R "build/macos/Build/Products/Release/${APP_NAME}.app" "${STAGING_DIR}/"
 mkdir -p "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib"
 cp "native_lib/libnative_input.dylib" "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/native_lib/"
 
+# Injection: 内置默认 ASR 模型（装完即用，省掉首启 229MB 下载）
+# 模型不入 git（228MB 会让仓库永久膨胀），首次打包时下载到 build/ 缓存，后续复用。
+# 必须在 codesign 之前注入，否则签名不覆盖新文件 → 公证失败。
+BUNDLED_MODEL_DIR="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+BUNDLED_MODEL_CACHE="build/bundled-models/${BUNDLED_MODEL_DIR}"
+BUNDLED_MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${BUNDLED_MODEL_DIR}.tar.bz2"
+
+if [ ! -f "${BUNDLED_MODEL_CACHE}/model.int8.onnx" ]; then
+    echo "📥 首次打包：下载内置模型 ${BUNDLED_MODEL_DIR}..."
+    mkdir -p build/bundled-models
+    curl -L --fail -o "build/bundled-models/model.tar.bz2" "${BUNDLED_MODEL_URL}" || {
+        echo "❌ 内置模型下载失败，中止打包（避免产出无模型的包）"; exit 1; }
+    tar xjf "build/bundled-models/model.tar.bz2" -C build/bundled-models
+    rm -f "build/bundled-models/model.tar.bz2"
+fi
+
+# 只装 sherpa 真正需要的两个文件，省掉 README / test_wavs（约 1MB 冗余）
+MODEL_DEST="${STAGING_DIR}/${APP_NAME}.app/Contents/Resources/models/${BUNDLED_MODEL_DIR}"
+mkdir -p "${MODEL_DEST}"
+cp "${BUNDLED_MODEL_CACHE}/model.int8.onnx" "${MODEL_DEST}/"
+cp "${BUNDLED_MODEL_CACHE}/tokens.txt" "${MODEL_DEST}/"
+echo "📦 已内置模型: $(du -sh "${MODEL_DEST}" | cut -f1)"
+
 ln -s /Applications "${STAGING_DIR}/Applications"
 
 # 2.5. Code Sign (Developer ID + Hardened Runtime + Timestamp for notarization)

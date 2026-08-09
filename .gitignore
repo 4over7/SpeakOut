@@ -95,3 +95,7 @@ tools/ax_probe/Package.resolved
 
 # Wiki submodule (managed via GitHub Wiki separately)
 wiki/
+
+# 内置 ASR 模型的打包缓存（228MB，绝不入库）
+build/bundled-models/
+*.onnx

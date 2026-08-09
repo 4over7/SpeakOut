@@ -118,12 +118,12 @@ Settings page after the v1.8 redesign — sidebar navigation, every feature has 
 1. Download `SpeakOut.dmg` from [Releases](https://github.com/4over7/SpeakOut/releases/latest)
 2. Drag to `/Applications` (DMG is signed with Developer ID + Apple Notarized — no Gatekeeper warning, no `xattr` needed)
 3. Grant permissions: **Input Monitoring**, **Accessibility**, **Microphone**
-4. Follow the onboarding wizard to download a voice model
+4. Follow the onboarding wizard — **the default model ships inside the app, so you can speak right away**
 
 ### System Requirements
 
 - macOS 13+ (Ventura or later)
-- ~230MB for default model, up to ~1.4GB for Whisper/FireRedASR
+- **Default model is bundled — no download needed on first launch.** Optional larger models (Whisper / FireRedASR) download on demand, up to ~1.4GB
 
 ---
 
@@ -272,9 +272,9 @@ v1.8 设置页全面重构 — sidebar 导航，每个功能独立页面，每�
 1. 从 [Releases](https://github.com/4over7/SpeakOut/releases/latest) 下载 `SpeakOut.dmg`
 2. 拖到 `/Applications`（DMG 已 Developer ID 签名 + Apple 公证，无需 `xattr -cr`，双击即用）
 3. 授权：**输入监控**、**辅助功能**、**麦克风**
-4. 按引导下载语音模型即可使用
+4. 按引导完成即可使用 —— **默认模型已随包内置，无需下载，装完就能说第一句话**
 
-**系统要求**：macOS 13+，磁盘空间 80MB ~ 1GB（取决于模型选择）
+**系统要求**：macOS 13+。默认模型已内置，无需额外下载；如需 Whisper / FireRedASR 等更大模型可按需下载（最多约 1.4GB）
 
 ---
 

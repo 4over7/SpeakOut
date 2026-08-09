@@ -61,6 +61,8 @@ class AppService {
   Future<String?> getActiveModelPath() => modelManager.getActiveModelPath();
   Future<void> setActiveModel(String id) => modelManager.setActiveModel(id);
   Future<bool> isModelDownloaded(String id) => modelManager.isModelDownloaded(id);
+  /// 该模型是否随包内置（内置则无需下载，首启即可用）
+  bool isModelBundled(String id) => modelManager.isModelBundled(id);
   Future<bool> isPunctuationModelDownloaded() => modelManager.isPunctuationModelDownloaded();
   Future<String?> getPunctuationModelPath() => modelManager.getPunctuationModelPath();
   Future<void> deleteModel(String id) => modelManager.deleteModel(id);
