@@ -1290,4 +1290,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shortcutsAndDuration => '快捷键与时长';
+
+  @override
+  String get onboardingTryItHint => '在下面输入框里试一次 —— 按住快捷键说话，松开后文字会自动出现';
+
+  @override
+  String get onboardingTryItPlaceholder => '说点什么…';
+
+  @override
+  String get onboardingTryItNeedPerm => '权限未授予，暂时无法试用。稍后可在「设置 → 通用」中补授权';
 }

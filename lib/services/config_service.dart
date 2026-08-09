@@ -493,12 +493,20 @@ class ConfigService {
   bool get isFirstLaunch => !(_prefs?.getBool(_kOnboardingCompleted) ?? false);
   
   /// Mark onboarding as completed
+  /// 引导进行到第几步（断点续走用）。完成引导后清除。
+  static const String _kOnboardingStep = 'onboarding_step';
+  int get onboardingStep => _prefs?.getInt(_kOnboardingStep) ?? 0;
+  Future<void> setOnboardingStep(int step) async =>
+      await _prefs?.setInt(_kOnboardingStep, step);
+
   Future<void> completeOnboarding() async {
     await _prefs?.setBool(_kOnboardingCompleted, true);
+    await _prefs?.remove(_kOnboardingStep);
   }
   
   /// Reset onboarding status (for testing)
   Future<void> resetOnboarding() async {
     await _prefs?.remove(_kOnboardingCompleted);
+    await _prefs?.remove(_kOnboardingStep);
   }
 }

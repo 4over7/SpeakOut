@@ -21,7 +21,7 @@ class OnboardingPage extends StatefulWidget {
   State<OnboardingPage> createState() => _OnboardingPageState();
 }
 
-class _OnboardingPageState extends State<OnboardingPage> {
+class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObserver {
   int _currentStep = 0;
   final AppService _app = AppService();
 
@@ -39,6 +39,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
   String _selectedModelId = AppConstants.kDefaultModelId;
   bool _showCustomModels = false;
 
+  /// 「现在试一次」输入框 —— 引导内完成第一次成功
+  final TextEditingController _tryItController = TextEditingController();
+
   // Download state
   bool _isDownloading = false;
   double _downloadProgress = 0;
@@ -49,14 +52,43 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _restoreStep();
     _checkPermissions();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _tryItController.dispose();
+    super.dispose();
+  }
+
+  /// 用户去系统设置授权后切回本窗口 → 自动重查，无需手动点「刷新状态」，
+  /// 也不需要重启应用（主界面 main.dart 同样有这套恢复逻辑）。
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
+  }
+
+  /// 断点续走：中途退出后重开，回到上次所在步骤，不必从 Welcome 重来。
+  /// 下载步骤（3）不恢复 —— 让用户回到选模型（2）自行确认后再下，避免一进来就闷头跑网络。
+  void _restoreStep() {
+    final saved = ConfigService().onboardingStep;
+    if (saved > 0 && saved <= 4) {
+      _currentStep = saved == 3 ? 2 : saved;
+    }
+  }
+
   Future<void> _checkPermissions() async {
+    if (!mounted) return;
     setState(() => _checkingPermissions = true);
     _inputMonitoringGranted = _app.checkInputMonitoringPermission();
     _accessibilityGranted = _app.checkAccessibilityPermission();
     _microphoneGranted = _app.checkMicrophonePermission();
+    if (!mounted) return;
     setState(() => _checkingPermissions = false);
   }
 
@@ -245,6 +277,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void _nextStep() {
     if (_currentStep < 4) {
       setState(() => _currentStep++);
+      ConfigService().setOnboardingStep(_currentStep);
 
       // Auto-start download when reaching download step (step 3)
       if (_currentStep == 3 && !_downloadComplete && !_isDownloading) {
@@ -965,7 +998,30 @@ class _OnboardingPageState extends State<OnboardingPage> {
           ),
         ),
 
-        const SizedBox(height: 48),
+        const SizedBox(height: 24),
+
+        // 「现在试一次」—— 把第一次成功提前到引导内完成，而不是等用户关掉引导再摸索。
+        // 原理：SpeakOut 走系统级文本注入，只要这个输入框有焦点，识别结果就会落进来。
+        if (_inputMonitoringGranted && _accessibilityGranted && _microphoneGranted) ...[
+          Text(_l10n.onboardingTryItHint,
+              style: AppTheme.caption(context), textAlign: TextAlign.center),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: 420,
+            child: MacosTextField(
+              controller: _tryItController,
+              placeholder: _l10n.onboardingTryItPlaceholder,
+              maxLines: 3,
+              minLines: 2,
+              autofocus: true,
+            ),
+          ),
+        ] else
+          Text(_l10n.onboardingTryItNeedPerm,
+              style: AppTheme.caption(context).copyWith(color: Colors.orange),
+              textAlign: TextAlign.center),
+
+        const SizedBox(height: 32),
 
         PushButton(
           controlSize: ControlSize.large,

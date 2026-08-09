@@ -505,5 +505,8 @@
   "aboutUpdateDownload": "下载更新",
   "aboutPrivacyPolicy": "隐私政策",
   "clearHotkey": "清除快捷键",
-  "shortcutsAndDuration": "快捷键与时长"
+  "shortcutsAndDuration": "快捷键与时长",
+  "onboardingTryItHint": "在下面输入框里试一次 —— 按住快捷键说话，松开后文字会自动出现",
+  "onboardingTryItPlaceholder": "说点什么…",
+  "onboardingTryItNeedPerm": "权限未授予，暂时无法试用。稍后可在「设置 → 通用」中补授权"
 }

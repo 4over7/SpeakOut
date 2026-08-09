@@ -1357,4 +1357,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shortcutsAndDuration => 'Shortcuts & Duration';
+
+  @override
+  String get onboardingTryItHint =>
+      'Try it below — hold the hotkey, speak, and release. Your text lands here.';
+
+  @override
+  String get onboardingTryItPlaceholder => 'Say something…';
+
+  @override
+  String get onboardingTryItNeedPerm =>
+      'Permissions not granted yet — you can grant them later in Settings → General.';
 }

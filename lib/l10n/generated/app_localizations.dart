@@ -2551,6 +2551,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shortcuts & Duration'**
   String get shortcutsAndDuration;
+
+  /// No description provided for @onboardingTryItHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it below — hold the hotkey, speak, and release. Your text lands here.'**
+  String get onboardingTryItHint;
+
+  /// No description provided for @onboardingTryItPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Say something…'**
+  String get onboardingTryItPlaceholder;
+
+  /// No description provided for @onboardingTryItNeedPerm.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions not granted yet — you can grant them later in Settings → General.'**
+  String get onboardingTryItNeedPerm;
 }
 
 class _AppLocalizationsDelegate

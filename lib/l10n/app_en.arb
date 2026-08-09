@@ -545,5 +545,8 @@
   "aboutUpdateDownload": "Download Update",
   "aboutPrivacyPolicy": "Privacy Policy",
   "clearHotkey": "Clear hotkey",
-  "shortcutsAndDuration": "Shortcuts & Duration"
+  "shortcutsAndDuration": "Shortcuts & Duration",
+  "onboardingTryItHint": "Try it below — hold the hotkey, speak, and release. Your text lands here.",
+  "onboardingTryItPlaceholder": "Say something…",
+  "onboardingTryItNeedPerm": "Permissions not granted yet — you can grant them later in Settings → General."
 }

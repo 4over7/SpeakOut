@@ -177,6 +177,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   String _status = "初始化中...";
   bool _ready = false;
   String _lastError = "";
+  /// 缺少「输入监控 / 辅助功能」时为 true —— 错误横幅据此追加「授权」按钮
+  bool _permissionMissing = false;
   bool _isRecording = false;
   String _currentKeyName = ""; // Loaded from config in initState
   String _recognizedText = "";
@@ -224,6 +226,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
            if (msg.startsWith("Error")) {
              _lastError = msg;
              _ready = false;
+             _permissionMissing = !(_appService.engine.checkInputMonitoringPermission() &&
+                                    _appService.engine.checkAccessibilityPermission());
            } else if (msg.startsWith("Warning:")) {
              // Partial success (e.g. listener running but missing Accessibility)
              _lastError = msg;
@@ -327,6 +331,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     // Check real permission state
     final hasInputMonitoring = _appService.engine.checkInputMonitoringPermission();
     final hasAccessibility = _appService.engine.checkAccessibilityPermission();
+    if (mounted) setState(() => _permissionMissing = !(hasInputMonitoring && hasAccessibility));
     if (hasInputMonitoring && hasAccessibility) {
       // Both permissions granted — try to start the listener
       await _appService.engine.init();
@@ -571,6 +576,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                             const MacosIcon(CupertinoIcons.exclamationmark_triangle, color: AppTheme.errorColor, size: 16),
                             const SizedBox(width: 8),
                             Flexible(child: Text(_lastError, style: AppTheme.body(context).copyWith(color: AppTheme.errorColor))),
+                            if (_permissionMissing) ...[
+                              const SizedBox(width: 12),
+                              PushButton(
+                                controlSize: ControlSize.small,
+                                onPressed: () async {
+                                  final uri = Uri.parse(
+                                      'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
+                                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+                                },
+                                child: Text(AppLocalizations.of(context)!.permGrant),
+                              ),
+                            ],
                           ],
                         ),
                       ),
