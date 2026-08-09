@@ -61,7 +61,7 @@ void _applyModelSpecificParams(Map<String, dynamic> body, String model) {
 ```
 
 4 处 OpenAI 兼容 body 构造点都接通：
-- `streamCorrectText` 流式调用
+- `correctTextStream` 流式调用
 - `correctText` 同步调用
 - `_callLlmGeneric` (organize / 翻译)
 - `routeIntent` 工具路由

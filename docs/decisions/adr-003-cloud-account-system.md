@@ -55,7 +55,7 @@ class CloudProvider {
   List<CloudASRModel> asrModels;      // ASR 模型
   String? llmBaseUrl;
   String? llmDefaultModel;
-  LlmApiFormat llmApiFormat;          // openai / anthropic / ollama
+  LlmApiFormat llmApiFormat;          // 枚举只有 openai / anthropic 两个值
   // ...
 }
 
@@ -80,8 +80,19 @@ class CredentialField {
 
 1. **`scope` 字段决定 UI 分组** — 凭证字段按能力分类，UI 渲染成「通用（灰）/ ASR（蓝）/ LLM（橙）」三色卡，用户一眼看出 ASR-only 和 LLM-only 字段
 2. **`effectiveId` 模式** — 当用户保存的 `selectedLlmAccountId` 不在账户列表时（被删了/迁移失效），自动回退到第一个账户。防止旧 ID 失效导致 UI 报错
-3. **`credentialKeys` 冗余** — `CloudAccount` 存"已设置的凭证字段名列表"，便于 UI 快速判断"账户配置完整性"，避免每次都遍历 keychain
+3. **`credentialKeys` 冗余** — `CloudAccount` 存"已设置的凭证字段名列表"，便于 UI 快速判断"账户配置完整性"，避免每次都遍历凭证存储
 4. **凭证安全迁移** — `flutter.cloud_cred_secure_migrated` 标记一次性迁移完成，新账户直接进 keychain
+
+> ### ⚠️ 勘误（2026-08-09 逐句核实）
+>
+> 上面第 3、4 条描述的 **keychain 机制从未落地**，保留原文仅为记录当时的设计意图：
+> - `flutter.cloud_cred_secure_migrated` 这个 key **在代码中不存在**（全仓 grep 零命中）
+> - 凭证（`cloud_cred_*` / AK·SK / LLM key）**至今明文存 SharedPreferences**
+> - `config_service.dart` 与 `cloud_account_service.dart` 里是 `TODO: 拿到苹果开发者账号后迁移到 Keychain`
+> - 代码里若干注释写着 "loaded from Keychain at startup"，同属超前描述
+>
+> 现状与迁移风险见 `lib/services/AGENTS.md` 设计决策 #5。迁移涉及 entitlement 变更 +
+> 存量明文数据迁移 + 公证签名验证，**需单独排期，不可顺手做**。
 
 ### Provider 分组顺序（用户看到的）
 

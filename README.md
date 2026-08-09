@@ -10,8 +10,8 @@
   [Download](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [Changelog](CHANGELOG.md)
 
   ![Platform](https://img.shields.io/badge/platform-macOS%2013+-blue)
-  ![Version](https://img.shields.io/badge/version-1.8.5-brightgreen)
-  ![Tests](https://img.shields.io/badge/tests-598%20passed-brightgreen)
+  ![Version](https://img.shields.io/badge/version-1.9.1-brightgreen)
+  ![Tests](https://img.shields.io/badge/tests-passing%20on%20macOS-brightgreen)
   ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
   <br/>
@@ -36,12 +36,14 @@ A macOS desktop app that turns your voice into text — offline by default, with
 
 ### Voice Input
 
-| | Offline Mode | Smart Mode | Cloud Mode |
-|---|---|---|---|
-| **ASR Engine** | Sherpa-ONNX (local) | Sherpa-ONNX (local) | Cloud ASR (Groq, DashScope, etc.) |
-| **AI Polish** | — | LLM correction + translation | — |
-| **Privacy** | 100% offline | ASR offline, LLM via cloud | Audio sent to cloud |
-| **Latency** | Fastest | +0.5~1s for LLM | Depends on network |
+Two working modes, plus **AI Polish as an independent toggle** that can be layered on either one:
+
+| | Offline Mode | Cloud Mode |
+|---|---|---|
+| **ASR Engine** | Sherpa-ONNX (local) | Cloud ASR (Groq, DashScope, etc.) |
+| **Privacy** | 100% offline | Audio sent to cloud |
+| **Latency** | Fastest | Depends on network |
+| **+ AI Polish** | ASR local, LLM via cloud (+0.5~1s) | LLM correction + translation (+0.5~1s) |
 
 - **8 Offline Models** — SenseVoice, Paraformer, Whisper Large-v3, FireRedASR, and more
 - **Two Trigger Modes** — Hold to Speak (PTT) or Tap to Toggle
@@ -52,10 +54,10 @@ A macOS desktop app that turns your voice into text — offline by default, with
 | Languages | Input | Output | Translation |
 |-----------|-------|--------|-------------|
 | Chinese, English, Japanese, Korean, Cantonese | All modes | All modes | — |
-| Spanish, French, German, Russian, Portuguese | Whisper / Cloud | Smart Mode | Via LLM |
+| Spanish, French, German, Russian, Portuguese | Whisper / Cloud | With AI Polish | Via LLM |
 
 - **Auto-detect** — Let the model detect what language you're speaking
-- **Translation Mode** — Set different input/output languages (e.g., speak Chinese → output English). Requires Smart Mode.
+- **Translation Mode** — Set different input/output languages (e.g., speak Chinese → output English). Requires AI Polish to be enabled.
 - **Script Control** — Choose Simplified or Traditional Chinese output
 
 ### Cloud ASR (6 Providers)
@@ -69,7 +71,7 @@ A macOS desktop app that turns your voice into text — offline by default, with
 | **iFlytek** | WebSocket | 202 dialects |
 | **Tencent Cloud** | WebSocket | 5h/month free |
 
-### AI Polish (Smart Mode)
+### AI Polish (optional toggle)
 
 LLM post-processing: fix homophones, remove filler words, translate, enforce output language.
 
@@ -169,7 +171,7 @@ Hotkey → native_input.m (CGEventTap)
 | Native | `native_lib/` | Objective-C: CGEventTap + AudioQueue ring buffer |
 | Gateway | `gateway/` | Cloudflare Workers (Hono): license, billing, version check |
 
-**Codebase**: ~37,000 lines across 83 files. 598 tests.
+**Codebase**: ~31,500 lines of Dart across 85 files, plus ~1,800 lines of Objective-C.
 
 ---
 
@@ -178,7 +180,7 @@ Hotkey → native_input.m (CGEventTap)
 ```bash
 flutter pub get          # Dependencies
 flutter analyze          # Static analysis (0 issues)
-flutter test             # Run tests (598 tests)
+flutter test             # Run tests
 flutter build macos --release  # Build
 ./scripts/install.sh     # Install to /Applications
 ./scripts/create_styled_dmg.sh  # Create DMG
@@ -227,13 +229,13 @@ license.
 
 ### 语音输入
 - **完全离线可用** — 无需账号、无需联网、无需 API Key，安装即用。9 款本地模型（1 流式 + 8 非流式）基于 [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)，中英识别准确率媲美云端，音频不出设备
-- **三种工作模式** — 纯离线（隐私优先）/ 智能（离线识别 + AI 润色）/ 云端（高精度）
+- **两种工作模式 + 独立 AI 润色开关** — 本地（隐私优先）/ 云端（高精度）；AI 润色可叠加在任一模式上
 - **两种触发方式** — 按住说话（PTT）或单击切换（Toggle）；PTT 和 Toggle 可共用一个键
 - **预分段识别** — 录音中检测到 3 秒停顿自动后台解码，停止时只等最后一段，显著减少等待
 
 ### 11 种语言 + 口译
 - 中英日韩粤 + 西法德俄葡，支持输入/输出自动检测
-- **口译模式** — 输入中文→输出英文等任意组合，LLM 自动翻译（需智能模式）
+- **口译模式** — 输入中文→输出英文等任意组合，LLM 自动翻译（需开启 AI 润色）
 
 ### ⚡ 超能力（热键驱动）
 - **闪念笔记** — 独立热键，语音直接保存为 Markdown，按天归档到自定义目录
@@ -246,7 +248,7 @@ license.
 - **6 家云端 ASR** — 阿里云百炼（DashScope 实时）、Groq、OpenAI、火山引擎、讯飞、腾讯云
 - **12 家 LLM** — 百炼、DeepSeek、豆包、OpenAI、Claude、智谱、Kimi、MiniMax、Gemini、讯飞、Groq、Ollama 本地
 - **服务商预置** — 新用户打开云账户即可看到完整列表，点击配置即用
-- **账户导入/导出** — 跨设备迁移，JSONL 格式，含凭证
+- **账户导入/导出** — 跨设备迁移，JSON 格式，**含明文凭证**（与「配置备份」不同，后者默认排除密钥）
 
 ### 专业词汇 & 安全
 - **行业词典 + 个人词库** — 术语注入 LLM 实现领域感知

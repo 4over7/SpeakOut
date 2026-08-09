@@ -43,11 +43,13 @@
 - 写入有时需要触发副作用（如改音频设备 → 通知 AudioDeviceService 重启）
 - 测试时 mock 一个 service 比 mock 整个 SharedPreferences 容易
 
-### 3. LLMService 三种 API 格式
+### 3. LLMService 三条调用路径（但枚举只有两个值）
 - OpenAI 兼容（绝大多数：DeepSeek/阿里云/Groq/智谱/Kimi/MiniMax/Doubao 等）
 - Anthropic（Claude）
 - Ollama（本地）
-- 入口分流在 `correctText()` / `correctTextStream()`，按 `provider.llmApiFormat` 决定走哪条
+- 入口在 `correctText()` / `correctTextStream()`。⚠️ 分流是**两段式**，别只看枚举：
+  先判 `providerType == 'ollama'` → 走 `_correctTextOllama()`；**其余**才按
+  `provider.llmApiFormat` 分流，而 `enum LlmApiFormat` **只有 `openai` / `anthropic`**（无 ollama 成员）
 - 模型特定参数（如 V4 thinking off）通过 `_applyModelSpecificParams()` helper 注入
 
 ### 4. 流式 stream 在 dispose() 时必须关

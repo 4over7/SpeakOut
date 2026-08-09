@@ -55,6 +55,15 @@ SpeakOut 的核心功能：录音转文字 → 注入到当前应用的输入框
 
 **残留 CGEvent 路径**：`inject_via_keyboard` 函数仍保留在 `native_lib/native_input.m`，但生产代码不再调用。**保留原因**是某些极端场景（剪贴板被锁定的特殊系统状态）的兜底备用。**未来可考虑彻底删除**。
 
+> ### ⚠️ 勘误（2026-08-09 逐句核实）
+>
+> 「兜底备用」这个说法**不成立**：`inject_via_keyboard` 被声明为 `static`（文件内可见）且**零调用点**，
+> 没有任何代码路径能在运行时触达它 —— 它是纯 dead code，不是可用的降级方案。
+> FFI 侧唯一注入入口是 `inject_text`，其实现体只有一行 `inject_via_clipboard(text)`，没有任何条件分支。
+>
+> 决策本身（选 B：统一走剪贴板）依然有效，只是「保留它以备兜底」是事后合理化。
+> 真要恢复 CGEvent 兜底，需要重新接线（去 static + 加分流判断），不是"已经在那儿了"。
+
 ## 相关
 
 - 实现：`native_lib/native_input.m` `inject_via_clipboard()`
