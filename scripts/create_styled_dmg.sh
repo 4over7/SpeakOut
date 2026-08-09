@@ -20,7 +20,7 @@ echo "🔄 Gateway synced: v${VERSION}+${NEW_BUILD}"
 # 版本号与 gateway 已在上面被改写。若后续步骤失败，工作区会留下这些改动 ——
 # set -e 退出时提示一下，避免带着「已声明但未发布」的 gateway 版本号继续操作。
 trap 'code=$?; [ $code -ne 0 ] && echo "
-⚠️  打包中断（exit $code）。pubspec.yaml 与 gateway/src/index.js 的版本号已改为 ${VERSION}+${NEW_BUILD}，
+⚠️  打包中断（exit ${code}）。pubspec.yaml 与 gateway/src/index.js 的版本号已改为 ${VERSION}+${NEW_BUILD}，
    但 DMG 未成功发布。请先 git checkout 这两个文件，或修复后重跑本脚本。"; exit $code' EXIT
 
 # Build
