@@ -790,7 +790,6 @@ class ModeTabState extends State<ModeTab> {
   Color _modeColor(String mode) {
     switch (mode) {
       case 'offline': return MacosColors.systemGreenColor;
-      case 'smart': return MacosColors.systemBlueColor;
       case 'cloud': return MacosColors.systemOrangeColor;
       default: return MacosColors.systemGrayColor;
     }
