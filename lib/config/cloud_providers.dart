@@ -225,11 +225,10 @@ class CloudProviders {
       capabilities: {CloudCapability.llm},
       llmModels: [
         CloudLLMModel(id: 'MiniMax-M2.5', name: 'MiniMax M2.5', description: '推荐，MoE 旗舰'),
-        CloudLLMModel(id: 'MiniMax-M1', name: 'MiniMax M1', description: '推理增强'),
       ],
       llmBaseUrl: 'https://api.minimaxi.com/v1',
       llmDefaultModel: 'MiniMax-M2.5',
-      llmModelHint: '如 MiniMax-M2.5, MiniMax-M1',
+      llmModelHint: '如 MiniMax-M2.5',
       helpUrl: 'https://platform.minimaxi.com/document/introduction',
     ),
 
@@ -242,11 +241,10 @@ class CloudProviders {
       capabilities: {CloudCapability.llm},
       llmModels: [
         CloudLLMModel(id: 'MiniMax-M2.5', name: 'MiniMax M2.5', description: '推荐，MoE 旗舰'),
-        CloudLLMModel(id: 'MiniMax-M1', name: 'MiniMax M1', description: '推理增强'),
       ],
       llmBaseUrl: 'https://api.minimax.io/v1',
       llmDefaultModel: 'MiniMax-M2.5',
-      llmModelHint: '如 MiniMax-M2.5, MiniMax-M1',
+      llmModelHint: '如 MiniMax-M2.5',
       helpUrl: 'https://platform.minimax.io/docs/api-reference/text-openai-api',
     ),
 

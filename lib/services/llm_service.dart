@@ -294,6 +294,12 @@ class LLMService {
     if (model.startsWith('deepseek-v4')) {
       body['thinking'] = {'type': 'disabled'};
     }
+    // Kimi K2 系列只接受 temperature=1，传别的值直接 HTTP 400
+    // （"invalid temperature: only 1 is allowed for this model"）——
+    // 默认 0.3 会让整家 Kimi 账户 100% 失败。
+    if (model.startsWith('kimi-k2')) {
+      body['temperature'] = 1;
+    }
   }
 
   Future<String> _correctTextCloud(String input, {List<String>? vocabHints, ({String apiKey, String baseUrl, String model, bool isAnthropic})? resolved, String? translateTo}) async {

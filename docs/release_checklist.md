@@ -7,6 +7,10 @@
 - [ ] `flutter analyze` 零错误
 - [ ] `flutter test` 全部通过
 - [ ] `./scripts/test_all.sh` 一键跑通
+- [ ] `python3 tools/llm_bench/check_models.py` — 代码里写死的模型 vs 线上清单对账。
+      服务商换代会让默认模型悄悄失效（DeepSeek 停用 `deepseek-chat` 就是这么炸的），
+      跑一次几秒钟。⚠️ 模型不在 `/models` 里**不等于**已下线，需实际发一次请求确认，
+      详见 [`llm_provider_benchmark.md`](./llm_provider_benchmark.md)
 
 ## 引导流程
 
