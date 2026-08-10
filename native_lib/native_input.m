@@ -87,6 +87,15 @@ typedef void (*DartKeyCallback)(int keyCode, bool isDown, unsigned int modifierF
 #define NX_DEVICELALTKEYMASK    0x00000020
 #define NX_DEVICERALTKEYMASK    0x00000040
 #define NX_DEVICERCTLKEYMASK    0x00002000
+// 真实键盘事件都带此位；合成事件漏了它，部分 App 会认不出组合键
+#define NX_NONCOALSESCEDMASK    0x00000100
+
+// 合成 Cmd+V 时各事件之间的间隔：连发会被系统合并（实测四个事件只有前两个到达）
+#define INJECT_KEY_GAP_US 8000
+
+// 粘贴后多久还原剪贴板。必须长于目标 App 真正读到剪贴板的耗时 ——
+// Electron 应用走跨进程 IPC，比原生控件慢得多，还原太早会粘出旧内容。
+#define CLIPBOARD_RESTORE_DELAY_MS 800
 
 // Forward declaration
 bool check_permission();
@@ -431,6 +440,45 @@ static void inject_via_keyboard(const char *text) {
 }
 
 // Inject via clipboard paste (Cmd+V) — for terminal emulators
+// 合成「Command + 某键」。必须逐位复刻真实键盘事件，否则部分 App 认不出这是组合键。
+//
+// 曾经的写法是「只造目标键 + CGEventSetFlags(Command)」，在原生控件和 Chromium 里能用
+// （它们只读高位 modifierFlags），但 Flutter 应用完全收不到 —— 它在框架层靠
+// HardwareKeyboard 的按键状态判断组合键，而那个状态只由 Command 键自身的 down/up 维护。
+// 三处缺失缺一不可：
+//   a) 发送 Command 键本身的 down/up，不能只打 flags 标记
+//   b) flags 补上低位设备相关位：左Command | 非合并 —— 真实按键都带着
+//   c) 事件间留间隔，否则四个事件会被系统合并掉（实测只有前两个能到达）
+static void post_command_key(CGKeyCode key, CGEventTapLocation tap) {
+  CGEventSourceRef source =
+      CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+  if (!source) return;
+  const CGEventFlags kCmdFlags =
+      kCGEventFlagMaskCommand | NX_DEVICELCMDKEYMASK | NX_NONCOALSESCEDMASK;
+  CGEventRef cmdDown = CGEventCreateKeyboardEvent(source, 55, true);
+  CGEventRef keyDown = CGEventCreateKeyboardEvent(source, key, true);
+  CGEventRef keyUp = CGEventCreateKeyboardEvent(source, key, false);
+  CGEventRef cmdUp = CGEventCreateKeyboardEvent(source, 55, false);
+  if (cmdDown && keyDown && keyUp && cmdUp) {
+    CGEventSetFlags(cmdDown, kCmdFlags);
+    CGEventSetFlags(keyDown, kCmdFlags);
+    CGEventSetFlags(keyUp, kCmdFlags);
+    CGEventSetFlags(cmdUp, NX_NONCOALSESCEDMASK); // Command 已抬起
+    CGEventPost(tap, cmdDown);
+    usleep(INJECT_KEY_GAP_US);
+    CGEventPost(tap, keyDown);
+    usleep(INJECT_KEY_GAP_US);
+    CGEventPost(tap, keyUp);
+    usleep(INJECT_KEY_GAP_US);
+    CGEventPost(tap, cmdUp);
+  }
+  if (cmdDown) CFRelease(cmdDown);
+  if (keyDown) CFRelease(keyDown);
+  if (keyUp) CFRelease(keyUp);
+  if (cmdUp) CFRelease(cmdUp);
+  CFRelease(source);
+}
+
 static void inject_via_clipboard(const char *text) {
   @autoreleasepool {
     NSString *newText = [NSString stringWithUTF8String:text];
@@ -458,31 +506,19 @@ static void inject_via_clipboard(const char *text) {
     }
 
     // 2. Put text on clipboard
-    [pasteboard clearContents];
+    NSInteger ourChangeCount = [pasteboard clearContents];
     [pasteboard setString:newText forType:NSPasteboardTypeString];
     usleep(10000); // 10ms for pasteboard propagation
 
-    // 3. Simulate Cmd+V (keycode 9 = 'v')
-    CGEventSourceRef source =
-        CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-    if (source) {
-      CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 9, true);
-      CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 9, false);
-      if (keyDown && keyUp) {
-        CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
-        CGEventSetFlags(keyUp, kCGEventFlagMaskCommand);
-        CGEventPost(kCGHIDEventTap, keyDown);
-        CGEventPost(kCGHIDEventTap, keyUp);
-      }
-      if (keyDown) CFRelease(keyDown);
-      if (keyUp) CFRelease(keyUp);
-      CFRelease(source);
-    }
+    // 3. Simulate Cmd+V
+    post_command_key(9, kCGHIDEventTap);
 
-    // 4. Restore clipboard after 200ms
+    // 4. 还原剪贴板。等待期变长后，用户很可能在这期间自己复制了别的东西 ——
+    //    changeCount 变了就说明剪贴板已易主，此时还原等于把用户刚复制的内容吃掉。
     dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+        dispatch_time(DISPATCH_TIME_NOW, CLIPBOARD_RESTORE_DELAY_MS * NSEC_PER_MSEC),
         dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          if (pasteboard.changeCount != ourChangeCount) return;
           [pasteboard clearContents];
           if (savedItems != nil && savedItems.count > 0) {
             [pasteboard writeObjects:savedItems];
@@ -494,6 +530,8 @@ static void inject_via_clipboard(const char *text) {
 // --- Streaming clipboard injection (for typewriter effect) ---
 // Saves clipboard once at begin, pastes each chunk, restores at end.
 static NSArray *_savedClipboardItems = nil;
+// 最后一次 chunk 写入后的 changeCount，供 end 判断剪贴板有没有易主
+static NSInteger _lastChunkChangeCount = -1;
 
 void inject_clipboard_begin(void) {
   @autoreleasepool {
@@ -530,25 +568,11 @@ void inject_clipboard_chunk(const char *text) {
       return;
 
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    [pasteboard clearContents];
+    _lastChunkChangeCount = [pasteboard clearContents];
     [pasteboard setString:newText forType:NSPasteboardTypeString];
     usleep(10000); // 10ms for pasteboard propagation
 
-    CGEventSourceRef source =
-        CGEventSourceCreate(kCGEventSourceStatePrivate);
-    if (source) {
-      CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 9, true);
-      CGEventRef keyUp = CGEventCreateKeyboardEvent(source, 9, false);
-      if (keyDown && keyUp) {
-        CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
-        CGEventSetFlags(keyUp, kCGEventFlagMaskCommand);
-        CGEventPost(kCGHIDEventTap, keyDown);
-        CGEventPost(kCGHIDEventTap, keyUp);
-      }
-      if (keyDown) CFRelease(keyDown);
-      if (keyUp) CFRelease(keyUp);
-      CFRelease(source);
-    }
+    post_command_key(9, kCGHIDEventTap);
     usleep(30000); // 30ms for paste to complete before next chunk
   }
 }
@@ -558,10 +582,16 @@ void inject_clipboard_end(void) {
     // Restore clipboard after a short delay
     NSArray *saved = _savedClipboardItems;
     _savedClipboardItems = nil;
+    const NSInteger expected = _lastChunkChangeCount;
     dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+        dispatch_time(DISPATCH_TIME_NOW, CLIPBOARD_RESTORE_DELAY_MS * NSEC_PER_MSEC),
         dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+          // 剪贴板已易主（用户自己复制了东西）就别还原，否则会吃掉他刚复制的内容
+          if (expected >= 0 && pasteboard.changeCount != expected) {
+            log_to_file("Clipboard streaming: end (skipped restore, clipboard changed)");
+            return;
+          }
           [pasteboard clearContents];
           if (saved != nil && saved.count > 0) {
             [pasteboard writeObjects:saved];
@@ -576,19 +606,7 @@ void inject_clipboard_end(void) {
 // 模拟 Cmd+C 复制选中文字到剪贴板
 void copy_selection(void) {
   @autoreleasepool {
-    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-    if (!source) return;
-    CGEventRef keyDown = CGEventCreateKeyboardEvent(source, 8, true);  // 8 = 'c'
-    CGEventRef keyUp   = CGEventCreateKeyboardEvent(source, 8, false);
-    if (keyDown && keyUp) {
-      CGEventSetFlags(keyDown, kCGEventFlagMaskCommand);
-      CGEventSetFlags(keyUp,   kCGEventFlagMaskCommand);
-      CGEventPost(kCGAnnotatedSessionEventTap, keyDown);
-      CGEventPost(kCGAnnotatedSessionEventTap, keyUp);
-    }
-    if (keyDown) CFRelease(keyDown);
-    if (keyUp) CFRelease(keyUp);
-    CFRelease(source);
+    post_command_key(8, kCGAnnotatedSessionEventTap); // 8 = 'c'
     usleep(100000); // 100ms 等待剪贴板更新
   }
 }

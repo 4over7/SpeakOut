@@ -64,6 +64,21 @@ SpeakOut 的核心功能：录音转文字 → 注入到当前应用的输入框
 > 决策本身（选 B：统一走剪贴板）依然有效，只是「保留它以备兜底」是事后合理化。
 > 真要恢复 CGEvent 兜底，需要重新接线（去 static + 加分流判断），不是"已经在那儿了"。
 
+> ### ⚠️ 勘误（2026-08-10 实测）
+>
+> 上面「200ms 后恢复」已不准确，现为 **800ms**（常量 `CLIPBOARD_RESTORE_DELAY_MS`）。
+>
+> 200ms 一直卡在临界点：**Electron 应用**（Obsidian / Cursor / Slack 等）读剪贴板走跨进程 IPC，
+> 比原生控件慢得多。本文列的那条 known issue 就是它的表现。2026-08-10 修复合成按键序列时
+> 注入耗时增加约 24ms，直接把这个窗口推过了线 —— Obsidian 开始稳定粘出旧剪贴板内容。
+>
+> 连带加固：窗口拉长后「用户在等待期内自己复制了东西、还原时被覆盖」的风险变大，
+> 因此还原前比对 `NSPasteboard.changeCount`，剪贴板已易主则放弃还原。
+>
+> **决策本身（选 B：统一走剪贴板）依然有效。** 但要清楚这个还原是在赌目标 App 够快 ——
+> 粘贴完成没有任何回执信号，固定延迟只能取足够大的经验值。
+> 完整排查过程见 [`docs/debug-log/2026-08-10-synthetic-cmdv-not-recognized.md`](../debug-log/2026-08-10-synthetic-cmdv-not-recognized.md)。
+
 ## 相关
 
 - 实现：`native_lib/native_input.m` `inject_via_clipboard()`
