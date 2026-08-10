@@ -549,6 +549,8 @@
   "onboardingTryItHint": "Try it below — hold the hotkey, speak, and release. Your text lands here.",
   "onboardingTryItPlaceholder": "Say something…",
   "onboardingTryItNeedPerm": "Permissions not granted yet — you can grant them later in Settings → General.",
+  "onboardingTryItPreparing": "Getting the shortcut ready…",
+  "onboardingTryItUnavailable": "Trial unavailable — the shortcut or voice model isn't ready. Click \"Start Using\"; the main window retries automatically.",
   "devRedundantModels": "Clean up redundant model copies",
   "devRedundantModelsDesc": "Remove the local copy and use the bundled version instead",
   "devRedundantNone": "No redundant copies found",

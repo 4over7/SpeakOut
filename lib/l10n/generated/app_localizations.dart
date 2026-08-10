@@ -2447,7 +2447,7 @@ abstract class AppLocalizations {
   /// No description provided for @llmDataSource.
   ///
   /// In en, this message translates to:
-  /// **'Source: 2026-03-21 benchmark, non-streaming API, China Mainland network'**
+  /// **'Source: measured 2026-05-09 (DeepSeek V4 with thinking off), non-streaming API, mainland China network'**
   String get llmDataSource;
 
   /// No description provided for @llmModelField.
@@ -2569,6 +2569,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Permissions not granted yet — you can grant them later in Settings → General.'**
   String get onboardingTryItNeedPerm;
+
+  /// No description provided for @onboardingTryItPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting the shortcut ready…'**
+  String get onboardingTryItPreparing;
+
+  /// No description provided for @onboardingTryItUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial unavailable — the shortcut or voice model isn\'t ready. Click \"Start Using\"; the main window retries automatically.'**
+  String get onboardingTryItUnavailable;
 
   /// No description provided for @devRedundantModels.
   ///

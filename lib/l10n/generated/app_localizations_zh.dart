@@ -1238,7 +1238,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get llmTagStableNote => '波动最小，质量稳定';
 
   @override
-  String get llmDataSource => '数据来源：2026-03-21 实测，非流式 API，中国大陆网络';
+  String get llmDataSource =>
+      '数据来源：2026-05-09 实测（DeepSeek V4 关闭 thinking 后），非流式 API，中国大陆网络';
 
   @override
   String get llmModelField => '模型';
@@ -1299,6 +1300,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onboardingTryItNeedPerm => '权限未授予，暂时无法试用。稍后可在「设置 → 通用」中补授权';
+
+  @override
+  String get onboardingTryItPreparing => '正在准备快捷键…';
+
+  @override
+  String get onboardingTryItUnavailable =>
+      '试用暂不可用（快捷键或语音模型未就绪）。点「开始使用」进入主界面后会自动重试';
 
   @override
   String get devRedundantModels => '清理冗余模型副本';

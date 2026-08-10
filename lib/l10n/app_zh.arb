@@ -509,6 +509,8 @@
   "onboardingTryItHint": "在下面输入框里试一次 —— 按住快捷键说话，松开后文字会自动出现",
   "onboardingTryItPlaceholder": "说点什么…",
   "onboardingTryItNeedPerm": "权限未授予，暂时无法试用。稍后可在「设置 → 通用」中补授权",
+  "onboardingTryItPreparing": "正在准备快捷键…",
+  "onboardingTryItUnavailable": "试用暂不可用（快捷键或语音模型未就绪）。点「开始使用」进入主界面后会自动重试",
   "devRedundantModels": "清理冗余模型副本",
   "devRedundantModelsDesc": "删除本地副本，改用随包内置的版本",
   "devRedundantNone": "没有可清理的冗余副本",

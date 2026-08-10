@@ -110,6 +110,21 @@ class AppService {
     engine.nativeInput?.setDebugLogging(enabled);
   }
 
+  /// 启动键盘监听（CGEventTap）。init() 与引导页「现在试一次」共用同一入口，
+  /// 避免「谁负责装监听」散落到多处 —— 引导页曾因漏装导致完成页按快捷键无反应。
+  /// engine.init() 自身幂等，重复调用会 skip。
+  /// 返回值只表示启动过程有没有抛错；监听是否真的在跑要查 engine.isListenerRunning。
+  Future<bool> startKeyboardListener() async {
+    engine.pttKeyCode = ConfigService().pttKeyCode;
+    try {
+      await engine.init();
+      return true;
+    } catch (e) {
+      engine.updateStatus("❌ 键盘监听失败: $e");
+      return false;
+    }
+  }
+
   /// 初始化应用核心服务
   Future<void> init() async {
     engine.updateStatus("正在配置服务...");
@@ -134,14 +149,10 @@ class AppService {
     await Future.delayed(const Duration(milliseconds: 100));
 
     // 2. Engine (Set KeyCode)
-    engine.pttKeyCode = ConfigService().pttKeyCode;
-    try {
-       await engine.init(); 
-    } catch (e) {
-       engine.updateStatus("❌ 键盘监听失败: $e");
+    if (!await startKeyboardListener()) {
        await Future.delayed(const Duration(seconds: 2));
     }
-    
+
     // 3. Initialize ASR (HEAVY TASK - Delay significantly)
     // Skip if already initialized (e.g., by onboarding)
     if (engine.isASRReady) {

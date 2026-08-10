@@ -43,6 +43,17 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
   /// 「现在试一次」输入框 —— 引导内完成第一次成功
   final TextEditingController _tryItController = TextEditingController();
 
+  /// 「现在试一次」要能用，完成页必须自己备齐键盘监听 + ASR ——
+  /// 引导页原本只预热 ASR（engine.init() 等进主界面才调），
+  /// 而从「上次没点开始使用就退出」恢复回完成页时，连 ASR 也没有。
+  /// null=准备中，true=可用，false=备不齐（不能让用户对着死键盘按半天）
+  bool? _trialReady;
+  bool _trialPrepRequested = false;
+
+  /// engine.init() 的幂等靠 _isListenerRunning，而该标志要到 init 末尾才置位 ——
+  /// 期间并发进来的第二次调用会一路往下走，重复创建 CGEventTap
+  bool _preparingTrial = false;
+
   /// 防止快速双击「继续」并发触发两次内置激活 ——
   /// initASR 会 dispose 上一个 provider，并发调用有竞态
   bool _activatingBundled = false;
@@ -58,6 +69,9 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 文件日志原本要等进主界面 AppService.init() 才开 —— 于是引导阶段（最容易出问题、
+    // 用户也最难描述现象的阶段）全程无日志可查。这里提前开。
+    _app.applyVerboseLogging();
     _restoreStep();
     _checkPermissions();
   }
@@ -75,6 +89,11 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPermissions();
+      // macOS 权限授予后有生效延迟，首次装监听可能正好卡在延迟里失败。
+      // 用户切出去授权再回来时给一次重试，否则失败文案会一直挂着。
+      if (_trialReady == false) {
+        _trialPrepRequested = false;
+      }
     }
   }
 
@@ -335,6 +354,42 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       if (_currentStep == 3 && !_downloadComplete && !_isDownloading) {
         _downloadSelectedModel();
       }
+    }
+  }
+
+  /// 完成页专用：备齐「现在试一次」需要的两样东西，否则它就是个死输入框。
+  /// 键盘监听走 AppService 统一入口，进主界面后 init() 再调会 skip。
+  Future<void> _prepareTrial() async {
+    if (_preparingTrial) return;
+    _preparingTrial = true;
+    try {
+      // 先备 ASR 再装监听：反过来的话，监听已生效而模型还在加载的那几百毫秒里
+      // 按快捷键能录上音却识别不出东西。
+      // 正常流程 ASR 已由选模型那步初始化好，只有从「上次停在完成页」恢复进来时才是空的。
+      if (!_app.engine.isASRReady) {
+        await _initASRForActiveModel();
+      }
+      await _app.startKeyboardListener();
+    } finally {
+      _preparingTrial = false;
+    }
+    if (!mounted) return;
+    setState(() =>
+        _trialReady = _app.engine.isListenerRunning && _app.engine.isASRReady);
+  }
+
+  Future<void> _initASRForActiveModel() async {
+    try {
+      final model = _app.getModelById(ConfigService().activeModelId);
+      final path = await _app.getActiveModelPath();
+      if (model == null || path == null) return;
+      await _app.initASR(
+          modelPath: path,
+          type: model.type,
+          modelName: model.name,
+          hasPunctuation: model.hasPunctuation);
+    } catch (e) {
+      AppLog.d('[Onboarding] 恢复完成页时重建 ASR 失败: $e');
     }
   }
 
@@ -998,6 +1053,15 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
 
   // Step 4: Done
   Widget _buildDoneStep() {
+    // 进入完成页有三条路径（内置激活 / 下载完成后翻页 / 恢复上次进度），
+    // 放在 build 里触发比逐个入口埋调用更不容易漏 —— 这个 bug 就是漏出来的。
+    // 权限没齐时不装：engine.init() 会因缺权限中止并往 statusStream 推 Error，
+    // 而这种情况下界面本来就显示权限提示、不显示试用框。
+    if (!_trialPrepRequested &&
+        _inputMonitoringGranted && _accessibilityGranted && _microphoneGranted) {
+      _trialPrepRequested = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _prepareTrial());
+    }
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -1055,8 +1119,18 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
         // 「现在试一次」—— 把第一次成功提前到引导内完成，而不是等用户关掉引导再摸索。
         // 原理：SpeakOut 走系统级文本注入，只要这个输入框有焦点，识别结果就会落进来。
         if (_inputMonitoringGranted && _accessibilityGranted && _microphoneGranted) ...[
-          Text(_l10n.onboardingTryItHint,
-              style: AppTheme.caption(context), textAlign: TextAlign.center),
+          if (_trialReady == false)
+            // 监听没装上时说清楚，不然用户会对着不动的输入框反复按快捷键
+            Text(_l10n.onboardingTryItUnavailable,
+                style: AppTheme.caption(context).copyWith(color: Colors.orange),
+                textAlign: TextAlign.center)
+          else if (_trialReady == null)
+            // 装监听要枚举音频设备，有几百毫秒。这期间别催用户按键。
+            Text(_l10n.onboardingTryItPreparing,
+                style: AppTheme.caption(context), textAlign: TextAlign.center)
+          else
+            Text(_l10n.onboardingTryItHint,
+                style: AppTheme.caption(context), textAlign: TextAlign.center),
           const SizedBox(height: 10),
           SizedBox(
             width: 420,

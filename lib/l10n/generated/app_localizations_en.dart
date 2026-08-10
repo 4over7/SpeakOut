@@ -1303,7 +1303,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get llmDataSource =>
-      'Source: 2026-03-21 benchmark, non-streaming API, China Mainland network';
+      'Source: measured 2026-05-09 (DeepSeek V4 with thinking off), non-streaming API, mainland China network';
 
   @override
   String get llmModelField => 'Model';
@@ -1368,6 +1368,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get onboardingTryItNeedPerm =>
       'Permissions not granted yet — you can grant them later in Settings → General.';
+
+  @override
+  String get onboardingTryItPreparing => 'Getting the shortcut ready…';
+
+  @override
+  String get onboardingTryItUnavailable =>
+      'Trial unavailable — the shortcut or voice model isn\'t ready. Click \"Start Using\"; the main window retries automatically.';
 
   @override
   String get devRedundantModels => 'Clean up redundant model copies';

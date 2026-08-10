@@ -334,7 +334,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     if (mounted) setState(() => _permissionMissing = !(hasInputMonitoring && hasAccessibility));
     if (hasInputMonitoring && hasAccessibility) {
       // Both permissions granted — try to start the listener
-      await _appService.engine.init();
+      await _appService.startKeyboardListener();
       if (mounted) {
         setState(() {
           if (_appService.engine.isListenerRunning) {
