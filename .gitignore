@@ -89,6 +89,7 @@ docs/wiki/vocab_*.md
 # Old directories (merged into scripts/) — 例外：ax_probe Phase 0 探针保留
 tools/*
 !tools/ax_probe/
+!tools/llm_bench/
 tools/ax_probe/.build/
 tools/ax_probe/.swiftpm/
 tools/ax_probe/Package.resolved
