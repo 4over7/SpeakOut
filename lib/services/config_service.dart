@@ -266,13 +266,22 @@ class ConfigService {
   /// 官方映射：两者都落到 v4-flash（reasoner 对应其 thinking 模式），**同价**；
   /// 迁到 v4-pro 单价约 3 倍，不能拿来当 reasoner 的替代。
   /// 本项目 ADR-005 已默认关闭 v4 的 thinking，故统一迁到 v4-flash。
+  /// 旧别名 → 新模型名的纯映射（提出来是为了可测：
+  /// ConfigService 是 singleton 且 init 有 guard，跨用例隔离 flag 很别扭）。
+  /// 两个旧别名都落到 flash，**不是** pro —— pro 单价约 3 倍。
+  static String? mapRetiredDeepSeekModel(String? current) {
+    const retired = {'deepseek-chat', 'deepseek-reasoner'};
+    if (current != null && retired.contains(current)) return 'deepseek-v4-flash';
+    return current;
+  }
+
   Future<void> migrateDeepSeekV4() async {
     const flag = 'deepseek_v4_migrated';
     if (_prefs?.getBool(flag) ?? false) return;
-    const retired = {'deepseek-chat', 'deepseek-reasoner'};
     final current = _prefs?.getString('llm_model');
-    if (current != null && retired.contains(current)) {
-      await _prefs?.setString('llm_model', 'deepseek-v4-flash');
+    final mapped = mapRetiredDeepSeekModel(current);
+    if (mapped != null && mapped != current) {
+      await _prefs?.setString('llm_model', mapped);
     }
     await _prefs?.setBool(flag, true);
   }

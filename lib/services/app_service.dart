@@ -120,13 +120,15 @@ class AppService {
     await ConfigService().migrateLlmModelOwner();
     await ConfigService().migrateSmartModeToToggle();
     await ConfigService().migrateDeepSeekV4();
-    await CloudAccountService().migrateDeepSeekModels();
     await applyVerboseLogging(); // Apply debug logging as early as possible
 
     // 1.5 Other Services
     await ChatService().init();
     await CloudAccountService().init();
     await CloudAccountService().migrateFromLegacy();
+    // 必须在 init() 之后：init 里才 _loadAccounts()，
+    // 放前面的话 _accounts 还是空列表，迁移会静默 no-op
+    await CloudAccountService().migrateDeepSeekModels();
     
     engine.updateStatus("正在启动键盘监听...");
     await Future.delayed(const Duration(milliseconds: 100));
