@@ -294,10 +294,13 @@ class LLMService {
     if (model.startsWith('deepseek-v4')) {
       body['thinking'] = {'type': 'disabled'};
     }
-    // Kimi K2 系列只接受 temperature=1，传别的值直接 HTTP 400
+    // Kimi K 系列（k2/k2.5/k2.6/k3…）只接受 temperature=1，传别的值直接 HTTP 400
     // （"invalid temperature: only 1 is allowed for this model"）——
     // 默认 0.3 会让整家 Kimi 账户 100% 失败。
-    if (model.startsWith('kimi-k2')) {
+    // 用 contains('kimi-k') 而非具体版本：k3 已实测同样限制，写死版本号下一代又会漏；
+    // 也能覆盖带前缀的转售形式（如 Groq 的 moonshotai/kimi-k2-instruct-0905）。
+    // moonshot-v1-* 老系列不受此限制，正好不被命中。
+    if (model.contains('kimi-k')) {
       body['temperature'] = 1;
     }
   }
