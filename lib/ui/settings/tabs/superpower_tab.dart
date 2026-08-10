@@ -22,12 +22,10 @@ enum SuperpowerView { all, diary, organize, translate }
 /// "超能力" tab — 3 independent features as a dual-column card grid:
 /// 闪念笔记 / AI 梳理 / 即时翻译
 class SuperpowerTab extends StatefulWidget {
-  final ValueChanged<int> onNavigateToTab;
   final SuperpowerView viewFilter;
 
   const SuperpowerTab({
     super.key,
-    required this.onNavigateToTab,
     this.viewFilter = SuperpowerView.all,
   });
 

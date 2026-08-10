@@ -101,7 +101,7 @@ class _SettingsSidebarShellState extends State<SettingsSidebarShell> {
         entries: [
           SidebarEntry(
             id: 'superpower',
-            label: loc.sidebarSectionSuperpower,
+            label: loc.sidebarSuperpower,
             icon: CupertinoIcons.bolt_fill,
             builder: (_) => SuperpowerHubPage(),
           ),

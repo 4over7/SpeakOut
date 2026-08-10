@@ -83,7 +83,6 @@ class CoreEngine {
   bool _typewriterInjected = false;
   DateTime? _recordingStartTime;
   bool _isOrganizing = false;
-  // AI 一键调试状态
   /// 最近一次 ASR 原文（供 UI 做对比展示）
   String? lastAsrOriginal;
   /// 最近一次 LLM 润色是否成功（null=未调用，true=成功，false=失败）

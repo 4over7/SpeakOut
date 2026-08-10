@@ -15,9 +15,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabGeneral => 'General';
 
   @override
-  String get tabModels => 'Voice Models';
-
-  @override
   String get language => 'Interface Language';
 
   @override
@@ -84,10 +81,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get translationNeedsSmartMode =>
       'Translation requires AI Polish. Please turn on the \"AI Polish\" switch above to enable it.';
-
-  @override
-  String get translationCloudLimited =>
-      'Cloud mode has no AI polish. Translation quality will be limited. Recommend Smart Mode.';
 
   @override
   String inputLangModelHint(Object lang) {
@@ -228,9 +221,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get change => 'Change';
 
   @override
-  String get tabOrganize => 'AI Organize';
-
-  @override
   String get organizeEnabled => 'AI Organize';
 
   @override
@@ -254,9 +244,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get organizeGoConfig => 'Go to config →';
-
-  @override
-  String get tabAbout => 'About';
 
   @override
   String get aboutTagline => 'Your Local AI Speech Assistant';
@@ -555,9 +542,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingBegin => 'Start Using';
 
   @override
-  String get tabTrigger => 'Triggers';
-
-  @override
   String get pttMode => 'Hold to Speak (PTT)';
 
   @override
@@ -604,9 +588,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importing => 'Importing...';
 
   @override
-  String get tabWorkMode => 'Work Mode';
-
-  @override
   String get workModeOffline => 'Offline Mode';
 
   @override
@@ -617,21 +598,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workModeOfflineIcon => 'Privacy-first, zero network dependency';
 
   @override
-  String get workModeSmart => 'Smart Mode';
-
-  @override
-  String get workModeSmartDesc =>
-      'Local recognition + AI polish. Fixes homophones, removes filler words';
-
-  @override
   String get workModeCloud => 'Cloud Recognition';
 
   @override
   String get workModeCloudDesc =>
       'Cloud high-accuracy recognition, requires internet';
-
-  @override
-  String get workModeSmartConfig => 'Smart Polish Config';
 
   @override
   String get workModeAdvanced => 'Advanced Settings';
@@ -772,9 +743,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output';
 
   @override
-  String get tabCloudAccounts => 'Cloud Accounts';
-
-  @override
   String get cloudAccountsTitle => 'Manage Cloud Accounts';
 
   @override
@@ -826,10 +794,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageSettings => 'Language';
 
   @override
-  String get translationDisabledReason =>
-      'Translation requires AI polish, only available in Smart Mode';
-
-  @override
   String get cloudAsrLangUnsupported =>
       'Current cloud ASR service only supports Chinese and English. Selected language will fall back to Chinese recognition.';
 
@@ -860,10 +824,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarSectionVoice => 'Voice';
 
   @override
-  String get sidebarSectionSuperpower => 'Superpower';
+  String get sidebarSectionSuperpower => 'Extras';
 
   @override
   String get sidebarSectionOther => 'Other';
+
+  @override
+  String get sidebarSuperpower => 'Superpower';
 
   @override
   String get sidebarOverview => 'Overview';
@@ -1003,7 +970,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureSuperpowerDesc =>
-      'Flash Note / AI Organize / Quick Translate / Correction / AI Debug';
+      'Flash Note / AI Organize / Quick Translate';
 
   @override
   String get featureVocabTitle => 'Professional Vocab';
@@ -1408,6 +1375,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get devResetOnboardingDesc =>
       'Run the first-launch flow again on next start; leaves cloud accounts, hotkeys and all other settings untouched';
+
+  @override
+  String get devResetOnboardingConfirm =>
+      'The first-run setup (permissions, model choice) will run again on next launch. Cloud accounts, shortcuts and other settings are untouched.';
+
+  @override
+  String get devResetOnboardingConfirmBtn => 'Reset';
 
   @override
   String get devResetOnboardingDone => 'Reset — please restart the app';

@@ -25,12 +25,10 @@ import '../sidebar/sidebar_shell.dart';
 enum ModeTabView { all, recognition, aiPlus }
 
 class ModeTab extends StatefulWidget {
-  final ValueChanged<int> onNavigateToTab;
   final ModeTabView viewFilter;
 
   const ModeTab({
     super.key,
-    required this.onNavigateToTab,
     this.viewFilter = ModeTabView.all,
   });
 

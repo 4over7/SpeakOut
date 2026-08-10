@@ -15,9 +15,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabGeneral => '通用';
 
   @override
-  String get tabModels => '语音模型';
-
-  @override
   String get language => '界面语言';
 
   @override
@@ -83,9 +80,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get translationNeedsSmartMode =>
       '口译/翻译需要 AI 润色支持，请打开上方的「AI 润色」开关以启用翻译。';
-
-  @override
-  String get translationCloudLimited => '云端模式不含 AI 润色，口译效果有限。推荐切换到「智能模式」。';
 
   @override
   String inputLangModelHint(Object lang) {
@@ -220,9 +214,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get change => '更改';
 
   @override
-  String get tabOrganize => 'AI 梳理';
-
-  @override
   String get organizeEnabled => 'AI 梳理';
 
   @override
@@ -245,9 +236,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get organizeGoConfig => '前往配置 →';
-
-  @override
-  String get tabAbout => '关于';
 
   @override
   String get aboutTagline => '您的全能离线语音助手';
@@ -533,9 +521,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingBegin => '开始使用';
 
   @override
-  String get tabTrigger => '触发方式';
-
-  @override
   String get pttMode => '长按说话 (PTT)';
 
   @override
@@ -580,9 +565,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importing => '导入中...';
 
   @override
-  String get tabWorkMode => '工作模式';
-
-  @override
   String get workModeOffline => '纯离线模式';
 
   @override
@@ -592,19 +574,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workModeOfflineIcon => '隐私优先，零网络依赖';
 
   @override
-  String get workModeSmart => '智能模式';
-
-  @override
-  String get workModeSmartDesc => '本地识别 + AI 纠错润色，修复同音字、去除口水词';
-
-  @override
   String get workModeCloud => '云端识别模式';
 
   @override
   String get workModeCloudDesc => '云端高精度识别，需联网';
-
-  @override
-  String get workModeSmartConfig => '智能润色配置';
 
   @override
   String get workModeAdvanced => '高级设置';
@@ -740,9 +713,6 @@ class AppLocalizationsZh extends AppLocalizations {
       'LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出';
 
   @override
-  String get tabCloudAccounts => '云服务账户';
-
-  @override
   String get cloudAccountsTitle => '管理云服务账户';
 
   @override
@@ -794,9 +764,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageSettings => '语言设置';
 
   @override
-  String get translationDisabledReason => '口译模式需要 AI 润色，仅智能模式可用';
-
-  @override
   String get cloudAsrLangUnsupported => '当前云端 ASR 服务仅支持中文和英文，已选语言将回退到中文识别。';
 
   @override
@@ -824,10 +791,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarSectionVoice => '语音';
 
   @override
-  String get sidebarSectionSuperpower => '超能力';
+  String get sidebarSectionSuperpower => '扩展';
 
   @override
   String get sidebarSectionOther => '其他';
+
+  @override
+  String get sidebarSuperpower => '超能力';
 
   @override
   String get sidebarOverview => '概览';
@@ -958,7 +928,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get featureSuperpowerTitle => '超能力';
 
   @override
-  String get featureSuperpowerDesc => '闪念笔记 / AI 梳理 / 即时翻译 / 纠错反馈 / AI 调试';
+  String get featureSuperpowerDesc => '闪念笔记 / AI 梳理 / 即时翻译';
 
   @override
   String get featureVocabTitle => '专业词典';
@@ -1338,6 +1308,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devResetOnboardingDesc => '下次启动重新走首次引导，不影响云账户、快捷键等任何配置';
+
+  @override
+  String get devResetOnboardingConfirm =>
+      '下次启动会重新走一遍首次引导（权限、选模型）。不影响云账户、快捷键等任何配置。';
+
+  @override
+  String get devResetOnboardingConfirmBtn => '重置';
 
   @override
   String get devResetOnboardingDone => '已重置，请重启应用';

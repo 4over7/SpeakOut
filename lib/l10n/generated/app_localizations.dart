@@ -110,12 +110,6 @@ abstract class AppLocalizations {
   /// **'General'**
   String get tabGeneral;
 
-  /// No description provided for @tabModels.
-  ///
-  /// In en, this message translates to:
-  /// **'Voice Models'**
-  String get tabModels;
-
   /// No description provided for @language.
   ///
   /// In en, this message translates to:
@@ -247,12 +241,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Translation requires AI Polish. Please turn on the \"AI Polish\" switch above to enable it.'**
   String get translationNeedsSmartMode;
-
-  /// No description provided for @translationCloudLimited.
-  ///
-  /// In en, this message translates to:
-  /// **'Cloud mode has no AI polish. Translation quality will be limited. Recommend Smart Mode.'**
-  String get translationCloudLimited;
 
   /// No description provided for @inputLangModelHint.
   ///
@@ -506,12 +494,6 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get change;
 
-  /// No description provided for @tabOrganize.
-  ///
-  /// In en, this message translates to:
-  /// **'AI Organize'**
-  String get tabOrganize;
-
   /// No description provided for @organizeEnabled.
   ///
   /// In en, this message translates to:
@@ -559,12 +541,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go to config →'**
   String get organizeGoConfig;
-
-  /// No description provided for @tabAbout.
-  ///
-  /// In en, this message translates to:
-  /// **'About'**
-  String get tabAbout;
 
   /// No description provided for @aboutTagline.
   ///
@@ -1112,12 +1088,6 @@ abstract class AppLocalizations {
   /// **'Start Using'**
   String get onboardingBegin;
 
-  /// No description provided for @tabTrigger.
-  ///
-  /// In en, this message translates to:
-  /// **'Triggers'**
-  String get tabTrigger;
-
   /// No description provided for @pttMode.
   ///
   /// In en, this message translates to:
@@ -1202,12 +1172,6 @@ abstract class AppLocalizations {
   /// **'Importing...'**
   String get importing;
 
-  /// No description provided for @tabWorkMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Work Mode'**
-  String get tabWorkMode;
-
   /// No description provided for @workModeOffline.
   ///
   /// In en, this message translates to:
@@ -1226,18 +1190,6 @@ abstract class AppLocalizations {
   /// **'Privacy-first, zero network dependency'**
   String get workModeOfflineIcon;
 
-  /// No description provided for @workModeSmart.
-  ///
-  /// In en, this message translates to:
-  /// **'Smart Mode'**
-  String get workModeSmart;
-
-  /// No description provided for @workModeSmartDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Local recognition + AI polish. Fixes homophones, removes filler words'**
-  String get workModeSmartDesc;
-
   /// No description provided for @workModeCloud.
   ///
   /// In en, this message translates to:
@@ -1249,12 +1201,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cloud high-accuracy recognition, requires internet'**
   String get workModeCloudDesc;
-
-  /// No description provided for @workModeSmartConfig.
-  ///
-  /// In en, this message translates to:
-  /// **'Smart Polish Config'**
-  String get workModeSmartConfig;
 
   /// No description provided for @workModeAdvanced.
   ///
@@ -1502,12 +1448,6 @@ abstract class AppLocalizations {
   /// **'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output'**
   String get aiPolishMatrix;
 
-  /// No description provided for @tabCloudAccounts.
-  ///
-  /// In en, this message translates to:
-  /// **'Cloud Accounts'**
-  String get tabCloudAccounts;
-
   /// No description provided for @cloudAccountsTitle.
   ///
   /// In en, this message translates to:
@@ -1610,12 +1550,6 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get languageSettings;
 
-  /// No description provided for @translationDisabledReason.
-  ///
-  /// In en, this message translates to:
-  /// **'Translation requires AI polish, only available in Smart Mode'**
-  String get translationDisabledReason;
-
   /// No description provided for @cloudAsrLangUnsupported.
   ///
   /// In en, this message translates to:
@@ -1673,7 +1607,7 @@ abstract class AppLocalizations {
   /// No description provided for @sidebarSectionSuperpower.
   ///
   /// In en, this message translates to:
-  /// **'Superpower'**
+  /// **'Extras'**
   String get sidebarSectionSuperpower;
 
   /// No description provided for @sidebarSectionOther.
@@ -1681,6 +1615,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get sidebarSectionOther;
+
+  /// No description provided for @sidebarSuperpower.
+  ///
+  /// In en, this message translates to:
+  /// **'Superpower'**
+  String get sidebarSuperpower;
 
   /// No description provided for @sidebarOverview.
   ///
@@ -1931,7 +1871,7 @@ abstract class AppLocalizations {
   /// No description provided for @featureSuperpowerDesc.
   ///
   /// In en, this message translates to:
-  /// **'Flash Note / AI Organize / Quick Translate / Correction / AI Debug'**
+  /// **'Flash Note / AI Organize / Quick Translate'**
   String get featureSuperpowerDesc;
 
   /// No description provided for @featureVocabTitle.
@@ -2635,6 +2575,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Run the first-launch flow again on next start; leaves cloud accounts, hotkeys and all other settings untouched'**
   String get devResetOnboardingDesc;
+
+  /// No description provided for @devResetOnboardingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'The first-run setup (permissions, model choice) will run again on next launch. Cloud accounts, shortcuts and other settings are untouched.'**
+  String get devResetOnboardingConfirm;
+
+  /// No description provided for @devResetOnboardingConfirmBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get devResetOnboardingConfirmBtn;
 
   /// No description provided for @devResetOnboardingDone.
   ///

@@ -355,6 +355,29 @@ class _DeveloperPageState extends State<DeveloperPage> {
           child: PushButton(
             controlSize: ControlSize.regular,
             onPressed: () async {
+              // 同页其他有副作用的操作都带确认，这个会改变下次启动行为，不该一键触发
+              final ok = await showMacosAlertDialog<bool>(
+                context: context,
+                builder: (ctx) => MacosAlertDialog(
+                  appIcon: const MacosIcon(CupertinoIcons.arrow_counterclockwise,
+                      size: 48, color: Colors.orange),
+                  title: Text(loc.devResetOnboarding),
+                  message: Text(loc.devResetOnboardingConfirm,
+                      textAlign: TextAlign.center),
+                  primaryButton: PushButton(
+                    controlSize: ControlSize.large,
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: Text(loc.devResetOnboardingConfirmBtn),
+                  ),
+                  secondaryButton: PushButton(
+                    controlSize: ControlSize.large,
+                    secondary: true,
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: Text(loc.devRedundantCancel),
+                  ),
+                ),
+              );
+              if (ok != true) return;
               await ConfigService().resetOnboarding();
               showSettingsInfo(loc.devResetOnboardingDone);
             },

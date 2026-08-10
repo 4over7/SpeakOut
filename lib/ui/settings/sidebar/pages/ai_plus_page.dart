@@ -6,14 +6,12 @@ import '../../tabs/mode_tab.dart';
 /// 当前策略：wrap ModeTab with ModeTabView.aiPlus filter.
 /// Phase 6 清理旧 5-tab 后再做真正的文件级拆分。
 class AiPlusPage extends StatelessWidget {
-  final ValueChanged<int>? onNavigateToTab;
 
-  const AiPlusPage({super.key, this.onNavigateToTab});
+  const AiPlusPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ModeTab(
-      onNavigateToTab: onNavigateToTab ?? (_) {},
       viewFilter: ModeTabView.aiPlus,
     );
   }
