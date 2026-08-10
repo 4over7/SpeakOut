@@ -119,6 +119,8 @@ class AppService {
     await ConfigService().migrateToWorkMode();
     await ConfigService().migrateLlmModelOwner();
     await ConfigService().migrateSmartModeToToggle();
+    await ConfigService().migrateDeepSeekV4();
+    await CloudAccountService().migrateDeepSeekModels();
     await applyVerboseLogging(); // Apply debug logging as early as possible
 
     // 1.5 Other Services

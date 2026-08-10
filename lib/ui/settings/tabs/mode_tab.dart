@@ -1864,9 +1864,11 @@ class ModeTabState extends State<ModeTab> {
             ],
           ),
           const SizedBox(height: 8),
-          _buildRecommendItem('DeepSeek deepseek-chat', loc.llmTagFastest, '~129ms', loc.llmTagFastestNote),
+          // 数据取自 ADR-005 实测（V4 thinking 默认关闭后的横向对比）。
+          // 顺序按实测总耗时排 —— V3 时代 DeepSeek 最快（129ms），V4 之后已退居其后。
+          _buildRecommendItem('阿里云百炼 qwen-turbo', loc.llmTagFastest, '~518ms', loc.llmTagFastestNote),
           const SizedBox(height: 4),
-          _buildRecommendItem('阿里云百炼 qwen-turbo', loc.llmTagStable, '~573ms', loc.llmTagStableNote),
+          _buildRecommendItem('DeepSeek deepseek-v4-flash', loc.llmTagStable, '~1050ms', loc.llmTagStableNote),
           const SizedBox(height: 6),
           Text(
             loc.llmDataSource,

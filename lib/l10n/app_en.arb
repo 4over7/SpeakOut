@@ -528,7 +528,7 @@
   "llmTagStable": "Stable Pick",
   "llmTagFastestNote": "May fluctuate at peak",
   "llmTagStableNote": "Least fluctuation, stable quality",
-  "llmDataSource": "Source: 2026-03-21 benchmark, non-streaming API, China Mainland network",
+  "llmDataSource": "Source: measured 2026-05-09 (DeepSeek V4 with thinking off), non-streaming API, mainland China network",
   "llmModelField": "Model",
   "llmModelCustom": "Custom...",
   "llmModelNamePlaceholder": "Model name",

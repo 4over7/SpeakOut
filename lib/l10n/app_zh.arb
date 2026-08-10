@@ -488,7 +488,7 @@
   "llmTagStable": "稳定首选",
   "llmTagFastestNote": "高峰期可能波动",
   "llmTagStableNote": "波动最小，质量稳定",
-  "llmDataSource": "数据来源：2026-03-21 实测，非流式 API，中国大陆网络",
+  "llmDataSource": "数据来源：2026-05-09 实测（DeepSeek V4 关闭 thinking 后），非流式 API，中国大陆网络",
   "llmModelField": "模型",
   "llmModelCustom": "自定义...",
   "llmModelNamePlaceholder": "模型名称",

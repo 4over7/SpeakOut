@@ -98,8 +98,11 @@ class AppConstants {
       id: 'deepseek',
       name: 'DeepSeek',
       baseUrl: 'https://api.deepseek.com/v1',
-      defaultModel: 'deepseek-chat',
-      modelHint: '模型名，如 deepseek-chat, deepseek-reasoner',
+      // deepseek-chat / deepseek-reasoner 两个旧别名已于 2026-07-24 15:59 UTC 永久停用
+      // （无宽限期、无软重定向）。官方映射：两者都指向 v4-flash，同价；
+      // v4-pro 是另一档、单价约 3 倍，不要拿来当 reasoner 的替代。
+      defaultModel: 'deepseek-v4-flash',
+      modelHint: '模型名，如 deepseek-v4-flash（推荐）, deepseek-v4-pro',
       helpUrl: 'https://platform.deepseek.com/docs',
     ),
     LlmPreset(

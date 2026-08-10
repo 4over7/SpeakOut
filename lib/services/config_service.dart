@@ -259,6 +259,24 @@ class ConfigService {
     await _prefs?.setBool(flag, true);
   }
 
+  /// One-time migration: DeepSeek 旧模型别名 → v4-flash。
+  ///
+  /// `deepseek-chat` / `deepseek-reasoner` 已于 2026-07-24 15:59 UTC 永久停用，
+  /// 无宽限期也无软重定向 —— 存量用户保存的这两个名字会直接调用失败。
+  /// 官方映射：两者都落到 v4-flash（reasoner 对应其 thinking 模式），**同价**；
+  /// 迁到 v4-pro 单价约 3 倍，不能拿来当 reasoner 的替代。
+  /// 本项目 ADR-005 已默认关闭 v4 的 thinking，故统一迁到 v4-flash。
+  Future<void> migrateDeepSeekV4() async {
+    const flag = 'deepseek_v4_migrated';
+    if (_prefs?.getBool(flag) ?? false) return;
+    const retired = {'deepseek-chat', 'deepseek-reasoner'};
+    final current = _prefs?.getString('llm_model');
+    if (current != null && retired.contains(current)) {
+      await _prefs?.setString('llm_model', 'deepseek-v4-flash');
+    }
+    await _prefs?.setBool(flag, true);
+  }
+
   /// One-time migration: Smart 模式降级为"AI 润色"独立开关。
   /// 原 smart = 本地离线 + AI 润色 → 迁移为 work_mode=offline + aiCorrectionEnabled=true（行为不变）。
   Future<void> migrateSmartModeToToggle() async {

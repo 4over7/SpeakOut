@@ -140,6 +140,21 @@ class CloudAccountService {
 
   // ── 持久化 ──
 
+  /// 云账户凭证里存的 model 字段同样可能是已停用的 DeepSeek 旧别名。
+  /// 与 ConfigService.migrateDeepSeekV4 配套，只动 deepseek 账户。
+  Future<void> migrateDeepSeekModels() async {
+    const retired = {'deepseek-chat', 'deepseek-reasoner'};
+    for (final a in _accounts) {
+      if (a.providerId != 'deepseek') continue;
+      final m = a.credentials['model'];
+      if (m != null && retired.contains(m)) {
+        a.credentials['model'] = 'deepseek-v4-flash';
+        await updateAccount(a);
+        AppLog.d('[Migration] DeepSeek 账户模型 $m → deepseek-v4-flash');
+      }
+    }
+  }
+
   Future<void> _loadAccounts() async {
     final json = _prefs?.getString(_kAccountsKey);
     if (json == null || json.isEmpty) return;
