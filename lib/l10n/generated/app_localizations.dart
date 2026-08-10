@@ -2611,6 +2611,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove copy'**
   String get devRedundantConfirmBtn;
+
+  /// No description provided for @devResetOnboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset onboarding'**
+  String get devResetOnboarding;
+
+  /// No description provided for @devResetOnboardingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Run the first-launch flow again on next start; leaves cloud accounts, hotkeys and all other settings untouched'**
+  String get devResetOnboardingDesc;
+
+  /// No description provided for @devResetOnboardingDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset — please restart the app'**
+  String get devResetOnboardingDone;
 }
 
 class _AppLocalizationsDelegate

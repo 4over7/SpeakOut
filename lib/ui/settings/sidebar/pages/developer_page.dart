@@ -349,6 +349,20 @@ class _DeveloperPageState extends State<DeveloperPage> {
         ],
         const SettingsDivider(),
         SettingsTile(
+          label: loc.devResetOnboarding,
+          subtitle: loc.devResetOnboardingDesc,
+          icon: CupertinoIcons.arrow_counterclockwise,
+          child: PushButton(
+            controlSize: ControlSize.regular,
+            onPressed: () async {
+              await ConfigService().resetOnboarding();
+              showSettingsInfo(loc.devResetOnboardingDone);
+            },
+            child: Text(loc.devResetOnboarding),
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsTile(
           label: loc.aboutModelsDir,
           subtitle: _modelsDir.isEmpty ? loc.aboutLoading : _shortenPath(_modelsDir),
           icon: CupertinoIcons.cube_box,

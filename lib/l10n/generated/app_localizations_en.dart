@@ -1394,4 +1394,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devRedundantConfirmBtn => 'Remove copy';
+
+  @override
+  String get devResetOnboarding => 'Reset onboarding';
+
+  @override
+  String get devResetOnboardingDesc =>
+      'Run the first-launch flow again on next start; leaves cloud accounts, hotkeys and all other settings untouched';
+
+  @override
+  String get devResetOnboardingDone => 'Reset — please restart the app';
 }

@@ -569,5 +569,8 @@
         "type": "String"
       }
     }
-  }
+  },
+  "devResetOnboarding": "Reset onboarding",
+  "devResetOnboardingDesc": "Run the first-launch flow again on next start; leaves cloud accounts, hotkeys and all other settings untouched",
+  "devResetOnboardingDone": "Reset — please restart the app"
 }

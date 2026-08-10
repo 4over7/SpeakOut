@@ -1324,4 +1324,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devRedundantConfirmBtn => '删除副本';
+
+  @override
+  String get devResetOnboarding => '重置引导流程';
+
+  @override
+  String get devResetOnboardingDesc => '下次启动重新走首次引导，不影响云账户、快捷键等任何配置';
+
+  @override
+  String get devResetOnboardingDone => '已重置，请重启应用';
 }
