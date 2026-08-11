@@ -323,7 +323,10 @@ class CoreEngine {
     final isOfflineModel = modelType == 'sense_voice' || modelType == 'offline_paraformer' || modelType == 'whisper' || modelType == 'fire_red_asr' || modelType == 'funasr_nano' || modelType == 'fire_red_asr_ctc' || modelType == 'moonshine' || modelType == 'telespeech_ctc' || modelType == 'dolphin';
 
     // Cloud Account path: use unified account system
-    final accountId = ConfigService().selectedAsrAccountId;
+    // 走 effectiveAsrAccount() 而非直接读 selectedAsrAccountId：
+    // 用户没显式选过时它给出与 UI 完全一致的兜底账户。少了这层，
+    // 会掉到下面的 legacy Aliyun NLS 分支，报一句误导性的 "Aliyun Config Missing"。
+    final accountId = CloudAccountService().effectiveAsrAccount()?.id;
     final asrModelId = ConfigService().selectedAsrModelId;
     if (type == 'aliyun' && accountId != null) {
       final account = CloudAccountService().getAccountById(accountId);

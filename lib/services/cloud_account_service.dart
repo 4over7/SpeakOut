@@ -122,6 +122,66 @@ class CloudAccountService {
     'xfyun',
   ];
 
+  /// 具备 ASR 能力的账户池（去重，保持列表顺序）。
+  List<CloudAccount> asrAccountPool() {
+    final all = getAccountsWithCapability(CloudCapability.asrStreaming) +
+        getAccountsWithCapability(CloudCapability.asrBatch);
+    final seen = <String>{};
+    return all.where((a) => seen.add(a.id)).toList();
+  }
+
+  /// 当前实际生效的 ASR 账户 —— **UI 与 Engine 必须共用这一个入口**。
+  /// 曾经两边各写各的回退：UI 回退到池中第一个（画出「火山引擎」已选中的假象），
+  /// Engine 回退到推荐顺序（实际连的是阿里云百炼），于是界面显示的和真正在跑的不是一个。
+  /// 注意 selectedAsrAccountId 为空时这里只是「临时生效」，并未落盘，
+  /// 直到用户在下拉里主动选一次才会持久化。
+  CloudAccount? effectiveAsrAccount() {
+    final pool = asrAccountPool();
+    if (pool.isEmpty) return null;
+    final saved = ConfigService().selectedAsrAccountId;
+    if (saved != null) {
+      for (final a in pool) {
+        if (a.id == saved) return a;
+      }
+    }
+    return pickRecommendedAsrAccount() ?? pool.first;
+  }
+
+  /// ASR 推荐优先级。与 LLM 分开排：ASR 看重流式稳定与低延迟，
+  /// 且凭证形态各异（讯飞要 app_id+api_key+api_secret，火山有独立 asr_api_key）。
+  /// aliyun_nls 是 legacy 通道，排最后。
+  static const List<String> _kAsrRecommendationOrder = [
+    'dashscope',
+    'volcengine',
+    'xfyun',
+    'tencent',
+    'openai',
+    'groq',
+    'aliyun_nls',
+  ];
+
+  /// 按优先级挑一个 ASR 账户，对应 LLM 的 pickRecommendedLlmAccount()。
+  /// 少了这个兜底，用户切到云端识别但没显式选过 ASR 账户时，
+  /// initASR 会一路掉进 legacy Aliyun NLS 分支，报一句指向错误方向的
+  /// "Aliyun Config Missing" —— 而他的 DashScope 凭证其实是全的。
+  /// 凭证完整性按能力判断，不能只看 api_key。
+  CloudAccount? pickRecommendedAsrAccount() {
+    final pool = _accounts.where((a) {
+      if (!a.isEnabled) return false;
+      final p = CloudProviders.getById(a.providerId);
+      if (p == null) return false;
+      return p.hasValidCredentialsFor(CloudCapability.asrStreaming, a.credentials) ||
+          p.hasValidCredentialsFor(CloudCapability.asrBatch, a.credentials);
+    }).toList();
+    if (pool.isEmpty) return null;
+    for (final pid in _kAsrRecommendationOrder) {
+      for (final a in pool) {
+        if (a.providerId == pid) return a;
+      }
+    }
+    return pool.first;
+  }
+
   /// 按优先级挑一个 LLM 账户（已 enabled 且 api_key 已配）。
   /// 用于 selectedLlmAccountId 为空 / 失效时的兜底——避免落到豆包 lite 这种
   /// 对 prompt 约束服从性差的小模型上。

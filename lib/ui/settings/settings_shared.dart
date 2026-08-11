@@ -389,7 +389,11 @@ String resolveLlmApiKey() {
   final llmAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.llm);
   if (llmAccounts.isNotEmpty) {
     final savedId = ConfigService().selectedLlmAccountId ?? '';
-    final effectiveId = llmAccounts.any((a) => a.id == savedId) ? savedId : llmAccounts.first.id;
+    // 兜底必须与 LLMService._resolveLlmConfig() 一致（推荐顺序），
+    // 否则这里算出的 key 属于 A、实际请求发给 B
+    final effectiveId = llmAccounts.any((a) => a.id == savedId)
+        ? savedId
+        : (CloudAccountService().pickRecommendedLlmAccount()?.id ?? llmAccounts.first.id);
     final account = CloudAccountService().getAccountById(effectiveId);
     if (account == null) return '';
     // 用 provider 的 llmApiKeyField（讯飞等为 api_password），不硬编码 api_key

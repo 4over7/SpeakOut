@@ -1309,12 +1309,9 @@ class ModeTabState extends State<ModeTab> {
   }
 
   Widget _buildAiConfigCardCloud(AppLocalizations loc) {
-    final asrAccounts = CloudAccountService().getAccountsWithCapability(CloudCapability.asrStreaming)
-      + CloudAccountService().getAccountsWithCapability(CloudCapability.asrBatch);
-    final seen = <String>{};
-    final uniqueAsrAccounts = asrAccounts.where((a) => seen.add(a.id)).toList();
-
-    final selectedAsrId = ConfigService().selectedAsrAccountId;
+    // 池与「当前生效账户」都取自 CloudAccountService，与 Engine 共用同一份判断，
+    // 避免界面显示 A、实际连 B
+    final uniqueAsrAccounts = CloudAccountService().asrAccountPool();
 
     if (uniqueAsrAccounts.isEmpty) {
       return SettingsCard(
@@ -1358,9 +1355,7 @@ class ModeTabState extends State<ModeTab> {
       );
     }
 
-    final effectiveAsrId = uniqueAsrAccounts.any((a) => a.id == selectedAsrId)
-        ? selectedAsrId!
-        : uniqueAsrAccounts.first.id;
+    final effectiveAsrId = CloudAccountService().effectiveAsrAccount()!.id;
 
     final selectedAsrAccount = uniqueAsrAccounts.firstWhere((a) => a.id == effectiveAsrId);
     final selectedAsrProvider = CloudProviders.getById(selectedAsrAccount.providerId);
