@@ -25,6 +25,7 @@ class VolcengineASRProvider implements ASRProvider {
 
   // Audio buffering before handshake completes
   final List<Uint8List> _pendingBuffer = [];
+  int _frameDebugCount = 0;
   static const int _maxPendingBuffers = 200;
 
   // Result tracking
@@ -238,10 +239,37 @@ class VolcengineASRProvider implements ASRProvider {
     final byte2 = data[2];
     final compression = byte2 & 0xF;
 
-    final payloadSize = ByteData.sublistView(data, 4, 8).getUint32(0, Endian.big);
-    if (data.length < 8 + payloadSize) return;
+    // 服务端响应带序列号。实测帧布局（火山 豆包 Seed-ASR）：
+    //   11 91 10 00 | 00 00 00 01 | 00 00 00 6e | 7b 22 ...
+    //   └ header 4 ┘ └ sequence 4┘ └ p_size 4 ┘ └ payload(0x6e=110) ┘  总长 122
+    // header_size 取自 byte0 低 4 位（单位 4 字节 word，实测 1）；
+    // byte1 低 4 位是 flags，bit0 置位表示其后跟 4 字节 sequence。
+    // 早先没处理 sequence，payload_size 读成了序列号（值 1），payload 只截到 1 字节。
+    // 保留少量帧头采样：协议一旦变更（header_size / flags 位），
+    // 有这几行就能立刻定位，而且只有字节头、不含识别内容
+    if (_frameDebugCount < 5) {
+      _frameDebugCount++;
+      final head = data.sublist(0, data.length < 20 ? data.length : 20)
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ');
+      _log('FRAME#$_frameDebugCount len=${data.length} head20=[$head]');
+    }
 
-    var payload = data.sublist(8, 8 + payloadSize);
+    final headerSize = (data[0] & 0xF) * 4;
+    final flags = data[1] & 0xF;
+    var offset = headerSize;
+    if (flags & 0x1 != 0) offset += 4; // sequence number
+    if (headerSize < 4 || data.length < offset + 4) {
+      _log('Bad frame: header_size=$headerSize flags=$flags len=${data.length}');
+      return;
+    }
+
+    final payloadSize =
+        ByteData.sublistView(data, offset, offset + 4).getUint32(0, Endian.big);
+    offset += 4;
+    if (data.length < offset + payloadSize) return;
+
+    var payload = data.sublist(offset, offset + payloadSize);
 
     // Decompress if gzip
     if (compression == 0x1) {
@@ -276,14 +304,20 @@ class VolcengineASRProvider implements ASRProvider {
   }
 
   void _processResponse(Map<String, dynamic> json) {
-    final resultList = json['result'] as List?;
-    if (resultList == null || resultList.isEmpty) return;
+    // result 实测是 Map（早先按 List 取，报 _Map is not a subtype of List）。
+    // 两种形态都兼容，避免服务端版本差异再次踩坑。
+    final raw = json['result'];
+    String text = '';
+    if (raw is Map) {
+      text = (raw['text'] as String?) ?? '';
+    } else if (raw is List && raw.isNotEmpty && raw.first is Map) {
+      text = ((raw.first as Map)['text'] as String?) ?? '';
+    }
+    if (text.isEmpty) return;
 
-    final result = resultList[0] as Map<String, dynamic>;
-    final text = result['text'] as String? ?? '';
+    // 流式响应回的是累积文本，没有 type 字段时一律当作最新结果
     final type = json['type'] as String? ?? '';
-
-    if (type == 'final' || type == 'interim') {
+    if (type.isEmpty || type == 'final' || type == 'interim') {
       _finalText = text;
       _textController.add(text);
     }
