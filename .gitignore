@@ -90,6 +90,7 @@ docs/wiki/vocab_*.md
 tools/*
 !tools/ax_probe/
 !tools/llm_bench/
+!tools/clipboard_race/
 tools/ax_probe/.build/
 tools/ax_probe/.swiftpm/
 tools/ax_probe/Package.resolved
