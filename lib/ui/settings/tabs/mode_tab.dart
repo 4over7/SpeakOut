@@ -644,8 +644,10 @@ class ModeTabState extends State<ModeTab> {
   }
 
   CloudASRModel? _getCurrentCloudAsrModel() {
-    final asrAccountId = ConfigService().selectedAsrAccountId ?? '';
-    final asrAccount = CloudAccountService().getAccountById(asrAccountId);
+    // 必须与 Engine 实际使用的账户一致：直读 selectedAsrAccountId 时，
+    // 用户没显式选过就拿不到账户 → 语言过滤整个失效，
+    // 界面会放出该服务商并不支持的语言而不给任何提示
+    final asrAccount = CloudAccountService().effectiveAsrAccount();
     if (asrAccount == null) return null;
     final asrProvider = CloudProviders.getById(asrAccount.providerId);
     if (asrProvider == null) return null;
@@ -694,9 +696,8 @@ class ModeTabState extends State<ModeTab> {
 
     // 3. Input language not supported by current cloud ASR provider
     if (inputLang != 'auto' && workMode == 'cloud') {
-      final asrAccountId = ConfigService().selectedAsrAccountId;
-      if (asrAccountId != null) {
-        final asrAccount = CloudAccountService().getAccountById(asrAccountId);
+      {
+        final asrAccount = CloudAccountService().effectiveAsrAccount();
         if (asrAccount != null) {
           final asrProvider = CloudProviders.getById(asrAccount.providerId);
           if (asrProvider != null) {

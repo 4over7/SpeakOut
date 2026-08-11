@@ -43,11 +43,13 @@ case "race":
         print("✅ changeCount 保护生效：没有覆盖用户新复制的内容")
     } else {
         print("❌ 保护失效：用户复制的内容被还原逻辑吃掉了 → \(clip())")
+        exit(1)
     }
 default:
     if clip() == "ORIGINAL_USER_CLIPBOARD" {
         print("✅ 正常路径：原剪贴板已还原")
     } else {
         print("❌ 原剪贴板未还原 → \(clip())")
+        exit(1)
     }
 }

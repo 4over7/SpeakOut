@@ -192,13 +192,30 @@ class CoreEngine {
   bool _isListenerRunning = false;
   bool get isListenerRunning => _isListenerRunning;
 
-  Future<void> init() async {
-    _log("Init started. _isListenerRunning: $_isListenerRunning");
-    // Only skip if keyboard listener is already running (not just ASR init)
+  /// 进行中的 init。_isListenerRunning 要到末尾才置位，光靠入口检查挡不住
+  /// 「引导页 _prepareTrial 还在跑、用户就点了开始使用」这种并发 ——
+  /// 两次都会越过入口、各造一个 NativeCallable，而 native 侧
+  /// start_keyboard_listener 见 eventTap 已存在会直接 return、不更新 dartCallback，
+  /// 于是前一个 callable 泄漏且 native 仍在用它。
+  Future<void>? _initInFlight;
+
+  Future<void> init() {
     if (_isListenerRunning) {
       _log("Listener already running, skipping init.");
-      return;
+      return Future.value();
     }
+    final inFlight = _initInFlight;
+    if (inFlight != null) {
+      _log("Init already in flight, awaiting the same future.");
+      return inFlight;
+    }
+    final future = _initInternal();
+    _initInFlight = future;
+    return future.whenComplete(() => _initInFlight = null);
+  }
+
+  Future<void> _initInternal() async {
+    _log("Init started. _isListenerRunning: $_isListenerRunning");
 
     // 1. Check Native Perms — diagnose each permission separately
     _log("Checking permissions...");

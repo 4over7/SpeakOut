@@ -93,6 +93,11 @@ typedef void (*DartKeyCallback)(int keyCode, bool isDown, unsigned int modifierF
 // 合成 Cmd+V 时各事件之间的间隔：连发会被系统合并（实测四个事件只有前两个到达）
 #define INJECT_KEY_GAP_US 8000
 
+// 自身合成事件的标记。注入时我们真的会按下 Command/字母键，这些事件同样会流经
+// 本进程的 CGEventTap；若用户恰好把热键设成 Left Command 之类，就会被自己触发一次录音。
+// 打上标记后回调里直接放行不处理。
+#define SPEAKOUT_SYNTHETIC_MARK 0x53504B54  // 'SPKT'
+
 // 粘贴后多久还原剪贴板。必须长于目标 App 真正读到剪贴板的耗时 ——
 // Electron 应用走跨进程 IPC，比原生控件慢得多，还原太早会粘出旧内容。
 #define CLIPBOARD_RESTORE_DELAY_MS 800
@@ -119,6 +124,13 @@ static uint64_t lastFn63Time = 0;
 // CGEventCallback
 CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
                              CGEventRef event, void *refcon) {
+  // 自己注入时合成的按键不参与热键判定，否则把热键设成 Command 的用户
+  // 每次粘贴都会被自己触发一次录音
+  if (CGEventGetIntegerValueField(event, kCGEventSourceUserData) ==
+      SPEAKOUT_SYNTHETIC_MARK) {
+    return event;
+  }
+
   if (type == kCGEventTapDisabledByTimeout) {
     log_to_file("EventTap Disabled by Timeout. Re-enabling...");
     CGEventTapEnable(eventTap, true);
@@ -464,6 +476,11 @@ static void post_command_key(CGKeyCode key, CGEventTapLocation tap) {
     CGEventSetFlags(keyDown, kCmdFlags);
     CGEventSetFlags(keyUp, kCmdFlags);
     CGEventSetFlags(cmdUp, NX_NONCOALSESCEDMASK); // Command 已抬起
+    CGEventRef marked[4] = {cmdDown, keyDown, keyUp, cmdUp};
+    for (int i = 0; i < 4; i++) {
+      CGEventSetIntegerValueField(marked[i], kCGEventSourceUserData,
+                                  SPEAKOUT_SYNTHETIC_MARK);
+    }
     CGEventPost(tap, cmdDown);
     usleep(INJECT_KEY_GAP_US);
     CGEventPost(tap, keyDown);
@@ -619,6 +636,10 @@ void press_key(int keyCode, int modifierFlags) {
     CGEventRef keyDown = CGEventCreateKeyboardEvent(source, (CGKeyCode)keyCode, true);
     CGEventRef keyUp   = CGEventCreateKeyboardEvent(source, (CGKeyCode)keyCode, false);
     if (keyDown && keyUp) {
+      CGEventSetIntegerValueField(keyDown, kCGEventSourceUserData,
+                                  SPEAKOUT_SYNTHETIC_MARK);
+      CGEventSetIntegerValueField(keyUp, kCGEventSourceUserData,
+                                  SPEAKOUT_SYNTHETIC_MARK);
       if (modifierFlags) {
         CGEventSetFlags(keyDown, (CGEventFlags)modifierFlags);
         CGEventSetFlags(keyUp,   (CGEventFlags)modifierFlags);

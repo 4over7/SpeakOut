@@ -186,9 +186,14 @@ class CloudAccountService {
   /// 用于 selectedLlmAccountId 为空 / 失效时的兜底——避免落到豆包 lite 这种
   /// 对 prompt 约束服从性差的小模型上。
   CloudAccount? pickRecommendedLlmAccount() {
-    final pool = getAccountsWithCapability(CloudCapability.llm)
-        .where((a) => (a.credentials['api_key'] ?? '').isNotEmpty)
-        .toList();
+    // 凭证完整性按**能力**判断，不能硬编码 api_key ——
+    // 讯飞的 LLM 用 api_password（llmApiKeyField），它同时还有个给 ASR 用的 api_key。
+    // 只看 api_key 会把「只配了 ASR」的讯飞账户推荐去做 LLM，然后调用失败。
+    final pool = getAccountsWithCapability(CloudCapability.llm).where((a) {
+      final p = CloudProviders.getById(a.providerId);
+      return p != null &&
+          p.hasValidCredentialsFor(CloudCapability.llm, a.credentials);
+    }).toList();
     if (pool.isEmpty) return null;
     for (final pid in _kLlmRecommendationOrder) {
       for (final a in pool) {

@@ -101,3 +101,6 @@ wiki/
 # 内置 ASR 模型的打包缓存（228MB，绝不入库）
 build/bundled-models/
 *.onnx
+
+# llm_bench 运行产物
+tools/llm_bench/llm_bench_result.json

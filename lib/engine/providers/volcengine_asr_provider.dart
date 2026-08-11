@@ -264,10 +264,22 @@ class VolcengineASRProvider implements ASRProvider {
       return;
     }
 
+    // 错误帧布局与普通响应不同：Header [+Sequence] + ErrorCode(4) + ErrorSize(4) + ErrorPayload。
+    // 早先统一按「第一个 uint32 = payload_size」解析，错误码（如 45000001）被当成长度，
+    // 必然撞上下面的长度检查而静默 return —— 于是鉴权失败/配额超限等错误全被吞掉，
+    // 用户只能等超时拿到空结果。错误帧必须在长度检查之前单独走。
+    if (msgType == _msgServerError) {
+      _handleErrorFrame(data, offset, compression);
+      return;
+    }
+
     final payloadSize =
         ByteData.sublistView(data, offset, offset + 4).getUint32(0, Endian.big);
     offset += 4;
-    if (data.length < offset + payloadSize) return;
+    if (data.length < offset + payloadSize) {
+      _log('Truncated frame: need ${offset + payloadSize}, got ${data.length}');
+      return;
+    }
 
     var payload = data.sublist(offset, offset + payloadSize);
 
@@ -281,18 +293,6 @@ class VolcengineASRProvider implements ASRProvider {
       }
     }
 
-    if (msgType == _msgServerError) {
-      try {
-        final json = jsonDecode(utf8.decode(payload)) as Map<String, dynamic>;
-        _errorMessage = json['message'] as String? ?? 'Server error';
-        _log('Server error: $_errorMessage');
-      } catch (_) {
-        _errorMessage = 'Server error (unparseable)';
-      }
-      _finishStop();
-      return;
-    }
-
     if (msgType == _msgServerResponse) {
       try {
         final json = jsonDecode(utf8.decode(payload)) as Map<String, dynamic>;
@@ -301,6 +301,39 @@ class VolcengineASRProvider implements ASRProvider {
         _log('Response parse error: $e');
       }
     }
+  }
+
+  /// 错误帧：Header [+Sequence] + ErrorCode(4) + ErrorSize(4) + ErrorPayload
+  void _handleErrorFrame(Uint8List data, int offset, int compression) {
+    var code = 0;
+    var detail = '';
+    try {
+      if (data.length >= offset + 8) {
+        code = ByteData.sublistView(data, offset, offset + 4).getUint32(0, Endian.big);
+        final size =
+            ByteData.sublistView(data, offset + 4, offset + 8).getUint32(0, Endian.big);
+        final start = offset + 8;
+        if (size > 0 && data.length >= start + size) {
+          var body = data.sublist(start, start + size);
+          if (compression == 0x1) {
+            body = Uint8List.fromList(gzip.decode(body));
+          }
+          final text = utf8.decode(body, allowMalformed: true);
+          try {
+            final json = jsonDecode(text) as Map<String, dynamic>;
+            detail = (json['message'] ?? json['error'] ?? text).toString();
+          } catch (_) {
+            detail = text;
+          }
+        }
+      }
+    } catch (e) {
+      detail = 'unparseable ($e)';
+    }
+    // 宁可给个含错误码的粗糙消息，也不能像以前那样静默丢弃
+    _errorMessage = detail.isEmpty ? 'Server error (code=$code)' : '[$code] $detail';
+    _log('Server error: $_errorMessage');
+    _finishStop();
   }
 
   void _processResponse(Map<String, dynamic> json) {

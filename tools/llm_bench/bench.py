@@ -32,7 +32,7 @@ TARGETS = {
     "volcengine": ("https://ark.cn-beijing.volces.com/api/v3",         "doubao-seed-2-0-mini-260215"),
     "groq":       ("https://api.groq.com/openai/v1",                   "llama-3.3-70b-versatile"),
     "zhipu":      ("https://open.bigmodel.cn/api/paas/v4",             "glm-4-flash"),
-    "moonshot":   ("https://api.moonshot.cn/v1",                       "kimi-k2.5"),
+    "moonshot":   ("https://api.moonshot.cn/v1",                       "kimi-k2.6"),
     "minimax":    ("https://api.minimaxi.com/v1",                      "MiniMax-M2.5"),
 }
 
@@ -71,8 +71,8 @@ def build_body(model, text):
     }
     if model.startswith("deepseek-v4"):
         body["thinking"] = {"type": "disabled"}   # _applyModelSpecificParams
-    if model.startswith("kimi-k2"):
-        body["temperature"] = 1                   # 该模型只接受 1，传 0.3 会 HTTP 400
+    if "kimi-k" in model:
+        body["temperature"] = 1                   # K 系列只接受 1，传 0.3 会 HTTP 400（k3 亦然）
     return body
 
 def clean_llm_output(text):
