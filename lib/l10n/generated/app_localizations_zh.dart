@@ -962,8 +962,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get gotoAiPlus => '前往 AI Plus';
 
   @override
-  String get aiPlusNotActive =>
-      'AI 润色当前未开启：在「识别引擎」页打开「AI 润色」开关即可生效。LLM 配置仍可在此编辑。';
+  String get aiPlusNotActive => 'AI 润色当前未开启：打开下方开关即可生效。LLM 配置随时可编辑。';
 
   @override
   String get aboutModelsDir => '模型目录';
@@ -1209,7 +1208,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get llmDataSource =>
-      '数据来源：2026-05-09 实测（DeepSeek V4 关闭 thinking 后），非流式 API，中国大陆网络';
+      '数据来源：2026-08-10 实测（8 样本总时中位，流式 API，DeepSeek V4 关闭 thinking），中国大陆网络';
 
   @override
   String get llmModelField => '模型';

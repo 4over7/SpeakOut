@@ -1006,7 +1006,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiPlusNotActive =>
-      'AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.';
+      'AI Polish is currently off — flip the switch below to enable it. LLM settings stay editable regardless.';
 
   @override
   String get aboutModelsDir => 'Models Directory';
@@ -1270,7 +1270,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get llmDataSource =>
-      'Source: measured 2026-05-09 (DeepSeek V4 with thinking off), non-streaming API, mainland China network';
+      'Source: measured 2026-08-10 (median total of 8 samples, streaming API, DeepSeek V4 with thinking off), mainland China network';
 
   @override
   String get llmModelField => 'Model';

@@ -1937,7 +1937,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiPlusNotActive.
   ///
   /// In en, this message translates to:
-  /// **'AI Polish is off: turn on the \"AI Polish\" switch in \"Recognition\" to enable it. You can still edit LLM config here.'**
+  /// **'AI Polish is currently off — flip the switch below to enable it. LLM settings stay editable regardless.'**
   String get aiPlusNotActive;
 
   /// No description provided for @aboutModelsDir.
@@ -2387,7 +2387,7 @@ abstract class AppLocalizations {
   /// No description provided for @llmDataSource.
   ///
   /// In en, this message translates to:
-  /// **'Source: measured 2026-05-09 (DeepSeek V4 with thinking off), non-streaming API, mainland China network'**
+  /// **'Source: measured 2026-08-10 (median total of 8 samples, streaming API, DeepSeek V4 with thinking off), mainland China network'**
   String get llmDataSource;
 
   /// No description provided for @llmModelField.
