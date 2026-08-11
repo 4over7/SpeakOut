@@ -805,11 +805,10 @@ class ModeTabState extends State<ModeTab> {
   Widget _buildWorkModeView() {
     final loc = AppLocalizations.of(context)!;
     final currentMode = ConfigService().workMode;
-    final isTranslation = _isTranslationMode();
 
     switch (widget.viewFilter) {
       case ModeTabView.recognition:
-        return _buildRecognitionOnlyView(loc, currentMode, isTranslation);
+        return _buildRecognitionOnlyView(loc, currentMode);
       case ModeTabView.aiPlus:
         return _buildAiPlusOnlyView(loc);
       case ModeTabView.all:
@@ -824,7 +823,7 @@ class ModeTabState extends State<ModeTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. Mode selector — 3 compact cards
-              _buildModeSelector(loc, currentMode, isTranslation),
+              _buildModeSelector(loc, currentMode),
 
               // Language hints (between mode selector and card grid)
               ..._buildLanguageHints(loc),
@@ -920,7 +919,7 @@ class ModeTabState extends State<ModeTab> {
   /// 不包含 hotkey（在 general_tab）、vocab（在 vocab_page）、LLM（在 ai_plus_page）
   /// Simple：模式 + 语言 + 当前模型卡；Advanced：加 offline 模型列表 + streaming/punct。
   /// 视觉上分两区：顶部"工作模式"（模式选择+hints）+ 下方"配置"（语言/模型 双列卡）。
-  Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode, bool isTranslation) {
+  Widget _buildRecognitionOnlyView(AppLocalizations loc, String currentMode) {
     final advanced = ConfigService().showAdvanced;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(4),
@@ -946,7 +945,7 @@ class ModeTabState extends State<ModeTab> {
           const SizedBox(height: 20),
 
           // --- 区 2: 工作模式 ---
-          _buildModeSelector(loc, currentMode, isTranslation),
+          _buildModeSelector(loc, currentMode),
           ..._buildLanguageHints(loc),
           if (ConfigService().aiCorrectionEnabled) ...[
             const SizedBox(height: 10),
@@ -1072,7 +1071,9 @@ class ModeTabState extends State<ModeTab> {
 
   // --- Mode selector (3 horizontal cards) ---
 
-  Widget _buildModeSelector(AppLocalizations loc, String currentMode, bool isTranslation) {
+  /// 识别模式（本地/云端）与翻译无关：翻译由 LLMService.correctText(translateTo:) 完成，
+  /// ASR provider 全程不参与。曾因智能模式时代的遗留逻辑在翻译时锁死这两张卡片。
+  Widget _buildModeSelector(AppLocalizations loc, String currentMode) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
@@ -1085,7 +1086,6 @@ class ModeTabState extends State<ModeTab> {
                 emoji: '🔒',
                 label: loc.workModeOffline,
                 subtitle: loc.workModeOfflineDesc,
-                enabled: !isTranslation,
               )),
               const SizedBox(width: 8),
               Expanded(child: _buildModeCard(
@@ -1094,7 +1094,6 @@ class ModeTabState extends State<ModeTab> {
                 emoji: '☁️',
                 label: loc.workModeCloud,
                 subtitle: loc.workModeCloudDesc,
-                enabled: !isTranslation,
               )),
             ],
           ),
