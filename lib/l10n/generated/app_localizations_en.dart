@@ -1141,7 +1141,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutExportConfigDesc =>
-      'Export all settings and credentials to file (plaintext keys included, store safely)';
+      'Export all settings to a file. You\'ll be asked whether to include API keys (excluded by default).';
 
   @override
   String get aboutExportAction => 'Export';
@@ -1385,4 +1385,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devResetOnboardingDone => 'Reset — please restart the app';
+
+  @override
+  String get exportConfigDialogTitle => 'Export Settings';
+
+  @override
+  String get exportConfigDialogMsg =>
+      'Include API keys / credentials in the exported file?\nIncluding them eases migration, but the file will contain plaintext secrets — store it safely.';
+
+  @override
+  String get exportConfigWithout => 'Without keys (recommended)';
+
+  @override
+  String get exportConfigWith => 'Include keys';
 }

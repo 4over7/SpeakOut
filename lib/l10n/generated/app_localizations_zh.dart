@@ -1085,7 +1085,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutExportConfig => '导出配置';
 
   @override
-  String get aboutExportConfigDesc => '将所有设置和凭证导出为文件（含明文密钥，请妥善保管）';
+  String get aboutExportConfigDesc => '导出所有设置到文件；是否包含 API 密钥会在导出前询问（默认不含）';
 
   @override
   String get aboutExportAction => '导出';
@@ -1317,4 +1317,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devResetOnboardingDone => '已重置，请重启应用';
+
+  @override
+  String get exportConfigDialogTitle => '导出配置';
+
+  @override
+  String get exportConfigDialogMsg =>
+      '是否在导出文件中包含 API 密钥/凭证？\n包含便于换机迁移，但文件含明文敏感信息，请妥善保管。';
+
+  @override
+  String get exportConfigWithout => '不含密钥（推荐）';
+
+  @override
+  String get exportConfigWith => '包含密钥';
 }

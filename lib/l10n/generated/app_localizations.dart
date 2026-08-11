@@ -2171,7 +2171,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutExportConfigDesc.
   ///
   /// In en, this message translates to:
-  /// **'Export all settings and credentials to file (plaintext keys included, store safely)'**
+  /// **'Export all settings to a file. You\'ll be asked whether to include API keys (excluded by default).'**
   String get aboutExportConfigDesc;
 
   /// No description provided for @aboutExportAction.
@@ -2593,6 +2593,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset — please restart the app'**
   String get devResetOnboardingDone;
+
+  /// No description provided for @exportConfigDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Settings'**
+  String get exportConfigDialogTitle;
+
+  /// No description provided for @exportConfigDialogMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Include API keys / credentials in the exported file?\nIncluding them eases migration, but the file will contain plaintext secrets — store it safely.'**
+  String get exportConfigDialogMsg;
+
+  /// No description provided for @exportConfigWithout.
+  ///
+  /// In en, this message translates to:
+  /// **'Without keys (recommended)'**
+  String get exportConfigWithout;
+
+  /// No description provided for @exportConfigWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Include keys'**
+  String get exportConfigWith;
 }
 
 class _AppLocalizationsDelegate

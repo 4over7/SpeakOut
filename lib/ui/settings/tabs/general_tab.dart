@@ -201,6 +201,18 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
           loc.shortcutsTip,
           MacosColors.systemYellowColor,
         ),
+        // 两个键相同是**受支持**的用法（按住 >1s 走 PTT，点一下走 Toggle），
+        // 但界面上只并排显示两个一样的键名，不说明就只能靠猜。
+        // toggleHint 这条文案早就写好了，此前零引用。
+        if (_toggleInputKeyName.isNotEmpty &&
+            _toggleInputKeyName == _currentKeyName) ...[
+          const SizedBox(height: 8),
+          _tipBanner(
+            CupertinoIcons.info_circle,
+            loc.toggleHint,
+            MacosColors.systemBlueColor,
+          ),
+        ],
       ],
     );
   }

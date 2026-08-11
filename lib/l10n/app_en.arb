@@ -430,7 +430,7 @@
   "aboutLoading": "Loading…",
   "aboutConfigBackup": "Config Backup",
   "aboutExportConfig": "Export Config",
-  "aboutExportConfigDesc": "Export all settings and credentials to file (plaintext keys included, store safely)",
+  "aboutExportConfigDesc": "Export all settings to a file. You'll be asked whether to include API keys (excluded by default).",
   "aboutExportAction": "Export",
   "aboutExportFileTitle": "Export Config File",
   "aboutImportConfig": "Import Config",
@@ -566,5 +566,9 @@
   "devResetOnboardingDesc": "Run the first-launch flow again on next start; leaves cloud accounts, hotkeys and all other settings untouched",
   "devResetOnboardingConfirm": "The first-run setup (permissions, model choice) will run again on next launch. Cloud accounts, shortcuts and other settings are untouched.",
   "devResetOnboardingConfirmBtn": "Reset",
-  "devResetOnboardingDone": "Reset — please restart the app"
+  "devResetOnboardingDone": "Reset — please restart the app",
+  "exportConfigDialogTitle": "Export Settings",
+  "exportConfigDialogMsg": "Include API keys / credentials in the exported file?\nIncluding them eases migration, but the file will contain plaintext secrets — store it safely.",
+  "exportConfigWithout": "Without keys (recommended)",
+  "exportConfigWith": "Include keys"
 }

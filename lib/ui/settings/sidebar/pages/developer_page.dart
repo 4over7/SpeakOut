@@ -417,22 +417,21 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 context: context,
                 builder: (ctx) => MacosAlertDialog(
                   appIcon: const MacosIcon(CupertinoIcons.lock_shield, size: 48),
-                  title: const Text('导出配置'),
-                  message: const Text(
-                    '是否在导出文件中包含 API 密钥/凭证？\n'
-                    '包含便于换机迁移，但文件含明文敏感信息，请妥善保管。',
+                  title: Text(loc.exportConfigDialogTitle),
+                  message: Text(
+                    loc.exportConfigDialogMsg,
                     textAlign: TextAlign.center,
                   ),
                   primaryButton: PushButton(
                     controlSize: ControlSize.large,
                     onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('不含密钥（推荐）'),
+                    child: Text(loc.exportConfigWithout),
                   ),
                   secondaryButton: PushButton(
                     controlSize: ControlSize.large,
                     secondary: true,
                     onPressed: () => Navigator.of(ctx).pop(true),
-                    child: const Text('包含密钥'),
+                    child: Text(loc.exportConfigWith),
                   ),
                 ),
               );
