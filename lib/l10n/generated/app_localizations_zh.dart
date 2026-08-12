@@ -1137,10 +1137,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchToBuiltin => '切换到内置';
 
   @override
-  String get autoOptimizeAudio => '自动优化音频';
+  String get autoOptimizeAudio => '蓝牙麦克风提醒';
 
   @override
-  String get autoOptimizeAudioDesc => '蓝牙耳机时自动切换到高质量麦克风';
+  String get autoOptimizeAudioDesc => '检测到蓝牙麦克风时提醒你切换到内置麦克风（一键切换，不会自动改动设备）';
 
   @override
   String get hotkeyConflictTaken => '该按键已被占用，请选择其他按键。';

@@ -1194,11 +1194,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchToBuiltin => 'Switch to built-in';
 
   @override
-  String get autoOptimizeAudio => 'Auto-optimize audio';
+  String get autoOptimizeAudio => 'Bluetooth mic reminder';
 
   @override
   String get autoOptimizeAudioDesc =>
-      'Auto-switch to higher-quality mic when Bluetooth headset is connected';
+      'Remind you to switch to the built-in mic when a Bluetooth mic is detected (one tap; never switches silently)';
 
   @override
   String get hotkeyConflictTaken => 'That key is taken. Please choose another.';

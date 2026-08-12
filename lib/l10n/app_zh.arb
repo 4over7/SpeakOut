@@ -439,8 +439,8 @@
   },
   "bluetoothMicWarning": "蓝牙麦克风可能降低质量",
   "switchToBuiltin": "切换到内置",
-  "autoOptimizeAudio": "自动优化音频",
-  "autoOptimizeAudioDesc": "蓝牙耳机时自动切换到高质量麦克风",
+  "autoOptimizeAudio": "蓝牙麦克风提醒",
+  "autoOptimizeAudioDesc": "检测到蓝牙麦克风时提醒你切换到内置麦克风（一键切换，不会自动改动设备）",
   "hotkeyConflictTaken": "该按键已被占用，请选择其他按键。",
   "hotkeyConflictAutoClearTitle": "{keyName} 已被「{feature}」占用",
   "@hotkeyConflictAutoClearTitle": {

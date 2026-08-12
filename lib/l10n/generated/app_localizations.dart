@@ -2255,13 +2255,13 @@ abstract class AppLocalizations {
   /// No description provided for @autoOptimizeAudio.
   ///
   /// In en, this message translates to:
-  /// **'Auto-optimize audio'**
+  /// **'Bluetooth mic reminder'**
   String get autoOptimizeAudio;
 
   /// No description provided for @autoOptimizeAudioDesc.
   ///
   /// In en, this message translates to:
-  /// **'Auto-switch to higher-quality mic when Bluetooth headset is connected'**
+  /// **'Remind you to switch to the built-in mic when a Bluetooth mic is detected (one tap; never switches silently)'**
   String get autoOptimizeAudioDesc;
 
   /// No description provided for @hotkeyConflictTaken.

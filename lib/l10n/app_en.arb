@@ -479,8 +479,8 @@
   },
   "bluetoothMicWarning": "Bluetooth mic may reduce quality",
   "switchToBuiltin": "Switch to built-in",
-  "autoOptimizeAudio": "Auto-optimize audio",
-  "autoOptimizeAudioDesc": "Auto-switch to higher-quality mic when Bluetooth headset is connected",
+  "autoOptimizeAudio": "Bluetooth mic reminder",
+  "autoOptimizeAudioDesc": "Remind you to switch to the built-in mic when a Bluetooth mic is detected (one tap; never switches silently)",
   "hotkeyConflictTaken": "That key is taken. Please choose another.",
   "hotkeyConflictAutoClearTitle": "{keyName} is taken by \"{feature}\"",
   "@hotkeyConflictAutoClearTitle": {
