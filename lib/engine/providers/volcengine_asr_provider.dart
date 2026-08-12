@@ -194,7 +194,11 @@ class VolcengineASRProvider implements ASRProvider {
       'request': {
         'model_name': 'bigmodel',
         'enable_punc': true,
-        'result_type': 'single',
+        // 用 full 而非 single：官方对 single 的定义是「增量结果返回，即不返回之前分句的结果」，
+        // 而本类是覆盖式赋值（_finalText = text），只在累积语义下才成立。
+        // 文档另一处又称 result.text 是「整个音频的识别结果文本」，两处说法打架；
+        // full 是全量返回、语义无歧义，代价只是每帧多传些字节。
+        'result_type': 'full',
       },
     };
 

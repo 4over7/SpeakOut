@@ -69,6 +69,9 @@ class CoreEngine {
   Timer? _watchdogTimer; // Safety mechanism
   Timer? _silenceCheckTimer;
   int _silencePollCount = 0;
+  /// 本次录音是否曾捕获到声音。用来区分「麦克风真的没工作」与「用户只是停顿」——
+  /// 说话中的换气/思考很容易凑满 2 秒静音，此时弹「请检查麦克风」纯属误报。
+  bool _everHadVoice = false;
   DateTime? _lastSilenceNotify;
   int _pauseSegmentPollCount = 0; // Pre-segment: consecutive silence polls
 
@@ -898,6 +901,7 @@ class CoreEngine {
       _silencePollCount = 0;
       _pauseSegmentPollCount = 0;
       _lastSilenceNotify = null;
+      _everHadVoice = false;
       _silenceCheckTimer = Timer.periodic(Duration(milliseconds: AppConstants.kSilenceCheckIntervalMs), (timer) {
         if (_recordingState != RecordingState.recording) { timer.cancel(); return; }
         final level = _nativeInput.getAudioLevel();
@@ -911,6 +915,7 @@ class CoreEngine {
           }
           _silencePollCount = 0;
           _pauseSegmentPollCount = 0;
+          _everHadVoice = true;
           // Mark "last voice chunk" for pre-segment cut point
           if (_asrProvider is OfflineSherpaProvider) {
             (_asrProvider as OfflineSherpaProvider).markLastVoiceChunk();
@@ -926,7 +931,10 @@ class CoreEngine {
         }
 
         // 2 seconds continuous silence (10 × 200ms), with 10s cooldown
-        if (_silencePollCount >= AppConstants.kSilenceThresholdCount) {
+        // 只在整段录音从未捕获到声音时提示 —— 否则用户一停顿就被告知「麦克风不可用」，
+        // 而实际上前面的话已经正常录进去了（实测：说 28 秒被误报两次，最终识别 79 字）
+        if (_silencePollCount >= AppConstants.kSilenceThresholdCount &&
+            !_everHadVoice) {
           final now = DateTime.now();
           if (_lastSilenceNotify == null ||
               now.difference(_lastSilenceNotify!).inSeconds >= 10) {
