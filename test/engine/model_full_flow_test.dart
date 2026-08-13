@@ -54,8 +54,27 @@ void main() {
     ...ModelManager.offlineModels,
   ];
 
+  /// 从 description 里解析体积（如 "~538MB" / "~1.0GB"）。
+  /// 不硬编码模型 id 列表 —— 那种清单会随模型增删漂移。
+  double sizeMb(String description) {
+    final m = RegExp(r'~\s*([\d.]+)\s*(MB|GB)', caseSensitive: false)
+        .firstMatch(description);
+    if (m == null) return 0;
+    final v = double.parse(m.group(1)!);
+    return m.group(2)!.toUpperCase() == 'GB' ? v * 1024 : v;
+  }
+
+  /// 不同环境带宽差异极大：家里千兆能跑完 1.4GB，外面热点连 500MB 都超时。
+  /// 用 MODEL_TEST_MAX_MB 划一条线，超过的直接 skip，而不是让它们超时拖垮整轮。
+  ///   flutter test                              # 全跑（默认）
+  ///   MODEL_TEST_MAX_MB=300 flutter test        # 只跑 300MB 以内的
+  final maxMb = double.tryParse(
+          Platform.environment['MODEL_TEST_MAX_MB'] ?? '') ??
+      double.infinity;
+
   group('模型全流程（下载+解压+验证）', () {
     for (final model in visibleModels) {
+      final mb = sizeMb(model.description);
       test('${model.name} (${model.id})', () async {
         print('\n=== 测试模型: ${model.name} ===');
         print('  ID: ${model.id}');
@@ -112,7 +131,12 @@ void main() {
 
         // 清理本模型释放磁盘空间（保持 tmpDir 给下一个模型）
         if (modelDir.existsSync()) modelDir.deleteSync(recursive: true);
-      }, timeout: const Timeout(Duration(minutes: 10)));
+      },
+          // 大模型给足下载时间：10 分钟对 1GB 级模型在多数网络下都不够
+          timeout: Timeout(Duration(minutes: mb >= 300 ? 30 : 10)),
+          skip: mb > maxMb
+              ? '模型 ${mb.toStringAsFixed(0)}MB 超过 MODEL_TEST_MAX_MB=$maxMb'
+              : null);
     }
   });
 

@@ -130,6 +130,22 @@ CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——�
   > 重跑 10/10 全过）。**区分方法**：稳定复现同样数量、同样用例 → 代码 bug，别赖网络；
   > 两次结果不同 → 网络，重跑即可。排查时先跑 `test/services` + `test/engine` 里
   > 除本文件外的其余 11 个文件（约 598 例，不碰网络），全过即可排除代码回归。
+  >
+  > **2026-08-13 补充**：上面那条「两次结果不同 → 网络」的判据仍然成立，但它曾把一个真缺陷
+  > 伪装成网络问题 —— 慢网络下**稳定** -8 且报 `Bad state: Cannot close sink while adding stream`。
+  > 真因：Dart 的 test timeout **不取消正在运行的 Future**，用例超时后 `tearDown` 立刻删掉临时目录，
+  > 而下载协程还在往里写 → `PathNotFoundException` 击穿 stream sink → 框架崩 → **后续用例级联失败**。
+  > 所以「快网络全过 / 慢网络全崩」看着像网络，实为缺乏隔离。已修（下载前补建父目录 + tearDown 容错）。
+  > **教训**：网络只该让**个别**用例失败；一旦出现「整批崩塌」或框架级异常，那是隔离问题，不是网络。
+  >
+  > **按环境裁剪**（弱网必备）：用体积阈值跳过大模型，避免它们超时拖垮整轮 ——
+  > ```bash
+  > flutter test                                    # 全跑（约 3GB，需良好带宽）
+  > MODEL_TEST_MAX_MB=300 flutter test              # 只跑 300MB 以内的模型
+  > MODEL_TEST_MAX_MB=1   flutter test test/engine/model_full_flow_test.dart   # 全部跳过，24 秒
+  > ```
+  > 体积从 `ModelInfo.description` 里的 `~538MB` / `~1.0GB` 解析，不维护硬编码 id 清单
+  > （那种清单会随模型增删漂移）。超时也按体积给：≥300MB 用 30 分钟，其余 10 分钟。
 - `test/engine/hotkey_matching_test.dart` — 修饰键精确匹配规则
 - 新增 Provider 时：mock WebSocket，验证 protocol 序列（run-task → task-started → result-generated → task-finished/task-failed）
 
