@@ -40,7 +40,12 @@ void main() {
   });
 
   tearDown(() {
-    if (tmpDir.existsSync()) tmpDir.deleteSync(recursive: true);
+    // 用例超时后下载 Future 仍在跑（Dart 的 test timeout 不会取消它），
+    // 此时删目录会与写入竞争。删不掉就交给系统清理临时目录，
+    // 绝不能让这里抛异常 —— 否则会连累后续用例。
+    try {
+      if (tmpDir.existsSync()) tmpDir.deleteSync(recursive: true);
+    } catch (_) {}
   });
 
   // 9 个可见模型 = 1 streaming + 8 offline

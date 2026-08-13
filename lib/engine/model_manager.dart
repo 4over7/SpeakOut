@@ -729,6 +729,10 @@ class ModelManager {
         }
         
         // Open file for append or write
+        // 父目录可能在下载途中消失（测试超时后 tearDown 会删临时目录，而下载 Future
+        // 无法被取消，仍会继续写）。这里补建一次，避免 PathNotFoundException 冒泡
+        // 击穿 stream sink，把整个测试框架拖崩、造成后续用例级联失败。
+        await destFile.parent.create(recursive: true);
         final sink = destFile.openWrite(mode: existingBytes > 0 ? FileMode.append : FileMode.write);
         int downloadedBytes = existingBytes;
         double lastReportedProgress = existingBytes / (totalBytes > 0 ? totalBytes : 1);
