@@ -50,7 +50,7 @@ class AliyunTokenService {
           return json['Token']['Id']?.toString();
         }
       }
-      AppLog.d("Aliyun Token Error: ${response.body}");
+      AppLog.d("Aliyun Token Error: ${AppLog.redact(response.body)}");
     } catch (e) {
       AppLog.d("Aliyun Token Network Error: $e");
     }

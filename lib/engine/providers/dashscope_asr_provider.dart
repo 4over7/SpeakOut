@@ -142,9 +142,9 @@ class DashScopeASRProvider implements ASRProvider {
             _committedText += deduped;
             _currentSentence = '';
             if (deduped != text) {
-              _log('sentence[$sentenceId] FINAL: "$text" (deduped: "$deduped")');
+              _log('sentence[$sentenceId] FINAL: ${AppLog.redact(text)} (deduped: ${AppLog.redact(deduped)})');
             } else {
-              _log('sentence[$sentenceId] FINAL: "$text"');
+              _log('sentence[$sentenceId] FINAL: ${AppLog.redact(text)}');
             }
           } else {
             // Intermediate result

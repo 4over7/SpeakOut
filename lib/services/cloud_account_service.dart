@@ -266,11 +266,15 @@ class CloudAccountService {
   /// 导出所有云账户（含凭证）到 JSON 文件
   Future<bool> exportToFile(String filePath) async {
     try {
+      // 导出**不含凭证**。导出文件会被同步、转发、误提交，API Key 一旦落进
+      // 明文 JSON 就收不回来。v1.9.0 只给 ConfigBackupService 加了这道闸，
+      // 这条同源路径漏了 —— 它还挂在普通用户按钮上，无任何提示。
+      // 只带出「有哪些账户、填过哪些字段」，导入后由用户重填密钥。
       final data = _accounts.map((a) => {
         'providerId': a.providerId,
         'displayName': a.displayName,
         'isEnabled': a.isEnabled,
-        'credentials': Map<String, String>.from(a.credentials),
+        'credentialKeys': a.credentials.keys.toList()..sort(),
       }).toList();
       final json = const JsonEncoder.withIndent('  ').convert({
         'app': 'SpeakOut',
@@ -302,18 +306,33 @@ class CloudAccountService {
       for (final item in list) {
         final providerId = item['providerId'] as String? ?? '';
         if (providerId.isEmpty) continue;
-        // 跳过已存在的服务商
-        if (getAccountByProviderId(providerId) != null) continue;
+        // 老格式（v1.10.0 前）带明文 credentials，仍需读出来以便用户恢复自己的旧备份；
+        // 新格式只有 credentialKeys，没有值可填。
         final creds = (item['credentials'] as Map<String, dynamic>?)
             ?.map((k, v) => MapEntry(k, v.toString())) ?? {};
-        final account = CloudAccount(
-          id: const Uuid().v4(),
-          providerId: providerId,
-          displayName: item['displayName'] as String? ?? providerId,
-          isEnabled: item['isEnabled'] as bool? ?? true,
-          credentials: creds,
-        );
-        await addAccount(account);
+
+        // 不能「已存在就跳过」：云账户页一进入就会 _ensureAllProvidersExist()
+        // 预建全部 15 家，那样导入永远是 0 条。改为合并到既有账户。
+        final existing = getAccountByProviderId(providerId);
+        if (existing != null) {
+          existing.displayName = item['displayName'] as String? ?? existing.displayName;
+          existing.isEnabled = item['isEnabled'] as bool? ?? existing.isEnabled;
+          // 只补空缺，不用导入值覆盖用户已填好的密钥
+          creds.forEach((k, v) {
+            if (v.isNotEmpty && (existing.credentials[k] ?? '').isEmpty) {
+              existing.credentials[k] = v;
+            }
+          });
+          await updateAccount(existing);
+        } else {
+          await addAccount(CloudAccount(
+            id: const Uuid().v4(),
+            providerId: providerId,
+            displayName: item['displayName'] as String? ?? providerId,
+            isEnabled: item['isEnabled'] as bool? ?? true,
+            credentials: creds,
+          ));
+        }
         imported++;
       }
       AppLog.d('CloudAccountService: imported $imported accounts from $filePath');

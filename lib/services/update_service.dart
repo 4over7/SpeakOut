@@ -163,7 +163,7 @@ class UpdateService {
         }
       }
 
-      return _RemoteVersion(version, url, dmgUrl: dmgUrl);
+      return _RemoteVersion.tryCreate(version, url, dmgUrl: dmgUrl);
     } catch (e) {
       AppLog.d('UpdateService: GitHub check failed: $e');
       return null;
@@ -186,7 +186,7 @@ class UpdateService {
 
       final url = (json['download_url'] as String?) ?? AppConstants.kGitHubReleasesUrl;
       final dmgUrl = json['dmg_url'] as String?;
-      return _RemoteVersion(version, url, dmgUrl: dmgUrl);
+      return _RemoteVersion.tryCreate(version, url, dmgUrl: dmgUrl);
     } catch (e) {
       AppLog.d('UpdateService: Gateway check failed: $e');
       return null;
@@ -566,6 +566,17 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
   bool get canAutoUpdate => Distribution.supportsAutoUpdate && _dmgAssetUrl != null;
 
   /// 语义化版本比较: remote > local 返回 true
+  /// 远端版本号最终会拼进 `_dmgPath`，再原样写进 update helper 的 shell 脚本
+  /// （`DMG="$_dmgPath"`）。含引号的版本号能闭合引号执行任意命令，且注入发生在
+  /// codesign 校验之前 —— 签名兜不住。
+  ///
+  /// 不能指望 [isNewer] 拦住：`_parseVersion` 对非数字段静默兜底为 0，
+  /// `999.0.0"; cmd; #` 会被解析成 [999,0,0] 并判定为新版本。
+  static final RegExp _semverPattern = RegExp(r'^\d{1,5}\.\d{1,5}\.\d{1,5}$');
+
+  static bool isValidRemoteVersion(String version) =>
+      _semverPattern.hasMatch(version);
+
   static bool isNewer(String remote, String local) {
     final r = _parseVersion(remote);
     final l = _parseVersion(local);
@@ -587,4 +598,15 @@ class _RemoteVersion {
   final String url;
   final String? dmgUrl;
   _RemoteVersion(this.version, this.url, {this.dmgUrl});
+
+  /// 两个来源（gateway / GitHub tag）的唯一收口点：非法版本号一律当作
+  /// 「没拿到更新信息」，而不是带着脏串继续走下载安装流程。
+  static _RemoteVersion? tryCreate(String version, String url, {String? dmgUrl}) {
+    if (!UpdateService.isValidRemoteVersion(version)) {
+      AppLog.d('UpdateService: rejected malformed remote version: '
+          '${AppLog.redact(version)}');
+      return null;
+    }
+    return _RemoteVersion(version, url, dmgUrl: dmgUrl);
+  }
 }

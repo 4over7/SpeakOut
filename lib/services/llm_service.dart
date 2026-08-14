@@ -353,7 +353,7 @@ class LLMService {
         }
         _log("LLM returned empty content.");
       } else {
-        _log("LLM ERROR: ${response.statusCode} - ${response.body}");
+        _log("LLM ERROR: ${response.statusCode} - ${AppLog.redact(response.body)}");
       }
     } catch (e) {
       _log("LLM EXCEPTION: $e");
@@ -407,13 +407,13 @@ class LLMService {
             ?.firstWhere((b) => b['type'] == 'text', orElse: () => null)
             ?['text']?.toString();
         if (content != null && content.isNotEmpty) {
-          _log("Anthropic SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
+          _log("Anthropic SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): ${AppLog.redact(content.trim())}");
           lastCallSucceeded = true;
           return content.trim();
         }
         _log("Anthropic returned empty content.");
       } else {
-        _log("Anthropic ERROR: ${response.statusCode} - ${response.body}");
+        _log("Anthropic ERROR: ${response.statusCode} - ${AppLog.redact(response.body)}");
       }
     } catch (e) {
       _log("Anthropic EXCEPTION: $e");
@@ -457,13 +457,13 @@ class LLMService {
         final json = jsonDecode(utf8.decode(response.bodyBytes));
         final content = json['message']?['content']?.toString();
         if (content != null && content.isNotEmpty) {
-          _log("Ollama SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): '${content.trim()}'");
+          _log("Ollama SUCCESS (${content.trim().length}字, differs=${content.trim() != input}): ${AppLog.redact(content.trim())}");
           lastCallSucceeded = true;
           return content.trim();
         }
         _log("Ollama returned empty content.");
       } else {
-        _log("Ollama ERROR: ${response.statusCode} - ${response.body}");
+        _log("Ollama ERROR: ${response.statusCode} - ${AppLog.redact(response.body)}");
       }
     } catch (e) {
       _log("Ollama EXCEPTION: $e");
