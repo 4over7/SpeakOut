@@ -534,5 +534,37 @@
     "placeholders": {
       "count": {}
     }
+  },
+  "chatToday": "今天",
+  "chatYesterday": "昨天",
+  "chatDateFormat": "M月d日",
+  "chatFilterAll": "全部",
+  "chatFilterVoice": "语音记录",
+  "chatEmptyVoice": "暂无语音记录",
+  "chatEmptyAll": "暂无历史记录",
+  "chatRoleUser": "用户",
+  "chatRoleTool": "工具",
+  "chatRoleVoice": "语音输入",
+  "chatRoleSystem": "系统",
+  "chatDiffShorter": "精简 {n} 字",
+  "chatDiffLonger": "扩展 {n} 字",
+  "chatDiffSame": "等长",
+  "chatPolishedBy": "AI 润色 · {detail}",
+  "chatOriginalAsr": "原始识别",
+  "chatInputHint": "输入消息...",
+  "@chatDiffShorter": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "@chatDiffLonger": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "@chatPolishedBy": {
+    "placeholders": {
+      "detail": {}
+    }
   }
 }

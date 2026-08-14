@@ -1290,4 +1290,61 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get credCheckAsrMissing => 'ASR: 凭证未完整填写';
+
+  @override
+  String get chatToday => '今天';
+
+  @override
+  String get chatYesterday => '昨天';
+
+  @override
+  String get chatDateFormat => 'M月d日';
+
+  @override
+  String get chatFilterAll => '全部';
+
+  @override
+  String get chatFilterVoice => '语音记录';
+
+  @override
+  String get chatEmptyVoice => '暂无语音记录';
+
+  @override
+  String get chatEmptyAll => '暂无历史记录';
+
+  @override
+  String get chatRoleUser => '用户';
+
+  @override
+  String get chatRoleTool => '工具';
+
+  @override
+  String get chatRoleVoice => '语音输入';
+
+  @override
+  String get chatRoleSystem => '系统';
+
+  @override
+  String chatDiffShorter(Object n) {
+    return '精简 $n 字';
+  }
+
+  @override
+  String chatDiffLonger(Object n) {
+    return '扩展 $n 字';
+  }
+
+  @override
+  String get chatDiffSame => '等长';
+
+  @override
+  String chatPolishedBy(Object detail) {
+    return 'AI 润色 · $detail';
+  }
+
+  @override
+  String get chatOriginalAsr => '原始识别';
+
+  @override
+  String get chatInputHint => '输入消息...';
 }

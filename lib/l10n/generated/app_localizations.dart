@@ -2521,6 +2521,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ASR: credentials incomplete'**
   String get credCheckAsrMissing;
+
+  /// No description provided for @chatToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get chatToday;
+
+  /// No description provided for @chatYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get chatYesterday;
+
+  /// No description provided for @chatDateFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'MMM d'**
+  String get chatDateFormat;
+
+  /// No description provided for @chatFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get chatFilterAll;
+
+  /// No description provided for @chatFilterVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get chatFilterVoice;
+
+  /// No description provided for @chatEmptyVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'No voice records yet'**
+  String get chatEmptyVoice;
+
+  /// No description provided for @chatEmptyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'No history yet'**
+  String get chatEmptyAll;
+
+  /// No description provided for @chatRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get chatRoleUser;
+
+  /// No description provided for @chatRoleTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool'**
+  String get chatRoleTool;
+
+  /// No description provided for @chatRoleVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice input'**
+  String get chatRoleVoice;
+
+  /// No description provided for @chatRoleSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get chatRoleSystem;
+
+  /// No description provided for @chatDiffShorter.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} chars shorter'**
+  String chatDiffShorter(Object n);
+
+  /// No description provided for @chatDiffLonger.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} chars longer'**
+  String chatDiffLonger(Object n);
+
+  /// No description provided for @chatDiffSame.
+  ///
+  /// In en, this message translates to:
+  /// **'same length'**
+  String get chatDiffSame;
+
+  /// No description provided for @chatPolishedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish · {detail}'**
+  String chatPolishedBy(Object detail);
+
+  /// No description provided for @chatOriginalAsr.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw transcript'**
+  String get chatOriginalAsr;
+
+  /// No description provided for @chatInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message...'**
+  String get chatInputHint;
 }
 
 class _AppLocalizationsDelegate

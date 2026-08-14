@@ -1353,4 +1353,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credCheckAsrMissing => 'ASR: credentials incomplete';
+
+  @override
+  String get chatToday => 'Today';
+
+  @override
+  String get chatYesterday => 'Yesterday';
+
+  @override
+  String get chatDateFormat => 'MMM d';
+
+  @override
+  String get chatFilterAll => 'All';
+
+  @override
+  String get chatFilterVoice => 'Voice';
+
+  @override
+  String get chatEmptyVoice => 'No voice records yet';
+
+  @override
+  String get chatEmptyAll => 'No history yet';
+
+  @override
+  String get chatRoleUser => 'You';
+
+  @override
+  String get chatRoleTool => 'Tool';
+
+  @override
+  String get chatRoleVoice => 'Voice input';
+
+  @override
+  String get chatRoleSystem => 'System';
+
+  @override
+  String chatDiffShorter(Object n) {
+    return '$n chars shorter';
+  }
+
+  @override
+  String chatDiffLonger(Object n) {
+    return '$n chars longer';
+  }
+
+  @override
+  String get chatDiffSame => 'same length';
+
+  @override
+  String chatPolishedBy(Object detail) {
+    return 'AI Polish · $detail';
+  }
+
+  @override
+  String get chatOriginalAsr => 'Raw transcript';
+
+  @override
+  String get chatInputHint => 'Type a message...';
 }

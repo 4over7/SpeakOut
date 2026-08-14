@@ -140,7 +140,8 @@ void main() {
     }
   });
 
-  // 标点模型单独测试
+  // 标点模型单独测试。体积不在 SherpaModel.description 里，只能实测（HEAD 该 URL 得 266MB）
+  const punctMb = 266.0;
   test('标点模型下载+解压', () async {
     print('\n=== 测试标点模型 ===');
 
@@ -158,7 +159,11 @@ void main() {
     expect(onnxFiles, isNotEmpty, reason: '标点模型应包含 .onnx 文件');
     print('  ✅ 通过 (onnx文件: ${onnxFiles.length})');
     dir.deleteSync(recursive: true);
-  }, timeout: const Timeout(Duration(minutes: 10)));
+  },
+      timeout: const Timeout(Duration(minutes: 10)),
+      skip: punctMb > maxMb
+          ? '标点模型 ${punctMb.toStringAsFixed(0)}MB 超过 MODEL_TEST_MAX_MB=$maxMb'
+          : null);
 }
 
 bool _hasTokensOrTokenizer(String dirPath) {

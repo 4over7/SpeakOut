@@ -6,6 +6,7 @@ import '../../models/chat_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/diary_service.dart';
 import '../../ui/theme.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -65,18 +66,19 @@ class _ChatPageState extends State<ChatPage> {
     return groups;
   }
 
-  String _dateLabel(String dateKey) {
+  String _dateLabel(String dateKey, AppLocalizations loc) {
     final date = DateFormat('yyyy-MM-dd').parse(dateKey);
     final now = DateTime.now();
     final diff = DateTime(now.year, now.month, now.day).difference(DateTime(date.year, date.month, date.day)).inDays;
-    if (diff == 0) return '今天';
-    if (diff == 1) return '昨天';
+    if (diff == 0) return loc.chatToday;
+    if (diff == 1) return loc.chatYesterday;
     if (diff < 7) return DateFormat('EEEE', 'zh').format(date);
-    return DateFormat('M月d日').format(date);
+    return DateFormat(loc.chatDateFormat).format(date);
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     return MacosScaffold(
       backgroundColor: AppTheme.getBackground(context),
       toolBar: ToolBar(
@@ -109,10 +111,10 @@ class _ChatPageState extends State<ChatPage> {
                     child: SizedBox(
                       width: double.infinity,
                       child: CupertinoSlidingSegmentedControl<int>(
-                        children: const {
-                          0: Text("全部"),
-                          1: Text("Agent"),
-                          2: Text("语音记录"),
+                        children: {
+                          0: Text(loc.chatFilterAll),
+                          1: const Text("Agent"),
+                          2: Text(loc.chatFilterVoice),
                         },
                         groupValue: _selectedFilterIndex,
                         onValueChanged: (v) {
@@ -145,7 +147,7 @@ class _ChatPageState extends State<ChatPage> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  _selectedFilterIndex == 2 ? "暂无语音记录" : "暂无历史记录",
+                                  _selectedFilterIndex == 2 ? loc.chatEmptyVoice : loc.chatEmptyAll,
                                   style: AppTheme.caption(context),
                                 ),
                               ],
@@ -184,6 +186,7 @@ class _ChatPageState extends State<ChatPage> {
 
   /// Build a date group with header and timeline entries
   Widget _buildDateGroup(String dateKey, List<ChatMessage> msgs) {
+    final loc = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -199,7 +202,7 @@ class _ChatPageState extends State<ChatPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _dateLabel(dateKey),
+                  _dateLabel(dateKey, loc),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -318,12 +321,13 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   String _getRoleLabel(ChatRole role) {
+    final loc = AppLocalizations.of(context)!;
     return switch (role) {
-      ChatRole.user => '用户',
+      ChatRole.user => loc.chatRoleUser,
       ChatRole.ai => 'AI',
-      ChatRole.tool => '工具',
-      ChatRole.dictation => '语音输入',
-      ChatRole.system => '系统',
+      ChatRole.tool => loc.chatRoleTool,
+      ChatRole.dictation => loc.chatRoleVoice,
+      ChatRole.system => loc.chatRoleSystem,
     };
   }
 
@@ -339,10 +343,13 @@ class _ChatPageState extends State<ChatPage> {
   
   /// ASR 原文 vs LLM 润色对比（可折叠）
   Widget _buildAsrComparison(ChatMessage msg) {
+    final loc = AppLocalizations.of(context)!;
     final asrOriginal = msg.metadata!["asrOriginal"] as String;
     final llmResult = msg.text;
     final diffChars = asrOriginal.length - llmResult.length;
-    final diffLabel = diffChars > 0 ? '精简 $diffChars 字' : (diffChars < 0 ? '扩展 ${-diffChars} 字' : '等长');
+    final diffLabel = diffChars > 0
+        ? loc.chatDiffShorter(diffChars.toString())
+        : (diffChars < 0 ? loc.chatDiffLonger((-diffChars).toString()) : loc.chatDiffSame);
 
     return StatefulBuilder(
       builder: (context, setInnerState) {
@@ -361,7 +368,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'AI 润色 · $diffLabel',
+                    loc.chatPolishedBy(diffLabel),
                     style: TextStyle(fontSize: 10, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500),
                   ),
                 ],
@@ -378,7 +385,7 @@ class _ChatPageState extends State<ChatPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('原始识别', style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor, fontWeight: FontWeight.w600)),
+                    Text(loc.chatOriginalAsr, style: TextStyle(fontSize: 9, color: MacosColors.systemGrayColor, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
                     SelectableText(
                       asrOriginal,
@@ -450,6 +457,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildInputArea() {
+    final loc = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -461,7 +469,7 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: MacosTextField(
               controller: _textCtrl,
-              placeholder: "输入消息...",
+              placeholder: loc.chatInputHint,
               maxLines: null,
               onSubmitted: (_) => _sendMessage(),
             ),

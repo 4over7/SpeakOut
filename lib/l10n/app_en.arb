@@ -574,5 +574,37 @@
     "placeholders": {
       "count": {}
     }
+  },
+  "chatToday": "Today",
+  "chatYesterday": "Yesterday",
+  "chatDateFormat": "MMM d",
+  "chatFilterAll": "All",
+  "chatFilterVoice": "Voice",
+  "chatEmptyVoice": "No voice records yet",
+  "chatEmptyAll": "No history yet",
+  "chatRoleUser": "You",
+  "chatRoleTool": "Tool",
+  "chatRoleVoice": "Voice input",
+  "chatRoleSystem": "System",
+  "chatDiffShorter": "{n} chars shorter",
+  "chatDiffLonger": "{n} chars longer",
+  "chatDiffSame": "same length",
+  "chatPolishedBy": "AI Polish · {detail}",
+  "chatOriginalAsr": "Raw transcript",
+  "chatInputHint": "Type a message...",
+  "@chatDiffShorter": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "@chatDiffLonger": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "@chatPolishedBy": {
+    "placeholders": {
+      "detail": {}
+    }
   }
 }
