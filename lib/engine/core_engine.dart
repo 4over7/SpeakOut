@@ -1159,7 +1159,11 @@ class CoreEngine {
     // 停 ASR（丢弃结果）
     if (_asrProvider != null) {
       try {
-        await _asrProvider!.stop().timeout(_asrProvider!.stopTimeout,
+        // 取消路径**不能**用 provider 的 stopTimeout：那是「等结果」的预算
+        // （OpenAI/Groq 批量识别 35s）。用户既然点了取消，结果本来就要丢，
+        // 没必要为它把状态机锁在 stopping 最长 35 秒 —— 期间 startRecording
+        // 的非 idle 守卫会拒掉所有新录音。用全局短超时即可。
+        await _asrProvider!.stop().timeout(AppConstants.kAsrStopTimeout,
             onTimeout: () => ASRResult.textOnly(""));
       } catch (e) {
         _log("[Cancel] ASR stop error: $e");
@@ -1384,9 +1388,19 @@ class CoreEngine {
       if (finalText.isNotEmpty) {
         if (mode == RecordingMode.diary) {
           _statusController.add(EngineStatus.info("Saving Note..."));
-          // 必须 await：原来是 fire-and-forget，用户识别完立刻从托盘退出时
-          // （AppService.dispose() 后紧跟 exit(0)）写盘可能还没完成，这条闪念就没了。
-          // 笔记目录在慢盘 / 外接盘上尤其容易复现。
+
+          // 顺序要紧：**先**写聊天记录，再 await 笔记落盘。
+          // ChatService 有自己的写入队列，且 AppService.dispose() 会 await
+          // ChatService().dispose() 把队列 flush 掉 —— 它是这条内容的兜底副本。
+          // 先前改成「await 笔记 → 写聊天」反而更糟：慢盘上退出时卡在 await，
+          // 聊天那份也没写成，两份一起丢。
+          ChatService().addUserMessage(finalText);
+
+          // 笔记本身要 await：原来是 fire-and-forget，识别完立刻从托盘退出
+          // （AppService.dispose() 后紧跟 exit(0)）时写盘未完成就没了。
+          // 注：退出路径目前不会等待正在进行的 stopRecording()，
+          // 所以这只缩小窗口、并不彻底关闭 —— 真正关闭要让退出流程等待
+          // 在途的 stopRecording，属独立改动。
           final err = await DiaryService().appendNote(finalText);
           if (err == null) {
             _statusController.add(EngineStatus.info("✅ Saved Note"));
@@ -1395,7 +1409,6 @@ class CoreEngine {
             _statusController.add(EngineStatus.error("❌ Save Failed"));
             _log("Diary Save Error: $err");
           }
-          ChatService().addUserMessage(finalText);
         } else {
           if (!_typewriterInjected) {
             _nativeInput?.inject(finalText);
