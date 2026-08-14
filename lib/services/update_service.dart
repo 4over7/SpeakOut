@@ -580,12 +580,21 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
   /// 引号、`$`、反引号、空格、换行，进 shell 是安全的。
   /// 长度上限只为兜住畸形输入（版本号要进文件名），不是 SemVer 语义的一部分：
   /// 放到 63 是为了容得下 40 位 commit SHA 作 build metadata。
+  /// SemVer 2.0.0 官方文法（§9 禁前导零与空标识符）。
+  /// 上一版用 `[0-9A-Za-z][0-9A-Za-z.-]{0,63}` 图省事，把 `1.0.0-alpha..2`、
+  /// `1.0.0-01` 这类非法串也放行了 —— 而 _comparePrerelease 会把空标识符
+  /// 当成字母数字段判为「高于数字段」，得出错误的「有更新」。
   static final RegExp _semverPattern = RegExp(
-      r'^\d{1,5}\.\d{1,5}\.\d{1,5}(-[0-9A-Za-z][0-9A-Za-z.-]{0,63})?'
-      r'(\+[0-9A-Za-z][0-9A-Za-z.-]{0,63})?$');
+      r'^(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})'
+      r'(-((0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)'
+      r'(\.(0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?'
+      r'(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$');
+
+  /// 版本号最终要进 DMG 文件名，再长的合法 SemVer 也不该无限接受。
+  static const int _maxVersionLength = 96;
 
   static bool isValidRemoteVersion(String version) =>
-      _semverPattern.hasMatch(version);
+      version.length <= _maxVersionLength && _semverPattern.hasMatch(version);
 
   static bool isNewer(String remote, String local) {
     final r = _parseVersion(remote);
@@ -624,7 +633,10 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
     final ai = a.split('.'), bi = b.split('.');
     for (var i = 0; i < ai.length && i < bi.length; i++) {
       if (ai[i] == bi[i]) continue;
-      final an = int.tryParse(ai[i]), bn = int.tryParse(bi[i]);
+      // 用 BigInt 而非 int：SemVer 对数字标识符没有位数上限，而 Dart Native 的
+      // int 是 64 位 —— `1.0.0-9999999999999999999` 会让 int.tryParse 返回 null，
+      // 该段被误判成字母数字段，进而得出反的优先级。
+      final an = BigInt.tryParse(ai[i]), bn = BigInt.tryParse(bi[i]);
       if (an != null && bn != null) return an.compareTo(bn);
       if (an != null) return -1; // 数字段低于字母数字段
       if (bn != null) return 1;

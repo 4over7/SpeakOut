@@ -90,12 +90,39 @@ void main() {
       expect(UpdateService.isNewer('1.2.0-RC1', '1.1.0'), isTrue);
     });
 
-    test('长度上限容得下 40 位 commit SHA 作 build metadata', () {
+    test('长度上限容得下 40 位 commit SHA，但整串仍有上限', () {
       final sha = 'a' * 40;
       expect(UpdateService.isValidRemoteVersion('1.0.0+$sha'), isTrue);
-      expect(UpdateService.isValidRemoteVersion('1.0.0-${'b' * 64}'), isTrue);
-      expect(UpdateService.isValidRemoteVersion('1.0.0-${'b' * 65}'), isFalse,
-          reason: '超长后缀仍应拒绝 —— 版本号要进文件名');
+      // 上限是整串 96 字符（版本号要进 DMG 文件名），不是每段各自设限
+      expect(UpdateService.isValidRemoteVersion('1.0.0-${'b' * 90}'), isTrue);
+      expect(UpdateService.isValidRemoteVersion('1.0.0-${'b' * 91}'), isFalse,
+          reason: '整串超过 96 应拒绝');
+    });
+
+    // SemVer §9 禁止空标识符与数字段前导零。上一版正则图省事用
+    // [0-9A-Za-z][0-9A-Za-z.-]{0,63} 把它们全放行了，而 _comparePrerelease
+    // 会把空标识符当字母数字段判为「高于数字段」，得出反的「有更新」结论。
+    test('SemVer 非法形态必须拒绝（空标识符 / 前导零）', () {
+      for (final v in [
+        '1.0.0-alpha..2', '1.0.0-alpha.', '1.0.0-.alpha',
+        '1.0.0-01', '1.0.0-1.02', '01.0.0', '1.02.0', '1.0.03',
+        '1.0.0+', '1.0.0+a..b',
+      ]) {
+        expect(UpdateService.isValidRemoteVersion(v), isFalse, reason: v);
+      }
+    });
+
+    test('超过 64 位的数字标识符按数值比较（int 会溢出，须用 BigInt）', () {
+      // SemVer 对数字标识符没有位数上限；int.tryParse 在 >2^63 时返回 null，
+      // 该段会被误判成字母数字段，优先级反转。
+      expect(
+          UpdateService.isNewer('1.0.0-9999999999999999999', '1.0.0-1a'), isFalse,
+          reason: '纯数字标识符必须低于任何非数字标识符');
+      expect(
+          UpdateService.isNewer(
+              '1.0.0-99999999999999999999', '1.0.0-99999999999999999998'),
+          isTrue,
+          reason: '两个超长数字段应按数值比大小');
     });
 
     test('注入串确实能骗过版本比较 —— 证明白名单不可省', () {

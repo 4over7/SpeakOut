@@ -59,22 +59,37 @@ void main() {
 
   // ── 三层架构：UI 不得穿透 Service 直接操作 Engine ──
   //
-  // 这条是补的。此前只查 import —— 而 facade 重构（73bf717）去掉了 import，
-  // 却留着 AppService.engine 这个 public 字段，UI 照样
-  // `_appService.engine.statusStream.listen(...)`，12 处，测试全绿。
-  // 教训：查 import 挡不住穿透访问，访问路径也要一起钉。
+  // 这条断言改过两版，两版都栽在同一个坑上：**判据比它声称防的东西更窄**。
+  //   v1 只查 import —— facade 重构（73bf717）去掉 import 却留着
+  //      AppService.engine 这个 public 字段，12 处穿透测试全绿。
+  //   v2 改查访问路径，却把接收者硬编码成 AppService()/_app/_appService/appService
+  //      且逐行匹配 —— codex 指出后实测：换个局部变量名、把 . 换行、用级联，
+  //      三种普通写法全部漏报。
+  // v3 的判据：**lib/ui 下任何 `.engine` 访问都算违规**，与接收者名无关；
+  // 先剥注释再把整文件空白归一化，换行/级联都跑不掉。
+  // 代价是若将来有别的对象真叫 engine，需要显式加豁免 —— 这个代价是对的，
+  // 宁可误报让人来看一眼，也不要漏报。
   test('UI 不得穿透 AppService 直接操作 engine', () {
     final hits = <String>[];
     for (final e in Directory('lib/ui').listSync(recursive: true)) {
       if (e is! File || !e.path.endsWith('.dart')) continue;
-      for (final line in e.readAsStringSync().split('\n')) {
-        final t = line.trim();
-        if (t.startsWith('//') || t.startsWith('///') || t.startsWith('*')) continue;
-        final code = t.contains('//') ? t.substring(0, t.indexOf('//')) : t;
-        if (RegExp(r'(AppService\(\)|_app|_appService|appService)\s*\.\s*engine\b')
-            .hasMatch(code)) {
-          hits.add('${e.path}: $t');
-        }
+      // 剥掉行注释与块注释（注释里写 `.engine` 讲解不算违规）
+      var src = e
+          .readAsStringSync()
+          .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), ' ')
+          .split('\n')
+          .map((l) {
+            final i = l.indexOf('//');
+            return i < 0 ? l : l.substring(0, i);
+          })
+          .join('\n');
+      // 空白归一化：换行式链式调用、级联都被拉平成一行
+      src = src.replaceAll(RegExp(r'\s+'), ' ');
+      final m = RegExp(r'\.\s*engine\b').firstMatch(src);
+      if (m != null) {
+        final from = (m.start - 45).clamp(0, src.length);
+        final to = (m.end + 45).clamp(0, src.length);
+        hits.add('${e.path}: ...${src.substring(from, to)}...');
       }
     }
     expect(hits, isEmpty,

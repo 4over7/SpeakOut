@@ -291,7 +291,20 @@ class AudioDeviceService {
   /// Dispose the service
   void dispose() {
     _nativeInput.stopDeviceChangeListener();
-    _deviceChangeCallable?.close();
+
+    // 故意不 close() 这个 NativeCallable。
+    // 原生回调 deviceChangeListenerProc 会先把函数指针捕获到局部变量 cb，
+    // 之后还要做 4 次 CoreAudio 查询（毫秒级）才真正调用；而
+    // AudioObjectRemovePropertyListener 不等待 in-flight 回调返回。
+    // 也就是说 stopDeviceChangeListener() 返回后仍可能有回调在途，
+    // 此时 close() 释放 trampoline，那次在途调用就是 use-after-free。
+    //
+    // 本方法只在 CoreEngine.dispose() → 进程退出路径上被调用一次，
+    // 泄漏一个 trampoline 到进程结束没有代价，而 UAF 是崩溃。
+    // 要真正关掉它得让 native 侧对 in-flight 回调计数并等待 —— 那是独立的
+    // 并发改动，不在本批范围内，不做半吊子。
+    // _deviceChangeCallable?.close();
+
     _deviceChangeController.close();
     AppLog.d('[AudioDeviceService] Disposed');
   }
