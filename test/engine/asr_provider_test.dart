@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/engine/asr_provider.dart';
 import 'package:speakout/engine/asr_result.dart';
+import 'package:speakout/config/app_constants.dart';
 
 // Mock Implementation to verify interface stability
 class MockCloudProvider implements ASRProvider {
@@ -37,6 +38,9 @@ class MockCloudProvider implements ASRProvider {
     // Simulate cloud return
     _controller.add("Received ${samples.length} samples");
   }
+
+  @override
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   @override
   Future<ASRResult> stop() async {

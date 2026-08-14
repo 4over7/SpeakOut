@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'asr_result.dart';
+import '../config/app_constants.dart';
 
 /// Abstract interface for ASR (Automatic Speech Recognition) Providers
 ///
@@ -23,6 +24,16 @@ abstract class ASRProvider {
 
   /// Stop recognition and return the final ASR result (text + optional tokens/confidence)
   Future<ASRResult> stop();
+
+  /// CoreEngine 等待 [stop] 的上限。
+  ///
+  /// 必须 ≥ provider 自己的网络超时，否则 Core 先超时丢弃结果，provider 还在干活 ——
+  /// 用户看到的是「说了一段话，什么都没出来」。曾经 Core 固定等 6 秒，而
+  /// OpenAI/Groq 批量识别自身超时 30 秒：Whisper 转写稍长的录音必然超 6 秒，
+  /// 结果被静默丢掉。
+  ///
+  /// 默认取流式 provider 的口径；批量识别 provider 必须 override。
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   /// Free resources
   Future<void> dispose();

@@ -6,6 +6,7 @@ import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
 import 'package:speakout/services/config_service.dart';
+import '../../config/app_constants.dart';
 
 /// Offline (non-streaming) ASR Provider using sherpa-onnx OfflineRecognizer.
 ///
@@ -294,6 +295,10 @@ class OfflineSherpaProvider implements ASRProvider {
       _isSegmentDecoding = false;
     }
   }
+
+  /// 本地解码：stop 里同步跑完剩余音频，不走网络。
+  @override
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   @override
   Future<ASRResult> stop() async {

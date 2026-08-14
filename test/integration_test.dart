@@ -3,6 +3,7 @@ import 'package:speakout/engine/asr_provider.dart';
 import 'package:speakout/engine/asr_result.dart';
 import 'dart:typed_data';
 import 'dart:async';
+import 'package:speakout/config/app_constants.dart';
 
 // === MOCKS ===
 
@@ -36,6 +37,9 @@ class FakeASRProvider implements ASRProvider {
       _textController.add("partial text ${receivedSamples.length}");
     }
   }
+
+  @override
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   @override
   Future<ASRResult> stop() async {

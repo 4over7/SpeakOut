@@ -58,6 +58,12 @@ class OpenAIASRProvider implements ASRProvider {
     _totalSamples += samples.length;
   }
 
+  /// 批量识别：整段音频在松手后才上传+转写，耗时随录音长度增长。
+  /// 自身 HTTP 超时 30s（见 request.send().timeout），Core 必须等得比它久，
+  /// 否则 Core 先弃、provider 后返回，结果丢失。
+  @override
+  Duration get stopTimeout => const Duration(seconds: 35);
+
   @override
   Future<ASRResult> stop() async {
     if (_totalSamples == 0) return ASRResult.textOnly('');

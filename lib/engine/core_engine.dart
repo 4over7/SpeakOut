@@ -1126,7 +1126,7 @@ class CoreEngine {
     // 停 ASR（丢弃结果）
     if (_asrProvider != null) {
       try {
-        await _asrProvider!.stop().timeout(AppConstants.kAsrStopTimeout,
+        await _asrProvider!.stop().timeout(_asrProvider!.stopTimeout,
             onTimeout: () => ASRResult.textOnly(""));
       } catch (e) {
         _log("[Cancel] ASR stop error: $e");
@@ -1198,7 +1198,7 @@ class CoreEngine {
     if (_asrProvider != null) {
       ASRResult asrResult = ASRResult.textOnly("");
       try {
-        asrResult = await _asrProvider!.stop().timeout(AppConstants.kAsrStopTimeout, onTimeout: () {
+        asrResult = await _asrProvider!.stop().timeout(_asrProvider!.stopTimeout, onTimeout: () {
           _log("ASR Provider Stop Timeout!");
           return ASRResult.textOnly("");
         });

@@ -7,6 +7,7 @@ import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
 import 'package:speakout/services/config_service.dart';
+import '../../config/app_constants.dart';
 
 /// 讯飞实时语音听写 ASR Provider
 ///
@@ -104,6 +105,10 @@ class XfyunASRProvider implements ASRProvider {
       _pendingBuffer.add(pcm);
     }
   }
+
+  /// 流式识别：结果随说话陆续回来，stop 只等最后一帧，用全局默认即可。
+  @override
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   @override
   Future<ASRResult> stop() async {

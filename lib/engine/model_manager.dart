@@ -517,7 +517,9 @@ class ModelManager {
       // Normalize: Find where the content is and move to final 'dirName'
       final dirName = _getDirNameFromUrl(model.url); // Standard name
       final finalModelDir = Directory('${modelsRoot.path}/$dirName');
-      if (await finalModelDir.exists()) await finalModelDir.delete(recursive: true);
+      // 注意：**不要**在这里删 finalModelDir。
+      // 下面才做 anchor 校验，包损坏时会抛异常 —— 先删就等于「导入一个坏包
+      // 顺便毁掉本来能用的模型」。删除已挪到校验通过、rename 之前，并带 .old 回滚。
 
       // Analyze tempExtractDir content
       // Find anchor file: tokens.txt / *-tokens.txt / tokenizer.json (FunASR Nano)
@@ -574,11 +576,31 @@ class ModelManager {
       AppLog.d("[Extraction] Found tokens in: ${sourceDir.path}");
       AppLog.d("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
 
-      // Move sourceDir to finalModelDir
-      if (sourceDir.absolute.path == tempExtractDir.absolute.path) {
-         await tempExtractDir.rename(finalModelDir.path);
-      } else {
-         await sourceDir.rename(finalModelDir.path);
+      // 到这里 anchor 校验已通过，才允许动既有模型。
+      // 先把旧模型改名成 .old 备份而不是直接删：rename 失败时还能回滚，
+      // 不至于既没装上新的、又弄丢了旧的。
+      Directory? backupDir;
+      if (await finalModelDir.exists()) {
+        backupDir = Directory('${finalModelDir.path}.old');
+        if (await backupDir.exists()) await backupDir.delete(recursive: true);
+        await finalModelDir.rename(backupDir.path);
+      }
+
+      final source = sourceDir.absolute.path == tempExtractDir.absolute.path
+          ? tempExtractDir
+          : sourceDir;
+      try {
+        await source.rename(finalModelDir.path);
+      } catch (e) {
+        // 回滚：新的没放进去，就把旧的还原回来
+        if (backupDir != null && !await finalModelDir.exists()) {
+          await backupDir.rename(finalModelDir.path);
+          AppLog.d("[Extraction] rename 失败，已回滚旧模型: $e");
+        }
+        rethrow;
+      }
+      if (backupDir != null && await backupDir.exists()) {
+        await backupDir.delete(recursive: true);
       }
 
       // Cleanup residue

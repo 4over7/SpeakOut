@@ -7,6 +7,7 @@ import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'aliyun_token_service.dart';
 import 'package:speakout/config/app_log.dart';
+import '../../config/app_constants.dart';
 class AliyunProvider implements ASRProvider {
   WebSocketChannel? _channel;
   StreamController<String> _textController = StreamController<String>.broadcast();
@@ -257,6 +258,10 @@ class AliyunProvider implements ASRProvider {
     return buffer.buffer.asUint8List();
   }
   // ...
+
+  /// 流式识别：结果随说话陆续回来，stop 只等最后一帧，用全局默认即可。
+  @override
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   @override
   Future<ASRResult> stop() async {

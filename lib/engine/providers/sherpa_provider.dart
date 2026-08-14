@@ -5,6 +5,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../asr_provider.dart';
 import '../asr_result.dart';
 import 'package:speakout/config/app_log.dart';
+import '../../config/app_constants.dart';
 
 class SherpaProvider implements ASRProvider {
   sherpa.OnlineRecognizer? _recognizer;
@@ -133,6 +134,10 @@ class SherpaProvider implements ASRProvider {
       AppLog.d("[SherpaProvider] acceptWaveform error: $e");
     }
   }
+
+  /// 本地解码：stop 里同步跑完剩余音频，不走网络。
+  @override
+  Duration get stopTimeout => AppConstants.kAsrStopTimeout;
 
   @override
   Future<ASRResult> stop() async {
