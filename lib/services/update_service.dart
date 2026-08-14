@@ -572,7 +572,15 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
   ///
   /// 不能指望 [isNewer] 拦住：`_parseVersion` 对非数字段静默兜底为 0，
   /// `999.0.0"; cmd; #` 会被解析成 [999,0,0] 并判定为新版本。
-  static final RegExp _semverPattern = RegExp(r'^\d{1,5}\.\d{1,5}\.\d{1,5}$');
+  ///
+  /// 必须接受 prerelease：本仓库真实发过 `v1.1.0-RC3` / `v1.1.0-RC4`。
+  /// 只收三段数字会把它们误判成脏数据，而脏数据与「源不可达」共用 null 兜底 ——
+  /// 结果是 gateway 的 RC 版被丢弃、回落到 GitHub 的旧稳定版，用户被告知"已是最新"。
+  /// SemVer 自身的 prerelease/build 语法只允许 [0-9A-Za-z-] 和点，天然不含
+  /// 引号、`$`、反引号、空格、换行，进 shell 是安全的。
+  static final RegExp _semverPattern = RegExp(
+      r'^\d{1,5}\.\d{1,5}\.\d{1,5}(-[0-9A-Za-z][0-9A-Za-z.-]{0,31})?'
+      r'(\+[0-9A-Za-z][0-9A-Za-z.-]{0,31})?$');
 
   static bool isValidRemoteVersion(String version) =>
       _semverPattern.hasMatch(version);

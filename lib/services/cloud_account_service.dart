@@ -293,6 +293,12 @@ class CloudAccountService {
   }
 
   /// 从 JSON 文件导入云账户（跳过已存在的服务商）
+  /// 新格式导出不带密钥值，无脑恢复 isEnabled 会让**空凭证账户被启用**：
+  /// asrAccountPool() 只看 isEnabled + capability，会把它选中，
+  /// 然后云端识别初始化失败。所以只有真拿到凭证才允许启用。
+  static bool _shouldEnable(bool wanted, Map<String, String> creds) =>
+      wanted && creds.values.any((v) => v.isNotEmpty);
+
   Future<int> importFromFile(String filePath) async {
     try {
       final content = await File(filePath).readAsString();
@@ -303,37 +309,68 @@ class CloudAccountService {
       }
       final list = (map['accounts'] as List?) ?? [];
       int imported = 0;
+      int skipped = 0;
       for (final item in list) {
-        final providerId = item['providerId'] as String? ?? '';
-        if (providerId.isEmpty) continue;
-        // 老格式（v1.10.0 前）带明文 credentials，仍需读出来以便用户恢复自己的旧备份；
-        // 新格式只有 credentialKeys，没有值可填。
-        final creds = (item['credentials'] as Map<String, dynamic>?)
-            ?.map((k, v) => MapEntry(k, v.toString())) ?? {};
+        // 先把整项解析校验完，再动 _accounts 里的对象。
+        // getAccountByProviderId 返回的是**原对象引用**，边解析边改的话，
+        // 后一个字段 cast 抛异常会留下「已改名但没落盘」的脏内存状态。
+        final ({
+          String providerId,
+          String? displayName,
+          bool? isEnabled,
+          Map<String, String> creds
+        })? p;
+        try {
+          p = (
+            providerId: (item['providerId'] as String?) ?? '',
+            displayName: item['displayName'] as String?,
+            isEnabled: item['isEnabled'] as bool?,
+            // 老格式（v1.10.0 前）带明文 credentials，仍要读出来让用户能恢复自己的旧备份；
+            // 新格式只有 credentialKeys（字段名清单，供人看），没有值可填。
+            creds: (item['credentials'] as Map<String, dynamic>?)
+                    ?.map((k, v) => MapEntry(k, v.toString())) ??
+                <String, String>{},
+          );
+        } catch (e) {
+          // 单项坏数据只跳过这一项，不能让整个导入 return 0 —— 那会在前面若干项
+          // 已逐项落盘之后谎报「一条都没导入」。
+          AppLog.d('CloudAccountService: skip malformed entry: $e');
+          skipped++;
+          continue;
+        }
+        if (p.providerId.isEmpty) {
+          skipped++;
+          continue;
+        }
 
         // 不能「已存在就跳过」：云账户页一进入就会 _ensureAllProvidersExist()
         // 预建全部 15 家，那样导入永远是 0 条。改为合并到既有账户。
-        final existing = getAccountByProviderId(providerId);
+        final existing = getAccountByProviderId(p.providerId);
         if (existing != null) {
-          existing.displayName = item['displayName'] as String? ?? existing.displayName;
-          existing.isEnabled = item['isEnabled'] as bool? ?? existing.isEnabled;
           // 只补空缺，不用导入值覆盖用户已填好的密钥
-          creds.forEach((k, v) {
-            if (v.isNotEmpty && (existing.credentials[k] ?? '').isEmpty) {
-              existing.credentials[k] = v;
-            }
+          final merged = Map<String, String>.from(existing.credentials);
+          p.creds.forEach((k, v) {
+            if (v.isNotEmpty && (merged[k] ?? '').isEmpty) merged[k] = v;
           });
+          existing.displayName = p.displayName ?? existing.displayName;
+          existing.credentials
+            ..clear()
+            ..addAll(merged);
+          existing.isEnabled = _shouldEnable(p.isEnabled ?? existing.isEnabled, merged);
           await updateAccount(existing);
         } else {
           await addAccount(CloudAccount(
             id: const Uuid().v4(),
-            providerId: providerId,
-            displayName: item['displayName'] as String? ?? providerId,
-            isEnabled: item['isEnabled'] as bool? ?? true,
-            credentials: creds,
+            providerId: p.providerId,
+            displayName: p.displayName ?? p.providerId,
+            isEnabled: _shouldEnable(p.isEnabled ?? true, p.creds),
+            credentials: p.creds,
           ));
         }
         imported++;
+      }
+      if (skipped > 0) {
+        AppLog.d('CloudAccountService: skipped $skipped malformed entries');
       }
       AppLog.d('CloudAccountService: imported $imported accounts from $filePath');
       return imported;

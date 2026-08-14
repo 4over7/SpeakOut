@@ -286,7 +286,7 @@ class OfflineSherpaProvider implements ASRProvider {
       if (text.isNotEmpty) {
         _segmentResults.add(text);
         AppLog.d("[OfflineSherpaProvider] PreSegment #${_segmentResults.length}: "
-            "(${text.length}字, ${durationSec}s): '$text'");
+            "(${text.length}字, ${durationSec}s): ${AppLog.redact(text)}");
       }
     } catch (e) {
       AppLog.d("[OfflineSherpaProvider] PreSegment error: $e");
@@ -333,7 +333,7 @@ class OfflineSherpaProvider implements ASRProvider {
         stream.free();
 
         final fullDurationSec = durationSec;
-        AppLog.d("[OfflineSherpaProvider] Final segment (${lastSegmentText.length}字, ${fullDurationSec}s): '$lastSegmentText'");
+        AppLog.d("[OfflineSherpaProvider] Final segment (${lastSegmentText.length}字, ${fullDurationSec}s): ${AppLog.redact(lastSegmentText)}");
       } else {
         _audioChunks.clear();
       }
@@ -348,9 +348,9 @@ class OfflineSherpaProvider implements ASRProvider {
       _segmentResults.clear();
 
       if (hasPreSegments) {
-        AppLog.d("[OfflineSherpaProvider] Merged $segmentCount segments → (${fullText.length}字): '$fullText'");
+        AppLog.d("[OfflineSherpaProvider] Merged $segmentCount segments → (${fullText.length}字): ${AppLog.redact(fullText)}");
       } else if (fullText.isNotEmpty) {
-        AppLog.d("[OfflineSherpaProvider] Result (${fullText.length}字): '$fullText'");
+        AppLog.d("[OfflineSherpaProvider] Result (${fullText.length}字): ${AppLog.redact(fullText)}");
       } else {
         AppLog.d("[OfflineSherpaProvider] No audio accumulated (0 chunks)");
       }

@@ -586,7 +586,7 @@ class LLMService {
         final content = jsonDecode(utf8.decode(resp.bodyBytes))['choices']?[0]?['message']?['content']?.toString();
         return _cleanLlmOutput(content?.trim() ?? '');
       }
-      _log("[Generic] Cloud ERROR: ${resp.statusCode} - ${resp.body}");
+      _log("[Generic] Cloud ERROR: ${resp.statusCode} - ${AppLog.redact(resp.body)}");
       return '';
     } catch (e) {
       _log("[Generic] EXCEPTION: $e");

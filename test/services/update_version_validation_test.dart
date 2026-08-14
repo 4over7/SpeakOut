@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/services/update_service.dart';
 
@@ -11,6 +13,31 @@ void main() {
       for (final v in ['1.10.0', '0.0.1', '99999.0.0', '2.3.4']) {
         expect(UpdateService.isValidRemoteVersion(v), isTrue, reason: v);
       }
+    });
+
+    test('prerelease / build metadata 放行 —— 本仓库真发过 v1.1.0-RC3/RC4', () {
+      for (final v in [
+        '1.1.0-RC3', '1.1.0-RC4', '1.11.0-beta.1', '1.0.0-alpha', '1.0.0+build.5',
+        '1.0.0-rc.1+exp.sha.5114f85',
+      ]) {
+        expect(UpdateService.isValidRemoteVersion(v), isTrue, reason: v);
+      }
+    });
+
+    test('仓库全部历史 tag 都必须过白名单 —— 防止再次误拒真实版本', () {
+      final tags = Process.runSync('git', ['tag', '-l']).stdout as String;
+      final versions = tags
+          .split('\n')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .map((t) => t.startsWith('v') ? t.substring(1) : t)
+          .toList();
+      expect(versions, isNotEmpty, reason: '没读到 git tag，测试环境异常');
+      final rejected =
+          versions.where((v) => !UpdateService.isValidRemoteVersion(v)).toList();
+      expect(rejected, isEmpty,
+          reason: '这些真实发布过的版本号会被白名单拒绝，'
+              '导致更新检查静默回落到旧版本：$rejected');
     });
 
     test('命令注入串被拒', () {
@@ -28,7 +55,7 @@ void main() {
     });
 
     test('非 SemVer 形状被拒', () {
-      for (final v in ['', 'v1.0.0', '1.0', '1.0.0.0', 'latest', '1.0.0-beta', '../../etc']) {
+      for (final v in ['', 'v1.0.0', '1.0', '1.0.0.0', 'latest', '../../etc', '1.0.0-']) {
         expect(UpdateService.isValidRemoteVersion(v), isFalse, reason: v);
       }
     });
