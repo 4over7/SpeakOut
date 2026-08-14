@@ -200,6 +200,23 @@ class AliyunProvider implements ASRProvider {
       final map = jsonDecode(jsonStr);
       final header = map['header'];
       final name = header['name'];
+
+      // 按 task_id 过滤过期帧。
+      //
+      // 本 provider 复用连接（initialize 就预连接，start 在 _isConnected 时不重连），
+      // 所以上一次录音的 SentenceEnd / ResultChanged 可能在下一次录音开始后才到 ——
+      // 不过滤的话会把旧句子 append 进新会话的 _committedText，字幕直接串台。
+      // stop() 只固定等 500ms，这个窗口很容易命中。
+      //
+      // 不能用其它 provider 那套「录音代次」：那是给「每次 start 都新建连接」
+      // 设计的，套到复用连接上会把本次录音的消息也全挡掉（我试过，阿里云直接全废）。
+      // task_id 每次 start() 重新生成并随 StartTranscription 下发，服务端原样回带，
+      // 是复用连接下唯一可靠的会话标识。
+      final msgTaskId = header['task_id'];
+      if (_taskId != null && msgTaskId != null && msgTaskId != _taskId) {
+        AppLog.d('[AliyunProvider] 丢弃过期帧 $name (task ${msgTaskId.toString().substring(0, 8)}… != 当前 ${_taskId!.substring(0, 8)}…)');
+        return;
+      }
       
       if (name == 'TranscriptionStarted') {
         _isHandshakeComplete = true;
