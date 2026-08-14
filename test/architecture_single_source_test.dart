@@ -145,10 +145,15 @@ class _EngineAccessVisitor extends RecursiveAstVisitor<void> {
     super.visitPrefixedIdentifier(node);
   }
 
+  /// `foo.engine()` —— 被调用的成员叫 engine。
+  /// 必须看 methodName 而不是 target：看 target 的话
+  ///   `foo.engine()` 会漏（target 是 foo），
+  ///   `engine.search()` 会误报（target 恰好叫 engine，可能是无关的搜索引擎变量）。
+  /// `foo.engine.bar()` 不归这里管 —— 它的 target 是 PrefixedIdentifier /
+  /// PropertyAccess，递归下去由上面两个 visit 命中，不会重复计数。
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    final t = node.target;
-    if (t is SimpleIdentifier) _check(t.name, node);
+    if (node.target != null) _check(node.methodName.name, node);
     super.visitMethodInvocation(node);
   }
 }
