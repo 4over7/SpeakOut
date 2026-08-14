@@ -366,7 +366,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       // 先备 ASR 再装监听：反过来的话，监听已生效而模型还在加载的那几百毫秒里
       // 按快捷键能录上音却识别不出东西。
       // 正常流程 ASR 已由选模型那步初始化好，只有从「上次停在完成页」恢复进来时才是空的。
-      if (!_app.engine.isASRReady) {
+      if (!_app.isASRReady) {
         await _initASRForActiveModel();
       }
       await _app.startKeyboardListener();
@@ -375,7 +375,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
     }
     if (!mounted) return;
     setState(() =>
-        _trialReady = _app.engine.isListenerRunning && _app.engine.isASRReady);
+        _trialReady = _app.isListenerRunning && _app.isASRReady);
   }
 
   Future<void> _initASRForActiveModel() async {

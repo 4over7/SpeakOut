@@ -58,7 +58,7 @@ class _AboutTabState extends State<AboutTab> {
     final svc = UpdateService();
     final scriptPath = svc.prepareInstall();
     if (scriptPath.isEmpty) return;
-    AppService().engine.nativeInput?.launchUpdater(scriptPath);
+    AppService().nativeInput?.launchUpdater(scriptPath);
     Future.delayed(const Duration(milliseconds: 500), () => exit(0));
   }
 

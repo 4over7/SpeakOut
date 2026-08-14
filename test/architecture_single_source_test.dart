@@ -57,6 +57,50 @@ void main() {
     );
   });
 
+  // ── 三层架构：UI 不得穿透 Service 直接操作 Engine ──
+  //
+  // 这条是补的。此前只查 import —— 而 facade 重构（73bf717）去掉了 import，
+  // 却留着 AppService.engine 这个 public 字段，UI 照样
+  // `_appService.engine.statusStream.listen(...)`，12 处，测试全绿。
+  // 教训：查 import 挡不住穿透访问，访问路径也要一起钉。
+  test('UI 不得穿透 AppService 直接操作 engine', () {
+    final hits = <String>[];
+    for (final e in Directory('lib/ui').listSync(recursive: true)) {
+      if (e is! File || !e.path.endsWith('.dart')) continue;
+      for (final line in e.readAsStringSync().split('\n')) {
+        final t = line.trim();
+        if (t.startsWith('//') || t.startsWith('///') || t.startsWith('*')) continue;
+        final code = t.contains('//') ? t.substring(0, t.indexOf('//')) : t;
+        if (RegExp(r'(AppService\(\)|_app|_appService|appService)\s*\.\s*engine\b')
+            .hasMatch(code)) {
+          hits.add('${e.path}: $t');
+        }
+      }
+    }
+    expect(hits, isEmpty,
+        reason: 'UI 应走 AppService 的 facade getter，不要直接摸 engine 对象'
+            '（缺什么就往 AppService 补一个转发 getter）：\n  ${hits.join("\n  ")}');
+  });
+
+  // 拆卸顺序：必须 native 先停回调，Dart 才能释放 NativeCallable 蹦床。
+  // 反序会让 native 侧的 dartCallback 指向已释放内存。
+  // stopListener() 曾经全仓零调用点 —— 拆卸路径压根没写完。
+  test('CoreEngine.dispose 必须先 stopListener 再 close NativeCallable', () {
+    final src = File('lib/engine/core_engine.dart').readAsStringSync();
+    final body = RegExp(r'void dispose\(\)\s*\{([\s\S]*?)\n  \}')
+        .firstMatch(src)
+        ?.group(1);
+    expect(body, isNotNull, reason: '没找到 CoreEngine.dispose() 方法体');
+    final stopAt = body!.indexOf('stopListener()');
+    final closeAt = body.indexOf('_nativeCallable?.close()');
+    expect(stopAt, greaterThanOrEqualTo(0),
+        reason: 'dispose() 未调用 stopListener()，原生 eventTap 不会摘除');
+    expect(closeAt, greaterThanOrEqualTo(0), reason: 'dispose() 未关闭 _nativeCallable');
+    expect(stopAt, lessThan(closeAt),
+        reason: 'stopListener() 必须早于 _nativeCallable.close()，'
+            '否则 native 仍持有已释放的回调指针');
+  });
+
   test('UI 不得自己拼 ASR 账户池（应调 asrAccountPool）', () {
     // 判据要精确到「取账户」这个动作；按能力筛 CredentialField 是另一回事，不算
     // 用正则而非精确字符串：换行、空格都不该成为绕过手段

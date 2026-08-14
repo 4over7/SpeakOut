@@ -352,12 +352,19 @@ class CloudAccountService {
           p.creds.forEach((k, v) {
             if (v.isNotEmpty && (merged[k] ?? '').isEmpty) merged[k] = v;
           });
-          existing.displayName = p.displayName ?? existing.displayName;
-          existing.credentials
-            ..clear()
-            ..addAll(merged);
-          existing.isEnabled = _shouldEnable(p.isEnabled ?? existing.isEnabled, merged);
-          await updateAccount(existing);
+          // 构造副本而不是就地改 existing：getAccountByProviderId 返回的是
+          // _accounts 里的原对象，就地改会让 updateAccount 里
+          // 「旧 keys - 新 keys」的差集恒为空 —— 那道用来清除 SharedPreferences
+          // 残留明文密钥的安全网会静默失效（本路径只增不减，暂时无泄漏，
+          // 但这个写法一旦被照抄到会删字段的场景就是真漏）。
+          await updateAccount(CloudAccount(
+            id: existing.id,
+            providerId: existing.providerId,
+            displayName: p.displayName ?? existing.displayName,
+            credentials: merged,
+            isEnabled: _shouldEnable(p.isEnabled ?? existing.isEnabled, merged),
+            createdAt: existing.createdAt,
+          ));
         } else {
           await addAccount(CloudAccount(
             id: const Uuid().v4(),

@@ -52,7 +52,7 @@ class _LinuxHomePageState extends State<LinuxHomePage> with WidgetsBindingObserv
       await _appService.init();
     });
 
-    _statusSub = _appService.engine.statusStream.listen((status) {
+    _statusSub = _appService.statusStream.listen((status) {
       if (!mounted) return;
       setState(() {
         // 按 kind 判断，不再匹配文案 —— 文案改动或本地化都不会影响这里
@@ -74,7 +74,7 @@ class _LinuxHomePageState extends State<LinuxHomePage> with WidgetsBindingObserv
       });
     });
 
-    _recordingSub = _appService.engine.recordingStream.listen((isRecording) {
+    _recordingSub = _appService.recordingStream.listen((isRecording) {
       if (!mounted) return;
       setState(() {
         _isRecording = isRecording;
@@ -82,7 +82,7 @@ class _LinuxHomePageState extends State<LinuxHomePage> with WidgetsBindingObserv
       });
     });
 
-    _resultSub = _appService.engine.resultStream.listen((text) {
+    _resultSub = _appService.resultStream.listen((text) {
       if (!mounted || text.isEmpty) return;
       setState(() => _recognizedText = text);
       final captured = text;
@@ -96,7 +96,7 @@ class _LinuxHomePageState extends State<LinuxHomePage> with WidgetsBindingObserv
 
   void _subscribeToPartialResults() {
     if (_partialSub != null) return;
-    _partialSub = _appService.engine.partialTextStream.listen((partialText) {
+    _partialSub = _appService.partialTextStream.listen((partialText) {
       if (mounted && _isRecording && partialText.isNotEmpty) {
         setState(() => _recognizedText = partialText);
       }

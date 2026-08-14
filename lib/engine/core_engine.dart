@@ -140,13 +140,24 @@ class CoreEngine {
 
   /// Release all resources. Call when app is shutting down.
   void dispose() {
+    // 顺序要紧：必须先让 native 停止回调，再关 Dart 侧的 NativeCallable。
+    // 反过来的话 eventTap 还挂在 run loop 上、native 的 dartCallback 仍指向
+    // 已释放的蹦床，下一次按键就是野指针调用。
+    // 范本见 AudioDeviceService.dispose()，那里的顺序一直是对的。
+    _nativeInput?.stopListener();
+    _nativeCallable?.close();
+    _nativeCallable = null;
+
+    // 原生设备变化监听同样要拆：AudioDeviceService.dispose() 写得没问题，
+    // 但此前全仓无人调用，退出时 native listener 和它的 NativeCallable 都不释放。
+    audioDeviceService?.dispose();
+
     _statusController.close();
     _recordingController.close();
     _rawKeyController.close();
     _resultController.close();
     _partialTextController.close();
     _asrSubscription?.cancel();
-    _nativeCallable?.close();
     _watchdogTimer?.cancel();
     _toggleMaxTimer?.cancel();
     _silenceCheckTimer?.cancel();

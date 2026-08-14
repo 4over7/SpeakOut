@@ -114,6 +114,26 @@ void main() {
     expect(svc.getAccountByProviderId('zhipu')?.credentials['api_key'], 'sk-also-good');
   });
 
+  test('合并走副本，不就地改 _accounts 里的原对象', () async {
+    // updateAccount 用「旧 keys - 新 keys」差集去清 SharedPreferences 里的残留密钥。
+    // 若导入就地改 existing.credentials，差集恒为空，那道安全网静默失效。
+    final svc = CloudAccountService();
+    final original = CloudAccount(
+      id: 'pre', providerId: 'deepseek', displayName: '原名',
+      isEnabled: true, credentials: {'api_key': 'sk-user'},
+    );
+    await svc.addAccount(original);
+    final path = await writeBackup([
+      {'providerId': 'deepseek', 'displayName': '新名', 'isEnabled': true,
+       'credentials': {'model': 'deepseek-v4-flash'}},
+    ]);
+    await svc.importFromFile(path);
+    // 传给 updateAccount 的必须是新对象：原对象不该被就地改名
+    expect(original.displayName, '原名',
+        reason: '导入就地改了 _accounts 里的原对象，updateAccount 的差集清理会失效');
+    expect(svc.getAccountByProviderId('deepseek')!.displayName, '新名');
+  });
+
   test('坏项不得在抛异常前留下半改状态', () async {
     final svc = CloudAccountService();
     await svc.addAccount(CloudAccount(

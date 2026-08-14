@@ -34,11 +34,16 @@ class AppService {
   // ── Streams ──
   Stream<EngineStatus> get statusStream => engine.statusStream;
   Stream<(int keyCode, int modifierFlags)> get rawKeyEventStream => engine.rawKeyEventStream;
+  Stream<bool> get recordingStream => engine.recordingStream;
+  Stream<String> get resultStream => engine.resultStream;
+  Stream<String> get partialTextStream => engine.partialTextStream;
 
   // ── Getters / setter ──
   NativeInputBase? get nativeInput => engine.nativeInput;
   AudioDeviceService? get audioDeviceService => engine.audioDeviceService;
   bool get isPunctuationEnabled => engine.isPunctuationEnabled;
+  bool get isASRReady => engine.isASRReady;
+  bool get isListenerRunning => engine.isListenerRunning;
   int get pttKeyCode => engine.pttKeyCode;
   set pttKeyCode(int v) => engine.pttKeyCode = v;
   void updateStatus(String msg) => engine.updateStatus(msg);
