@@ -69,6 +69,10 @@ class AudioDeviceService {
   
   // Native callback holder
   NativeCallable<DeviceChangeCallbackC>? _deviceChangeCallable;
+
+  /// dispose 后原生回调仍可能在途（见 dispose() 注释），必须挡住后续处理，
+  /// 否则会 add 到已 close 的 controller 抛 StateError。
+  bool _disposed = false;
   
   AudioDeviceService(this._nativeInput);
   
@@ -120,6 +124,11 @@ class AudioDeviceService {
   }
   
   void _handleDeviceChange(String deviceId, String deviceName, bool isBluetooth) {
+    // 在途回调保护：dispose 已把 controller 关掉，再 add 会抛 StateError。
+    // 这条路径比 trampoline 的 UAF 更容易发生 —— 恰恰因为我们不再 close()
+    // trampoline，在途回调现在能完整跑到这里。
+    if (_disposed || _deviceChangeController.isClosed) return;
+
     AppLog.d('[AudioDeviceService] Device changed: $deviceName (bluetooth=$isBluetooth)');
 
     // Invalidate cache — will be lazily rebuilt next time devices are accessed
@@ -290,6 +299,7 @@ class AudioDeviceService {
   
   /// Dispose the service
   void dispose() {
+    _disposed = true; // 先立旗，再拆 —— 拆的过程中来的回调也要挡住
     _nativeInput.stopDeviceChangeListener();
 
     // 故意不 close() 这个 NativeCallable。
