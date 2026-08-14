@@ -983,7 +983,19 @@ class CoreEngine {
           }
         }
 
-        // Pre-segment: 3s pause + accumulated audio >= 30s → background ASR decode
+        // Pre-segment: 3s pause + accumulated audio >= 30s → 提前解码一段
+        //
+        // ⚠️ 注意：这里**不是** background decode（原注释这么写是错的）。
+        // OfflineSherpaProvider.flushSegment() 里的 _recognizer.decode() 是同步
+        // FFI 调用，跑在主 isolate 上，期间 UI 与 Dart 侧按键回调都会卡住。
+        // stop() 里的最终解码同样如此 —— 阻塞是离线 provider 的固有形态，
+        // 不是这一处的问题。
+        // 已确认后果有限：ring buffer 深 60s（RING_BUFFER_SAMPLES=960000 @16k），
+        // 几秒冻结覆盖不掉音频；key-up 经 NativeCallable 队列投递，是延迟不是丢失。
+        // 要真正消除需要把 recognizer 搬到 worker isolate
+        // （OfflineRecognizer.fromPtr 使之可行），但那要同时改造 flushSegment
+        // 与 stop() 两处，且并发共用 recognizer 的安全性需实机长录音验证 ——
+        // 属独立改动，不在本批做。
         // Only split when enough audio has accumulated, avoiding short fragments
         // that hurt recognition quality. Each segment stays in the model's optimal range.
         if (_pauseSegmentPollCount >= AppConstants.kPauseSegmentThresholdCount
