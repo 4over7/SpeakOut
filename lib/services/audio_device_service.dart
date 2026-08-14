@@ -70,8 +70,9 @@ class AudioDeviceService {
   // Native callback holder
   NativeCallable<DeviceChangeCallbackC>? _deviceChangeCallable;
 
-  /// dispose 后原生回调仍可能在途（见 dispose() 注释），必须挡住后续处理，
-  /// 否则会 add 到已 close 的 controller 抛 StateError。
+  /// NativeCallable.listener 异步投递：stop 之前 native 已发出的那次回调，
+  /// 消息可能在 dispose 关掉 controller 之后才被 isolate 处理。见
+  /// _handleDeviceChange 入口的说明。
   bool _disposed = false;
   
   AudioDeviceService(this._nativeInput);
@@ -124,9 +125,11 @@ class AudioDeviceService {
   }
   
   void _handleDeviceChange(String deviceId, String deviceName, bool isBluetooth) {
-    // 在途回调保护：dispose 已把 controller 关掉，再 add 会抛 StateError。
-    // 这条路径比 trampoline 的 UAF 更容易发生 —— 恰恰因为我们不再 close()
-    // trampoline，在途回调现在能完整跑到这里。
+    // 与 native 那把锁互补，两者都不能少：
+    // 锁保证 stop 返回后没有 native 回调在途；但 NativeCallable.listener 是
+    // **异步投递**的 —— stop 之前 native 已经调过一次的话，那条消息还排在
+    // isolate 队列里，会在 dispose 关掉 controller 之后才被处理，
+    // 届时 add() 抛 StateError（Bad state: Cannot add new events after close）。
     if (_disposed || _deviceChangeController.isClosed) return;
 
     AppLog.d('[AudioDeviceService] Device changed: $deviceName (bluetooth=$isBluetooth)');
@@ -302,22 +305,19 @@ class AudioDeviceService {
     _disposed = true; // 先立旗，再拆 —— 拆的过程中来的回调也要挡住
     _nativeInput.stopDeviceChangeListener();
 
-    // 不 close() 这个 NativeCallable，改为解除它对 isolate 的 keep-alive。
+    // 可以安全 close()：native 侧的 stop_device_change_listener() 现在会持锁
+    // 清空回调指针，若此刻有回调在途就阻塞到它跑完。函数返回即保证
+    // 「没有回调在途，也不会再有新的」，此时释放 trampoline 不会 UAF。
     //
-    // 为什么不 close：原生回调 deviceChangeListenerProc 先把函数指针捕获到
-    // 局部变量 cb，之后还要做 4 次 CoreAudio 查询（毫秒级）才真正调用，而
-    // AudioObjectRemovePropertyListener 不等待 in-flight 回调返回。
-    // stopDeviceChangeListener() 返回后仍可能有回调在途，此时 close() 释放
-    // trampoline，那次在途调用就是 use-after-free。
-    //
-    // 为什么必须置 keepIsolateAlive=false：listener 默认让创建它的 isolate
-    // 一直存活到 close()。原先写「只在进程退出路径调用，泄漏没有代价」是错的 ——
-    // main.dart:366 在 Widget dispose 里调 AppService.dispose()，后面并没有
-    // exit(0)；测试与 Flutter teardown 也会自然等待 isolate 结束，会被挂住。
-    //
-    // 真正 close 需要 native 侧对 in-flight 回调计数并等待，那是独立的并发
-    // 改动，不在本批做半吊子。配合 _disposed 旗标，在途回调进来即空转返回。
-    _deviceChangeCallable?.keepIsolateAlive = false;
+    // 之前两版都不对，记在这里免得有人改回去：
+    //   v1 直接 close() —— native 把指针捕获进局部变量后还要做 4 次 CoreAudio
+    //      查询才调用，而 AudioObjectRemovePropertyListener 不等在途回调，UAF。
+    //   v2 不 close 只置 keepIsolateAlive=false —— 躲开了 UAF，但那是拿一种
+    //      未定义行为换另一种（文档只对 close 后调用有明确说法），
+    //      而且 listener 默认会把 isolate 钉住：实测默认 6 秒不退出被 kill，
+    //      置 false 后 434ms 退出。躲问题不如把 native 那把锁补上。
+    _deviceChangeCallable?.close();
+    _deviceChangeCallable = null;
 
     _deviceChangeController.close();
     AppLog.d('[AudioDeviceService] Disposed');

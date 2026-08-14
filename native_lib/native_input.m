@@ -5,6 +5,7 @@
 #include <Carbon/Carbon.h>
 #include <Foundation/Foundation.h>
 #include <mach/mach_time.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -1180,6 +1181,13 @@ typedef void (*DartDeviceChangeCallback)(const char *deviceId,
                                          int isBluetooth);
 static DartDeviceChangeCallback deviceChangeCallback = NULL;
 
+// 保护 deviceChangeCallback 的读取-调用与清空。
+// 没有它的话：listener proc 把指针存进局部变量后，还要做 4 次 CoreAudio 查询
+// （毫秒级）才真正调用，而 AudioObjectRemovePropertyListener 不等待在途回调 ——
+// stop 返回后 Dart 侧 close() 释放 trampoline，那次在途调用就是 use-after-free。
+// 加锁后 stop_device_change_listener() 返回即保证：没有回调在途，也不会再有新的。
+static pthread_mutex_t deviceChangeCallbackMutex = PTHREAD_MUTEX_INITIALIZER;
+
 // (moved to top of audio section for forward reference)
 
 // Get string property from audio device
@@ -1543,7 +1551,9 @@ deviceChangeListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddresses,
     if (inAddresses[i].mSelector == kAudioHardwarePropertyDefaultInputDevice) {
       log_to_file("AudioDevice: Default input device changed");
 
-      // Capture callback pointer locally to avoid TOCTOU race with stop_device_change_listener
+      // 持锁读取并调用，stop 会等这段跑完 —— 不能只把指针拷进局部变量：
+      // 那样只避开了空指针判断的 TOCTOU，避不开「调用时 trampoline 已被释放」。
+      pthread_mutex_lock(&deviceChangeCallbackMutex);
       DartDeviceChangeCallback cb = deviceChangeCallback;
       if (cb != NULL) {
         // Get new device info
@@ -1569,6 +1579,7 @@ deviceChangeListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddresses,
           }
         }
       }
+      pthread_mutex_unlock(&deviceChangeCallbackMutex);
     }
   }
   return noErr;
@@ -1583,7 +1594,9 @@ int start_device_change_listener(DartDeviceChangeCallback callback) {
     return 0;
   }
 
+  pthread_mutex_lock(&deviceChangeCallbackMutex);
   deviceChangeCallback = callback;
+  pthread_mutex_unlock(&deviceChangeCallbackMutex);
 
   AudioObjectPropertyAddress propAddr = {
       kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal,
@@ -1610,7 +1623,12 @@ void stop_device_change_listener() {
 
   AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &propAddr,
                                     deviceChangeListenerProc, NULL);
+  // 持锁清空：若此刻有回调在途，这里会阻塞到它跑完。
+  // 本函数返回后即保证「没有回调在途，也不会再有新的」——
+  // Dart 侧这才可以安全 close() 那个 NativeCallable。
+  pthread_mutex_lock(&deviceChangeCallbackMutex);
   deviceChangeCallback = NULL;
+  pthread_mutex_unlock(&deviceChangeCallbackMutex);
   log_to_file("AudioDevice: Device change listener stopped");
 }
 
