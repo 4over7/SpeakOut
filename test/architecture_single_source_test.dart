@@ -1,4 +1,9 @@
 import 'dart:io';
+
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 架构约束测试：某些「唯一真源」必须真的唯一。
@@ -59,44 +64,29 @@ void main() {
 
   // ── 三层架构：UI 不得穿透 Service 直接操作 Engine ──
   //
-  // 这条断言改过两版，两版都栽在同一个坑上：**判据比它声称防的东西更窄**。
+  // 这条断言改到第 4 版。前三版都栽在「判据比它声称防的东西更窄」上：
   //   v1 只查 import —— facade 重构（73bf717）去掉 import 却留着
   //      AppService.engine 这个 public 字段，12 处穿透测试全绿。
-  //   v2 改查访问路径，却把接收者硬编码成 AppService()/_app/_appService/appService
-  //      且逐行匹配 —— codex 指出后实测：换个局部变量名、把 . 换行、用级联，
-  //      三种普通写法全部漏报。
-  // v3 的判据：**lib/ui 下任何 `.engine` 访问都算违规**，与接收者名无关；
-  // 先剥注释再把整文件空白归一化，换行/级联都跑不掉。
-  // 代价是若将来有别的对象真叫 engine，需要显式加豁免 —— 这个代价是对的，
-  // 宁可误报让人来看一眼，也不要漏报。
+  //   v2 查访问路径但把接收者硬编码成 AppService()/_app/_appService/appService
+  //      且逐行匹配 —— 换变量名、点号换行、级联、中间变量别名，四种普通写法全漏。
+  //   v3 改成整文件空白归一化后正则扫 `.engine` —— codex 指出并实测：
+  //      注释剥离不是字符串感知的，`log('https://x'); AppService().engine...`
+  //      会在字符串里的 `//` 处被截断，真实违规被抹掉 → **漏报**；
+  //      反过来 `const k = 'settings.engine.mode';` 又会 **误报**。
+  //      我当时把它记成「已知局限」，但漏报违背了这条断言存在的意义。
   //
-  // ⚠️ 已知局限（实测确认，当前仓库不触发）：
-  //   - 字符串字面量里的 '.engine'（如 i18n key 'settings.engine.mode'）会误报。
-  //     实测会红；现仓库 0 处，出现时按上面的原则加豁免即可。
-  //   - 块注释剥离用的是非贪婪 /\*...\*/，字符串里若含 '/*' 会切错。
-  //     现仓库 0 处。
-  //   要根除这两条得上 AST，与本文件既有断言一样，取「低成本挡住高频退化」的折中。
+  // v4 直接走 AST：analyzer 精确区分标识符、字符串字面量、注释与插值表达式，
+  // 上面所有形态一次根除，不再有「判据窄于目标」的空间。
   test('UI 不得穿透 AppService 直接操作 engine', () {
     final hits = <String>[];
     for (final e in Directory('lib/ui').listSync(recursive: true)) {
       if (e is! File || !e.path.endsWith('.dart')) continue;
-      // 剥掉行注释与块注释（注释里写 `.engine` 讲解不算违规）
-      var src = e
-          .readAsStringSync()
-          .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), ' ')
-          .split('\n')
-          .map((l) {
-            final i = l.indexOf('//');
-            return i < 0 ? l : l.substring(0, i);
-          })
-          .join('\n');
-      // 空白归一化：换行式链式调用、级联都被拉平成一行
-      src = src.replaceAll(RegExp(r'\s+'), ' ');
-      final m = RegExp(r'\.\s*engine\b').firstMatch(src);
-      if (m != null) {
-        final from = (m.start - 45).clamp(0, src.length);
-        final to = (m.end + 45).clamp(0, src.length);
-        hits.add('${e.path}: ...${src.substring(from, to)}...');
+      final parsed = parseFile(
+          path: e.absolute.path, featureSet: FeatureSet.latestLanguageVersion());
+      final visitor = _EngineAccessVisitor();
+      parsed.unit.accept(visitor);
+      for (final expr in visitor.hits) {
+        hits.add('${e.path}: $expr');
       }
     }
     expect(hits, isEmpty,
@@ -132,4 +122,33 @@ void main() {
     expect(hits.where((p) => p.contains('/ui/')), isEmpty,
         reason: 'UI 自行拼装账户池会与 Engine 的口径漂移：\n  ${hits.join("\n  ")}');
   });
+}
+
+/// 收集所有名为 `engine` 的属性访问 —— 无论接收者叫什么、怎么换行、是否级联。
+/// AST 天然排除字符串字面量与注释，也天然包含字符串插值里的真实表达式。
+class _EngineAccessVisitor extends RecursiveAstVisitor<void> {
+  final List<String> hits = [];
+
+  void _check(String name, AstNode node) {
+    if (name == 'engine') hits.add(node.toSource());
+  }
+
+  @override
+  void visitPropertyAccess(PropertyAccess node) {
+    _check(node.propertyName.name, node);
+    super.visitPropertyAccess(node);
+  }
+
+  @override
+  void visitPrefixedIdentifier(PrefixedIdentifier node) {
+    _check(node.identifier.name, node);
+    super.visitPrefixedIdentifier(node);
+  }
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    final t = node.target;
+    if (t is SimpleIdentifier) _check(t.name, node);
+    super.visitMethodInvocation(node);
+  }
 }

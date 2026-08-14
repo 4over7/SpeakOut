@@ -302,18 +302,22 @@ class AudioDeviceService {
     _disposed = true; // 先立旗，再拆 —— 拆的过程中来的回调也要挡住
     _nativeInput.stopDeviceChangeListener();
 
-    // 故意不 close() 这个 NativeCallable。
-    // 原生回调 deviceChangeListenerProc 会先把函数指针捕获到局部变量 cb，
-    // 之后还要做 4 次 CoreAudio 查询（毫秒级）才真正调用；而
-    // AudioObjectRemovePropertyListener 不等待 in-flight 回调返回。
-    // 也就是说 stopDeviceChangeListener() 返回后仍可能有回调在途，
-    // 此时 close() 释放 trampoline，那次在途调用就是 use-after-free。
+    // 不 close() 这个 NativeCallable，改为解除它对 isolate 的 keep-alive。
     //
-    // 本方法只在 CoreEngine.dispose() → 进程退出路径上被调用一次，
-    // 泄漏一个 trampoline 到进程结束没有代价，而 UAF 是崩溃。
-    // 要真正关掉它得让 native 侧对 in-flight 回调计数并等待 —— 那是独立的
-    // 并发改动，不在本批范围内，不做半吊子。
-    // _deviceChangeCallable?.close();
+    // 为什么不 close：原生回调 deviceChangeListenerProc 先把函数指针捕获到
+    // 局部变量 cb，之后还要做 4 次 CoreAudio 查询（毫秒级）才真正调用，而
+    // AudioObjectRemovePropertyListener 不等待 in-flight 回调返回。
+    // stopDeviceChangeListener() 返回后仍可能有回调在途，此时 close() 释放
+    // trampoline，那次在途调用就是 use-after-free。
+    //
+    // 为什么必须置 keepIsolateAlive=false：listener 默认让创建它的 isolate
+    // 一直存活到 close()。原先写「只在进程退出路径调用，泄漏没有代价」是错的 ——
+    // main.dart:366 在 Widget dispose 里调 AppService.dispose()，后面并没有
+    // exit(0)；测试与 Flutter teardown 也会自然等待 isolate 结束，会被挂住。
+    //
+    // 真正 close 需要 native 侧对 in-flight 回调计数并等待，那是独立的并发
+    // 改动，不在本批做半吊子。配合 _disposed 旗标，在途回调进来即空转返回。
+    _deviceChangeCallable?.keepIsolateAlive = false;
 
     _deviceChangeController.close();
     AppLog.d('[AudioDeviceService] Disposed');

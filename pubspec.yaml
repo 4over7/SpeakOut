@@ -72,6 +72,10 @@ dev_dependencies:
   test: ^1.26.3
   mockito: ^5.6.1
   path_provider_platform_interface: ^2.1.0
+  # 架构断言用 AST 而非正则扫描源码 —— 正则版栽过两次：
+  # 字符串里的 '//' 或 '/*' 能把真实违规从扫描结果里抹掉（漏报），
+  # 字符串里的 '.engine' 又会误报。analyzer 本就在依赖树里（transitive）。
+  analyzer: ^8.4.1
   plugin_platform_interface: ^2.1.0
 
 # For information on the generic Dart part of this file, see the
