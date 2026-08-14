@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../engine/core_engine.dart';
+import '../engine/engine_status.dart';
 import '../ffi/native_input_base.dart';
 // import 'billing_service.dart'; // 暂时隐藏
 import 'config_service.dart';
@@ -31,7 +32,7 @@ class AppService {
   // ════════════════════════════════════════════════════════════
 
   // ── Streams ──
-  Stream<String> get statusStream => engine.statusStream;
+  Stream<EngineStatus> get statusStream => engine.statusStream;
   Stream<(int keyCode, int modifierFlags)> get rawKeyEventStream => engine.rawKeyEventStream;
 
   // ── Getters / setter ──
@@ -120,7 +121,7 @@ class AppService {
       await engine.init();
       return true;
     } catch (e) {
-      engine.updateStatus("❌ 键盘监听失败: $e");
+      engine.updateStatusEvent(EngineStatus.error("❌ 键盘监听失败: $e"));
       return false;
     }
   }
@@ -156,7 +157,7 @@ class AppService {
     // 3. Initialize ASR (HEAVY TASK - Delay significantly)
     // Skip if already initialized (e.g., by onboarding)
     if (engine.isASRReady) {
-      engine.updateStatus("语音模型已就绪");
+      engine.updateStatusEvent(const EngineStatus.ready("语音模型已就绪"));
       await Future.delayed(const Duration(milliseconds: 200));
     } else {
       // Give the UI time to fully settle (1 second) before hitting the CPU hard
@@ -168,7 +169,7 @@ class AppService {
       try {
         await _initASR();
       } catch (e) {
-        engine.updateStatus("❌ 语音模型失败: $e");
+        engine.updateStatusEvent(EngineStatus.error("❌ 语音模型失败: $e"));
       }
     }
     
@@ -179,12 +180,12 @@ class AppService {
     
     // Final Health Check
     if (engine.isListenerRunning) {
-        engine.updateStatus("✅就绪");
+        engine.updateStatusEvent(const EngineStatus.ready("✅就绪"));
         await Future.delayed(const Duration(milliseconds: 500));
         engine.updateStatus(""); // Clear
     } else {
         // Persistent Error - Do NOT Clear
-        engine.updateStatus("❌ 监听启动失败 (请检查权限)");
+        engine.updateStatusEvent(const EngineStatus.error("❌ 监听启动失败 (请检查权限)"));
     }
 
     // 5. Check for updates (non-blocking)

@@ -9,6 +9,7 @@ import 'package:system_tray/system_tray.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'services/config_service.dart';
 import 'ui/settings_page.dart';
+import 'engine/engine_status.dart';
 import 'services/app_service.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
@@ -174,7 +175,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   final AppService _appService = AppService();
   final SystemTray _systemTray = SystemTray();
   
-  String _status = "初始化中...";
+  EngineStatus _status = const EngineStatus.info("初始化中...");
   bool _ready = false;
   String _lastError = "";
   /// 缺少「输入监控 / 辅助功能」时为 true —— 错误横幅据此追加「授权」按钮
@@ -194,7 +195,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   double _downloadProgress = 0;
 
   // Stream subscriptions — cancelled in dispose
-  StreamSubscription<String>? _statusSub;
+  StreamSubscription<EngineStatus>? _statusSub;
   StreamSubscription<AppNotification>? _notifSub;
   StreamSubscription<bool>? _recordingSub;
   StreamSubscription<String>? _resultSub;
@@ -220,27 +221,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     });
     
     // Listen to Engine status
-    _statusSub = _appService.engine.statusStream.listen((msg) {
-      if (mounted) {
-        setState(() {
-           if (msg.startsWith("Error")) {
-             _lastError = msg;
-             _ready = false;
-             _permissionMissing = !(_appService.engine.checkInputMonitoringPermission() &&
-                                    _appService.engine.checkAccessibilityPermission());
-           } else if (msg.startsWith("Warning:")) {
-             // Partial success (e.g. listener running but missing Accessibility)
-             _lastError = msg;
-             _ready = true; // Listener works, but with degraded capability
-             _subscribeToPartialResults();
-           } else if (msg.contains("Trusted: true") || msg.contains("Listener Started") || msg.contains("就绪") || msg.contains("Ready")) {
-             _lastError = ""; // Clear error on successful start
-             _ready = true;
-             _subscribeToPartialResults();
-           }
-          _status = msg;
-        });
-      }
+    _statusSub = _appService.engine.statusStream.listen((status) {
+      if (!mounted) return;
+      setState(() {
+        switch (status.kind) {
+          case EngineStatusKind.error:
+            _lastError = status.message;
+            _ready = false;
+            _permissionMissing = !(_appService.engine.checkInputMonitoringPermission() &&
+                                   _appService.engine.checkAccessibilityPermission());
+          case EngineStatusKind.warning:
+            // 可用但降级（如监听已启动却缺「辅助功能」，注入不可用）
+            _lastError = status.message;
+            _ready = true;
+            _subscribeToPartialResults();
+          case EngineStatusKind.ready:
+            _lastError = "";
+            _ready = true;
+            _subscribeToPartialResults();
+          case EngineStatusKind.info:
+          case EngineStatusKind.idle:
+            break;
+        }
+        _status = status;
+      });
     });
     
     // Subscribe to Notifications
@@ -494,16 +498,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   
   // Hotkey loaded by ConfigService
 
-  String _getLocalizedStatus(String status) {
-    // Basic mapping for known engine statuses
+  /// 状态栏文案。按 kind 判断，不再匹配文案内容 ——
+  /// 此前靠 contains("Listener Started") / startsWith("Error") 这类字面量，
+  /// 改一句话就会失效，本地化后更是必崩。
+  String _getLocalizedStatus(EngineStatus status) {
     final loc = AppLocalizations.of(context)!;
-    if (status.contains("Initializing")) return loc.initializing;
-    if (status.contains("Listener Started")) return ""; // Hidden, showed by Ready Tip
-    if (status.contains("Trusted: true")) return "";
-    // If it's an error, return as is (or map common errors)
-    if (status.startsWith("Error")) return "${loc.error}: ${status.replaceAll("Error", "")}";
-    // Fallback
-    return status; 
+    switch (status.kind) {
+      case EngineStatusKind.idle:
+        return "";
+      case EngineStatusKind.ready:
+        // 就绪由下方「按住 X 说话」提示表达，状态栏留空避免重复
+        return "";
+      case EngineStatusKind.error:
+        return "${loc.error}: ${status.message.replaceFirst(RegExp(r'^Error:?\s*'), '')}";
+      case EngineStatusKind.warning:
+      case EngineStatusKind.info:
+        return status.message;
+    }
   }
 
   @override
@@ -783,7 +794,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                             ),
                             
                             // 4. Progress Circle (Init)
-                            if (!_ready && _status.contains("初始化"))
+                            // 初始化进度圈：未就绪且处于过程态。此前判据是 contains("初始化")，
+                            // 文案一改就失效
+                            if (!_ready && _status.kind == EngineStatusKind.info)
                               Positioned(
                                 top: cy + 120,
                                 left: 0,

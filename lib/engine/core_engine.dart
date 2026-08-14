@@ -13,6 +13,7 @@ import '../services/config_service.dart';
 import '../services/llm_service.dart';
 import '../services/vocab_service.dart';
 import '../services/notification_service.dart';
+import 'engine_status.dart';
 import 'asr_provider.dart';
 import 'asr_result.dart';
 import 'providers/sherpa_provider.dart';
@@ -95,13 +96,18 @@ class CoreEngine {
   int pttKeyCode = 58; 
   
   // Streams
-  final _statusController = StreamController<String>.broadcast();
-  Stream<String> get statusStream => _statusController.stream;
+  final _statusController = StreamController<EngineStatus>.broadcast();
+  Stream<EngineStatus> get statusStream => _statusController.stream;
   
   // Public helper for AppService
+  /// 兼容入口：未指明 kind 时按 info 处理。
+  /// 需要参与 UI 分支判断的状态，请用 updateStatusEvent 显式给出 kind。
   void updateStatus(String msg) {
-    _statusController.add(msg);
+    _statusController.add(
+        msg.isEmpty ? const EngineStatus.idle() : EngineStatus.info(msg));
   }
+
+  void updateStatusEvent(EngineStatus status) => _statusController.add(status);
 
   
   final _recordingController = StreamController<bool>.broadcast();
@@ -228,9 +234,9 @@ class CoreEngine {
     if (!hasInputMonitoring) {
       // Without Input Monitoring, CGEventTapCreate will fail. Don't attempt startup.
       if (!hasAccessibility) {
-        _statusController.add("Error: 需要「输入监控」和「辅助功能」权限，请在系统设置中授权。");
+        _statusController.add(EngineStatus.error("Error: 需要「输入监控」和「辅助功能」权限，请在系统设置中授权。"));
       } else {
-        _statusController.add("Error: 需要「输入监控」权限（用于监听快捷键），请在系统设置 → 隐私与安全性 → 输入监控中授权。");
+        _statusController.add(EngineStatus.error("Error: 需要「输入监控」权限（用于监听快捷键），请在系统设置 → 隐私与安全性 → 输入监控中授权。"));
       }
       _isListenerRunning = false;
       _log("Init aborted: missing Input Monitoring permission.");
@@ -278,14 +284,14 @@ class CoreEngine {
         _log("startListener returned: $started");
         if (started) {
           _isListenerRunning = true;
-          _statusController.add("Keyboard Listener Started.");
+          _statusController.add(EngineStatus.ready("Keyboard Listener Started."));
           _log("Listener start success.");
           // Listener running = Input Monitoring OK. Now verify Accessibility separately.
           final ax = _nativeInput.checkAccessibilityPermission();
           if (ax) {
-            _statusController.add("Accessibility Trusted: true");
+            _statusController.add(EngineStatus.ready("Accessibility Trusted: true"));
           } else {
-            _statusController.add("Warning: 键盘监听已启动，但缺少「辅助功能」权限 — 文本注入将不可用。");
+            _statusController.add(EngineStatus.warning("Warning: 键盘监听已启动，但缺少「辅助功能」权限 — 文本注入将不可用。"));
           }
         } else {
            // Listener failed — re-diagnose which permission is missing
@@ -293,9 +299,9 @@ class CoreEngine {
            final ax = _nativeInput.checkAccessibilityPermission();
            _log("Listener start FAILED. InputMonitoring=$im, Accessibility=$ax");
            if (!im) {
-             _statusController.add("Error: 键盘监听启动失败 — 缺少「输入监控」权限。");
+             _statusController.add(EngineStatus.error("Error: 键盘监听启动失败 — 缺少「输入监控」权限。"));
            } else {
-             _statusController.add("Error: 键盘监听启动失败 — 请检查系统权限设置。");
+             _statusController.add(EngineStatus.error("Error: 键盘监听启动失败 — 请检查系统权限设置。"));
            }
            _isListenerRunning = false;
         }
@@ -360,7 +366,7 @@ class CoreEngine {
         config = ASRProviderFactory.buildConfig(account, asrModel);
         _isOfflineASR = !asrModel.isStreaming;
         _log("Initializing ${cloudProvider.name} ASR (model=${asrModel.name})...");
-        _statusController.add("☁️ 连接 ${cloudProvider.name}...");
+        _statusController.add(EngineStatus.info("☁️ 连接 ${cloudProvider.name}..."));
         // Skip legacy path
         try {
           await provider.initialize(config);
@@ -373,11 +379,11 @@ class CoreEngine {
           });
           _activeModelHasPunctuation = true; // Cloud ASR has built-in punctuation
           _overlay.isOfflineMode = _isOfflineASR;
-          _statusController.add("✅ ${cloudProvider.name} 就绪");
+          _statusController.add(EngineStatus.ready("✅ ${cloudProvider.name} 就绪"));
           _log("ASR Provider initialized: ${provider.type}");
         } catch (e) {
           _log("Cloud ASR Init Failed: $e");
-          _statusController.add("❌ ${cloudProvider.name} 连接失败: $e");
+          _statusController.add(EngineStatus.error("❌ ${cloudProvider.name} 连接失败: $e"));
           _asrProvider = null;
         }
         return;
@@ -393,7 +399,7 @@ class CoreEngine {
         'appKey': ConfigService().aliyunAppKey,
       };
       _log("Initializing Aliyun Provider (legacy)...");
-      _statusController.add("☁️ 连接阿里云 (Connecting)...");
+      _statusController.add(EngineStatus.info("☁️ 连接阿里云 (Connecting)..."));
     } else if (isOfflineModel) {
       // Offline Sherpa (non-streaming, batch recognition)
       provider = OfflineSherpaProvider();
@@ -402,7 +408,7 @@ class CoreEngine {
         'modelType': modelType,
       };
       _log("Initializing Offline Sherpa Provider...");
-      _statusController.add("⏳ 加载模型: $modelName...");
+      _statusController.add(EngineStatus.info("⏳ 加载模型: $modelName..."));
     } else {
       // Default: Sherpa Local (streaming)
       provider = SherpaProvider();
@@ -411,7 +417,7 @@ class CoreEngine {
         'modelType': modelType,
       };
       _log("Initializing Sherpa Provider (Local)...");
-      _statusController.add("⏳ 加载模型: $modelName...");
+      _statusController.add(EngineStatus.info("⏳ 加载模型: $modelName..."));
     }
 
     try {
@@ -437,18 +443,18 @@ class CoreEngine {
   
       
       if (type == 'aliyun') {
-         _statusController.add("✅ 阿里云就绪 (Aliyun Ready)");
+         _statusController.add(EngineStatus.ready("✅ 阿里云就绪 (Aliyun Ready)"));
       } else {
-         _statusController.add("✅ 就绪: $modelName");
+         _statusController.add(EngineStatus.ready("✅ 就绪: $modelName"));
       }
       
       _log("ASR Provider initialized: ${provider.type}");
     } catch (e) {
       _log("Provider Init Failed: $e");
       if (type == 'aliyun') {
-         _statusController.add("❌ 阿里云连接失败: $e");
+         _statusController.add(EngineStatus.error("❌ 阿里云连接失败: $e"));
       } else {
-         _statusController.add("❌ 模型加载失败: $modelName ($e)");
+         _statusController.add(EngineStatus.error("❌ 模型加载失败: $modelName ($e)"));
       }
       _log("ASR Init Failed: $e");
       _asrProvider = null;
@@ -477,14 +483,14 @@ class CoreEngine {
       _punctuationEnabled = true;
       
       if (activeModelName.isNotEmpty) {
-        _statusController.add("✅ 就绪: $activeModelName + 标点");
+        _statusController.add(EngineStatus.ready("✅ 就绪: $activeModelName + 标点"));
       } else {
-        _statusController.add("✅ 就绪: 标点模型已加载");
+        _statusController.add(EngineStatus.ready("✅ 就绪: 标点模型已加载"));
       }
     } catch (e) {
       _punctuationEnabled = false;
       _log("[initPunctuation] Failed: $e");
-      _statusController.add("❌ 标点加载失败: $e");
+      _statusController.add(EngineStatus.error("❌ 标点加载失败: $e"));
     }
   }
   
@@ -827,7 +833,7 @@ class CoreEngine {
     // 1. PERMISSION CHECK
     if (_nativeInput == null || !_nativeInput.checkMicrophonePermission()) {
       _log("Permission DENIED by native check.");
-      _statusController.add("需要麦克风权限");
+      _statusController.add(EngineStatus.error("需要麦克风权限"));
       return;
     }
 
@@ -848,7 +854,7 @@ class CoreEngine {
       if (_asrProvider == null || !_asrProvider!.isReady) {
         _log("ASR Provider not ready!");
         _overlay.updateText("❌ 请先下载语音模型");
-        _statusController.add("引擎未就绪 - 请下载模型");
+        _statusController.add(EngineStatus.error("引擎未就绪 - 请下载模型"));
         await Future.delayed(const Duration(seconds: 2));
         _cleanupRecordingState();
         return;
@@ -888,7 +894,7 @@ class CoreEngine {
       if (!success) {
         _log("Native audio start failed!");
         _cleanupRecordingState();
-        _statusController.add("麦克风启动失败");
+        _statusController.add(EngineStatus.error("麦克风启动失败"));
         return;
       }
       _audioStarted = true;
@@ -973,7 +979,7 @@ class CoreEngine {
     } catch (e) {
       _log("Start Fatal Error: $e");
       _cleanupRecordingState();
-      _statusController.add("启动失败");
+      _statusController.add(EngineStatus.error("启动失败"));
     }
   }
   
@@ -1097,7 +1103,7 @@ class CoreEngine {
     _recordingState = RecordingState.stopping;
     _recordingController.add(false);
     _overlay.hide();
-    _statusController.add("已取消");
+    _statusController.add(EngineStatus.info("已取消"));
 
     // 关音频硬件
     try {
@@ -1145,7 +1151,7 @@ class CoreEngine {
 
     // 1. UI FIRST (Optimistic Update)
     _recordingController.add(false);
-    _statusController.add("处理中...");
+    _statusController.add(EngineStatus.info("处理中..."));
     _overlay.hide();
 
     // Yield to event loop so method channel message is dispatched
@@ -1193,7 +1199,7 @@ class CoreEngine {
       // 云端 ASR 错误（鉴权失败、配额超限等）
       if (asrResult.error != null) {
         _log("ASR Error: ${asrResult.error}");
-        _statusController.add("❌ ${asrResult.error}");
+        _statusController.add(EngineStatus.error("❌ ${asrResult.error}"));
         _overlay.showThenClear("❌ ${asrResult.error}", AppConstants.kErrorDisplayDuration);
         return; // finally block handles cleanup
       }
@@ -1209,7 +1215,7 @@ class CoreEngine {
       final shouldCallLlm = finalText.isNotEmpty && trimmedForCheck.length > 2 &&
           (ConfigService().aiCorrectionEnabled || isQuickTranslate);
       if (shouldCallLlm) {
-        _statusController.add(isQuickTranslate ? "翻译中..." : "AI 润色中...");
+        _statusController.add(EngineStatus.info(isQuickTranslate ? "翻译中..." : "AI 润色中..."));
         _overlay.updateText(isQuickTranslate ? "🌐 Translating..." : "🤖 AI Polishing...");
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
         bool typewriterBegan = false;
@@ -1333,13 +1339,13 @@ class CoreEngine {
 
       if (finalText.isNotEmpty) {
         if (mode == RecordingMode.diary) {
-          _statusController.add("Saving Note...");
+          _statusController.add(EngineStatus.info("Saving Note..."));
           DiaryService().appendNote(finalText).then((err) {
             if (err == null) {
-              _statusController.add("✅ Saved Note");
+              _statusController.add(EngineStatus.info("✅ Saved Note"));
               _overlay.showThenClear("✅ Saved Note", AppConstants.kSuccessDisplayDuration);
             } else {
-              _statusController.add("❌ Save Failed");
+              _statusController.add(EngineStatus.error("❌ Save Failed"));
               _log("Diary Save Error: $err");
             }
           });
@@ -1350,11 +1356,11 @@ class CoreEngine {
           }
           _typewriterInjected = false;
           ChatService().addDictation(finalText, asrOriginal: originalAsrText);
-          _statusController.add("Ready");
+          _statusController.add(EngineStatus.ready("Ready"));
         }
         _log("[PERF] +${sw.elapsedMilliseconds}ms — inject/save done");
       } else {
-        _statusController.add("🔇 No Speech");
+        _statusController.add(EngineStatus.info("🔇 No Speech"));
         _log("[PERF] +${sw.elapsedMilliseconds}ms — no speech detected");
       }
     }
