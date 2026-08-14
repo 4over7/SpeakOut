@@ -26,6 +26,9 @@ void main() {
     final v = _MethodBodyVisitor(methodName);
     unit.accept(v);
     expect(v.body, isNotNull, reason: '没找到方法 $methodName');
+    expect(v.found, 1,
+        reason: 'CoreEngine 里 $methodName 应恰好一个，实际 ${v.found} 个 —— '
+            '多个会让断言指向最后一个，悄悄失效');
     final t = _TimeoutArgVisitor();
     v.body!.accept(t);
     return t.args;
@@ -56,10 +59,11 @@ void main() {
 
     final a = _AppendNoteVisitor();
     v.body!.accept(a);
-    expect(a.node, isNotNull, reason: '没找到 DiaryService().appendNote 调用');
-    expect(a.awaited, isTrue,
-        reason: 'appendNote 退回 fire-and-forget 的话，识别完立刻从托盘退出'
-            '（dispose 后紧跟 exit(0)）会丢掉这条闪念');
+    expect(a.calls, isNotEmpty, reason: '没找到 DiaryService().appendNote 调用');
+    final unawaited = a.calls.where((c) => !c.awaited).map((c) => c.node.toSource());
+    expect(unawaited, isEmpty,
+        reason: '这些 appendNote 调用没有被 await —— 识别完立刻从托盘退出'
+            '（dispose 后紧跟 exit(0)）会丢掉这条闪念：${unawaited.join(", ")}');
 
     final body = v.body!.toSource();
     final chatAt = body.indexOf('ChatService().addUserMessage(finalText)');
@@ -85,6 +89,12 @@ class _MethodBodyVisitor extends RecursiveAstVisitor<void> {
     if (node.name.lexeme != 'CoreEngine') return; // 不递归进其它类
     super.visitClassDeclaration(node);
   }
+
+  /// extension 里的同名方法也要排除。只覆写 visitClassDeclaration 挡不住 ——
+  /// RecursiveAstVisitor 仍会递归进顶层 ExtensionDeclaration（codex 指出，
+  /// 我原注释声称已排除，其实没有）。
+  @override
+  void visitExtensionDeclaration(ExtensionDeclaration node) {}
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
@@ -115,23 +125,32 @@ class _TimeoutArgVisitor extends RecursiveAstVisitor<void> {
   }
 }
 
-/// 找 DiaryService().appendNote(...) 并判断它是否处在 await 表达式下
+/// 找出所有 DiaryService().appendNote(...) 调用，逐个判断是否被 await。
+///
+/// 两处被 codex 指出的缺陷已修：
+///  - 原来所有调用共享一个只增不减的 awaited 标志，
+///    「一处 await + 一处漏 await」会被首个调用蒙混过关 → 改为逐个记录。
+///  - 原来父链遇 FunctionBody 就停，导致
+///    `await Future(() => DiaryService().appendNote(x))` 被误判成未 await。
+///    实测 Future 构造器会展开回调返回的 Future（307ms 的对照实验），
+///    外层 await 确实等到了内层完成，不该报 → 改为父链走到底。
+///    裸调用 `DiaryService().appendNote(x);` 整条父链没有 AwaitExpression，
+///    仍会被正确抓出。
 class _AppendNoteVisitor extends RecursiveAstVisitor<void> {
-  MethodInvocation? node;
-  bool awaited = false;
+  final List<({MethodInvocation node, bool awaited})> calls = [];
 
   @override
   void visitMethodInvocation(MethodInvocation n) {
     if (n.methodName.name == 'appendNote' &&
         (n.target?.toSource() ?? '').contains('DiaryService')) {
-      node = n;
+      var awaited = false;
       for (AstNode? p = n.parent; p != null; p = p.parent) {
         if (p is AwaitExpression) {
           awaited = true;
           break;
         }
-        if (p is FunctionBody) break; // 越过函数体就不算同一个 await
       }
+      calls.add((node: n, awaited: awaited));
     }
     super.visitMethodInvocation(n);
   }
