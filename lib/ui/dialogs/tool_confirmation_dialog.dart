@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:macos_ui/macos_ui.dart';
 
+import '../../l10n/generated/app_localizations.dart';
+
 /// Callback type for HITL confirmation result
 typedef ConfirmCallback = void Function(bool approved);
 
@@ -11,16 +13,17 @@ Future<bool> showToolConfirmationDialog({
   required String toolName,
   required Map<String, dynamic> arguments,
 }) async {
+  final loc = AppLocalizations.of(context)!;
   final result = await showMacosAlertDialog<bool>(
     context: context,
     builder: (_) => MacosAlertDialog(
       appIcon: const Icon(CupertinoIcons.bolt_fill, size: 48, color: CupertinoColors.systemYellow),
-      title: const Text('执行 Agent 命令?'),
+      title: Text(loc.toolConfirmTitle),
       message: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('SpeakOut 想要执行以下操作：'),
+          Text(loc.toolConfirmBody),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -31,9 +34,9 @@ Future<bool> showToolConfirmationDialog({
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('工具: $toolName', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(loc.toolConfirmToolLabel(toolName), style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text('参数: ${_formatArgs(arguments)}', style: const TextStyle(fontSize: 12)),
+                Text(loc.toolConfirmArgsLabel(_formatArgs(arguments, loc)), style: const TextStyle(fontSize: 12)),
               ],
             ),
           ),
@@ -42,13 +45,13 @@ Future<bool> showToolConfirmationDialog({
       primaryButton: PushButton(
         controlSize: ControlSize.large,
         onPressed: () => Navigator.pop(context, true),
-        child: const Text('允许'),
+        child: Text(loc.toolConfirmAllow),
       ),
       secondaryButton: PushButton(
         controlSize: ControlSize.large,
         secondary: true,
         onPressed: () => Navigator.pop(context, false),
-        child: const Text('拒绝'),
+        child: Text(loc.toolConfirmDeny),
       ),
     ),
   );
@@ -56,7 +59,7 @@ Future<bool> showToolConfirmationDialog({
   return result ?? false;
 }
 
-String _formatArgs(Map<String, dynamic> args) {
-  if (args.isEmpty) return '(无)';
+String _formatArgs(Map<String, dynamic> args, AppLocalizations loc) {
+  if (args.isEmpty) return loc.toolConfirmNoArgs;
   return args.entries.map((e) => '${e.key}: ${e.value}').join(', ');
 }

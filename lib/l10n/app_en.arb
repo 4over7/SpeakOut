@@ -606,5 +606,35 @@
     "placeholders": {
       "detail": {}
     }
+  },
+  "toolConfirmTitle": "Run agent command?",
+  "toolConfirmBody": "SpeakOut wants to perform the following action:",
+  "toolConfirmToolLabel": "Tool: {name}",
+  "toolConfirmArgsLabel": "Arguments: {args}",
+  "toolConfirmAllow": "Allow",
+  "toolConfirmDeny": "Deny",
+  "toolConfirmNoArgs": "(none)",
+  "vocabExampleWrong": "recieve",
+  "vocabExampleCorrect": "receive",
+  "vocabEmpty": "No custom entries yet",
+  "vocabMatrixInfo": "AI Polish ✓ + Dictionary ✓ → terms injected into LLM\nAI Polish ✓ + Dictionary ✗ → plain LLM polish\nAI Polish ✗ + Dictionary ✓ → exact replace (offline)\nAI Polish ✗ + Dictionary ✗ → raw ASR output",
+  "modeExtracting": "Extracting...",
+  "commonSaved": "Saved",
+  "llmProviderBailianQwenTurbo": "Alibaba Bailian qwen-turbo",
+  "errorNetworkFailed": "Network connection failed. Please check your network settings.\n\nDetails: {detail}",
+  "@toolConfirmToolLabel": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@toolConfirmArgsLabel": {
+    "placeholders": {
+      "args": {}
+    }
+  },
+  "@errorNetworkFailed": {
+    "placeholders": {
+      "detail": {}
+    }
   }
 }

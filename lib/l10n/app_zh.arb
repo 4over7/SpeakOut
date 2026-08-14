@@ -566,5 +566,35 @@
     "placeholders": {
       "detail": {}
     }
+  },
+  "toolConfirmTitle": "执行 Agent 命令?",
+  "toolConfirmBody": "SpeakOut 想要执行以下操作：",
+  "toolConfirmToolLabel": "工具: {name}",
+  "toolConfirmArgsLabel": "参数: {args}",
+  "toolConfirmAllow": "允许",
+  "toolConfirmDeny": "拒绝",
+  "toolConfirmNoArgs": "(无)",
+  "vocabExampleWrong": "按装",
+  "vocabExampleCorrect": "安装",
+  "vocabEmpty": "尚无自定义词条",
+  "vocabMatrixInfo": "AI 润色 ✓ + 词典 ✓ → 术语注入 LLM\nAI 润色 ✓ + 词典 ✗ → 纯 LLM 润色\nAI 润色 ✗ + 词典 ✓ → 精确替换（离线）\nAI 润色 ✗ + 词典 ✗ → 原始 ASR 输出",
+  "modeExtracting": "解压中...",
+  "commonSaved": "已保存",
+  "llmProviderBailianQwenTurbo": "阿里云百炼 qwen-turbo",
+  "errorNetworkFailed": "网络连接失败，请检查网络设置。\n\n详细信息: {detail}",
+  "@toolConfirmToolLabel": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@toolConfirmArgsLabel": {
+    "placeholders": {
+      "args": {}
+    }
+  },
+  "@errorNetworkFailed": {
+    "placeholders": {
+      "detail": {}
+    }
   }
 }

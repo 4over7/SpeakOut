@@ -93,7 +93,7 @@ class _AboutTabState extends State<AboutTab> {
   Future<void> _copyDiagnostics() async {
     final info = await PackageInfo.fromPlatform();
     final buf = StringBuffer();
-    buf.writeln('SpeakOut 诊断信息');
+    buf.writeln('SpeakOut Diagnostics');
     buf.writeln('==========================');
     buf.writeln('App Version: ${info.version}+${info.buildNumber}');
     buf.writeln('Distribution: ${Distribution.channel}');
@@ -269,11 +269,11 @@ class _AboutTabState extends State<AboutTab> {
                                   final isInstalling = _updateState == UpdateState.installing;
                                   String btnLabel;
                                   if (isReady) {
-                                    btnLabel = '安装并重启';
+                                    btnLabel = loc.updateInstallRestart;
                                   } else if (isDownloading) {
                                     btnLabel = '${(svc.lastProgress * 100).toInt()}%';
                                   } else if (isInstalling) {
-                                    btnLabel = '安装中...';
+                                    btnLabel = loc.updateInstalling;
                                   } else {
                                     btnLabel = svc.canAutoUpdate ? loc.aboutUpdateDownload : loc.updateAction;
                                   }

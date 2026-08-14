@@ -2623,6 +2623,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Type a message...'**
   String get chatInputHint;
+
+  /// No description provided for @toolConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Run agent command?'**
+  String get toolConfirmTitle;
+
+  /// No description provided for @toolConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'SpeakOut wants to perform the following action:'**
+  String get toolConfirmBody;
+
+  /// No description provided for @toolConfirmToolLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool: {name}'**
+  String toolConfirmToolLabel(Object name);
+
+  /// No description provided for @toolConfirmArgsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Arguments: {args}'**
+  String toolConfirmArgsLabel(Object args);
+
+  /// No description provided for @toolConfirmAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get toolConfirmAllow;
+
+  /// No description provided for @toolConfirmDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get toolConfirmDeny;
+
+  /// No description provided for @toolConfirmNoArgs.
+  ///
+  /// In en, this message translates to:
+  /// **'(none)'**
+  String get toolConfirmNoArgs;
+
+  /// No description provided for @vocabExampleWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'recieve'**
+  String get vocabExampleWrong;
+
+  /// No description provided for @vocabExampleCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'receive'**
+  String get vocabExampleCorrect;
+
+  /// No description provided for @vocabEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No custom entries yet'**
+  String get vocabEmpty;
+
+  /// No description provided for @vocabMatrixInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Polish ✓ + Dictionary ✓ → terms injected into LLM\nAI Polish ✓ + Dictionary ✗ → plain LLM polish\nAI Polish ✗ + Dictionary ✓ → exact replace (offline)\nAI Polish ✗ + Dictionary ✗ → raw ASR output'**
+  String get vocabMatrixInfo;
+
+  /// No description provided for @modeExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting...'**
+  String get modeExtracting;
+
+  /// No description provided for @commonSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get commonSaved;
+
+  /// No description provided for @llmProviderBailianQwenTurbo.
+  ///
+  /// In en, this message translates to:
+  /// **'Alibaba Bailian qwen-turbo'**
+  String get llmProviderBailianQwenTurbo;
+
+  /// No description provided for @errorNetworkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Network connection failed. Please check your network settings.\n\nDetails: {detail}'**
+  String errorNetworkFailed(Object detail);
 }
 
 class _AppLocalizationsDelegate

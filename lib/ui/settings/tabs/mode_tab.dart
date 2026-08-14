@@ -347,7 +347,7 @@ class ModeTabState extends State<ModeTab> {
             setState(() {
               _downloadProgressMap[model.id] = p < 0 ? null : p;
               _downloadStatusMap[model.id] = p < 0
-                  ? "解压中..."
+                  ? loc.modeExtracting
                   : loc.downloading((p * 100).toStringAsFixed(0));
             });
           }
@@ -1345,7 +1345,7 @@ class ModeTabState extends State<ModeTab> {
                 await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("已保存"), duration: Duration(seconds: 2)),
+                    SnackBar(content: Text(loc.commonSaved), duration: const Duration(seconds: 2)),
                   );
                 }
               },
@@ -1859,7 +1859,7 @@ class ModeTabState extends State<ModeTab> {
           const SizedBox(height: 8),
           // 数据取自 ADR-005 实测（V4 thinking 默认关闭后的横向对比）。
           // 顺序按实测总耗时排 —— V3 时代 DeepSeek 最快（129ms），V4 之后已退居其后。
-          _buildRecommendItem('阿里云百炼 qwen-turbo', loc.llmTagFastest, '~446ms', loc.llmTagFastestNote),
+          _buildRecommendItem(loc.llmProviderBailianQwenTurbo, loc.llmTagFastest, '~446ms', loc.llmTagFastestNote),
           const SizedBox(height: 4),
           _buildRecommendItem('DeepSeek deepseek-v4-flash', loc.llmTagStable, '~1309ms', loc.llmTagStableNote),
           const SizedBox(height: 6),

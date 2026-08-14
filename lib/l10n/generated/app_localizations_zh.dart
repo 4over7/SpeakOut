@@ -1347,4 +1347,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatInputHint => '输入消息...';
+
+  @override
+  String get toolConfirmTitle => '执行 Agent 命令?';
+
+  @override
+  String get toolConfirmBody => 'SpeakOut 想要执行以下操作：';
+
+  @override
+  String toolConfirmToolLabel(Object name) {
+    return '工具: $name';
+  }
+
+  @override
+  String toolConfirmArgsLabel(Object args) {
+    return '参数: $args';
+  }
+
+  @override
+  String get toolConfirmAllow => '允许';
+
+  @override
+  String get toolConfirmDeny => '拒绝';
+
+  @override
+  String get toolConfirmNoArgs => '(无)';
+
+  @override
+  String get vocabExampleWrong => '按装';
+
+  @override
+  String get vocabExampleCorrect => '安装';
+
+  @override
+  String get vocabEmpty => '尚无自定义词条';
+
+  @override
+  String get vocabMatrixInfo =>
+      'AI 润色 ✓ + 词典 ✓ → 术语注入 LLM\nAI 润色 ✓ + 词典 ✗ → 纯 LLM 润色\nAI 润色 ✗ + 词典 ✓ → 精确替换（离线）\nAI 润色 ✗ + 词典 ✗ → 原始 ASR 输出';
+
+  @override
+  String get modeExtracting => '解压中...';
+
+  @override
+  String get commonSaved => '已保存';
+
+  @override
+  String get llmProviderBailianQwenTurbo => '阿里云百炼 qwen-turbo';
+
+  @override
+  String errorNetworkFailed(Object detail) {
+    return '网络连接失败，请检查网络设置。\n\n详细信息: $detail';
+  }
 }

@@ -1410,4 +1410,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputHint => 'Type a message...';
+
+  @override
+  String get toolConfirmTitle => 'Run agent command?';
+
+  @override
+  String get toolConfirmBody =>
+      'SpeakOut wants to perform the following action:';
+
+  @override
+  String toolConfirmToolLabel(Object name) {
+    return 'Tool: $name';
+  }
+
+  @override
+  String toolConfirmArgsLabel(Object args) {
+    return 'Arguments: $args';
+  }
+
+  @override
+  String get toolConfirmAllow => 'Allow';
+
+  @override
+  String get toolConfirmDeny => 'Deny';
+
+  @override
+  String get toolConfirmNoArgs => '(none)';
+
+  @override
+  String get vocabExampleWrong => 'recieve';
+
+  @override
+  String get vocabExampleCorrect => 'receive';
+
+  @override
+  String get vocabEmpty => 'No custom entries yet';
+
+  @override
+  String get vocabMatrixInfo =>
+      'AI Polish ✓ + Dictionary ✓ → terms injected into LLM\nAI Polish ✓ + Dictionary ✗ → plain LLM polish\nAI Polish ✗ + Dictionary ✓ → exact replace (offline)\nAI Polish ✗ + Dictionary ✗ → raw ASR output';
+
+  @override
+  String get modeExtracting => 'Extracting...';
+
+  @override
+  String get commonSaved => 'Saved';
+
+  @override
+  String get llmProviderBailianQwenTurbo => 'Alibaba Bailian qwen-turbo';
+
+  @override
+  String errorNetworkFailed(Object detail) {
+    return 'Network connection failed. Please check your network settings.\n\nDetails: $detail';
+  }
 }

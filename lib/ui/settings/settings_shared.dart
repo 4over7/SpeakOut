@@ -295,9 +295,10 @@ Map<HotkeyId, String> getActiveHotkeys(BuildContext context, {String? excludeFea
 
 /// Show error dialog
 void showSettingsError(BuildContext context, String msg) {
+  final loc = AppLocalizations.of(context)!;
   String cleanMsg = msg.replaceAll(RegExp(r'uri=https?:\/\/[^\s,]+'), '[URL]');
   if (cleanMsg.contains("ClientException") || cleanMsg.contains("SocketException")) {
-    cleanMsg = "网络连接失败，请检查网络设置。\n\n详细信息: $cleanMsg";
+    cleanMsg = loc.errorNetworkFailed(cleanMsg);
   }
   if (cleanMsg.length > 300) cleanMsg = "${cleanMsg.substring(0, 300)}...";
   showMacosAlertDialog(

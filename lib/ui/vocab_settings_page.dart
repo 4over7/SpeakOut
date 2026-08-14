@@ -68,11 +68,11 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
             children: [
               Text(loc.vocabWrongForm, style: const TextStyle(fontSize: 12)),
               const SizedBox(height: 4),
-              MacosTextField(controller: wrongCtrl, placeholder: "按装"),
+              MacosTextField(controller: wrongCtrl, placeholder: loc.vocabExampleWrong),
               const SizedBox(height: 12),
               Text(loc.vocabCorrectForm, style: const TextStyle(fontSize: 12)),
               const SizedBox(height: 4),
-              MacosTextField(controller: correctCtrl, placeholder: "安装"),
+              MacosTextField(controller: correctCtrl, placeholder: loc.vocabExampleCorrect),
             ],
           ),
           primaryButton: PushButton(
@@ -288,7 +288,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                   if (_userEnabled) ...[
                     const SizedBox(height: 6),
                     if (_userEntries.isEmpty)
-                      Text('尚无自定义词条', style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor, fontSize: 11))
+                      Text(loc.vocabEmpty, style: AppTheme.caption(context).copyWith(color: MacosColors.systemGrayColor, fontSize: 11))
                     else
                       ...List.generate(_userEntries.length, (idx) {
                         final entry = _userEntries[idx];
@@ -330,10 +330,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                   // Matrix info
                   Divider(height: 16, color: AppTheme.getBorder(context)),
                   Text(
-                    'AI 润色 ✓ + 词典 ✓ → 术语注入 LLM\n'
-                    'AI 润色 ✓ + 词典 ✗ → 纯 LLM 润色\n'
-                    'AI 润色 ✗ + 词典 ✓ → 精确替换（离线）\n'
-                    'AI 润色 ✗ + 词典 ✗ → 原始 ASR 输出',
+                    loc.vocabMatrixInfo,
                     style: AppTheme.caption(context).copyWith(fontSize: 10, color: MacosColors.systemGrayColor, height: 1.5),
                   ),
                 ],
