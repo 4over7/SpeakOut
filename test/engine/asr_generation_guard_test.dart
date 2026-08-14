@@ -40,10 +40,8 @@ void main() {
       }
       // 只约束「代次在 start() 里捕获」的 provider —— 那意味着代次绑定的是连接。
       // 批量识别（OpenAI/Groq）在 stop() 里捕获，绑定的是单次请求，不适用。
-      if (!mv.body!.toSource().contains('finalgen=_generation') &&
-          !mv.body!.toSource().contains('final gen = _generation')) {
-        continue;
-      }
+      // toSource() 保留 `=` 两侧空格（实测），只需匹配带空格的形态
+      if (!mv.body!.toSource().contains('final gen = _generation')) continue;
       final cv = _ConnectVisitor();
       mv.body!.accept(cv);
       if (!cv.found) {

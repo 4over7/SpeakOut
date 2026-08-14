@@ -29,6 +29,10 @@ class AliyunProvider implements ASRProvider {
   String? _token;
   DateTime? _tokenExpireTime;
   String? _taskId;
+
+  /// 本会话是否已证实「服务端会原样回带 task_id」。未证实前不做任何过滤，
+  /// 避免服务端规范化格式时把全部消息误丢。每次 start() 复位。
+  bool _taskIdEchoConfirmed = false;
   
   bool _isReady = false;
   
@@ -169,6 +173,7 @@ class AliyunProvider implements ASRProvider {
     
     // Generate new Task ID for this recording session
     _taskId = const Uuid().v4().replaceAll('-', '');
+    _taskIdEchoConfirmed = false;
 
     // Send Start Directive (reusing existing connection)
     final startCmd = {
@@ -212,10 +217,23 @@ class AliyunProvider implements ASRProvider {
       // 设计的，套到复用连接上会把本次录音的消息也全挡掉（我试过，阿里云直接全废）。
       // task_id 每次 start() 重新生成并随 StartTranscription 下发，服务端原样回带，
       // 是复用连接下唯一可靠的会话标识。
-      final msgTaskId = header['task_id'];
-      if (_taskId != null && msgTaskId != null && msgTaskId != _taskId) {
-        AppLog.d('[AliyunProvider] 丢弃过期帧 $name (task ${msgTaskId.toString().substring(0, 8)}… != 当前 ${_taskId!.substring(0, 8)}…)');
-        return;
+      // 「先证实、再过滤」：只有当本会话**确实收到过**一条 task_id 与我们
+      // 下发值完全相同的消息，才认为服务端会原样回带，之后才敢丢弃不匹配的帧。
+      //
+      // 为什么不能直接比对就丢：本项目没有这条 legacy 通道的真实报文
+      // （用户日志里 0 条阿里云记录），我无法证实服务端不会对 task_id 做
+      // 大小写/格式规范化。若它规范化了，无条件比对会把**全部**消息丢掉 ——
+      // 这正是我上一版给 aliyun 加「录音代次」守卫时犯过的错（阿里云直接全废）。
+      // 自适应写法在服务端不回带或格式不一致时永不生效，行为与加过滤前完全一致。
+      final msgTaskId = header['task_id']?.toString();
+      if (msgTaskId != null && _taskId != null) {
+        if (msgTaskId == _taskId) {
+          _taskIdEchoConfirmed = true;
+        } else if (_taskIdEchoConfirmed) {
+          AppLog.d('[AliyunProvider] 丢弃过期帧 $name '
+              '(task ${msgTaskId.substring(0, 8)}… != 当前 ${_taskId!.substring(0, 8)}…)');
+          return;
+        }
       }
       
       if (name == 'TranscriptionStarted') {
