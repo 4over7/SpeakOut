@@ -153,7 +153,9 @@ class _EngineAccessVisitor extends RecursiveAstVisitor<void> {
   /// PropertyAccess，递归下去由上面两个 visit 命中，不会重复计数。
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (node.target != null) _check(node.methodName.name, node);
+    // 不判 target 是否为 null：裸 `engine()`（局部/顶层函数返回 CoreEngine）
+    // 同样是穿透。lib/ui 目前没有这种写法，宁可误报也不留缺口。
+    _check(node.methodName.name, node);
     super.visitMethodInvocation(node);
   }
 }

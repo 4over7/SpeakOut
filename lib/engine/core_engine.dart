@@ -78,6 +78,19 @@ class CoreEngine {
 
   // Recording state machine (replaces _isRecording, _isStopping, _audioStarted, _isDiaryMode)
   RecordingState _recordingState = RecordingState.idle;
+
+  /// 是否还应该把 ring buffer 里的音频喂给 ASR。
+  ///
+  /// 必须包含 stopping：stopRecording 切到 stopping 后会特意等
+  /// kEngineShutdownDelayMs(200ms) 再关硬件，注释写的是「给 ASR 时间处理最后的
+  /// 音频块」—— 但轮询和 _processAudioData 各自守着 `== recording`，
+  /// 这 200ms 里一个字节都没读，用户最后一个音节直接丢掉。
+  /// 两处守卫原本各写各的，合并到这里避免再次漂移。
+  /// cancel 路径也用 stopping，但它设完状态后全是同步语句、紧接着
+  /// _stopAudioSafely() 同步取消定时器，事件循环没机会跑，不会多喂。
+  bool get _shouldConsumeAudio =>
+      _recordingState == RecordingState.recording ||
+      _recordingState == RecordingState.stopping;
   RecordingMode _recordingMode = RecordingMode.ptt;
   bool _audioStarted = false; // hardware-level flag: native audio is running
 
@@ -167,6 +180,9 @@ class CoreEngine {
       _pollBuffer = null;
     }
     _asrProvider?.dispose();
+    _punctuation?.free();
+    _punctuation = null;
+    _punctuationEnabled = false;
   }
 
 
@@ -490,6 +506,11 @@ class CoreEngine {
       final config = sherpa.OfflinePunctuationConfig(
         model: sherpa.OfflinePunctuationModelConfig(ctTransformer: finalPath, numThreads: 2, debug: false),
       );
+      // sherpa 官方注释明写「The user has to invoke OfflinePunctuation.free()
+      // to avoid memory leak」。设置页有 3 个入口会重复调用本方法
+      // （切模型 / 切云账户 / 手动指定标点模型路径），直接覆盖就是每次泄漏一个
+      // 已加载的 CT-Transformer 原生模型。
+      _punctuation?.free();
       _punctuation = sherpa.OfflinePunctuation(config: config);
       _punctuationEnabled = true;
       
@@ -1016,7 +1037,7 @@ class CoreEngine {
   
   /// Poll the C ring buffer and feed audio to ASR pipeline
   void _pollAudioRingBuffer() {
-    if (_recordingState != RecordingState.recording || _nativeInput == null || _pollBuffer == null) return;
+    if (!_shouldConsumeAudio || _nativeInput == null || _pollBuffer == null) return;
     
     final samplesRead = _nativeInput.readAudioBuffer(_pollBuffer!, _pollBufferSamples);
     if (samplesRead <= 0) return;
@@ -1030,7 +1051,7 @@ class CoreEngine {
   }
 
   void _processAudioData(Uint8List data) {
-    if (_recordingState != RecordingState.recording) return;
+    if (!_shouldConsumeAudio) return;
     
     // RAW 16k Int16 -> Float32 (direct passthrough, no gain)
     final int sampleCount = data.length ~/ 2;
@@ -1351,15 +1372,17 @@ class CoreEngine {
       if (finalText.isNotEmpty) {
         if (mode == RecordingMode.diary) {
           _statusController.add(EngineStatus.info("Saving Note..."));
-          DiaryService().appendNote(finalText).then((err) {
-            if (err == null) {
-              _statusController.add(EngineStatus.info("✅ Saved Note"));
-              _overlay.showThenClear("✅ Saved Note", AppConstants.kSuccessDisplayDuration);
-            } else {
-              _statusController.add(EngineStatus.error("❌ Save Failed"));
-              _log("Diary Save Error: $err");
-            }
-          });
+          // 必须 await：原来是 fire-and-forget，用户识别完立刻从托盘退出时
+          // （AppService.dispose() 后紧跟 exit(0)）写盘可能还没完成，这条闪念就没了。
+          // 笔记目录在慢盘 / 外接盘上尤其容易复现。
+          final err = await DiaryService().appendNote(finalText);
+          if (err == null) {
+            _statusController.add(EngineStatus.info("✅ Saved Note"));
+            _overlay.showThenClear("✅ Saved Note", AppConstants.kSuccessDisplayDuration);
+          } else {
+            _statusController.add(EngineStatus.error("❌ Save Failed"));
+            _log("Diary Save Error: $err");
+          }
           ChatService().addUserMessage(finalText);
         } else {
           if (!_typewriterInjected) {
