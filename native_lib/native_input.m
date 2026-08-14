@@ -1551,35 +1551,39 @@ deviceChangeListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddresses,
     if (inAddresses[i].mSelector == kAudioHardwarePropertyDefaultInputDevice) {
       log_to_file("AudioDevice: Default input device changed");
 
-      // 持锁读取并调用，stop 会等这段跑完 —— 不能只把指针拷进局部变量：
-      // 那样只避开了空指针判断的 TOCTOU，避不开「调用时 trampoline 已被释放」。
-      pthread_mutex_lock(&deviceChangeCallbackMutex);
-      DartDeviceChangeCallback cb = deviceChangeCallback;
-      if (cb != NULL) {
-        // Get new device info
-        AudioObjectPropertyAddress propAddr = {
-            kAudioHardwarePropertyDefaultInputDevice,
-            kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+      // 先在**锁外**把设备信息查完 —— 绝不能持锁调 CoreAudio：
+      // stop_device_change_listener() 里 AudioObjectRemovePropertyListener 若
+      // 持 HAL 内部锁等待在途回调返回，而回调正持本锁反过来要 HAL 锁，就是
+      // 锁序反转死锁。锁外查询后，临界区只剩一次立即返回的 trampoline 调用。
+      AudioObjectPropertyAddress propAddr = {
+          kAudioHardwarePropertyDefaultInputDevice,
+          kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
 
-        AudioObjectID deviceID = 0;
-        UInt32 size = sizeof(AudioObjectID);
-        OSStatus status = AudioObjectGetPropertyData(
-            kAudioObjectSystemObject, &propAddr, 0, NULL, &size, &deviceID);
+      AudioObjectID deviceID = 0;
+      UInt32 size = sizeof(AudioObjectID);
+      OSStatus status = AudioObjectGetPropertyData(
+          kAudioObjectSystemObject, &propAddr, 0, NULL, &size, &deviceID);
 
-        if (status == noErr && deviceID != kAudioObjectUnknown) {
-          NSString *uid =
-              getDeviceStringProperty(deviceID, kAudioDevicePropertyDeviceUID);
-          NSString *name = getDeviceStringProperty(
-              deviceID, kAudioDevicePropertyDeviceNameCFString);
-          bool isBluetooth = isBluetoothDevice(deviceID);
+      if (status == noErr && deviceID != kAudioObjectUnknown) {
+        NSString *uid =
+            getDeviceStringProperty(deviceID, kAudioDevicePropertyDeviceUID);
+        NSString *name = getDeviceStringProperty(
+            deviceID, kAudioDevicePropertyDeviceNameCFString);
+        bool isBluetooth = isBluetoothDevice(deviceID);
 
-          if (uid && name) {
-            cb([uid UTF8String], [name UTF8String],
-               isBluetooth ? 1 : 0);
+        if (uid && name) {
+          // 临界区只包住「读指针 + 调用」。不能只把指针拷进局部变量再在锁外调：
+          // 那样只避开了空指针判断的 TOCTOU，避不开「调用时 trampoline 已被释放」。
+          // cb 是 NativeCallable.listener 的 trampoline，投递消息后立即返回，
+          // 所以 stop 最多阻塞这一瞬间。
+          pthread_mutex_lock(&deviceChangeCallbackMutex);
+          DartDeviceChangeCallback cb = deviceChangeCallback;
+          if (cb != NULL) {
+            cb([uid UTF8String], [name UTF8String], isBluetooth ? 1 : 0);
           }
+          pthread_mutex_unlock(&deviceChangeCallbackMutex);
         }
       }
-      pthread_mutex_unlock(&deviceChangeCallbackMutex);
     }
   }
   return noErr;
