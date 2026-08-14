@@ -98,13 +98,13 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
               const Spacer(),
               GestureDetector(
                 onTap: () => _importAccounts(),
-                child: Text('导入', style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
+                child: Text(loc.cloudAccountImport, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
               ),
               if (_accounts.isNotEmpty) ...[
                 const SizedBox(width: 12),
                 GestureDetector(
                   onTap: () => _exportAccounts(),
-                  child: Text('导出', style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
+                  child: Text(loc.cloudAccountExport, style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context))),
                 ),
               ],
               const SizedBox(width: 12),
@@ -155,6 +155,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
       _accounts.where((a) => !_isPrimary(a)).toList();
 
   Widget _buildMoreProvidersToggle() {
+    final loc = AppLocalizations.of(context)!;
     final n = _otherAccounts.length;
     return GestureDetector(
       onTap: () => setState(() => _showMoreProviders = !_showMoreProviders),
@@ -172,7 +173,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             ),
             const SizedBox(width: 6),
             Text(
-              _showMoreProviders ? '收起其他服务商' : '更多服务商（$n）',
+              _showMoreProviders ? loc.cloudAccountCollapseMore : loc.cloudAccountShowMore(n.toString()),
               style: TextStyle(fontSize: 12, color: AppTheme.getAccent(context)),
             ),
           ],
@@ -182,6 +183,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   }
 
   Future<void> _importAccounts() async {
+    final loc = AppLocalizations.of(context)!;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -194,20 +196,23 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: const MacosIcon(CupertinoIcons.cloud_download, size: 48),
-        title: const Text('导入完成'),
-        message: Text(count > 0 ? '成功导入 $count 个云服务账户' : '没有新账户需要导入（已存在的服务商会跳过）'),
+        title: Text(loc.cloudAccountImportDone),
+        message: Text(count > 0
+            ? loc.cloudAccountImportedN(count.toString())
+            : loc.cloudAccountImportedNone),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('确定'),
+          child: Text(loc.ok),
         ),
       ),
     );
   }
 
   Future<void> _exportAccounts() async {
+    final loc = AppLocalizations.of(context)!;
     final path = await FilePicker.platform.saveFile(
-      dialogTitle: '导出云服务账户',
+      dialogTitle: loc.cloudAccountExportTitle,
       fileName: 'speakout_cloud_accounts.json',
       allowedExtensions: ['json'],
       type: FileType.custom,
@@ -219,12 +224,14 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
       context: context,
       builder: (_) => MacosAlertDialog(
         appIcon: MacosIcon(ok ? CupertinoIcons.checkmark_circle : CupertinoIcons.xmark_circle, size: 48),
-        title: Text(ok ? '导出成功' : '导出失败'),
-        message: Text(ok ? '已导出 ${_accounts.length} 个云服务账户\n注意：文件含明文凭证，请妥善保管' : '写入文件失败'),
+        title: Text(ok ? loc.cloudAccountExportOk : loc.cloudAccountExportFail),
+        message: Text(ok
+            ? loc.cloudAccountExportedN(_accounts.length.toString())
+            : loc.cloudAccountWriteFail),
         primaryButton: PushButton(
           controlSize: ControlSize.large,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('确定'),
+          child: Text(loc.ok),
         ),
       ),
     );
@@ -284,7 +291,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.getAccent(context).withValues(alpha: 0.4)),
                   ),
-                  child: Text('配置', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
+                  child: Text(loc.cloudAccountConfigure, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context), fontWeight: FontWeight.w500)),
                 ),
               ),
           ],
@@ -314,7 +321,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
             if (hasKeys) ...[
               GestureDetector(
                 onTap: () => _showAddEditDialog(context, loc, existingAccount: account),
-                child: Text('编辑', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
+                child: Text(loc.cloudAccountEditShort, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
               ),
               const SizedBox(width: 12),
               GestureDetector(
@@ -574,7 +581,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                                   );
                                   results.add((ok, 'LLM: $msg'));
                                 } else {
-                                  results.add((false, 'LLM: API Key 未填写'));
+                                  results.add((false, loc.credCheckLlmMissing));
                                 }
                               }
 
@@ -585,9 +592,9 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                                     .toList();
                                 final allFilled = asrFields.every((f) => (credControllers[f.key]?.text ?? '').isNotEmpty);
                                 if (allFilled && asrFields.isNotEmpty) {
-                                  results.add((true, 'ASR: 凭证已填写（需实际录音验证）'));
+                                  results.add((true, loc.credCheckAsrFilled));
                                 } else {
-                                  results.add((false, 'ASR: 凭证未完整填写'));
+                                  results.add((false, loc.credCheckAsrMissing));
                                 }
                               }
 
@@ -595,7 +602,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                             },
                             child: testLoading
                               ? const SizedBox(width: 16, height: 16, child: ProgressCircle(value: null))
-                              : const Text('测试连接'),
+                              : Text(loc.cloudAccountTestConn),
                           ),
                           const Spacer(),
                         ],
@@ -662,6 +669,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
 
   /// Build credential fields grouped by scope (通用 / ASR / LLM)
   Widget _buildCredentialFieldsGrouped(CloudProvider provider, Map<String, TextEditingController> controllers, {Set<String>? visibleSecrets, void Function(void Function())? setDialogState}) {
+    final loc = AppLocalizations.of(context)!;
     final universal = provider.credentialFields.where((f) => f.scope.isEmpty).toList();
     final asrOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.asrStreaming) || f.scope.contains(CloudCapability.asrBatch)).toList();
     final llmOnly = provider.credentialFields.where((f) => f.scope.contains(CloudCapability.llm)).toList();
@@ -675,7 +683,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
         if (universal.isNotEmpty) ...[
           if (hasGroups) _buildSectionCard(
             icon: CupertinoIcons.lock_shield,
-            label: '通用凭证',
+            label: loc.credGroupUniversal,
             color: MacosColors.systemGrayColor,
             fields: universal,
             controllers: controllers,
@@ -690,7 +698,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           if (universal.isNotEmpty) const SizedBox(height: 8),
           _buildSectionCard(
             icon: CupertinoIcons.waveform,
-            label: '语音识别 (ASR)',
+            label: loc.credGroupAsr,
             color: MacosColors.systemBlueColor,
             fields: asrOnly,
             controllers: controllers,
@@ -703,7 +711,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
           if (universal.isNotEmpty || asrOnly.isNotEmpty) const SizedBox(height: 8),
           _buildSectionCard(
             icon: CupertinoIcons.sparkles,
-            label: '大语言模型 (LLM)',
+            label: loc.credGroupLlm,
             color: MacosColors.systemOrangeColor,
             fields: llmOnly,
             controllers: controllers,

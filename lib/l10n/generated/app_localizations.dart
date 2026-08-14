@@ -2395,6 +2395,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account deleted'**
   String get cloudAccountDeleted;
+
+  /// No description provided for @cloudAccountImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get cloudAccountImport;
+
+  /// No description provided for @cloudAccountExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get cloudAccountExport;
+
+  /// No description provided for @cloudAccountCollapseMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse other providers'**
+  String get cloudAccountCollapseMore;
+
+  /// No description provided for @cloudAccountShowMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More providers ({count})'**
+  String cloudAccountShowMore(Object count);
+
+  /// No description provided for @cloudAccountImportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Import complete'**
+  String get cloudAccountImportDone;
+
+  /// No description provided for @cloudAccountImportedN.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} cloud account(s)'**
+  String cloudAccountImportedN(Object count);
+
+  /// No description provided for @cloudAccountImportedNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing new to import (existing providers are skipped)'**
+  String get cloudAccountImportedNone;
+
+  /// No description provided for @cloudAccountExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export cloud accounts'**
+  String get cloudAccountExportTitle;
+
+  /// No description provided for @cloudAccountExportOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Export succeeded'**
+  String get cloudAccountExportOk;
+
+  /// No description provided for @cloudAccountExportFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get cloudAccountExportFail;
+
+  /// No description provided for @cloudAccountExportedN.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported {count} cloud account(s)\nNote: the file contains plaintext credentials — store it safely'**
+  String cloudAccountExportedN(Object count);
+
+  /// No description provided for @cloudAccountWriteFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to write file'**
+  String get cloudAccountWriteFail;
+
+  /// No description provided for @cloudAccountConfigure.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure'**
+  String get cloudAccountConfigure;
+
+  /// No description provided for @cloudAccountEditShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get cloudAccountEditShort;
+
+  /// No description provided for @cloudAccountTestConn.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get cloudAccountTestConn;
+
+  /// No description provided for @credGroupUniversal.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared credentials'**
+  String get credGroupUniversal;
+
+  /// No description provided for @credGroupAsr.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition (ASR)'**
+  String get credGroupAsr;
+
+  /// No description provided for @credGroupLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'Large language model (LLM)'**
+  String get credGroupLlm;
+
+  /// No description provided for @credCheckLlmMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM: API key is empty'**
+  String get credCheckLlmMissing;
+
+  /// No description provided for @credCheckAsrFilled.
+  ///
+  /// In en, this message translates to:
+  /// **'ASR: credentials filled (verify by recording)'**
+  String get credCheckAsrFilled;
+
+  /// No description provided for @credCheckAsrMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'ASR: credentials incomplete'**
+  String get credCheckAsrMissing;
 }
 
 class _AppLocalizationsDelegate

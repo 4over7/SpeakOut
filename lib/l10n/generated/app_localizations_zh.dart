@@ -1221,4 +1221,73 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cloudAccountDeleted => '账户已删除';
+
+  @override
+  String get cloudAccountImport => '导入';
+
+  @override
+  String get cloudAccountExport => '导出';
+
+  @override
+  String get cloudAccountCollapseMore => '收起其他服务商';
+
+  @override
+  String cloudAccountShowMore(Object count) {
+    return '更多服务商（$count）';
+  }
+
+  @override
+  String get cloudAccountImportDone => '导入完成';
+
+  @override
+  String cloudAccountImportedN(Object count) {
+    return '成功导入 $count 个云服务账户';
+  }
+
+  @override
+  String get cloudAccountImportedNone => '没有新账户需要导入（已存在的服务商会跳过）';
+
+  @override
+  String get cloudAccountExportTitle => '导出云服务账户';
+
+  @override
+  String get cloudAccountExportOk => '导出成功';
+
+  @override
+  String get cloudAccountExportFail => '导出失败';
+
+  @override
+  String cloudAccountExportedN(Object count) {
+    return '已导出 $count 个云服务账户\n注意：文件含明文凭证，请妥善保管';
+  }
+
+  @override
+  String get cloudAccountWriteFail => '写入文件失败';
+
+  @override
+  String get cloudAccountConfigure => '配置';
+
+  @override
+  String get cloudAccountEditShort => '编辑';
+
+  @override
+  String get cloudAccountTestConn => '测试连接';
+
+  @override
+  String get credGroupUniversal => '通用凭证';
+
+  @override
+  String get credGroupAsr => '语音识别 (ASR)';
+
+  @override
+  String get credGroupLlm => '大语言模型 (LLM)';
+
+  @override
+  String get credCheckLlmMissing => 'LLM: API Key 未填写';
+
+  @override
+  String get credCheckAsrFilled => 'ASR: 凭证已填写（需实际录音验证）';
+
+  @override
+  String get credCheckAsrMissing => 'ASR: 凭证未完整填写';
 }

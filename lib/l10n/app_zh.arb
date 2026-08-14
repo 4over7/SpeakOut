@@ -498,5 +498,41 @@
     "placeholders": {
       "name": {}
     }
+  },
+  "cloudAccountImport": "导入",
+  "cloudAccountExport": "导出",
+  "cloudAccountCollapseMore": "收起其他服务商",
+  "cloudAccountShowMore": "更多服务商（{count}）",
+  "cloudAccountImportDone": "导入完成",
+  "cloudAccountImportedN": "成功导入 {count} 个云服务账户",
+  "cloudAccountImportedNone": "没有新账户需要导入（已存在的服务商会跳过）",
+  "cloudAccountExportTitle": "导出云服务账户",
+  "cloudAccountExportOk": "导出成功",
+  "cloudAccountExportFail": "导出失败",
+  "cloudAccountExportedN": "已导出 {count} 个云服务账户\n注意：文件含明文凭证，请妥善保管",
+  "cloudAccountWriteFail": "写入文件失败",
+  "cloudAccountConfigure": "配置",
+  "cloudAccountEditShort": "编辑",
+  "cloudAccountTestConn": "测试连接",
+  "credGroupUniversal": "通用凭证",
+  "credGroupAsr": "语音识别 (ASR)",
+  "credGroupLlm": "大语言模型 (LLM)",
+  "credCheckLlmMissing": "LLM: API Key 未填写",
+  "credCheckAsrFilled": "ASR: 凭证已填写（需实际录音验证）",
+  "credCheckAsrMissing": "ASR: 凭证未完整填写",
+  "@cloudAccountShowMore": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@cloudAccountImportedN": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@cloudAccountExportedN": {
+    "placeholders": {
+      "count": {}
+    }
   }
 }

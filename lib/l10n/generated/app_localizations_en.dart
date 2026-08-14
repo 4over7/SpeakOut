@@ -1282,4 +1282,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudAccountDeleted => 'Account deleted';
+
+  @override
+  String get cloudAccountImport => 'Import';
+
+  @override
+  String get cloudAccountExport => 'Export';
+
+  @override
+  String get cloudAccountCollapseMore => 'Collapse other providers';
+
+  @override
+  String cloudAccountShowMore(Object count) {
+    return 'More providers ($count)';
+  }
+
+  @override
+  String get cloudAccountImportDone => 'Import complete';
+
+  @override
+  String cloudAccountImportedN(Object count) {
+    return 'Imported $count cloud account(s)';
+  }
+
+  @override
+  String get cloudAccountImportedNone =>
+      'Nothing new to import (existing providers are skipped)';
+
+  @override
+  String get cloudAccountExportTitle => 'Export cloud accounts';
+
+  @override
+  String get cloudAccountExportOk => 'Export succeeded';
+
+  @override
+  String get cloudAccountExportFail => 'Export failed';
+
+  @override
+  String cloudAccountExportedN(Object count) {
+    return 'Exported $count cloud account(s)\nNote: the file contains plaintext credentials — store it safely';
+  }
+
+  @override
+  String get cloudAccountWriteFail => 'Failed to write file';
+
+  @override
+  String get cloudAccountConfigure => 'Configure';
+
+  @override
+  String get cloudAccountEditShort => 'Edit';
+
+  @override
+  String get cloudAccountTestConn => 'Test connection';
+
+  @override
+  String get credGroupUniversal => 'Shared credentials';
+
+  @override
+  String get credGroupAsr => 'Speech recognition (ASR)';
+
+  @override
+  String get credGroupLlm => 'Large language model (LLM)';
+
+  @override
+  String get credCheckLlmMissing => 'LLM: API key is empty';
+
+  @override
+  String get credCheckAsrFilled =>
+      'ASR: credentials filled (verify by recording)';
+
+  @override
+  String get credCheckAsrMissing => 'ASR: credentials incomplete';
 }

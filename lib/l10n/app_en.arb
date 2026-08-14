@@ -538,5 +538,41 @@
     "placeholders": {
       "name": {}
     }
+  },
+  "cloudAccountImport": "Import",
+  "cloudAccountExport": "Export",
+  "cloudAccountCollapseMore": "Collapse other providers",
+  "cloudAccountShowMore": "More providers ({count})",
+  "cloudAccountImportDone": "Import complete",
+  "cloudAccountImportedN": "Imported {count} cloud account(s)",
+  "cloudAccountImportedNone": "Nothing new to import (existing providers are skipped)",
+  "cloudAccountExportTitle": "Export cloud accounts",
+  "cloudAccountExportOk": "Export succeeded",
+  "cloudAccountExportFail": "Export failed",
+  "cloudAccountExportedN": "Exported {count} cloud account(s)\nNote: the file contains plaintext credentials — store it safely",
+  "cloudAccountWriteFail": "Failed to write file",
+  "cloudAccountConfigure": "Configure",
+  "cloudAccountEditShort": "Edit",
+  "cloudAccountTestConn": "Test connection",
+  "credGroupUniversal": "Shared credentials",
+  "credGroupAsr": "Speech recognition (ASR)",
+  "credGroupLlm": "Large language model (LLM)",
+  "credCheckLlmMissing": "LLM: API key is empty",
+  "credCheckAsrFilled": "ASR: credentials filled (verify by recording)",
+  "credCheckAsrMissing": "ASR: credentials incomplete",
+  "@cloudAccountShowMore": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@cloudAccountImportedN": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@cloudAccountExportedN": {
+    "placeholders": {
+      "count": {}
+    }
   }
 }
