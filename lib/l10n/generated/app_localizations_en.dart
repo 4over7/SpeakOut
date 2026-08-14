@@ -24,14 +24,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inputLanguage => 'Input Language';
 
   @override
-  String get inputLanguageDesc => 'Language you speak';
-
-  @override
   String get outputLanguage => 'Output Language';
-
-  @override
-  String get outputLanguageDesc =>
-      'Language for text output. Auto-translates when different from input';
 
   @override
   String get langAutoDetect => 'Auto-detect';
@@ -107,39 +100,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get disabled => 'Disabled';
 
   @override
-  String get apiConfig => 'API Config (OpenAI Compatible)';
-
-  @override
   String get systemPrompt => 'System Prompt';
 
   @override
   String get resetDefault => 'Reset Default';
 
   @override
-  String get triggerKey => 'Trigger Key (PTT)';
-
-  @override
-  String get triggerKeyDesc =>
-      'Hold key to speak, release to input. Supports all keys (incl. FN).';
-
-  @override
   String get pressAnyKey => 'Press any key...';
-
-  @override
-  String get activeEngine => 'Active Voice Engine';
-
-  @override
-  String get engineLocal => '🔒 Local Offline Model (Privacy)';
-
-  @override
-  String get engineLocalDesc =>
-      'Fully offline, privacy protected. No internet required.';
-
-  @override
-  String get engineCloud => '☁️ Aliyun Smart Voice (Cloud)';
-
-  @override
-  String get engineCloudDesc => 'Higher accuracy via cloud. Requires API Key.';
 
   @override
   String get aliyunConfig => 'Aliyun Config';
@@ -227,9 +194,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get organizeHotkey => 'Organize Hotkey';
 
   @override
-  String get organizeHotkeyHint => 'Select text then press this hotkey';
-
-  @override
   String get organizePrompt => 'Organize Instructions';
 
   @override
@@ -261,25 +225,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diaryMode => 'Flash Note';
 
   @override
-  String get diaryTrigger => 'Note Hotkey';
-
-  @override
   String get diaryPath => 'Save Directory';
-
-  @override
-  String get createFolder => 'New Folder';
-
-  @override
-  String get folderCreated => 'Folder Created';
-
-  @override
-  String get chooseFile => 'Choose File...';
-
-  @override
-  String get diarySaved => 'Saved to Note';
-
-  @override
-  String get engineType => 'Engine Type';
 
   @override
   String get punctuationModel => 'Punctuation Model';
@@ -287,19 +233,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get punctuationModelDesc =>
       'Automatically adds punctuation to recognized text. This model is required.';
-
-  @override
-  String get asrModels => 'Speech Recognition Models';
-
-  @override
-  String get asrModelsDesc =>
-      'Please download and activate at least one ASR model to use voice input.';
-
-  @override
-  String get required => 'Required';
-
-  @override
-  String get pickOne => 'Pick One';
 
   @override
   String get llmProvider => 'LLM Provider';
@@ -548,12 +481,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toggleModeTip => 'Tap to Toggle';
 
   @override
-  String get textInjection => 'Text Input (IME)';
-
-  @override
-  String get recordingProtection => 'Recording Protection';
-
-  @override
   String get toggleMaxDuration => 'Max Recording Duration';
 
   @override
@@ -582,9 +509,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get manualDownload => 'Manual Download';
 
   @override
-  String get importModelDesc => 'Select a downloaded .tar.bz2 model file';
-
-  @override
   String get importing => 'Importing...';
 
   @override
@@ -611,27 +535,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabAiPolish => 'AI Polish';
 
   @override
-  String get aiPolishDesc =>
-      'Use LLM to polish speech results with professional vocabulary context.';
-
-  @override
   String get vocabEnhancement => 'Professional Vocab';
-
-  @override
-  String get vocabEnhancementSubtitle =>
-      'Provide terminology hints to AI for better domain recognition';
-
-  @override
-  String get vocabEnabled => 'Enable Professional Vocab';
 
   @override
   String get vocabIndustryPresets => 'Industry Preset Dictionaries';
 
   @override
   String get vocabCustomVocab => 'Personal Dictionary';
-
-  @override
-  String get vocabCustomEnabled => 'Enable Personal Dictionary';
 
   @override
   String get vocabAddEntry => 'Add Entry';
@@ -641,9 +551,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vocabCorrectForm => 'Correct form';
-
-  @override
-  String get vocabDelete => 'Delete';
 
   @override
   String get vocabTech => 'Software/IT';
@@ -679,10 +586,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vocabImportTsv => 'Import File';
-
-  @override
-  String get vocabImportTsvDesc =>
-      'TSV or CSV format, one entry per line: wrong<Tab>correct';
 
   @override
   String vocabImportSuccess(Object count) {
@@ -736,9 +639,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateManualDownload => 'Open Download Page';
 
   @override
-  String get llmRewrite => 'LLM Rewrite';
-
-  @override
   String get aiPolishMatrix =>
       'LLM ✓ + Vocab ✓ → Terms injected into LLM for smart correction\nLLM ✓ + Vocab ✗ → Pure LLM polish\nLLM ✗ + Vocab ✓ → Dictionary exact replacement (works offline)\nLLM ✗ + Vocab ✗ → Raw ASR output';
 
@@ -750,9 +650,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudAccountEdit => 'Edit';
-
-  @override
-  String get cloudAccountDelete => 'Delete';
 
   @override
   String get cloudAccountCapabilityAsr => 'Speech Recognition';
@@ -773,25 +670,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudAccountGoConfig => 'Go to Cloud Accounts';
 
   @override
-  String get cloudAccountSaved => 'Account saved';
-
-  @override
-  String get cloudAccountDeleted => 'Account deleted';
-
-  @override
-  String get cloudAccountDeleteConfirm => 'Delete this account?';
-
-  @override
   String get cloudAccountProvider => 'Provider';
 
   @override
   String get cloudAccountName => 'Display Name';
-
-  @override
-  String get cloudAccountEnabled => 'Enabled';
-
-  @override
-  String get languageSettings => 'Language';
 
   @override
   String get cloudAsrLangUnsupported =>
@@ -867,9 +749,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap = toggle recording, Hold = push-to-talk';
 
   @override
-  String get shortcutsSplitTitle => 'Record Key (PTT / Toggle separately)';
-
-  @override
   String get shortcutsPttTitle => 'Push-to-Talk (PTT)';
 
   @override
@@ -940,9 +819,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hotkeyRecordTranslateHint =>
       'After selecting text, press to translate';
-
-  @override
-  String get overviewWelcome => 'Welcome to SpeakOut';
 
   @override
   String get overviewTagline =>
@@ -1082,9 +958,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionCopied => 'Copied';
-
-  @override
-  String get permissionsSectionTitle => 'System Permissions';
 
   @override
   String get permissionsReauthTip =>
@@ -1398,4 +1271,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportConfigWith => 'Include keys';
+
+  @override
+  String get cloudAccountDelete => 'Delete account';
+
+  @override
+  String cloudAccountDeleteConfirm(Object name) {
+    return 'Delete \"$name\"? Its saved credentials will be removed. You can set it up again later.';
+  }
+
+  @override
+  String get cloudAccountDeleted => 'Account deleted';
 }

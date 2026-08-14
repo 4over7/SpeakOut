@@ -128,23 +128,11 @@ abstract class AppLocalizations {
   /// **'Input Language'**
   String get inputLanguage;
 
-  /// No description provided for @inputLanguageDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Language you speak'**
-  String get inputLanguageDesc;
-
   /// No description provided for @outputLanguage.
   ///
   /// In en, this message translates to:
   /// **'Output Language'**
   String get outputLanguage;
-
-  /// No description provided for @outputLanguageDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Language for text output. Auto-translates when different from input'**
-  String get outputLanguageDesc;
 
   /// No description provided for @langAutoDetect.
   ///
@@ -284,12 +272,6 @@ abstract class AppLocalizations {
   /// **'Disabled'**
   String get disabled;
 
-  /// No description provided for @apiConfig.
-  ///
-  /// In en, this message translates to:
-  /// **'API Config (OpenAI Compatible)'**
-  String get apiConfig;
-
   /// No description provided for @systemPrompt.
   ///
   /// In en, this message translates to:
@@ -302,53 +284,11 @@ abstract class AppLocalizations {
   /// **'Reset Default'**
   String get resetDefault;
 
-  /// No description provided for @triggerKey.
-  ///
-  /// In en, this message translates to:
-  /// **'Trigger Key (PTT)'**
-  String get triggerKey;
-
-  /// No description provided for @triggerKeyDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold key to speak, release to input. Supports all keys (incl. FN).'**
-  String get triggerKeyDesc;
-
   /// No description provided for @pressAnyKey.
   ///
   /// In en, this message translates to:
   /// **'Press any key...'**
   String get pressAnyKey;
-
-  /// No description provided for @activeEngine.
-  ///
-  /// In en, this message translates to:
-  /// **'Active Voice Engine'**
-  String get activeEngine;
-
-  /// No description provided for @engineLocal.
-  ///
-  /// In en, this message translates to:
-  /// **'🔒 Local Offline Model (Privacy)'**
-  String get engineLocal;
-
-  /// No description provided for @engineLocalDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Fully offline, privacy protected. No internet required.'**
-  String get engineLocalDesc;
-
-  /// No description provided for @engineCloud.
-  ///
-  /// In en, this message translates to:
-  /// **'☁️ Aliyun Smart Voice (Cloud)'**
-  String get engineCloud;
-
-  /// No description provided for @engineCloudDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Higher accuracy via cloud. Requires API Key.'**
-  String get engineCloudDesc;
 
   /// No description provided for @aliyunConfig.
   ///
@@ -506,12 +446,6 @@ abstract class AppLocalizations {
   /// **'Organize Hotkey'**
   String get organizeHotkey;
 
-  /// No description provided for @organizeHotkeyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Select text then press this hotkey'**
-  String get organizeHotkeyHint;
-
   /// No description provided for @organizePrompt.
   ///
   /// In en, this message translates to:
@@ -572,47 +506,11 @@ abstract class AppLocalizations {
   /// **'Flash Note'**
   String get diaryMode;
 
-  /// No description provided for @diaryTrigger.
-  ///
-  /// In en, this message translates to:
-  /// **'Note Hotkey'**
-  String get diaryTrigger;
-
   /// No description provided for @diaryPath.
   ///
   /// In en, this message translates to:
   /// **'Save Directory'**
   String get diaryPath;
-
-  /// No description provided for @createFolder.
-  ///
-  /// In en, this message translates to:
-  /// **'New Folder'**
-  String get createFolder;
-
-  /// No description provided for @folderCreated.
-  ///
-  /// In en, this message translates to:
-  /// **'Folder Created'**
-  String get folderCreated;
-
-  /// No description provided for @chooseFile.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose File...'**
-  String get chooseFile;
-
-  /// No description provided for @diarySaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Saved to Note'**
-  String get diarySaved;
-
-  /// No description provided for @engineType.
-  ///
-  /// In en, this message translates to:
-  /// **'Engine Type'**
-  String get engineType;
 
   /// No description provided for @punctuationModel.
   ///
@@ -625,30 +523,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatically adds punctuation to recognized text. This model is required.'**
   String get punctuationModelDesc;
-
-  /// No description provided for @asrModels.
-  ///
-  /// In en, this message translates to:
-  /// **'Speech Recognition Models'**
-  String get asrModels;
-
-  /// No description provided for @asrModelsDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Please download and activate at least one ASR model to use voice input.'**
-  String get asrModelsDesc;
-
-  /// No description provided for @required.
-  ///
-  /// In en, this message translates to:
-  /// **'Required'**
-  String get required;
-
-  /// No description provided for @pickOne.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick One'**
-  String get pickOne;
 
   /// No description provided for @llmProvider.
   ///
@@ -1100,18 +974,6 @@ abstract class AppLocalizations {
   /// **'Tap to Toggle'**
   String get toggleModeTip;
 
-  /// No description provided for @textInjection.
-  ///
-  /// In en, this message translates to:
-  /// **'Text Input (IME)'**
-  String get textInjection;
-
-  /// No description provided for @recordingProtection.
-  ///
-  /// In en, this message translates to:
-  /// **'Recording Protection'**
-  String get recordingProtection;
-
   /// No description provided for @toggleMaxDuration.
   ///
   /// In en, this message translates to:
@@ -1159,12 +1021,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manual Download'**
   String get manualDownload;
-
-  /// No description provided for @importModelDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Select a downloaded .tar.bz2 model file'**
-  String get importModelDesc;
 
   /// No description provided for @importing.
   ///
@@ -1214,29 +1070,11 @@ abstract class AppLocalizations {
   /// **'AI Polish'**
   String get tabAiPolish;
 
-  /// No description provided for @aiPolishDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Use LLM to polish speech results with professional vocabulary context.'**
-  String get aiPolishDesc;
-
   /// No description provided for @vocabEnhancement.
   ///
   /// In en, this message translates to:
   /// **'Professional Vocab'**
   String get vocabEnhancement;
-
-  /// No description provided for @vocabEnhancementSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Provide terminology hints to AI for better domain recognition'**
-  String get vocabEnhancementSubtitle;
-
-  /// No description provided for @vocabEnabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable Professional Vocab'**
-  String get vocabEnabled;
 
   /// No description provided for @vocabIndustryPresets.
   ///
@@ -1249,12 +1087,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Personal Dictionary'**
   String get vocabCustomVocab;
-
-  /// No description provided for @vocabCustomEnabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable Personal Dictionary'**
-  String get vocabCustomEnabled;
 
   /// No description provided for @vocabAddEntry.
   ///
@@ -1273,12 +1105,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Correct form'**
   String get vocabCorrectForm;
-
-  /// No description provided for @vocabDelete.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete'**
-  String get vocabDelete;
 
   /// No description provided for @vocabTech.
   ///
@@ -1345,12 +1171,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import File'**
   String get vocabImportTsv;
-
-  /// No description provided for @vocabImportTsvDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'TSV or CSV format, one entry per line: wrong<Tab>correct'**
-  String get vocabImportTsvDesc;
 
   /// No description provided for @vocabImportSuccess.
   ///
@@ -1436,12 +1256,6 @@ abstract class AppLocalizations {
   /// **'Open Download Page'**
   String get updateManualDownload;
 
-  /// No description provided for @llmRewrite.
-  ///
-  /// In en, this message translates to:
-  /// **'LLM Rewrite'**
-  String get llmRewrite;
-
   /// No description provided for @aiPolishMatrix.
   ///
   /// In en, this message translates to:
@@ -1465,12 +1279,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit'**
   String get cloudAccountEdit;
-
-  /// No description provided for @cloudAccountDelete.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete'**
-  String get cloudAccountDelete;
 
   /// No description provided for @cloudAccountCapabilityAsr.
   ///
@@ -1508,24 +1316,6 @@ abstract class AppLocalizations {
   /// **'Go to Cloud Accounts'**
   String get cloudAccountGoConfig;
 
-  /// No description provided for @cloudAccountSaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Account saved'**
-  String get cloudAccountSaved;
-
-  /// No description provided for @cloudAccountDeleted.
-  ///
-  /// In en, this message translates to:
-  /// **'Account deleted'**
-  String get cloudAccountDeleted;
-
-  /// No description provided for @cloudAccountDeleteConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete this account?'**
-  String get cloudAccountDeleteConfirm;
-
   /// No description provided for @cloudAccountProvider.
   ///
   /// In en, this message translates to:
@@ -1537,18 +1327,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display Name'**
   String get cloudAccountName;
-
-  /// No description provided for @cloudAccountEnabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Enabled'**
-  String get cloudAccountEnabled;
-
-  /// No description provided for @languageSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Language'**
-  String get languageSettings;
 
   /// No description provided for @cloudAsrLangUnsupported.
   ///
@@ -1688,12 +1466,6 @@ abstract class AppLocalizations {
   /// **'Tap = toggle recording, Hold = push-to-talk'**
   String get shortcutsSharedHint;
 
-  /// No description provided for @shortcutsSplitTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Record Key (PTT / Toggle separately)'**
-  String get shortcutsSplitTitle;
-
   /// No description provided for @shortcutsPttTitle.
   ///
   /// In en, this message translates to:
@@ -1819,12 +1591,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'After selecting text, press to translate'**
   String get hotkeyRecordTranslateHint;
-
-  /// No description provided for @overviewWelcome.
-  ///
-  /// In en, this message translates to:
-  /// **'Welcome to SpeakOut'**
-  String get overviewWelcome;
 
   /// No description provided for @overviewTagline.
   ///
@@ -2059,12 +1825,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copied'**
   String get actionCopied;
-
-  /// No description provided for @permissionsSectionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'System Permissions'**
-  String get permissionsSectionTitle;
 
   /// No description provided for @permissionsReauthTip.
   ///
@@ -2617,6 +2377,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Include keys'**
   String get exportConfigWith;
+
+  /// No description provided for @cloudAccountDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get cloudAccountDelete;
+
+  /// No description provided for @cloudAccountDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"? Its saved credentials will be removed. You can set it up again later.'**
+  String cloudAccountDeleteConfirm(Object name);
+
+  /// No description provided for @cloudAccountDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deleted'**
+  String get cloudAccountDeleted;
 }
 
 class _AppLocalizationsDelegate

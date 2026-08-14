@@ -316,6 +316,13 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                 onTap: () => _showAddEditDialog(context, loc, existingAccount: account),
                 child: Text('编辑', style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
               ),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: () => _confirmDelete(context, loc, account),
+                child: Text(loc.cloudAccountDelete,
+                    style: const TextStyle(
+                        fontSize: 11, color: MacosColors.systemRedColor)),
+              ),
             ],
           ],
         ),
@@ -323,6 +330,38 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     );
   }
 
+
+  /// 删除账户。CloudAccountService.removeAccount() 实现完整却一直零调用 ——
+  /// 用户能通过「添加服务商」新建账户，却没有任何入口删除它。
+  /// 注意：删掉 15 家预置之一后，下次进本页 _ensureAllProvidersExist() 会补回一个
+  /// 空白条目，效果等同「清除该服务商的配置」，这是预期行为而非 bug。
+  Future<void> _confirmDelete(
+      BuildContext context, AppLocalizations loc, CloudAccount account) async {
+    final ok = await showMacosAlertDialog<bool>(
+      context: context,
+      builder: (ctx) => MacosAlertDialog(
+        appIcon: const MacosIcon(CupertinoIcons.trash,
+            size: 48, color: MacosColors.systemRedColor),
+        title: Text(loc.cloudAccountDelete),
+        message: Text(loc.cloudAccountDeleteConfirm(account.displayName),
+            textAlign: TextAlign.center),
+        primaryButton: PushButton(
+          controlSize: ControlSize.large,
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(loc.cloudAccountDelete),
+        ),
+        secondaryButton: PushButton(
+          controlSize: ControlSize.large,
+          secondary: true,
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(loc.cancel),
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await CloudAccountService().removeAccount(account.id);
+    await _refreshAccounts();
+  }
 
   void _showAddEditDialog(BuildContext context, AppLocalizations loc, {CloudAccount? existingAccount}) {
     final isEdit = existingAccount != null;

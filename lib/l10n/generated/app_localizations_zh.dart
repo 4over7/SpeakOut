@@ -24,13 +24,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get inputLanguage => '输入语言';
 
   @override
-  String get inputLanguageDesc => '你说什么语言';
-
-  @override
   String get outputLanguage => '输出语言';
-
-  @override
-  String get outputLanguageDesc => '文字输出的语言，不同于输入语言时自动翻译';
 
   @override
   String get langAutoDetect => '自动检测';
@@ -105,37 +99,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get disabled => '已禁用';
 
   @override
-  String get apiConfig => 'API 配置 (兼容 OpenAI 格式)';
-
-  @override
   String get systemPrompt => '系统提示词 (System Prompt)';
 
   @override
   String get resetDefault => '重置默认';
 
   @override
-  String get triggerKey => '触发按键 (PTT)';
-
-  @override
-  String get triggerKeyDesc => '支持所有按键 (包括 FN)。按住键录音，松开后自动输入。';
-
-  @override
   String get pressAnyKey => '按任意键...';
-
-  @override
-  String get activeEngine => '选择生效的语音引擎 (Active Engine)';
-
-  @override
-  String get engineLocal => '🔒 本地离线模型 (Local Privacy)';
-
-  @override
-  String get engineLocalDesc => '完全离线，保护隐私，无需联网。推荐日常使用。';
-
-  @override
-  String get engineCloud => '☁️ 阿里云智能语音 (Aliyun Cloud)';
-
-  @override
-  String get engineCloudDesc => '更高精度，支持云端识别。需要配置 API Key。';
 
   @override
   String get aliyunConfig => '阿里云智能语音配置';
@@ -220,9 +190,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get organizeHotkey => '梳理快捷键';
 
   @override
-  String get organizeHotkeyHint => '选中文字后按此快捷键触发';
-
-  @override
   String get organizePrompt => '梳理指令';
 
   @override
@@ -253,43 +220,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get diaryMode => '闪念笔记';
 
   @override
-  String get diaryTrigger => '笔记热键';
-
-  @override
   String get diaryPath => '保存目录';
-
-  @override
-  String get createFolder => '新建文件夹';
-
-  @override
-  String get folderCreated => '文件夹已创建';
-
-  @override
-  String get chooseFile => '选择文件...';
-
-  @override
-  String get diarySaved => '已保存到笔记';
-
-  @override
-  String get engineType => '引擎类型';
 
   @override
   String get punctuationModel => '标点符号模型';
 
   @override
   String get punctuationModelDesc => '为识别结果自动添加标点符号。此模型是必需的。';
-
-  @override
-  String get asrModels => '语音识别模型';
-
-  @override
-  String get asrModelsDesc => '请下载并激活至少一个语音识别模型才能使用语音输入功能。';
-
-  @override
-  String get required => '必需';
-
-  @override
-  String get pickOne => '二选一';
 
   @override
   String get llmProvider => 'LLM 提供方';
@@ -527,12 +464,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toggleModeTip => '单击切换 (Toggle)';
 
   @override
-  String get textInjection => '文本注入（输入法）';
-
-  @override
-  String get recordingProtection => '录音保护';
-
-  @override
   String get toggleMaxDuration => '最大录音时长';
 
   @override
@@ -559,9 +490,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get manualDownload => '手动下载';
 
   @override
-  String get importModelDesc => '选择已下载的 .tar.bz2 模型文件';
-
-  @override
   String get importing => '导入中...';
 
   @override
@@ -586,25 +514,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabAiPolish => 'AI 润色';
 
   @override
-  String get aiPolishDesc => '使用大模型自动润色语音识别结果，结合专业词典智能纠正。';
-
-  @override
   String get vocabEnhancement => '专业词汇';
-
-  @override
-  String get vocabEnhancementSubtitle => '为 AI 提供专业术语提示，提高领域词汇识别准确率';
-
-  @override
-  String get vocabEnabled => '启用专业词汇';
 
   @override
   String get vocabIndustryPresets => '行业预设词典';
 
   @override
   String get vocabCustomVocab => '个人词库';
-
-  @override
-  String get vocabCustomEnabled => '启用个人词库';
 
   @override
   String get vocabAddEntry => '添加词条';
@@ -614,9 +530,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vocabCorrectForm => '正确形式';
-
-  @override
-  String get vocabDelete => '删除';
 
   @override
   String get vocabTech => '软件/IT';
@@ -650,9 +563,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vocabImportTsv => '导入文件';
-
-  @override
-  String get vocabImportTsvDesc => '支持 TSV 或 CSV 格式，每行一条：错误形式<Tab>正确形式';
 
   @override
   String vocabImportSuccess(Object count) {
@@ -706,9 +616,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateManualDownload => '去下载页';
 
   @override
-  String get llmRewrite => 'LLM 智能改写';
-
-  @override
   String get aiPolishMatrix =>
       'LLM 改写 ✓ + 词典 ✓ → 术语注入 LLM，智能纠错\nLLM 改写 ✓ + 词典 ✗ → 纯 LLM 润色\nLLM 改写 ✗ + 词典 ✓ → 词典精确替换（离线可用）\nLLM 改写 ✗ + 词典 ✗ → 原始 ASR 输出';
 
@@ -720,9 +627,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cloudAccountEdit => '编辑';
-
-  @override
-  String get cloudAccountDelete => '删除';
 
   @override
   String get cloudAccountCapabilityAsr => '语音识别';
@@ -743,25 +647,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cloudAccountGoConfig => '前往账户中心配置';
 
   @override
-  String get cloudAccountSaved => '账户已保存';
-
-  @override
-  String get cloudAccountDeleted => '账户已删除';
-
-  @override
-  String get cloudAccountDeleteConfirm => '确定删除此账户？';
-
-  @override
   String get cloudAccountProvider => '服务商';
 
   @override
   String get cloudAccountName => '显示名称';
-
-  @override
-  String get cloudAccountEnabled => '启用';
-
-  @override
-  String get languageSettings => '语言设置';
 
   @override
   String get cloudAsrLangUnsupported => '当前云端 ASR 服务仅支持中文和英文，已选语言将回退到中文识别。';
@@ -833,9 +722,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutsSharedHint => '短按 = 切换录音，长按 = 说话松开停';
 
   @override
-  String get shortcutsSplitTitle => '录音键（PTT / Toggle 分键）';
-
-  @override
   String get shortcutsPttTitle => '长按说话 (PTT)';
 
   @override
@@ -902,9 +788,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hotkeyRecordTranslateHint => '选中文字后按此键翻译';
-
-  @override
-  String get overviewWelcome => '欢迎使用 SpeakOut';
 
   @override
   String get overviewTagline => 'macOS 离线优先 AI 语音输入 · 隐私安全 · 免费开源';
@@ -1028,9 +911,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get actionCopied => '已复制';
-
-  @override
-  String get permissionsSectionTitle => '系统权限';
 
   @override
   String get permissionsReauthTip => '更换签名证书后如快捷键失效，请逐项重新授权。';
@@ -1330,4 +1210,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exportConfigWith => '包含密钥';
+
+  @override
+  String get cloudAccountDelete => '删除账户';
+
+  @override
+  String cloudAccountDeleteConfirm(Object name) {
+    return '确定删除「$name」？该服务商保存的凭证会一并清除，之后可重新配置。';
+  }
+
+  @override
+  String get cloudAccountDeleted => '账户已删除';
 }
