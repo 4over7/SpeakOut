@@ -578,9 +578,11 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
   /// 结果是 gateway 的 RC 版被丢弃、回落到 GitHub 的旧稳定版，用户被告知"已是最新"。
   /// SemVer 自身的 prerelease/build 语法只允许 [0-9A-Za-z-] 和点，天然不含
   /// 引号、`$`、反引号、空格、换行，进 shell 是安全的。
+  /// 长度上限只为兜住畸形输入（版本号要进文件名），不是 SemVer 语义的一部分：
+  /// 放到 63 是为了容得下 40 位 commit SHA 作 build metadata。
   static final RegExp _semverPattern = RegExp(
-      r'^\d{1,5}\.\d{1,5}\.\d{1,5}(-[0-9A-Za-z][0-9A-Za-z.-]{0,31})?'
-      r'(\+[0-9A-Za-z][0-9A-Za-z.-]{0,31})?$');
+      r'^\d{1,5}\.\d{1,5}\.\d{1,5}(-[0-9A-Za-z][0-9A-Za-z.-]{0,63})?'
+      r'(\+[0-9A-Za-z][0-9A-Za-z.-]{0,63})?$');
 
   static bool isValidRemoteVersion(String version) =>
       _semverPattern.hasMatch(version);
@@ -592,12 +594,43 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
       if (r[i] > l[i]) return true;
       if (r[i] < l[i]) return false;
     }
-    return false;
+    // 主版本号相同 → 比 prerelease。白名单放行了 prerelease（仓库真发过
+    // v1.1.0-RC3/RC4），如果这里还只比三段数字，RC3 和 RC4 会被判成同一个版本，
+    // 而 1.1.0 稳定版相对 1.1.0-RC4 也永远"不是更新" —— 用户卡在 RC 上收不到正式版。
+    return _comparePrerelease(_prereleaseOf(remote), _prereleaseOf(local)) > 0;
   }
 
   static List<int> _parseVersion(String v) {
-    final parts = v.split('.');
+    // 先切掉 build metadata 和 prerelease，避免 '0-RC3' 这种段被静默解析成 0
+    final core = v.split('+').first.split('-').first;
+    final parts = core.split('.');
     return List.generate(3, (i) => i < parts.length ? (int.tryParse(parts[i]) ?? 0) : 0);
+  }
+
+  /// 取 prerelease 部分（不含 build metadata）。稳定版返回空串。
+  static String _prereleaseOf(String v) {
+    final noBuild = v.split('+').first;
+    final dash = noBuild.indexOf('-');
+    return dash < 0 ? '' : noBuild.substring(dash + 1);
+  }
+
+  /// SemVer 2.0.0 §11 优先级：稳定版 > 同版本的 prerelease；
+  /// prerelease 之间按点分标识符逐个比，纯数字段按数值比且低于字母数字段，
+  /// 前缀相同则字段多的更大。返回 >0 表示 a 更新。
+  static int _comparePrerelease(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return 1; // 稳定版更新
+    if (b.isEmpty) return -1;
+    final ai = a.split('.'), bi = b.split('.');
+    for (var i = 0; i < ai.length && i < bi.length; i++) {
+      if (ai[i] == bi[i]) continue;
+      final an = int.tryParse(ai[i]), bn = int.tryParse(bi[i]);
+      if (an != null && bn != null) return an.compareTo(bn);
+      if (an != null) return -1; // 数字段低于字母数字段
+      if (bn != null) return 1;
+      return ai[i].compareTo(bi[i]);
+    }
+    return ai.length.compareTo(bi.length);
   }
 }
 
