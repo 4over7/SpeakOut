@@ -25,6 +25,9 @@ class OpenAIASRProvider implements ASRProvider {
   final List<Float32List> _audioChunks = [];
   int _totalSamples = 0;
 
+  /// 录音代次，用于丢弃被放弃请求的迟到结果（见 start()）
+  int _generation = 0;
+
   @override
   Stream<String> get textStream => _textController.stream;
 
@@ -50,6 +53,12 @@ class OpenAIASRProvider implements ASRProvider {
   Future<void> start() async {
     _audioChunks.clear();
     _totalSamples = 0;
+    // 每次录音自增一代。批量识别的 stop() 可能被 Core 提前放弃
+    // （取消路径只等 kAsrStopTimeout），但 Future.timeout 只是停止等待，
+    // **不会取消底层 HTTP 请求** —— 它最长还能再跑 30 秒。
+    // 若这期间用户已开始下一次录音，迟到的结果会经共享 textStream
+    // 串进新录音的浮窗。用代次把过期结果丢掉。
+    _generation++;
   }
 
   @override
@@ -67,6 +76,7 @@ class OpenAIASRProvider implements ASRProvider {
   @override
   Future<ASRResult> stop() async {
     if (_totalSamples == 0) return ASRResult.textOnly('');
+    final gen = _generation;
 
     _log('Encoding $_totalSamples samples to WAV...');
     final wav = _encodeWav();
@@ -112,6 +122,12 @@ class OpenAIASRProvider implements ASRProvider {
       final json = jsonDecode(body) as Map<String, dynamic>;
       final text = json['text'] as String? ?? '';
       _log('Result: ${text.length} chars');
+      if (gen != _generation) {
+        // 本次请求已被放弃且新一轮录音已开始 —— 绝不能再往共享流里发，
+        // 否则新录音的浮窗会显示上一次的文本。
+        _log('Discarding stale result (gen $gen != $_generation)');
+        return ASRResult.textOnly('');
+      }
       _textController.add(text);
       return ASRResult.textOnly(text);
     } catch (e) {
