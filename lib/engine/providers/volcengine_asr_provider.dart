@@ -15,6 +15,13 @@ import '../../config/app_constants.dart';
 /// 鉴权：HTTP Headers (X-Api-App-Key, X-Api-Access-Key, X-Api-Resource-Id)。
 /// 文档：https://www.volcengine.com/docs/6561/1354869
 class VolcengineASRProvider implements ASRProvider {
+
+  /// 录音代次。start() 每次都新建 WebSocket 与 listener，但**旧 listener 从不取消**。
+  /// stop() 被 Core 提前放弃（取消路径只等 kAsrStopTimeout）或本 provider 自身
+  /// 5s 超时后，旧连接仍活着 —— 迟到帧不只是发布过期文本，_onMessage 还会改写
+  /// _finalText / _stopCompleter 等**新会话**的共享状态。
+  /// 守卫因此包住整个 listener，而不只是发布点。与 OpenAI 那处同源。
+  int _generation = 0;
   IOWebSocketChannel? _channel;
   StreamController<String> _textController = StreamController<String>.broadcast();
 
@@ -57,6 +64,8 @@ class VolcengineASRProvider implements ASRProvider {
 
   @override
   Future<void> start() async {
+    _generation++;
+    final gen = _generation;
     _finalText = '';
     _errorMessage = null;
     _handshakeDone = false;
@@ -76,13 +85,18 @@ class VolcengineASRProvider implements ASRProvider {
         },
       );
       _channel!.stream.listen(
-        _onMessage,
+        (msg) {
+          if (gen != _generation) return; // 上一轮录音的迟到帧，丢弃
+          _onMessage(msg);
+        },
         onError: (e) {
+          if (gen != _generation) return;
           _log('WebSocket error: $e');
           _errorMessage = e.toString();
           _finishStop();
         },
         onDone: () {
+          if (gen != _generation) return;
           _log('WebSocket closed');
           _finishStop();
         },

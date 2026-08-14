@@ -49,32 +49,56 @@ void main() {
         reason: '正常路径必须尊重批量识别 provider 的长超时，否则丢结果。实际: $args');
   });
 
-  test('闪念笔记：ChatService 写入必须早于 await appendNote', () {
+  test('闪念笔记：appendNote 必须被 await，且 ChatService 写入排在它之前', () {
     final v = _MethodBodyVisitor('stopRecording');
     unit.accept(v);
+    expect(v.found, 1, reason: 'CoreEngine 里应恰好有一个 stopRecording');
+
+    final a = _AppendNoteVisitor();
+    v.body!.accept(a);
+    expect(a.node, isNotNull, reason: '没找到 DiaryService().appendNote 调用');
+    expect(a.awaited, isTrue,
+        reason: 'appendNote 退回 fire-and-forget 的话，识别完立刻从托盘退出'
+            '（dispose 后紧跟 exit(0)）会丢掉这条闪念');
+
     final body = v.body!.toSource();
     final chatAt = body.indexOf('ChatService().addUserMessage(finalText)');
-    final noteAt = body.indexOf('DiaryService().appendNote(finalText)');
     expect(chatAt, greaterThan(-1), reason: '没找到 ChatService 写入');
-    expect(noteAt, greaterThan(-1), reason: '没找到 appendNote');
-    expect(chatAt, lessThan(noteAt),
+    expect(chatAt, lessThan(body.indexOf('DiaryService().appendNote')),
         reason: 'ChatService 是兜底副本（dispose 会 await 它的 _pendingSave）。'
             '排在 await appendNote 之后的话，慢盘上退出会卡在 await，两份一起丢');
   });
 }
 
+/// 只在 CoreEngine 类里找方法 —— 不限定类的话，文件里新增同名方法
+/// （另一个 class / extension）会覆盖掉目标，断言悄悄指向别处。
 class _MethodBodyVisitor extends RecursiveAstVisitor<void> {
   final String name;
   FunctionBody? body;
+  int _found = 0;
   _MethodBodyVisitor(this.name);
+
+  int get found => _found;
+
+  @override
+  void visitClassDeclaration(ClassDeclaration node) {
+    if (node.name.lexeme != 'CoreEngine') return; // 不递归进其它类
+    super.visitClassDeclaration(node);
+  }
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
-    if (node.name.lexeme == name) body = node.body;
+    if (node.name.lexeme == name) {
+      body = node.body;
+      _found++;
+    }
     super.visitMethodDeclaration(node);
   }
 }
 
+/// 只收 `_asrProvider…stop().timeout(...)` 的第一个实参。
+/// 不校验 receiver 的话，方法体里任何别的 .timeout()（含嵌套闭包里的）
+/// 都会被算进来，把真正改错的那处掩盖掉。
 class _TimeoutArgVisitor extends RecursiveAstVisitor<void> {
   final List<String> args = [];
 
@@ -82,8 +106,33 @@ class _TimeoutArgVisitor extends RecursiveAstVisitor<void> {
   void visitMethodInvocation(MethodInvocation node) {
     if (node.methodName.name == 'timeout' &&
         node.argumentList.arguments.isNotEmpty) {
-      args.add(node.argumentList.arguments.first.toSource());
+      final recv = node.target?.toSource() ?? '';
+      if (recv.contains('_asrProvider') && recv.contains('stop()')) {
+        args.add(node.argumentList.arguments.first.toSource());
+      }
     }
     super.visitMethodInvocation(node);
+  }
+}
+
+/// 找 DiaryService().appendNote(...) 并判断它是否处在 await 表达式下
+class _AppendNoteVisitor extends RecursiveAstVisitor<void> {
+  MethodInvocation? node;
+  bool awaited = false;
+
+  @override
+  void visitMethodInvocation(MethodInvocation n) {
+    if (n.methodName.name == 'appendNote' &&
+        (n.target?.toSource() ?? '').contains('DiaryService')) {
+      node = n;
+      for (AstNode? p = n.parent; p != null; p = p.parent) {
+        if (p is AwaitExpression) {
+          awaited = true;
+          break;
+        }
+        if (p is FunctionBody) break; // 越过函数体就不算同一个 await
+      }
+    }
+    super.visitMethodInvocation(n);
   }
 }

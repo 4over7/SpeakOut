@@ -9,6 +9,12 @@ import 'aliyun_token_service.dart';
 import 'package:speakout/config/app_log.dart';
 import '../../config/app_constants.dart';
 class AliyunProvider implements ASRProvider {
+
+  /// 录音代次。listener 建在 _connectWebSocket()（start() 与 initialize() 都会调），
+  /// 旧连接的 listener 从不取消。stop() 只固定等 500ms，迟到的
+  /// final/SentenceEnd 帧会走进 _handleMessage 改写新会话的 _committedText，
+  /// 污染下一次录音。捕获连接时的代次，过期回调直接返回。与 OpenAI 那处同源。
+  int _generation = 0;
   WebSocketChannel? _channel;
   StreamController<String> _textController = StreamController<String>.broadcast();
   
@@ -70,20 +76,24 @@ class AliyunProvider implements ASRProvider {
   
   /// Connect WebSocket and setup listeners
   Future<void> _connectWebSocket() async {
+    final gen = _generation;
     if (_isConnected && _channel != null) return;
     
     final url = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token=$_token";
     _channel = WebSocketChannel.connect(Uri.parse(url));
     
     _channel!.stream.listen((message) {
+      if (gen != _generation) return; // 上一轮录音的迟到帧，丢弃
       if (message is String) {
         _handleMessage(message);
       }
     }, onError: (e) {
+      if (gen != _generation) return;
       // 错误经 _lastError 上报（stop() 转 ASRResult.error），不塞进文本流污染识别结果
       _lastError = "连接错误: $e";
       _isConnected = false;
     }, onDone: () {
+      if (gen != _generation) return;
       _isConnected = false;
       _stopHeartbeat();
     });
@@ -141,6 +151,7 @@ class AliyunProvider implements ASRProvider {
 
   @override
   Future<void> start() async {
+    _generation++;
     // Ensure connection is ready (reuse existing or create new)
     if (!_isConnected || _channel == null) {
       await _refreshTokenIfNeeded();

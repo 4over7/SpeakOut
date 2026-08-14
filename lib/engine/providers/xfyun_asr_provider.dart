@@ -16,6 +16,12 @@ import '../../config/app_constants.dart';
 /// 限制：单次最长 60 秒。
 /// 文档：https://www.xfyun.cn/doc/asr/voicedictation/API.html
 class XfyunASRProvider implements ASRProvider {
+
+  /// 录音代次。start() 每次都新建 WebSocket 与 listener，但**旧 listener 从不取消**。
+  /// stop() 被 Core 提前放弃或本 provider 自身超时后，旧连接仍活着 —— 迟到帧
+  /// 不只是发布过期文本，回调还会改写新会话的共享状态（_finalText/_stopCompleter）。
+  /// 守卫因此包住整个 listener。与 OpenAI 那处同源。
+  int _generation = 0;
   IOWebSocketChannel? _channel;
   StreamController<String> _textController = StreamController<String>.broadcast();
 
@@ -61,6 +67,8 @@ class XfyunASRProvider implements ASRProvider {
 
   @override
   Future<void> start() async {
+    _generation++;
+    final gen = _generation;
     _segments.clear();
     _errorMessage = null;
     _firstFrameSent = false;
@@ -74,13 +82,18 @@ class XfyunASRProvider implements ASRProvider {
     try {
       _channel = IOWebSocketChannel.connect(Uri.parse(url));
       _channel!.stream.listen(
-        _onMessage,
+        (msg) {
+          if (gen != _generation) return; // 上一轮录音的迟到帧，丢弃
+          _onMessage(msg);
+        },
         onError: (e) {
+          if (gen != _generation) return;
           _log('WebSocket error: $e');
           _errorMessage = e.toString();
           _finishStop();
         },
         onDone: () {
+          if (gen != _generation) return;
           _log('WebSocket closed');
           _finishStop();
         },
