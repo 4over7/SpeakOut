@@ -109,8 +109,33 @@ class AppLog {
     return '<${text.length}字 #${(text.hashCode & 0xffffff).toRadixString(16)}>';
   }
 
+  /// 仅供测试：把日志接到指定文件，用来验证「哪些通道会落盘」。
+  @visibleForTesting
+  static Future<void> initForTest(File file) async {
+    await _sink?.flush();
+    await _sink?.close();
+    _sink = file.openWrite(mode: FileMode.append);
+  }
+
+  /// 仅供测试：等待缓冲写出，避免断言时文件还是空的。
+  @visibleForTesting
+  static Future<void> flushForTest() async => _sink?.flush();
+
   static void d(String message) {
     if (!enabled) return;
+    _write(message);
+  }
+
+  /// 错误日志：**不受 verbose 开关控制**，默认配置下也会落盘。
+  ///
+  /// d() 在 enabled=false（生产默认，见 AppConstants.kVerboseLogging）时首行就
+  /// return —— 用它记「回滚失败」「凭证残留」「悬空引用」这类兜底，
+  /// 等于什么都没记：用户真遇到时磁盘处于混合状态，却没有任何线索。
+  /// 这类事件稀少且必须可诊断，所以单开一个不看开关的通道。
+  /// 注意：调用方仍要自己用 redact() 处理敏感内容，这里不做脱敏。
+  static void e(String message) => _write('[ERROR] $message');
+
+  static void _write(String message) {
     try {
       debugPrint(message);
       _sink?.writeln('${DateTime.now().toIso8601String()} $message');

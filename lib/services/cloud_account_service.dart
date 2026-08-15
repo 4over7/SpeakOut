@@ -186,8 +186,16 @@ class CloudAccountService {
       // 只回滚内存和列表是不够的：凭证存在 cloud_cred_<accountId>_<key>，
       // **account id 不变**，所以刚才那几笔写入是就地覆盖了旧值。
       // 必须把旧值写回，并清掉「新增字段」留下的孤儿。
+      // 补偿动作各自 best-effort：串在同一个 try 里的话，
+      // 「写回旧凭证」失败会让「清理新增字段」**根本不执行** ——
+      // 而后者本来可能成功。两件事互相独立，不该互相拖累。
       try {
         await _saveCredentials(previous);
+      } catch (e2) {
+        AppLog.e('CloudAccountService: 账户 ${account.id} 旧凭证写回失败，'
+            '磁盘可能是新旧混合值: $e2');
+      }
+      try {
         final added = account.credentials.keys.toSet()
             .difference(previous.credentials.keys.toSet());
         if (added.isNotEmpty) {
@@ -201,8 +209,8 @@ class CloudAccountService {
         // 我一度在这里也加了 _saveAccounts()，还在 commit 里声称"实测能抓到
         // 去掉它的退化" —— 探针证明磁盘状态根本没差别，那是个假护栏。
       } catch (e2) {
-        AppLog.d('CloudAccountService: 账户 ${account.id} 更新失败后'
-            '凭证回滚也失败，磁盘可能处于混合状态: $e2');
+        AppLog.e('CloudAccountService: 账户 ${account.id} 更新失败后'
+            '新增凭证字段清理失败（孤儿明文）: $e2');
       }
       rethrow;
     }
@@ -215,7 +223,7 @@ class CloudAccountService {
         // 避免删字段/改 schema 后残留明文 secret
         await _clearCredentials(account.id, removed);
       } catch (e) {
-        AppLog.d('CloudAccountService: 账户 ${account.id} 已更新，'
+        AppLog.e('CloudAccountService: 账户 ${account.id} 已更新，'
             '但旧凭证字段清理失败（可能残留明文）: $e');
       }
     }
@@ -246,7 +254,7 @@ class CloudAccountService {
       await _clearCredentials(accountId, account.credentials.keys);
     } catch (e) {
       // 删除已生效，不回滚。凭证清理失败会留下孤儿明文，必须记下来。
-      AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
+      AppLog.e('CloudAccountService: 账户 $accountId 已删除，'
           '但凭证清理失败（可能残留明文）: $e');
     }
 
@@ -260,7 +268,7 @@ class CloudAccountService {
       try {
         await ConfigService().setSelectedAsrAccount(null);
       } catch (e) {
-        AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
+        AppLog.e('CloudAccountService: 账户 $accountId 已删除，'
             '但 ASR 选中项清理失败（悬空引用）: $e');
       }
     }
