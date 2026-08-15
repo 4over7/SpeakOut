@@ -57,6 +57,9 @@ void main() {
         reason: '置位必须早于空/非空分支，否则空剪贴板时会漏置');
   });
 
+  // 只在 macOS 跑：dylib 是 macOS 专属产物，且判据依赖 `strings`
+  // （binutils）—— Windows runner 上没有这个命令，会让本就该绿的
+  // Linux/Windows job 变红。CI 三个平台都会执行 flutter test。
   test('dylib 已随源码重新编译（内容判据，不看 mtime）', () {
     // 判据用「源码里的日志字面量是否已编进二进制」，**不能用 mtime**：
     // git clone 不保留 mtime，checkout 顺序决定先后 —— 本机三次 clone 都同秒，
@@ -80,5 +83,5 @@ void main() {
         reason: '这些日志字面量在源码里有、在 dylib 里没有 —— '
             '改了 native_input.m 却没重编译，跑的还是旧二进制。'
             '重编译命令见 native_lib/AGENTS.md：\n  ${missing.join("\n  ")}');
-  });
+  }, skip: !Platform.isMacOS ? 'dylib 检查仅在 macOS 有意义（依赖 strings）' : null);
 }
