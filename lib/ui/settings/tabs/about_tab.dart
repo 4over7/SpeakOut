@@ -16,6 +16,7 @@ import '../../../services/config_backup_service.dart';
 import '../../../config/distribution.dart';
 import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
+import '../../../services/notification_service.dart';
 
 /// About tab — app info, version, update check, developer settings, config backup
 class AboutTab extends StatefulWidget {
@@ -465,12 +466,9 @@ class _AboutTabState extends State<AboutTab> {
                       if (path != null) {
                         final result = await ConfigBackupService.exportToFile(path);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(result.success
+                          NotificationService().notify(result.success
                                 ? loc.aboutExportSuccess(result.message)
-                                : loc.aboutExportFailed(result.error ?? '')),
-                            behavior: SnackBarBehavior.floating,
-                          ));
+                                : loc.aboutExportFailed(result.error ?? ''));
                         }
                       }
                     },
@@ -495,13 +493,9 @@ class _AboutTabState extends State<AboutTab> {
                         final importResult = await ConfigBackupService.importFromFile(result.files.single.path!);
                         if (context.mounted) {
                           setState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(importResult.success
+                          NotificationService().notify(importResult.success
                                 ? loc.aboutImportSuccess(importResult.message)
-                                : loc.aboutImportFailed(importResult.error ?? '')),
-                            backgroundColor: importResult.success ? MacosColors.systemGreenColor : null,
-                            behavior: SnackBarBehavior.floating,
-                          ));
+                                : loc.aboutImportFailed(importResult.error ?? ''));
                         }
                       }
                     },

@@ -13,6 +13,7 @@ import '../../../../services/app_service.dart';
 import '../../../../services/config_backup_service.dart';
 import '../../../../services/config_service.dart';
 import '../../../widgets/settings_widgets.dart';
+import '../../../../services/notification_service.dart';
 
 /// v1.8 Sidebar - 开发者选项页
 ///
@@ -169,17 +170,10 @@ class _DeveloperPageState extends State<DeveloperPage> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(loc.aboutSystemLogSuccess(zipPath)),
-        backgroundColor: MacosColors.systemGreenColor,
-        behavior: SnackBarBehavior.floating,
-      ));
+      NotificationService().notify(loc.aboutSystemLogSuccess(zipPath));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(loc.aboutSystemLogFailed('$e')),
-        behavior: SnackBarBehavior.floating,
-      ));
+      NotificationService().notify(loc.aboutSystemLogFailed('$e'));
     } finally {
       try {
         tempDir?.deleteSync(recursive: true);
@@ -411,7 +405,9 @@ class _DeveloperPageState extends State<DeveloperPage> {
             controlSize: ControlSize.regular,
             secondary: true,
             onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
+              // 原来第一句就是 ScaffoldMessenger.of(context) —— macOS 根是 MacosApp
+              // （基于 WidgetsApp），没有 ScaffoldMessenger 祖先，这里直接抛，
+              // 对话框根本弹不出来：配置导出/导入整个功能坏死，不是"少个提示"。
               // 导出前让用户选择是否包含密钥（默认不含，更安全）
               final includeCreds = await showMacosAlertDialog<bool>(
                 context: context,
@@ -444,12 +440,9 @@ class _DeveloperPageState extends State<DeveloperPage> {
               );
               if (path != null) {
                 final result = await ConfigBackupService.exportToFile(path, includeCredentials: includeCreds);
-                messenger.showSnackBar(SnackBar(
-                  content: Text(result.success
+                NotificationService().notify(result.success
                       ? loc.aboutExportSuccess(result.message)
-                      : loc.aboutExportFailed(result.error ?? '')),
-                  behavior: SnackBarBehavior.floating,
-                ));
+                      : loc.aboutExportFailed(result.error ?? ''));
               }
             },
             child: Text(loc.aboutExportAction),
@@ -464,7 +457,9 @@ class _DeveloperPageState extends State<DeveloperPage> {
             controlSize: ControlSize.regular,
             secondary: true,
             onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
+              // 原来第一句就是 ScaffoldMessenger.of(context) —— macOS 根是 MacosApp
+              // （基于 WidgetsApp），没有 ScaffoldMessenger 祖先，这里直接抛，
+              // 对话框根本弹不出来：配置导出/导入整个功能坏死，不是"少个提示"。
               final result = await FilePicker.platform.pickFiles(
                 dialogTitle: loc.aboutImportFileTitle,
                 allowedExtensions: ['json'],
@@ -474,13 +469,9 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 final importResult = await ConfigBackupService.importFromFile(result.files.single.path!);
                 if (!mounted) return;
                 setState(() {});
-                messenger.showSnackBar(SnackBar(
-                  content: Text(importResult.success
+                NotificationService().notify(importResult.success
                       ? loc.aboutImportSuccess(importResult.message)
-                      : loc.aboutImportFailed(importResult.error ?? '')),
-                  backgroundColor: importResult.success ? MacosColors.systemGreenColor : null,
-                  behavior: SnackBarBehavior.floating,
-                ));
+                      : loc.aboutImportFailed(importResult.error ?? ''));
               }
             },
             child: Text(loc.aboutImportAction),

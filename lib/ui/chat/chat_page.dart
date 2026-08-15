@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../models/chat_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/diary_service.dart';
+import '../../services/notification_service.dart';
 import '../../ui/theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 
@@ -449,12 +450,11 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _toast(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(text),
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
-    ));
+    // 不能用 ScaffoldMessenger：macOS 的根是 MacosApp（基于 WidgetsApp），
+    // 没有 ScaffoldMessenger 祖先，of(context) 会抛
+    // "No ScaffoldMessenger widget found."（已用 widget 测试实证）。
+    // NotificationService 是本 App 里真正接了消费者的提示通道（main.dart:251）。
+    NotificationService().notify(text);
   }
   
   Widget _buildAvatar(ChatRole role) {

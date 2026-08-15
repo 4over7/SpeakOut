@@ -8,6 +8,7 @@ import '../models/billing_model.dart';
 import '../services/billing_service.dart';
 import 'theme.dart';
 import 'widgets/settings_widgets.dart';
+import '../services/notification_service.dart';
 
 class BillingPage extends StatefulWidget {
   const BillingPage({super.key});
@@ -384,20 +385,11 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 3)),
-    );
+    NotificationService().notify(msg);
   }
 
   void _showSuccess(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: MacosColors.systemGreenColor,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    NotificationService().notify(msg);
   }
 
   String _planDisplayName(String planId) {

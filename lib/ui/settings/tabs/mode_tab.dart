@@ -17,6 +17,7 @@ import '../../widgets/settings_widgets.dart';
 import '../../vocab_settings_page.dart';
 import '../settings_shared.dart';
 import '../sidebar/sidebar_shell.dart';
+import '../../../services/notification_service.dart';
 
 /// Which subset of mode_tab to render.
 /// `all` — legacy 5-tab settings page (default).
@@ -1344,9 +1345,7 @@ class ModeTabState extends State<ModeTab> {
               onPressed: () async {
                 await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(loc.commonSaved), duration: const Duration(seconds: 2)),
-                  );
+                  NotificationService().notify(loc.commonSaved);
                 }
               },
               child: Text(loc.saveApply),
