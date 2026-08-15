@@ -153,26 +153,40 @@ class CloudAccountService {
     await _ensureLoaded();
     final idx = _accounts.indexWhere((a) => a.id == account.id);
     if (idx < 0) return;
-    // 清理被移除的旧凭证 key（旧 - 新 差集），避免删字段/改 schema 后残留明文 secret
-    final removed = _accounts[idx].credentials.keys.toSet()
-        .difference(account.credentials.keys.toSet());
-    if (removed.isNotEmpty) {
-      await _clearCredentials(account.id, removed);
-    }
-    // 与 addAccount 同理：先改内存再落盘，失败必须回滚 ——
-    // 否则内存是新值、磁盘是旧值，下次刷新会显示一个磁盘上并不存在的状态
-    // （比如开关显示"已启用"，重启后又变回去）。
+    // 与 removeAccount 同理，按阶段划分 —— 这点第一版写错了两处：
+    //   旧版把「清理旧凭证差集」放在最前面且不设防：它失败时凭证已被删掉
+    //   一部分、内存却没动，留下残缺；
+    //   又把 _saveAccounts 与 _saveCredentials 包在同一个 try 里回滚，
+    //   而列表写成功后再回滚会造出「账户是旧的、凭证是新的」混合态。
+    //
+    //   阶段一 写凭证 + 写账户列表：都失败即「改动尚未生效」，回滚内存。
+    //     顺序改成先写凭证再写列表 —— 列表是那份「什么算数」的真源，
+    //     它最后落盘，前面失败时磁盘上仍是完整的旧状态。
+    //   阶段二 清理旧凭证差集：此时改动已生效，只记日志不回滚，
+    //     否则又是「复活出残缺对象」。
     final previous = _accounts[idx];
+    final removed = previous.credentials.keys.toSet()
+        .difference(account.credentials.keys.toSet());
     _accounts[idx] = account;
     try {
-      await _saveAccounts();
       await _saveCredentials(account);
+      await _saveAccounts();
     } catch (e) {
       _accounts[idx] = previous;
-      try {
-        await _saveAccounts();
-      } catch (_) {}
       rethrow;
+    }
+
+    if (removed.isNotEmpty) {
+      try {
+        if (debugFailAfterAccountsWrite) {
+          throw StateError('debugFailAfterAccountsWrite（仅测试）');
+        }
+        // 避免删字段/改 schema 后残留明文 secret
+        await _clearCredentials(account.id, removed);
+      } catch (e) {
+        AppLog.d('CloudAccountService: 账户 ${account.id} 已更新，'
+            '但旧凭证字段清理失败（可能残留明文）: $e');
+      }
     }
   }
 
@@ -205,12 +219,20 @@ class CloudAccountService {
           '但凭证清理失败（可能残留明文）: $e');
     }
 
-    // 如果被删除的账户正被选用，清除选择
-    if (ConfigService().selectedAsrAccountId == accountId) {
-      await ConfigService().setSelectedAsrAccount(null);
-    }
-    if (ConfigService().selectedLlmAccountId == accountId) {
-      await ConfigService().setSelectedLlmAccountId(null);
+    // 清除指向已删账户的选择。同样属「删除已生效」的收尾阶段，不回滚；
+    // 但必须兜住异常并记日志 —— 悬空的 selected ID 会让
+    // effectiveAsrAccount() 找不到目标而落到推荐兜底，
+    // 表现成「界面显示 A、实际跑 B」那类难查的问题。
+    try {
+      if (ConfigService().selectedAsrAccountId == accountId) {
+        await ConfigService().setSelectedAsrAccount(null);
+      }
+      if (ConfigService().selectedLlmAccountId == accountId) {
+        await ConfigService().setSelectedLlmAccountId(null);
+      }
+    } catch (e) {
+      AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
+          '但选中项清理失败（可能留下悬空引用）: $e');
     }
 
     AppLog.d('CloudAccountService: removed account $accountId');

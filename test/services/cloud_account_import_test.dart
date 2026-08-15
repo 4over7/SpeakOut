@@ -60,6 +60,44 @@ void main() {
     expect(svc.getAccountById('upd-1')!.isEnabled, isFalse);
   });
 
+  test('update 第一阶段失败回滚、第二阶段失败不回滚', () async {
+    // 与 remove 同构。第一版把「清理旧凭证差集」放最前面且不设防，
+    // 又把写凭证与写列表包在同一个 try 里回滚 ——
+    // 列表写成功后再回滚会造出「账户是旧的、凭证是新的」混合态。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'upd-2', providerId: 'gemini', displayName: '原名',
+      isEnabled: false, credentials: {'api_key': 'k', 'legacy': 'old'},
+    ));
+
+    // 第一阶段失败 → 必须回滚
+    CloudAccountService.debugFailPersistence = true;
+    addTearDown(() => CloudAccountService.debugFailPersistence = false);
+    await expectLater(
+      svc.updateAccount(CloudAccount(
+        id: 'upd-2', providerId: 'gemini', displayName: '改后',
+        isEnabled: true, credentials: {'api_key': 'k'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailPersistence = false;
+    expect(svc.getAccountById('upd-2')!.displayName, '原名',
+        reason: '第一阶段失败必须回滚内存');
+
+    // 第二阶段（清理旧凭证差集）失败 → 改动已生效，不得回滚
+    CloudAccountService.debugFailAfterAccountsWrite = true;
+    addTearDown(
+        () => CloudAccountService.debugFailAfterAccountsWrite = false);
+    await svc.updateAccount(CloudAccount(
+      id: 'upd-2', providerId: 'gemini', displayName: '改后',
+      isEnabled: true, credentials: {'api_key': 'k'},
+    ));
+    CloudAccountService.debugFailAfterAccountsWrite = false;
+    expect(svc.getAccountById('upd-2')!.displayName, '改后',
+        reason: '第二阶段失败不该回滚 —— 改动已经落盘了');
+  });
+
   test('remove 第二阶段（清凭证）失败不得把账户复活 —— 删除已经落盘了', () async {
     // 删除分两阶段：写账户列表 → 清凭证。
     // 第二阶段失败时删除**已经生效**，把账户复活回来等于造出一个
