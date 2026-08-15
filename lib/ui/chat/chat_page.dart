@@ -428,7 +428,8 @@ class _ChatPageState extends State<ChatPage> {
             // 守卫只挡得住"最后一个 chunk 之后"的复制，挡不住 chunk 之间的）。
             // 明确拒绝并提示，好过让他以为复制成功了。
             if (AppService().isClipboardInjecting) {
-              _toast(loc.chatCopyBusy);
+              // 拒绝了复制，不能报绿 —— 那会让用户以为复制成功了
+              _toast(loc.chatCopyBusy, error: true);
               return;
             }
             Clipboard.setData(ClipboardData(text: msg.text));

@@ -25,6 +25,7 @@ import 'ui/onboarding_page.dart';
 // Platform-specific UI imports
 import 'ui/windows/windows_app.dart';
 import 'ui/linux/linux_app.dart';
+import 'ui/notification_overlay.dart';
 
 // Global Error Catcher
 void main() {
@@ -102,6 +103,11 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
       builder: (context, locale, child) {
         return MacosApp(
           title: 'SpeakOut',
+          // 通知横幅必须挂在这里，不能放进某个页面 —— 聊天页/设置页是压在 Home
+          // 之上的不透明 route，横幅长在 Home 里会被完全遮住，
+          // 而「导出配置」「复制消息」这些操作恰恰发生在那些页面上。
+          builder: (context, child) =>
+              NotificationOverlay(child: child ?? const SizedBox.shrink()),
           // Auto-adapt to system light/dark mode
           theme: MacosThemeData.light().copyWith(
             primaryColor: AppTheme.lightAccent,

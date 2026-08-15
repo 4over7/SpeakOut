@@ -31,6 +31,10 @@ class _NotificationOverlayState extends State<NotificationOverlay> {
   AppNotification? _current;
   final List<AppNotification> _queue = [];
 
+  /// 队列上限。5 秒错误横幅期间可能连续来一串提示，无上限的话会积压成
+  /// 几十秒的连播，用户看到的全是过时信息。超出就丢最旧的低优先级那条。
+  static const int _maxQueue = 3;
+
   /// 数值越大越重要。低优先级不得顶掉尚未过期的高优先级。
   static int _rank(NotificationType t) => switch (t) {
         NotificationType.error => 3,
@@ -50,6 +54,14 @@ class _NotificationOverlayState extends State<NotificationOverlay> {
     final cur = _current;
     if (cur != null && _rank(n.type) < _rank(cur.type)) {
       _queue.add(n); // 别把还在展示的错误顶掉
+      if (_queue.length > _maxQueue) {
+        // 丢最旧且最不重要的那条，保住时效性
+        var worst = 0;
+        for (var i = 1; i < _queue.length; i++) {
+          if (_rank(_queue[i].type) < _rank(_queue[worst].type)) worst = i;
+        }
+        _queue.removeAt(worst);
+      }
       return;
     }
     _show(n);
@@ -61,14 +73,25 @@ class _NotificationOverlayState extends State<NotificationOverlay> {
     _timer = Timer(n.duration, () {
       if (!mounted) return;
       setState(() => _current = null);
-      if (_queue.isNotEmpty) _show(_queue.removeAt(0));
+      _showNext();
     });
+  }
+
+  /// 出队按优先级，不是 FIFO —— 否则 error 展示期间先入队的 info 会排在
+  /// 后入队但更紧急的 audioDeviceSwitch 前面。同优先级内保持先进先出。
+  void _showNext() {
+    if (_queue.isEmpty) return;
+    var best = 0;
+    for (var i = 1; i < _queue.length; i++) {
+      if (_rank(_queue[i].type) > _rank(_queue[best].type)) best = i;
+    }
+    _show(_queue.removeAt(best));
   }
 
   void _dismiss() {
     _timer?.cancel();
     setState(() => _current = null);
-    if (_queue.isNotEmpty) _show(_queue.removeAt(0));
+    _showNext();
   }
 
   @override

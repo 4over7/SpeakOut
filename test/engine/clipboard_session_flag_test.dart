@@ -60,6 +60,18 @@ void main() {
         reason: '计数不得减成负数：异常路径上 _clipEnd 可能比 _clipBegin 多跑一次');
   });
 
+  test('native 会话只在最外层开合 —— 它只有一份全局快照', () {
+    final b = _MethodBodyVisitor('_clipBegin');
+    unit.accept(b);
+    expect(b.body!.toSource().contains('_clipboardSessions == 0) _nativeInput'), isTrue,
+        reason: '内层 begin 也调 native 的话，第二次会覆盖第一次的剪贴板快照');
+    final e = _MethodBodyVisitor('_clipEnd');
+    unit.accept(e);
+    expect(e.body!.toSource().contains('_clipboardSessions == 0) _nativeInput'), isTrue,
+        reason: '内层 end 也调 native 的话，第一次结束就会提前恢复、'
+            '另一个流程还在写 chunk，且用户原始剪贴板丢失');
+  });
+
   test('UI 能通过 AppService facade 读到注入状态', () {
     expect(src.contains('bool get isClipboardInjecting'), isTrue);
     final facade = File('lib/services/app_service.dart').readAsStringSync();

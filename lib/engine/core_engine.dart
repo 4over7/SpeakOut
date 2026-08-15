@@ -100,15 +100,18 @@ class CoreEngine {
 
   /// 成对包装：计数只在这两个方法里维护，避免各调用点自己维护而漂移。
   void _clipBegin() {
+    // native 侧只有**一份**全局剪贴板快照：第二次 begin 会覆盖第一次的快照，
+    // 第一次 end 又会取走并清空它 —— 重叠注入下会提前恢复、且丢掉用户原始剪贴板。
+    // 所以 native 会话只在最外层开合，内层只加计数。
+    if (_clipboardSessions == 0) _nativeInput?.injectClipboardBegin();
     _clipboardSessions++;
-    _nativeInput?.injectClipboardBegin();
   }
 
   void _clipEnd() {
-    _nativeInput?.injectClipboardEnd();
     // 不能减成负数：异常路径上 _clipEnd 可能比 _clipBegin 多跑一次
     // （catch 里兜底 + 正常路径各一次）。
     if (_clipboardSessions > 0) _clipboardSessions--;
+    if (_clipboardSessions == 0) _nativeInput?.injectClipboardEnd();
   }
 
   bool get _shouldConsumeAudio =>
