@@ -94,6 +94,48 @@ void main() {
     expect(svc.getAccountById('iso-1')!.displayName, '旧名',
         reason: '清理失败把「重写旧列表」一起废掉了 —— '
             '缓存里仍是未提交的新 metadata');
+
+  });
+
+  test('清理多个新增字段时，首个失败不得让其余明文留下', () async {
+    // 逐 key best-effort 的另一半。上一条用例的清理集合只有一个 key，
+    // 验不了这件事（探针显示 keys=[extra]）—— 必须让新增字段有多个。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'iso-2', providerId: 'minimax', displayName: 'n',
+      isEnabled: false, credentials: {'api_key': 'k'},
+    ));
+
+    CloudAccountService.debugFailAccountsWriteAfterCache = true;
+    CloudAccountService.debugFailAccountsWrites = 1;
+    CloudAccountService.debugFailClearCredentials = true; // 只失败首个 key
+    addTearDown(() {
+      CloudAccountService.debugFailAccountsWriteAfterCache = false;
+      CloudAccountService.debugFailAccountsWrites = 0;
+      CloudAccountService.debugFailClearCredentials = false;
+    });
+    await expectLater(
+      svc.updateAccount(CloudAccount(
+        id: 'iso-2', providerId: 'minimax', displayName: 'n2',
+        isEnabled: true,
+        // 三个新增字段：首个删除失败，后两个必须仍被删掉
+        credentials: {'api_key': 'k', 'aa': '1', 'bb': '2', 'cc': '3'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailAccountsWriteAfterCache = false;
+    CloudAccountService.debugFailAccountsWrites = 0;
+    CloudAccountService.debugFailClearCredentials = false;
+
+    final prefs = await SharedPreferences.getInstance();
+    final leftover = prefs
+        .getKeys()
+        .where((k) => k.startsWith('cloud_cred_iso-2_'))
+        .where((k) => k.endsWith('_bb') || k.endsWith('_cc'))
+        .toList();
+    expect(leftover, isEmpty,
+        reason: '首个 key 删除失败后就放弃了，其余明文仍残留：$leftover');
   });
 
   test('update 失败时必须把账户列表写回 —— 缓存已被污染', () async {

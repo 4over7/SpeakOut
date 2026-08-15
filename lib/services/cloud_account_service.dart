@@ -516,15 +516,20 @@ class CloudAccountService {
 
   Future<void> _clearCredentials(String accountId, Iterable<String> keys) async {
     // 同样惰性获取：静默不删等于明文密钥残留在 SharedPreferences 里
-    if (debugFailClearCredentials) {
-      throw StateError('debugFailClearCredentials（仅测试）');
-    }
     final prefs = await _requirePrefs();
     // 逐 key best-effort：一个删不掉不该让其余的明文继续留着
     final failed = <String>[];
     Object? firstError;
     for (final key in keys) {
       try {
+        // 注入点在**循环内**且只失败首个 key，模拟真实形态：
+        // 逐 key 试、部分已删、最后聚合抛。放在方法开头整体抛是失真的 ——
+        // 那样一个 key 都不会被删，而真实故障下其余 key 是删掉了的，
+        // 两者对「明文是否残留」结论相反。
+        //（第二十六轮我就栽在「注入没有模拟真实故障」上。）
+        if (debugFailClearCredentials && failed.isEmpty) {
+          throw StateError('debugFailClearCredentials（仅测试，只失败首个 key）');
+        }
         await prefs.remove('cloud_cred_${accountId}_$key');
       } catch (e) {
         failed.add(key);
