@@ -401,6 +401,7 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
     showMacosSheet(
       context: context,
       builder: (sheetContext) {
+        bool saving = false;
         return StatefulBuilder(
           builder: (builderContext, setDialogState) {
             final provider = CloudProviders.getById(selectedProviderId);
@@ -598,6 +599,9 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                                 }
                               }
 
+                              // await 网络调用期间用户可能已经关掉弹窗，
+                              // 直接 setDialogState 会 "setState() called after dispose()"
+                              if (!builderContext.mounted) return;
                               setDialogState(() { testLoading = false; testResults = results; });
                             },
                             child: testLoading
@@ -618,7 +622,12 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                         const SizedBox(width: 8),
                         PushButton(
                           controlSize: ControlSize.regular,
-                          onPressed: () async {
+                          // 防重入：addAccount 是异步的，期间按钮仍可点 ——
+                          // 双击会用两个不同 uuid 建出两个重复账户，
+                          // 而 _ensureAllProvidersExist 按 providerId 判重，补不回来。
+                          onPressed: saving ? null : () async {
+                            if (saving) return;
+                            setDialogState(() => saving = true);
                             final creds = <String, String>{};
                             for (final entry in credControllers.entries) {
                               creds[entry.key] = entry.value.text;
