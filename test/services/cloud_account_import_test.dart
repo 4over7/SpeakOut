@@ -34,6 +34,62 @@ void main() {
     return f.path;
   }
 
+  test('任一落盘方法都不得静默 no-op（_prefs 为空必须抛）', () async {
+    // `_prefs?.setString(...)` 在 _prefs 为空时什么都不写，调用方却拿到"成功" ——
+    // 静默数据丢失。上面那条回滚测试只要有**任意一个**方法抛就会通过，
+    // 挡不住「只有一个改回 ?. 」的退化，所以这里逐个方法单独验。
+    final svc = CloudAccountService();
+    await svc.reload();
+    svc.debugSetPrefsForTest(null);
+
+    // _saveAccounts 路径（removeAccount 只调它，不调 _saveCredentials）
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'probe', providerId: 'zhipu', displayName: 'p',
+      isEnabled: false, credentials: {},
+    ));
+    svc.debugSetPrefsForTest(null);
+    await expectLater(svc.removeAccount('probe'), throwsA(isA<StateError>()),
+        reason: '_saveAccounts 在 _prefs 为空时静默 no-op 了');
+
+    // _saveCredentials 没法用行为测试隔离：仓库里没有「只调它、不调
+    // _saveAccounts」的路径，后者必先抛。改用一条精确的源码断言补上 ——
+    // 判据很窄（写入不得用 `_prefs?.`），不是那种能被等价改写绕过的宽泛规则。
+    final src =
+        File('lib/services/cloud_account_service.dart').readAsStringSync();
+    final silentWrites = RegExp(r'_prefs\?\.\s*set\w+\(')
+        .allMatches(src)
+        .map((m) => m.group(0)!)
+        .toList();
+    expect(silentWrites, isEmpty,
+        reason: '写入用了 `_prefs?.` —— _prefs 为空时静默什么都不写，'
+            '调用方却拿到"成功"，等于静默数据丢失：$silentWrites');
+  });
+
+  test('落盘失败必须回滚内存，否则重试会造出重复账户', () async {
+    // addAccount 先把账户加进 _accounts 再落盘。若落盘抛异常而不回滚，
+    // UI 的重试会用新 uuid 再追加一个，第二次成功时两条一起持久化。
+    // 这里用「未初始化的 _prefs」构造落盘失败 —— 它现在会抛 StateError
+    // 而不是像以前那样 `_prefs?.setString` 静默 no-op（静默 = 数据丢失）。
+    final svc = CloudAccountService();
+    await svc.reload();
+    final before = svc.accounts.length;
+
+    // 把 prefs 置空：模拟未初始化 / 平台通道不可用
+    svc.debugSetPrefsForTest(null);
+    await expectLater(
+      svc.addAccount(CloudAccount(
+        id: 'fail-1', providerId: 'deepseek', displayName: 'x',
+        isEnabled: true, credentials: {'api_key': 'k'},
+      )),
+      throwsA(isA<StateError>()),
+      reason: '落盘失败必须抛出来，不能静默成功',
+    );
+    expect(svc.accounts.length, before,
+        reason: '失败后账户仍留在内存里 —— 重试会造出第二个重复账户');
+    expect(svc.getAccountById('fail-1'), isNull);
+  });
+
   test('导出不含 credentials 值，只含字段名清单', () async {
     final svc = CloudAccountService();
     await svc.addAccount(CloudAccount(

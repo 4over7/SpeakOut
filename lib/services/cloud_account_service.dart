@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/cloud_account.dart';
@@ -40,12 +41,27 @@ class CloudAccountService {
     await _loadAccounts();
   }
 
+  /// 仅供测试：构造「落盘失败」场景。
+  /// 生产代码不要调用 —— 置空后所有写入都会抛 StateError。
+  @visibleForTesting
+  void debugSetPrefsForTest(SharedPreferences? prefs) => _prefs = prefs;
+
   // ── CRUD ──
 
   Future<String> addAccount(CloudAccount account) async {
+    // 先入内存再落盘：任一步抛异常都必须回滚，否则 UI 允许重试时会用新 uuid
+    // 再追加一个，第二次成功就把两条一起持久化 —— 重复账户。
     _accounts.add(account);
-    await _saveAccounts();
-    await _saveCredentials(account);
+    try {
+      await _saveAccounts();
+      await _saveCredentials(account);
+    } catch (e) {
+      _accounts.removeWhere((a) => a.id == account.id);
+      try {
+        await _saveAccounts(); // 尽力把已落盘的部分改回去
+      } catch (_) {}
+      rethrow;
+    }
     AppLog.d('CloudAccountService: added account ${account.id} (${account.providerId})');
     return account.id;
   }
@@ -245,13 +261,23 @@ class CloudAccountService {
   }
 
   Future<void> _saveAccounts() async {
+    // 用 ! 而不是 ?.：_prefs 为空时静默什么都不写，调用方却拿到"成功" ——
+    // 那是静默数据丢失。宁可抛出来让上层看见。
+    final prefs = _prefs;
+    if (prefs == null) {
+      throw StateError('CloudAccountService 未初始化，无法保存账户');
+    }
     final json = jsonEncode(_accounts.map((a) => a.toJson()).toList());
-    await _prefs?.setString(_kAccountsKey, json);
+    await prefs.setString(_kAccountsKey, json);
   }
 
   Future<void> _saveCredentials(CloudAccount account) async {
+    final prefs = _prefs;
+    if (prefs == null) {
+      throw StateError('CloudAccountService 未初始化，无法保存凭证');
+    }
     for (final entry in account.credentials.entries) {
-      await _prefs?.setString('cloud_cred_${account.id}_${entry.key}', entry.value);
+      await prefs.setString('cloud_cred_${account.id}_${entry.key}', entry.value);
     }
   }
 
@@ -432,7 +458,13 @@ class CloudAccountService {
       migrated++;
     }
 
-    await _prefs?.setBool(_kMigratedKey, true);
+    // 同样不能静默：这个标志没写成功，下次启动会重跑迁移，
+    // 而迁移里会 addAccount —— 可能造出重复账户。
+    final prefs = _prefs;
+    if (prefs == null) {
+      throw StateError('CloudAccountService 未初始化，无法写入迁移标志');
+    }
+    await prefs.setBool(_kMigratedKey, true);
     if (migrated > 0) {
       AppLog.d('CloudAccountService: migrated $migrated legacy accounts');
     }
