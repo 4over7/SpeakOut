@@ -75,9 +75,8 @@ void main() {
     var writes = 0;
     CloudAccountService.debugBeforeCredentialWrite = () async { writes++; };
     addTearDown(() => CloudAccountService.debugBeforeCredentialWrite = null);
-    CloudAccountService.debugFailAccountsWriteOnly = true;
-    addTearDown(
-        () => CloudAccountService.debugFailAccountsWriteOnly = false);
+    CloudAccountService.debugFailAccountsWrites = 1; // 只失败首次，回滚那次要成功
+    addTearDown(() => CloudAccountService.debugFailAccountsWrites = 0);
     await expectLater(
       svc.updateAccount(CloudAccount(
         id: 'cred-rb', providerId: 'gemini', displayName: 'n',
@@ -85,14 +84,16 @@ void main() {
       )),
       throwsA(isA<StateError>()),
     );
-    CloudAccountService.debugFailAccountsWriteOnly = false;
+    CloudAccountService.debugFailAccountsWrites = 0;
     expect(writes, greaterThan(0), reason: '前置条件：凭证确实写过');
 
     await svc.reload();
-    expect(svc.getAccountById('cred-rb')!.credentials['api_key'], 'OLD',
+    final rb = svc.getAccountById('cred-rb');
+    expect(rb, isNotNull, reason: '回滚后账户本身应该还在磁盘上');
+    expect(rb!.displayName, 'n', reason: '账户列表没还原到磁盘');
+    expect(rb.credentials['api_key'], 'OLD',
         reason: '凭证值没还原 —— 重启后是「旧 metadata + 新凭证」的混合状态');
-    expect(svc.getAccountById('cred-rb')!.credentials.containsKey('extra'),
-        isFalse,
+    expect(rb.credentials.containsKey('extra'), isFalse,
         reason: '新增字段没清掉，留下孤儿明文');
   });
 

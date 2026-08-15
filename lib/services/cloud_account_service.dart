@@ -85,10 +85,15 @@ class CloudAccountService {
     _prefs = null;
   }
 
-  /// 仅供测试：只让 _saveAccounts 抛错（凭证写入照常成功），
+  /// 仅供测试：让**前 N 次** _saveAccounts 抛错（凭证写入照常成功），
   /// 用来构造「凭证已就地覆盖、改动尚未提交」这个边界。
+  ///
+  /// 用计数而不是布尔：布尔会让回滚里那次 _saveAccounts 也抛 ——
+  /// 于是「回滚写列表」这一步在测试里**从未真正执行过**，
+  /// 它坏了也没人拦（探针实测 PROBE_ROLLBACK_LIST_OK 一次都没出现）。
+  /// 设成 1 就只有首次失败，回滚那次照常成功。
   @visibleForTesting
-  static bool debugFailAccountsWriteOnly = false;
+  static int debugFailAccountsWrites = 0;
 
   /// 仅供测试：让「写账户列表成功之后」的步骤抛错，
   /// 用来验证删除的第二阶段失败时**不得**回滚。
@@ -430,8 +435,9 @@ class CloudAccountService {
   }
 
   Future<void> _saveAccounts() async {
-    if (debugFailAccountsWriteOnly) {
-      throw StateError('debugFailAccountsWriteOnly（仅测试）');
+    if (debugFailAccountsWrites > 0) {
+      debugFailAccountsWrites--;
+      throw StateError('debugFailAccountsWrites（仅测试）');
     }
     // 用 ! 而不是 ?.：_prefs 为空时静默什么都不写，调用方却拿到"成功" ——
     // 那是静默数据丢失。宁可抛出来让上层看见。
