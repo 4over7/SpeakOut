@@ -142,16 +142,26 @@ class _DeveloperPageState extends State<DeveloperPage> {
             : '[log show failed: ${syslogResult.stderr}]',
       );
 
-      // 2. 应用详细日志目录（如果用户设了）
-      final logDir = ConfigService().logDirectory;
-      if (logDir.isNotEmpty && Directory(logDir).existsSync()) {
-        final appLogsDest = Directory('${tempDir.path}/app-logs');
-        appLogsDest.createSync();
-        for (final entity in Directory(logDir).listSync()) {
-          if (entity is File && entity.path.endsWith('.log')) {
-            final name = entity.uri.pathSegments.last;
-            await entity.copy('${appLogsDest.path}/$name');
-          }
+      // 2. 应用日志。**两个来源都要收**：
+      //    - 用户自定义目录（设了才有）
+      //    - app support 默认目录 —— AppLog.e() 的 speakout_errors.log 写在这里，
+      //      它记的是回滚失败/凭证残留/悬空引用这类事件，恰恰是报障时最需要的。
+      //      只收自定义目录的话，没设过目录的用户导出来是空的，等于白记。
+      final appLogsDest = Directory('${tempDir.path}/app-logs');
+      appLogsDest.createSync();
+      final logDirs = <Directory>[
+        if (ConfigService().logDirectory.isNotEmpty)
+          Directory(ConfigService().logDirectory),
+        await getApplicationSupportDirectory(),
+      ];
+      final copied = <String>{};
+      for (final dir in logDirs) {
+        if (!dir.existsSync()) continue;
+        for (final entity in dir.listSync()) {
+          if (entity is! File || !entity.path.endsWith('.log')) continue;
+          final name = entity.uri.pathSegments.last;
+          if (!copied.add(name)) continue; // 同名只收第一个（自定义目录优先）
+          await entity.copy('${appLogsDest.path}/$name');
         }
       }
 
