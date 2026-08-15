@@ -408,6 +408,10 @@ class CloudAccountService {
       wanted && creds.values.any((v) => v.isNotEmpty);
 
   Future<int> importFromFile(String filePath) async {
+    // 复合操作必须在**任何读取之前**加载：下面用 getAccountByProviderId 判重，
+    // 未加载时它恒为 null，于是每个磁盘上已有的 provider 都会被再建一条。
+    // 单靠 addAccount 内部的 _ensureLoaded 不够 —— 那时判重已经做完了。
+    await _ensureLoaded();
     try {
       final content = await File(filePath).readAsString();
       final map = jsonDecode(content) as Map<String, dynamic>;

@@ -70,6 +70,11 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   /// await 每次 addAccount 的持久化，避免页面快速关闭/进程退出导致预置账户未落盘
   Future<void> _ensureAllProvidersExist() async {
     final service = CloudAccountService();
+    // 必须先 init：窗口可能在 AppService.init() 完成前就显示，此时
+    // service.accounts 是空的 —— 下面会给磁盘上**已存在**的每个 provider
+    // 再追加一条空账户。addAccount 内部虽然也会加载，但那时这份空快照
+    // 早就拿在手里了。
+    await service.init();
     final existingProviderIds = service.accounts.map((a) => a.providerId).toSet();
     for (final provider in CloudProviders.all) {
       if (!existingProviderIds.contains(provider.id)) {

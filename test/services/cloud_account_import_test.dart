@@ -34,6 +34,38 @@ void main() {
     return f.path;
   }
 
+  test('未初始化时导入，不得给磁盘上已有的 provider 重复建账户', () async {
+    // 复合操作在**读取**时就要求已加载：importFromFile 用
+    // getAccountByProviderId 判重，未加载时它恒为 null ——
+    // 每个磁盘上已有的 provider 都会被再建一条。
+    // 单靠 addAccount 内部的 _ensureLoaded 挡不住：那时判重已经做完了。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'disk-deepseek', providerId: 'deepseek', displayName: '磁盘上的',
+      isEnabled: true, credentials: {'api_key': 'DISK-KEY'},
+    ));
+
+    // 模拟「重启后尚未 init」
+    svc.debugResetForTest();
+
+    final path = await writeBackup([
+      {'providerId': 'deepseek', 'displayName': '导入的',
+       'isEnabled': true, 'credentials': {'model': 'm'}},
+    ]);
+    await svc.importFromFile(path);
+
+    await svc.reload();
+    final deepseeks =
+        svc.accounts.where((a) => a.providerId == 'deepseek').toList();
+    expect(deepseeks.length, 1,
+        reason: '给已有 provider 重复建了账户：${deepseeks.map((a) => a.id).toList()}');
+    expect(deepseeks.first.credentials['api_key'], 'DISK-KEY',
+        reason: '原有凭证应保留');
+    expect(deepseeks.first.credentials['model'], 'm',
+        reason: '导入的空缺字段应补上');
+  });
+
   test('初始化失败后必须允许重试，不能永久卡在失败的 Future', () async {
     // `_initFuture ??= _doInit()` 会把已完成(error)的 Future 永久缓存，
     // 后续调用立刻重抛同一个错误 —— SharedPreferences 首次获取只要瞬时失败
