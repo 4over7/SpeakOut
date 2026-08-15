@@ -34,6 +34,39 @@ void main() {
     return f.path;
   }
 
+  test('未初始化时写入不得覆盖磁盘上已有的账户', () async {
+    // 真实时序：窗口可能在 AppService.init() 完成前就显示（托盘/重开路径），
+    // 用户进云账户页 → _ensureAllProvidersExist → addAccount，
+    // 此时 _accounts 还是空的。若直接 _saveAccounts()，那个近乎空的列表
+    // 会把用户原有的全部账户**覆盖掉**。
+    //
+    // 讽刺的是：改成惰性获取之前的 `_prefs?.setString` 静默 no-op
+    // 反而保护了数据 —— 所以「能写了」还不够，必须先加载。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'pre-existing', providerId: 'moonshot', displayName: '用户原有',
+      isEnabled: true, credentials: {'api_key': 'USER-KEY'},
+    ));
+
+    // 模拟「进程重启后尚未 init」：清掉内存与初始化标志，磁盘保持不变
+    svc.debugResetForTest();
+    expect(svc.accounts, isEmpty, reason: '前置条件：内存应为空');
+
+    // 未 init 直接写 —— 这正是页面 initState 抢跑的情形
+    await svc.addAccount(CloudAccount(
+      id: 'new-blank', providerId: 'zhipu', displayName: '新建',
+      isEnabled: false, credentials: {},
+    ));
+
+    await svc.reload();
+    expect(svc.getAccountById('pre-existing'), isNotNull,
+        reason: '用户原有账户被这次写入覆盖了 —— 数据丢失');
+    expect(svc.getAccountById('pre-existing')!.credentials['api_key'],
+        'USER-KEY');
+    expect(svc.getAccountById('new-blank'), isNotNull);
+  });
+
   test('_prefs 未初始化时写入必须真正发生，而不是静默跳过', () async {
     // 窗口可能在 AppService.init() 完成前就显示（托盘/重开路径），
     // 用户此时进云账户页会触发 addAccount。

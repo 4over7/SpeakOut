@@ -27,8 +27,27 @@ class CloudAccountService {
 
   List<CloudAccount> get accounts => List.unmodifiable(_accounts);
 
-  Future<void> init() async {
+  Future<void>? _initFuture;
+
+  Future<void> init() => _ensureLoaded();
+
+  /// 任何**写**操作之前都必须走这里。
+  ///
+  /// 只惰性拿 prefs 是不够的（我上一版就是那样）：窗口可能在 AppService.init()
+  /// 完成前就显示，用户进云账户页触发 _ensureAllProvidersExist → addAccount，
+  /// 此时 _accounts 还是空的 —— _saveAccounts() 会把这个近乎空的列表写回磁盘，
+  /// **覆盖用户原有的全部账户**。
+  /// 讽刺的是改之前的 `_prefs?.setString` 静默 no-op 反而保护了数据。
+  ///
+  /// 用共享 Future 而不是布尔标志：并发调用（页面 initState 与 AppService.init
+  /// 同时进行）必须等同一次加载，不能各加载一遍。
+  Future<void> _ensureLoaded() async {
     if (_initialized) return;
+    _initFuture ??= _doInit();
+    await _initFuture;
+  }
+
+  Future<void> _doInit() async {
     _prefs = await SharedPreferences.getInstance();
     await _loadAccounts();
     _initialized = true;
@@ -36,9 +55,20 @@ class CloudAccountService {
 
   /// 重新加载账户数据（导入配置后调用）
   Future<void> reload() async {
-    _accounts.clear();
+    _initialized = false;
+    _initFuture = null;
     _prefs = await SharedPreferences.getInstance();
     await _loadAccounts();
+    _initialized = true;
+  }
+
+  /// 仅供测试：模拟「进程重启后尚未 init」—— 清内存与初始化标志，不动磁盘。
+  @visibleForTesting
+  void debugResetForTest() {
+    _accounts.clear();
+    _initialized = false;
+    _initFuture = null;
+    _prefs = null;
   }
 
   /// 仅供测试：让所有落盘抛错，用来验证内存回滚。生产代码不要碰。
@@ -71,6 +101,7 @@ class CloudAccountService {
   // ── CRUD ──
 
   Future<String> addAccount(CloudAccount account) async {
+    await _ensureLoaded();
     // 先入内存再落盘：任一步抛异常都必须回滚，否则 UI 允许重试时会用新 uuid
     // 再追加一个，第二次成功就把两条一起持久化 —— 重复账户。
     _accounts.add(account);
@@ -96,6 +127,7 @@ class CloudAccountService {
   }
 
   Future<void> updateAccount(CloudAccount account) async {
+    await _ensureLoaded();
     final idx = _accounts.indexWhere((a) => a.id == account.id);
     if (idx < 0) return;
     // 清理被移除的旧凭证 key（旧 - 新 差集），避免删字段/改 schema 后残留明文 secret
@@ -110,6 +142,7 @@ class CloudAccountService {
   }
 
   Future<void> removeAccount(String accountId) async {
+    await _ensureLoaded();
     final account = getAccountById(accountId);
     if (account == null) return;
     _accounts.removeWhere((a) => a.id == accountId);
@@ -270,6 +303,8 @@ class CloudAccountService {
   }
 
   Future<void> _loadAccounts() async {
+    // 清空再加载：不清的话重入会把同一批账户追加两遍
+    _accounts.clear();
     final json = _prefs?.getString(_kAccountsKey);
     if (json == null || json.isEmpty) return;
     try {
