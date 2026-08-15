@@ -13,9 +13,6 @@ import 'config_service.dart';
 /// Singleton. 管理所有云服务商的账户 CRUD、持久化、旧数据迁移。
 /// 凭证存储在 SharedPreferences。
 /// TODO: 拿到苹果开发者账号后迁移到 Keychain (flutter_secure_storage)。
-/// 测试用的落盘失败注入模式，见 CloudAccountService.debugFailPersistence
-enum DebugPersistFailure { none, all, credentialsOnly }
-
 class CloudAccountService {
   static final CloudAccountService _instance = CloudAccountService._internal();
   factory CloudAccountService() => _instance;
@@ -44,12 +41,17 @@ class CloudAccountService {
     await _loadAccounts();
   }
 
-  /// 仅供测试：强制落盘抛错，用来验证失败回滚。生产代码不要碰。
-  /// - all：所有写入都抛（验内存回滚）
-  /// - credentialsOnly：账户列表写成功、凭证写到一半才抛
-  ///   （验孤儿凭证清理 —— 只有这种时序才构造得出孤儿）
+  /// 仅供测试：让所有落盘抛错，用来验证内存回滚。生产代码不要碰。
   @visibleForTesting
-  static DebugPersistFailure debugFailPersistence = DebugPersistFailure.none;
+  static bool debugFailPersistence = false;
+
+  /// 仅供测试：每写一个凭证字段前调用。用来在「已写了一部分」时抛，
+  /// 构造孤儿凭证场景 —— 那是唯一能触发它的时序。生产恒为 null。
+  @visibleForTesting
+  static Future<void> Function()? debugBeforeCredentialWrite;
+
+  Future<void> Function()? get _beforeCredentialWrite =>
+      debugBeforeCredentialWrite;
 
   /// 取 prefs 用于**写入**。
   ///
@@ -59,11 +61,9 @@ class CloudAccountService {
   /// - 用 `_prefs?.setString` 会静默什么都不写，调用方却拿到"成功" → 数据丢失
   /// - 直接抛 StateError 又会变成未处理异常 + 页面空白（我上一版就是这样）
   /// 惰性获取两者都避开：写入真正发生。
-  Future<SharedPreferences> _requirePrefs({bool credentials = false}) async {
-    final f = debugFailPersistence;
-    if (f == DebugPersistFailure.all ||
-        (f == DebugPersistFailure.credentialsOnly && credentials)) {
-      throw StateError('debugFailPersistence=$f: 强制落盘失败（仅测试）');
+  Future<SharedPreferences> _requirePrefs() async {
+    if (debugFailPersistence) {
+      throw StateError('debugFailPersistence: 强制落盘失败（仅测试）');
     }
     return _prefs ??= await SharedPreferences.getInstance();
   }
@@ -298,12 +298,12 @@ class CloudAccountService {
   }
 
   Future<void> _saveCredentials(CloudAccount account) async {
-    // 先拿真 prefs 写第一个字段，再触发失败 —— 这样才构造得出「部分已落盘」
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    var first = true;
+    final prefs = await _requirePrefs();
     for (final entry in account.credentials.entries) {
-      if (!first) await _requirePrefs(credentials: true);
-      first = false;
+      // 逐字段一个 hook：默认什么都不做，测试用它在「写了一部分」时抛，
+      // 才构造得出孤儿凭证场景。不把注入逻辑塞进循环体本身 ——
+      // 那样 first 标志之类纯测试用的分支会污染生产代码。
+      await _beforeCredentialWrite?.call();
       await prefs.setString('cloud_cred_${account.id}_${entry.key}', entry.value);
     }
   }

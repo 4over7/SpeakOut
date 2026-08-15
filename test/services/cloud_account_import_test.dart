@@ -62,9 +62,8 @@ void main() {
     await svc.reload();
     final before = svc.accounts.length;
 
-    CloudAccountService.debugFailPersistence = DebugPersistFailure.all;
-    addTearDown(() =>
-        CloudAccountService.debugFailPersistence = DebugPersistFailure.none);
+    CloudAccountService.debugFailPersistence = true;
+    addTearDown(() => CloudAccountService.debugFailPersistence = false);
     await expectLater(
       svc.addAccount(CloudAccount(
         id: 'fail-1', providerId: 'deepseek', displayName: 'x',
@@ -86,9 +85,14 @@ void main() {
     final svc = CloudAccountService();
     await svc.reload();
 
-    CloudAccountService.debugFailPersistence = DebugPersistFailure.credentialsOnly;
-    addTearDown(() =>
-        CloudAccountService.debugFailPersistence = DebugPersistFailure.none);
+    // 第一个字段放行、第二个字段抛 —— 这样才有「已落盘的孤儿」。
+    // 用 all 模式的话 _saveAccounts 第一步就抛，根本走不到写凭证
+    //（我第一版就是这么写的，导致「回滚不清凭证」的退化漏报）。
+    var n = 0;
+    CloudAccountService.debugBeforeCredentialWrite = () async {
+      if (++n > 1) throw StateError('注入：凭证写到一半失败');
+    };
+    addTearDown(() => CloudAccountService.debugBeforeCredentialWrite = null);
     await expectLater(
       svc.addAccount(CloudAccount(
         id: 'orphan-1', providerId: 'deepseek', displayName: 'x',
@@ -96,7 +100,7 @@ void main() {
       )),
       throwsA(isA<StateError>()),
     );
-    CloudAccountService.debugFailPersistence = DebugPersistFailure.none;
+    CloudAccountService.debugBeforeCredentialWrite = null;
 
     final prefs = await SharedPreferences.getInstance();
     final orphans = prefs
