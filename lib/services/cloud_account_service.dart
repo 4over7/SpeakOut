@@ -57,6 +57,11 @@ class CloudAccountService {
   }
 
   Future<void> _doInit() async {
+    // 测试注入点：模拟 SharedPreferences 首次获取瞬时失败。
+    // 生产恒为 false，仅一次判断。
+    if (debugFailInit) {
+      throw StateError('debugFailInit: 强制初始化失败（仅测试）');
+    }
     _prefs = await SharedPreferences.getInstance();
     await _loadAccounts();
     _initialized = true;
@@ -79,6 +84,10 @@ class CloudAccountService {
     _initFuture = null;
     _prefs = null;
   }
+
+  /// 仅供测试：让 _doInit 抛错，模拟 SharedPreferences 首次获取瞬时失败。
+  @visibleForTesting
+  static bool debugFailInit = false;
 
   /// 仅供测试：让所有落盘抛错，用来验证内存回滚。生产代码不要碰。
   @visibleForTesting

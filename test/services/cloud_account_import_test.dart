@@ -41,7 +41,11 @@ void main() {
     final svc = CloudAccountService();
     svc.debugResetForTest();
 
-    CloudAccountService.debugFailPersistence = true;
+    // 注入的是**初始化**失败，不是落盘失败 —— 后者走 _requirePrefs，
+    // 根本不经过 _doInit，构造不出「失败 Future 被缓存」的场景。
+    //（我第一版就用错了注入点，导致这条测试验证不通过。）
+    CloudAccountService.debugFailInit = true;
+    addTearDown(() => CloudAccountService.debugFailInit = false);
     await expectLater(
       svc.addAccount(CloudAccount(
         id: 'retry-1', providerId: 'zhipu', displayName: 'r',
@@ -51,7 +55,7 @@ void main() {
     );
 
     // 故障排除后应当能成功，而不是继续抛同一个错误
-    CloudAccountService.debugFailPersistence = false;
+    CloudAccountService.debugFailInit = false;
     await svc.addAccount(CloudAccount(
       id: 'retry-2', providerId: 'zhipu', displayName: 'r2',
       isEnabled: false, credentials: {},
