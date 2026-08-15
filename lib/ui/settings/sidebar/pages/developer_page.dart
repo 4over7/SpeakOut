@@ -149,19 +149,21 @@ class _DeveloperPageState extends State<DeveloperPage> {
       //      只收自定义目录的话，没设过目录的用户导出来是空的，等于白记。
       final appLogsDest = Directory('${tempDir.path}/app-logs');
       appLogsDest.createSync();
-      final logDirs = <Directory>[
+      // 标签与目录绑成一体，**不要**用平行数组 + 下标 ——
+      // logDirectory 为空时 logDirs 只有一项，labels[0] 却是 'custom'，
+      // 默认用户的日志会被标成 custom，排障时指向错误的来源。
+      final logDirs = <({String label, Directory dir})>[
         if (ConfigService().logDirectory.isNotEmpty)
-          Directory(ConfigService().logDirectory),
-        await getApplicationSupportDirectory(),
+          (label: 'custom', dir: Directory(ConfigService().logDirectory)),
+        (label: 'app-support', dir: await getApplicationSupportDirectory()),
       ];
       // 按来源分子目录，**不要**按文件名去重：两个目录常常都有 speakout.log
       // （用户切换过日志目录时，旧目录里往往正是故障发生时的那份）。
       // 按名字丢弃会静默少一份，排障的人可能据此误判「故障从未发生」。
-      final labels = <String>['custom', 'app-support'];
-      for (var i = 0; i < logDirs.length; i++) {
-        final dir = logDirs[i];
+      for (final entry in logDirs) {
+        final dir = entry.dir;
         if (!dir.existsSync()) continue;
-        final sub = Directory('${appLogsDest.path}/${labels[i]}');
+        final sub = Directory('${appLogsDest.path}/${entry.label}');
         sub.createSync(recursive: true);
         for (final entity in dir.listSync()) {
           if (entity is! File || !entity.path.endsWith('.log')) continue;

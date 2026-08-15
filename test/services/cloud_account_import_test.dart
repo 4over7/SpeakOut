@@ -97,6 +97,36 @@ void main() {
 
   });
 
+  test('串行化必须可重入 —— 复合路径里嵌套调用不得自死锁', () async {
+    // importFromFile / migrateFromLegacy / migrateDeepSeekModels 都会调
+    // add/update/remove。它们目前没被包进串行链，所以嵌套能各自排队；
+    // 但这份正确性靠「没人包错」维持。重入判断把隐患去掉。
+    //
+    // 这里直接验最坏情形：在一个串行写内部再发起一个串行写。
+    // 没有重入保护的话，内层会排在外层后面 —— 外层等内层、内层等外层，
+    // 永远不返回（测试会超时而不是失败，所以给它一个显式超时）。
+    final svc = CloudAccountService();
+    await svc.reload();
+
+    await svc
+        .addAccount(CloudAccount(
+          id: 'outer', providerId: 'zhipu', displayName: 'o',
+          isEnabled: false, credentials: {},
+        ))
+        .timeout(const Duration(seconds: 5));
+
+    // 复合路径的真实形态：importFromFile 内部连续 addAccount
+    final path = await writeBackup([
+      {'providerId': 'gemini', 'isEnabled': false, 'credentials': {}},
+      {'providerId': 'moonshot', 'isEnabled': false, 'credentials': {}},
+    ]);
+    final n = await svc
+        .importFromFile(path)
+        .timeout(const Duration(seconds: 5),
+            onTimeout: () => throw StateError('自死锁：嵌套写永远等不到'));
+    expect(n, 2);
+  });
+
   test('并发写必须串行 —— 先发失败的补偿不得覆盖后发成功的结果', () async {
     // add/update/remove 都是「改内存 → 分步落盘 → 失败则补偿」。
     // 不串行的话，先发那个失败后的补偿会用它的 previous 快照

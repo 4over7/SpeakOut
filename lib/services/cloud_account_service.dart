@@ -153,13 +153,24 @@ class CloudAccountService {
   /// 只把结果转交给各自的调用方。
   Future<void> _writeChain = Future.value();
 
+  /// 是否已在链内执行。复合路径（importFromFile / migrateFromLegacy /
+  /// migrateDeepSeekModels）会调 add/update/remove —— 它们**目前**没被包进
+  /// 串行链，所以嵌套调用能各自排队执行。但这份正确性靠「没人包错」维持：
+  /// 哪天有人给复合方法也套上 _serializedWrite，它就会排在自己后面永远等不到。
+  /// 加重入判断把这个隐患去掉，而不是靠注释提醒。
+  bool _inSerializedWrite = false;
+
   Future<T> _serializedWrite<T>(Future<T> Function() op) {
+    if (_inSerializedWrite) return op(); // 已持有「锁」，直接执行避免自死锁
     final done = Completer<T>();
     _writeChain = _writeChain.then((_) async {
+      _inSerializedWrite = true;
       try {
         done.complete(await op());
       } catch (e, st) {
         done.completeError(e, st);
+      } finally {
+        _inSerializedWrite = false;
       }
     });
     return done.future;
