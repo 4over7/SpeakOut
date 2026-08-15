@@ -1494,4 +1494,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String cloudAccountLoadFailed(Object error) {
     return 'Failed to load cloud accounts: $error';
   }
+
+  @override
+  String cloudAccountImportFailed(Object error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String cloudAccountDeleteFailed(Object error) {
+    return 'Delete failed: $error';
+  }
 }

@@ -1429,4 +1429,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String cloudAccountLoadFailed(Object error) {
     return '云账户加载失败：$error';
   }
+
+  @override
+  String cloudAccountImportFailed(Object error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String cloudAccountDeleteFailed(Object error) {
+    return '删除失败：$error';
+  }
 }

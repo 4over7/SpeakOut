@@ -619,5 +619,17 @@
     "placeholders": {
       "error": {}
     }
+  },
+  "cloudAccountImportFailed": "导入失败：{error}",
+  "@cloudAccountImportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudAccountDeleteFailed": "删除失败：{error}",
+  "@cloudAccountDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
   }
 }

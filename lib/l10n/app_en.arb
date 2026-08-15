@@ -659,5 +659,17 @@
     "placeholders": {
       "error": {}
     }
+  },
+  "cloudAccountImportFailed": "Import failed: {error}",
+  "@cloudAccountImportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudAccountDeleteFailed": "Delete failed: {error}",
+  "@cloudAccountDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
   }
 }

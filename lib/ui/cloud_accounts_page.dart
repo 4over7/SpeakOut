@@ -206,7 +206,17 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
       allowedExtensions: ['json'],
     );
     if (result == null || result.files.single.path == null) return;
-    final count = await CloudAccountService().importFromFile(result.files.single.path!);
+    // 必须接住：importFromFile 现在会把加载失败抛出来（不再吞成「导入 0 条」），
+    // 但调用方不接的话异常只进全局 zone 打印一行日志 ——
+    // 用户既看不到成功弹窗也看不到错误，等于把「消息指错方向」换成「完全没消息」。
+    final int count;
+    try {
+      count = await CloudAccountService().importFromFile(result.files.single.path!);
+    } catch (e) {
+      if (!mounted) return;
+      NotificationService().notifyError(loc.cloudAccountImportFailed(e.toString()));
+      return;
+    }
     if (!mounted) return;
     _refreshAccounts();
     await showMacosAlertDialog(
@@ -294,7 +304,14 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                     displayName: account.displayName, credentials: account.credentials,
                     isEnabled: v, createdAt: account.createdAt,
                   );
-                  await CloudAccountService().updateAccount(updated);
+                  try {
+                    await CloudAccountService().updateAccount(updated);
+                  } catch (e) {
+                    if (!mounted) return;
+                    NotificationService()
+                        .notifyError(loc.cloudAccountSaveFailed(e.toString()));
+                    return; // 别刷新出一个与磁盘不一致的开关状态
+                  }
                   _refreshAccounts();
                 },
               )
@@ -383,7 +400,14 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
       ),
     );
     if (ok != true) return;
-    await CloudAccountService().removeAccount(account.id);
+    try {
+      await CloudAccountService().removeAccount(account.id);
+    } catch (e) {
+      if (!mounted) return;
+      NotificationService()
+          .notifyError(loc.cloudAccountDeleteFailed(e.toString()));
+      return;
+    }
     await _refreshAccounts();
   }
 

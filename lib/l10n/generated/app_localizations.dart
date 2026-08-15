@@ -2761,6 +2761,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load cloud accounts: {error}'**
   String cloudAccountLoadFailed(Object error);
+
+  /// No description provided for @cloudAccountImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String cloudAccountImportFailed(Object error);
+
+  /// No description provided for @cloudAccountDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String cloudAccountDeleteFailed(Object error);
 }
 
 class _AppLocalizationsDelegate
