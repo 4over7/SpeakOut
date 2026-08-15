@@ -368,6 +368,14 @@ void main() {
     expect(orphans, isEmpty,
         reason: '账户 metadata 已删但凭证还在 —— 这些 key 再也定位不到，'
             '明文密钥永久残留：$orphans');
+
+    // 还要验**磁盘上的账户列表**：addAccount 是「先写列表、后写凭证」，
+    // 凭证失败时列表已经落盘 —— 回滚必须把它改回去，否则重启后会读出
+    // 一个凭证为空的幽灵账户。
+    // （原来这条测试只查凭证 key，去掉回滚里的写列表也不会红。）
+    await svc.reload();
+    expect(svc.getAccountById('orphan-1'), isNull,
+        reason: '磁盘上的账户列表没回滚 —— 重启后会出现凭证为空的幽灵账户');
   });
 
   test('写入路径不得使用 `_prefs?.` —— 静默 no-op 等于数据丢失', () {

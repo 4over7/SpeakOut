@@ -193,7 +193,13 @@ class CloudAccountService {
         if (added.isNotEmpty) {
           await _clearCredentials(account.id, added);
         }
-        await _saveAccounts();
+        // 这里**不需要**再写一次账户列表：本方法是「先写凭证、后写列表」，
+        // 走到 catch 说明列表那步没成功 —— 磁盘上仍是完整的旧状态，
+        // 重写一遍只是把相同的值再写一次。
+        //（对比 addAccount：它是「先写列表、后写凭证」，凭证失败时列表已落盘，
+        //  那里的回滚写列表是必要的。）
+        // 我一度在这里也加了 _saveAccounts()，还在 commit 里声称"实测能抓到
+        // 去掉它的退化" —— 探针证明磁盘状态根本没差别，那是个假护栏。
       } catch (e2) {
         AppLog.d('CloudAccountService: 账户 ${account.id} 更新失败后'
             '凭证回滚也失败，磁盘可能处于混合状态: $e2');
