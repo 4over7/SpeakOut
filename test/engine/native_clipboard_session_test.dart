@@ -57,11 +57,28 @@ void main() {
         reason: '置位必须早于空/非空分支，否则空剪贴板时会漏置');
   });
 
-  test('dylib 已随源码重新编译', () {
-    final m = File('native_lib/native_input.m').lastModifiedSync();
-    final so = File('native_lib/libnative_input.dylib').lastModifiedSync();
-    expect(so.isAfter(m) || so.isAtSameMomentAs(m), isTrue,
-        reason: 'dylib 比 native_input.m 旧 —— 改了原生代码没重编译，'
-            '跑的还是旧二进制');
+  test('dylib 已随源码重新编译（内容判据，不看 mtime）', () {
+    // 判据用「源码里的日志字面量是否已编进二进制」，**不能用 mtime**：
+    // git clone 不保留 mtime，checkout 顺序决定先后 —— 本机三次 clone 都同秒，
+    // 但 CI 上跨秒边界就会翻转，等于埋一颗随机变红的炸弹。
+    // 日志字面量会原样进入 __cstring 段，改了源码没重编译就一定查不到。
+    final src = File('native_lib/native_input.m').readAsStringSync();
+    final lits = RegExp(r'log_to_file\(\s*"([^"%\\]{20,})"')
+        .allMatches(src)
+        .map((m) => m.group(1)!)
+        .toSet()
+        .toList();
+    expect(lits.length, greaterThan(3),
+        reason: '没提取到足够的日志字面量，判据失效了');
+
+    final out = Process.runSync('strings', ['native_lib/libnative_input.dylib']);
+    expect(out.exitCode, 0, reason: 'strings 执行失败: ${out.stderr}');
+    final binary = out.stdout as String;
+
+    final missing = lits.where((l) => !binary.contains(l)).toList();
+    expect(missing, isEmpty,
+        reason: '这些日志字面量在源码里有、在 dylib 里没有 —— '
+            '改了 native_input.m 却没重编译，跑的还是旧二进制。'
+            '重编译命令见 native_lib/AGENTS.md：\n  ${missing.join("\n  ")}');
   });
 }
