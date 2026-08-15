@@ -7,6 +7,7 @@ import '../../models/chat_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/diary_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/app_service.dart';
 import '../../ui/theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 
@@ -420,7 +421,16 @@ class _ChatPageState extends State<ChatPage> {
         PopupMenuItem(
           child: Text(loc.chatCopy),
           onTap: () {
-            // 原来这里是空函数（注释写着 "Future: Clipboard"）—— 点了没反应
+            // 原来这里是空函数（注释写着 "Future: Clipboard"）—— 点了没反应。
+            //
+            // 注入进行中不能复制：文本注入借道剪贴板搬运，用户此刻复制的内容
+            // 会被下一个 chunk 覆盖，收尾还原时再抹一次（原生侧的 changeCount
+            // 守卫只挡得住"最后一个 chunk 之后"的复制，挡不住 chunk 之间的）。
+            // 明确拒绝并提示，好过让他以为复制成功了。
+            if (AppService().isClipboardInjecting) {
+              _toast(loc.chatCopyBusy);
+              return;
+            }
             Clipboard.setData(ClipboardData(text: msg.text));
             _toast(loc.chatCopied);
           },

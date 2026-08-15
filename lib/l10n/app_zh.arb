@@ -606,5 +606,6 @@
     }
   },
   "chatCopy": "复制",
-  "chatSaveToDiary": "存入闪念笔记"
+  "chatSaveToDiary": "存入闪念笔记",
+  "chatCopyBusy": "正在注入文字，请稍后再复制"
 }

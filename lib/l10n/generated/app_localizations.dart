@@ -2743,6 +2743,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save to Notes'**
   String get chatSaveToDiary;
+
+  /// No description provided for @chatCopyBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Text injection in progress — try copying again in a moment'**
+  String get chatCopyBusy;
 }
 
 class _AppLocalizationsDelegate

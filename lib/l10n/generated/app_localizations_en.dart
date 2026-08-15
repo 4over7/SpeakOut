@@ -1480,4 +1480,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatSaveToDiary => 'Save to Notes';
+
+  @override
+  String get chatCopyBusy =>
+      'Text injection in progress — try copying again in a moment';
 }

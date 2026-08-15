@@ -1416,4 +1416,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatSaveToDiary => '存入闪念笔记';
+
+  @override
+  String get chatCopyBusy => '正在注入文字，请稍后再复制';
 }

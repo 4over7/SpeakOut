@@ -43,6 +43,7 @@ class AppService {
   AudioDeviceService? get audioDeviceService => engine.audioDeviceService;
   bool get isPunctuationEnabled => engine.isPunctuationEnabled;
   bool get isASRReady => engine.isASRReady;
+  bool get isClipboardInjecting => engine.isClipboardInjecting;
   bool get isListenerRunning => engine.isListenerRunning;
   int get pttKeyCode => engine.pttKeyCode;
   set pttKeyCode(int v) => engine.pttKeyCode = v;

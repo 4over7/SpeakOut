@@ -88,6 +88,23 @@ class CoreEngine {
   /// 两处守卫原本各写各的，合并到这里避免再次漂移。
   /// cancel 路径也用 stopping，但它设完状态后全是同步语句、紧接着
   /// _stopAudioSafely() 同步取消定时器，事件循环没机会跑，不会多喂。
+  /// 剪贴板注入会话进行中。注入用剪贴板搬运文本，期间用户若自己复制，
+  /// 会被下一个 chunk 覆盖、收尾还原时再抹一次 —— UI 需要据此拒绝复制并提示，
+  /// 而不是让用户以为复制成功了。
+  bool _clipboardInjecting = false;
+  bool get isClipboardInjecting => _clipboardInjecting;
+
+  /// 成对包装：标志只在这两个方法里维护，避免各调用点自己维护而漂移。
+  void _clipBegin() {
+    _clipboardInjecting = true;
+    _nativeInput?.injectClipboardBegin();
+  }
+
+  void _clipEnd() {
+    _nativeInput?.injectClipboardEnd();
+    _clipboardInjecting = false;
+  }
+
   bool get _shouldConsumeAudio =>
       _recordingState == RecordingState.recording ||
       _recordingState == RecordingState.stopping;
@@ -703,7 +720,7 @@ class CoreEngine {
 
     try {
       // 1. 保存剪贴板 + Cmd+C 复制选中文字
-      ni.injectClipboardBegin();
+      _clipBegin();
       ni.copySelection();
       await Future.delayed(const Duration(milliseconds: 150));
 
@@ -712,7 +729,7 @@ class CoreEngine {
       final selectedText = clipData?.text?.trim() ?? '';
       if (selectedText.isEmpty) {
         _log("[Organize] 未检测到选中文字");
-        ni.injectClipboardEnd();
+        _clipEnd();
         overlay.recordingMode = "organize";
         overlay.updateText("未检测到选中文字");
         await overlay.show();
@@ -735,7 +752,7 @@ class CoreEngine {
         _log("[Organize] LLM 返回空结果");
         overlay.updateText("梳理失败");
         await Future.delayed(const Duration(seconds: 2));
-        ni.injectClipboardEnd();
+        _clipEnd();
         await overlay.hide();
         return;
       }
@@ -747,7 +764,7 @@ class CoreEngine {
       await Future.delayed(const Duration(milliseconds: 50));
       ni.injectClipboardChunk(result);
       await Future.delayed(const Duration(milliseconds: 100));
-      ni.injectClipboardEnd();
+      _clipEnd();
 
       overlay.updateText("✓");
       _log("[Organize] 完成，输出 ${result.length} 字");
@@ -755,7 +772,7 @@ class CoreEngine {
       await overlay.hide();
     } catch (e) {
       _log("[Organize] 错误: $e");
-      try { ni.injectClipboardEnd(); } catch (_) {}
+      try { _clipEnd(); } catch (_) {}
       overlay.updateText("梳理失败");
       await Future.delayed(const Duration(seconds: 2));
       await overlay.hide();
@@ -1287,7 +1304,7 @@ class CoreEngine {
             var lastInjectTime = DateTime.now();
             const batchInterval = Duration(milliseconds: AppConstants.kTypewriterBatchIntervalMs);
 
-            _nativeInput?.injectClipboardBegin();
+            _clipBegin();
             typewriterBegan = true;
             _log("[PERF] +${sw.elapsedMilliseconds}ms — typewriter mode: clipboard begin");
 
@@ -1320,7 +1337,7 @@ class CoreEngine {
               _nativeInput?.injectClipboardChunk(batchBuffer.toString());
               streamInjected = true;
             }
-            _nativeInput?.injectClipboardEnd();
+            _clipEnd();
             typewriterBegan = false;
 
             var polished = streamBuffer.toString().trim();
@@ -1356,7 +1373,7 @@ class CoreEngine {
           _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish error: $e");
           // Ensure typewriter clipboard session is properly ended
           if (typewriterBegan) {
-            try { _nativeInput?.injectClipboardEnd(); } catch (_) {}
+            try { _clipEnd(); } catch (_) {}
           }
         }
         lastLlmSuccess = LLMService().lastCallSucceeded;
