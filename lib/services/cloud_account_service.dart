@@ -69,7 +69,12 @@ class CloudAccountService {
   }
 
   /// 重新加载账户数据（导入配置后调用）
-  Future<void> reload() async {
+  /// 也要进链：它 clear + 重建 _accounts。与进行中的 update 并发时，
+  /// 那个 update 的补偿会基于被 reload 换掉的列表写回 —— 新凭证已落盘、
+  /// metadata 却被旧数据覆盖，而调用方收到的是「成功」。
+  Future<void> reload() => _serializedWrite(() => _reloadUnsafe());
+
+  Future<void> _reloadUnsafe() async {
     _initialized = false;
     _initFuture = null;
     _prefs = await SharedPreferences.getInstance();
@@ -153,24 +158,21 @@ class CloudAccountService {
   /// 只把结果转交给各自的调用方。
   Future<void> _writeChain = Future.value();
 
-  /// 是否已在链内执行。复合路径（importFromFile / migrateFromLegacy /
-  /// migrateDeepSeekModels）会调 add/update/remove —— 它们**目前**没被包进
-  /// 串行链，所以嵌套调用能各自排队执行。但这份正确性靠「没人包错」维持：
-  /// 哪天有人给复合方法也套上 _serializedWrite，它就会排在自己后面永远等不到。
-  /// 加重入判断把这个隐患去掉，而不是靠注释提醒。
-  bool _inSerializedWrite = false;
-
+  /// ⚠️ 不要用「布尔重入标志」来防自死锁 —— 我试过，它会把串行化打穿：
+  /// 标志在链内 op 的**整个执行期**（含每个 await 间隙）都为 true，
+  /// 此时外部调用会被误判成重入而直接执行，与链内操作并发。
+  /// 对照实验：A 进入 await 后调 B，B 走 BYPASS，
+  /// 执行顺序变成 A:start → B:start → A:end → B:end。
+  ///
+  /// 正解是**显式**：需要在链内做多步写的复合方法，自己整体入链，
+  /// 并调用下面的 *Unsafe 版本；公开方法只是「入链 + 调 unsafe」的薄包装。
   Future<T> _serializedWrite<T>(Future<T> Function() op) {
-    if (_inSerializedWrite) return op(); // 已持有「锁」，直接执行避免自死锁
     final done = Completer<T>();
     _writeChain = _writeChain.then((_) async {
-      _inSerializedWrite = true;
       try {
         done.complete(await op());
       } catch (e, st) {
         done.completeError(e, st);
-      } finally {
-        _inSerializedWrite = false;
       }
     });
     return done.future;
@@ -484,7 +486,10 @@ class CloudAccountService {
 
   /// 云账户凭证里存的 model 字段同样可能是已停用的 DeepSeek 旧别名。
   /// 与 ConfigService.migrateDeepSeekV4 配套，只动 deepseek 账户。
-  Future<void> migrateDeepSeekModels() async {
+  Future<void> migrateDeepSeekModels() =>
+      _serializedWrite(() => _migrateDeepSeekModelsUnsafe());
+
+  Future<void> _migrateDeepSeekModelsUnsafe() async {
     final prefs = await SharedPreferences.getInstance();
     const flag = 'deepseek_v4_account_migrated';
     if (prefs.getBool(flag) ?? false) return;
@@ -494,7 +499,7 @@ class CloudAccountService {
       final mapped = ConfigService.mapRetiredDeepSeekModel(m);
       if (m != null && mapped != null && mapped != m) {
         a.credentials['model'] = mapped;
-        await updateAccount(a);
+        await _updateAccountUnsafe(a);
         AppLog.d('[Migration] DeepSeek 账户模型 $m → deepseek-v4-flash');
       }
     }
@@ -633,7 +638,13 @@ class CloudAccountService {
   static bool _shouldEnable(bool wanted, Map<String, String> creds) =>
       wanted && creds.values.any((v) => v.isNotEmpty);
 
-  Future<int> importFromFile(String filePath) async {
+  /// 整体入链：链外读 accounts 判重会看到别人尚未提交、随后可能回滚的
+  /// 临时状态 —— 导入谎报成功或建出重复账户。内部必须调 *Unsafe，
+  /// 调公开方法会排在自己后面永远等不到（自死锁）。
+  Future<int> importFromFile(String filePath) =>
+      _serializedWrite(() => _importFromFileUnsafe(filePath));
+
+  Future<int> _importFromFileUnsafe(String filePath) async {
     // 复合操作必须在**任何读取之前**加载：下面用 getAccountByProviderId 判重，
     // 未加载时它恒为 null，于是每个磁盘上已有的 provider 都会被再建一条。
     // 单靠 addAccount 内部的 _ensureLoaded 不够 —— 那时判重已经做完了。
@@ -698,7 +709,7 @@ class CloudAccountService {
           // 「旧 keys - 新 keys」的差集恒为空 —— 那道用来清除 SharedPreferences
           // 残留明文密钥的安全网会静默失效（本路径只增不减，暂时无泄漏，
           // 但这个写法一旦被照抄到会删字段的场景就是真漏）。
-          await updateAccount(CloudAccount(
+          await _updateAccountUnsafe(CloudAccount(
             id: existing.id,
             providerId: existing.providerId,
             displayName: p.displayName ?? existing.displayName,
@@ -707,7 +718,7 @@ class CloudAccountService {
             createdAt: existing.createdAt,
           ));
         } else {
-          await addAccount(CloudAccount(
+          await _addAccountUnsafe(CloudAccount(
             id: const Uuid().v4(),
             providerId: p.providerId,
             displayName: p.displayName ?? p.providerId,
@@ -730,7 +741,10 @@ class CloudAccountService {
 
   // ── 旧数据迁移（Legacy → CloudAccount） ──
 
-  Future<void> migrateFromLegacy() async {
+  Future<void> migrateFromLegacy() =>
+      _serializedWrite(() => _migrateFromLegacyUnsafe());
+
+  Future<void> _migrateFromLegacyUnsafe() async {
     if (_prefs?.getBool(_kMigratedKey) ?? false) return;
 
     final config = ConfigService();
@@ -751,7 +765,7 @@ class CloudAccountService {
           'app_key': appKey,
         },
       );
-      await addAccount(account);
+      await _addAccountUnsafe(account);
       migrated++;
     }
 
@@ -769,7 +783,7 @@ class CloudAccountService {
         displayName: '${provider.name} (迁移)',
         credentials: {'api_key': savedKey},
       );
-      await addAccount(account);
+      await _addAccountUnsafe(account);
       migrated++;
     }
 
