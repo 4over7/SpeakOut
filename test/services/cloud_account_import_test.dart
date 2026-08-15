@@ -60,6 +60,42 @@ void main() {
     expect(svc.getAccountById('upd-1')!.isEnabled, isFalse);
   });
 
+  test('update 失败时凭证**值**也要还原 —— 它们是就地覆盖的', () async {
+    // 凭证存在 cloud_cred_<accountId>_<key>，account id 不变，
+    // 所以写新值等于就地覆盖旧值。只回滚内存和账户列表不够 ——
+    // 重启后会读到「旧 metadata + 新凭证」的混合状态。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'cred-rb', providerId: 'gemini', displayName: 'n',
+      isEnabled: false, credentials: {'api_key': 'OLD'},
+    ));
+
+    // 让写凭证成功、写账户列表失败 —— 正是「凭证已覆盖但改动未提交」的边界
+    var writes = 0;
+    CloudAccountService.debugBeforeCredentialWrite = () async { writes++; };
+    addTearDown(() => CloudAccountService.debugBeforeCredentialWrite = null);
+    CloudAccountService.debugFailAccountsWriteOnly = true;
+    addTearDown(
+        () => CloudAccountService.debugFailAccountsWriteOnly = false);
+    await expectLater(
+      svc.updateAccount(CloudAccount(
+        id: 'cred-rb', providerId: 'gemini', displayName: 'n',
+        isEnabled: false, credentials: {'api_key': 'NEW', 'extra': 'X'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailAccountsWriteOnly = false;
+    expect(writes, greaterThan(0), reason: '前置条件：凭证确实写过');
+
+    await svc.reload();
+    expect(svc.getAccountById('cred-rb')!.credentials['api_key'], 'OLD',
+        reason: '凭证值没还原 —— 重启后是「旧 metadata + 新凭证」的混合状态');
+    expect(svc.getAccountById('cred-rb')!.credentials.containsKey('extra'),
+        isFalse,
+        reason: '新增字段没清掉，留下孤儿明文');
+  });
+
   test('update 第一阶段失败回滚、第二阶段失败不回滚', () async {
     // 与 remove 同构。第一版把「清理旧凭证差集」放最前面且不设防，
     // 又把写凭证与写列表包在同一个 try 里回滚 ——

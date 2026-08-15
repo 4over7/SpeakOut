@@ -85,6 +85,11 @@ class CloudAccountService {
     _prefs = null;
   }
 
+  /// 仅供测试：只让 _saveAccounts 抛错（凭证写入照常成功），
+  /// 用来构造「凭证已就地覆盖、改动尚未提交」这个边界。
+  @visibleForTesting
+  static bool debugFailAccountsWriteOnly = false;
+
   /// 仅供测试：让「写账户列表成功之后」的步骤抛错，
   /// 用来验证删除的第二阶段失败时**不得**回滚。
   @visibleForTesting
@@ -173,6 +178,21 @@ class CloudAccountService {
       await _saveAccounts();
     } catch (e) {
       _accounts[idx] = previous;
+      // 只回滚内存和列表是不够的：凭证存在 cloud_cred_<accountId>_<key>，
+      // **account id 不变**，所以刚才那几笔写入是就地覆盖了旧值。
+      // 必须把旧值写回，并清掉「新增字段」留下的孤儿。
+      try {
+        await _saveCredentials(previous);
+        final added = account.credentials.keys.toSet()
+            .difference(previous.credentials.keys.toSet());
+        if (added.isNotEmpty) {
+          await _clearCredentials(account.id, added);
+        }
+        await _saveAccounts();
+      } catch (e2) {
+        AppLog.d('CloudAccountService: 账户 ${account.id} 更新失败后'
+            '凭证回滚也失败，磁盘可能处于混合状态: $e2');
+      }
       rethrow;
     }
 
@@ -223,16 +243,23 @@ class CloudAccountService {
     // 但必须兜住异常并记日志 —— 悬空的 selected ID 会让
     // effectiveAsrAccount() 找不到目标而落到推荐兜底，
     // 表现成「界面显示 A、实际跑 B」那类难查的问题。
-    try {
-      if (ConfigService().selectedAsrAccountId == accountId) {
+    // 两个 setter 各自 best-effort：放在同一个 try 里的话，
+    // ASR 清理失败会让 LLM 清理**根本不执行**，留下第二个悬空引用。
+    if (ConfigService().selectedAsrAccountId == accountId) {
+      try {
         await ConfigService().setSelectedAsrAccount(null);
+      } catch (e) {
+        AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
+            '但 ASR 选中项清理失败（悬空引用）: $e');
       }
-      if (ConfigService().selectedLlmAccountId == accountId) {
+    }
+    if (ConfigService().selectedLlmAccountId == accountId) {
+      try {
         await ConfigService().setSelectedLlmAccountId(null);
+      } catch (e) {
+        AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
+            '但 LLM 选中项清理失败（悬空引用）: $e');
       }
-    } catch (e) {
-      AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
-          '但选中项清理失败（可能留下悬空引用）: $e');
     }
 
     AppLog.d('CloudAccountService: removed account $accountId');
@@ -403,6 +430,9 @@ class CloudAccountService {
   }
 
   Future<void> _saveAccounts() async {
+    if (debugFailAccountsWriteOnly) {
+      throw StateError('debugFailAccountsWriteOnly（仅测试）');
+    }
     // 用 ! 而不是 ?.：_prefs 为空时静默什么都不写，调用方却拿到"成功" ——
     // 那是静默数据丢失。宁可抛出来让上层看见。
     final prefs = await _requirePrefs();
