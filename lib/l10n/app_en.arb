@@ -647,5 +647,11 @@
   },
   "chatCopy": "Copy",
   "chatSaveToDiary": "Save to Notes",
-  "chatCopyBusy": "Text injection in progress — try copying again in a moment"
+  "chatCopyBusy": "Text injection in progress — try copying again in a moment",
+  "cloudAccountSaveFailed": "Save failed: {error}",
+  "@cloudAccountSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  }
 }

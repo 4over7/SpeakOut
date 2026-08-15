@@ -1419,4 +1419,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatCopyBusy => '正在注入文字，请稍后再复制';
+
+  @override
+  String cloudAccountSaveFailed(Object error) {
+    return '保存失败：$error';
+  }
 }

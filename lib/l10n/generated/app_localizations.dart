@@ -2749,6 +2749,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text injection in progress — try copying again in a moment'**
   String get chatCopyBusy;
+
+  /// No description provided for @cloudAccountSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed: {error}'**
+  String cloudAccountSaveFailed(Object error);
 }
 
 class _AppLocalizationsDelegate

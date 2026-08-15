@@ -1484,4 +1484,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatCopyBusy =>
       'Text injection in progress — try copying again in a moment';
+
+  @override
+  String cloudAccountSaveFailed(Object error) {
+    return 'Save failed: $error';
+  }
 }

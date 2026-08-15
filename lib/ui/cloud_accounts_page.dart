@@ -10,6 +10,7 @@ import '../config/cloud_providers.dart';
 import '../models/cloud_account.dart';
 import 'theme.dart';
 import 'widgets/settings_widgets.dart';
+import '../services/notification_service.dart';
 
 /// 云服务账户管理页面
 ///
@@ -637,25 +638,39 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
                             final hasAnyCred = provider != null &&
                                 provider.hasAnyValidCredentials(creds);
 
-                            if (isEdit) {
-                              final updated = CloudAccount(
-                                id: existingAccount.id,
-                                providerId: existingAccount.providerId,
-                                displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
-                                credentials: creds,
-                                isEnabled: hasAnyCred && existingAccount.isEnabled,
-                                createdAt: existingAccount.createdAt,
-                              );
-                              await CloudAccountService().updateAccount(updated);
-                            } else {
-                              final account = CloudAccount(
-                                id: const Uuid().v4(),
-                                providerId: selectedProviderId,
-                                displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
-                                credentials: creds,
-                                isEnabled: hasAnyCred,
-                              );
-                              await CloudAccountService().addAccount(account);
+                            // 必须 try/catch：写盘抛异常时下面的 pop 不会执行，
+                            // 弹窗留着而 saving 永远为 true —— 按钮永久禁用，
+                            // 用户既不能重试也看不到原因。
+                            try {
+                              if (isEdit) {
+                                final updated = CloudAccount(
+                                  id: existingAccount.id,
+                                  providerId: existingAccount.providerId,
+                                  displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
+                                  credentials: creds,
+                                  isEnabled: hasAnyCred && existingAccount.isEnabled,
+                                  createdAt: existingAccount.createdAt,
+                                );
+                                await CloudAccountService().updateAccount(updated);
+                              } else {
+                                final account = CloudAccount(
+                                  id: const Uuid().v4(),
+                                  providerId: selectedProviderId,
+                                  displayName: displayName.isNotEmpty ? displayName : (provider?.name ?? selectedProviderId),
+                                  credentials: creds,
+                                  isEnabled: hasAnyCred,
+                                );
+                                await CloudAccountService().addAccount(account);
+                              }
+                            } catch (e) {
+                              NotificationService().notifyError(
+                                  loc.cloudAccountSaveFailed(e.toString()));
+                              if (builderContext.mounted) {
+                                setDialogState(() => saving = false);
+                              } else {
+                                saving = false;
+                              }
+                              return;
                             }
 
                             for (final c in credControllers.values) { c.dispose(); }
