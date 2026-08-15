@@ -56,8 +56,18 @@ void main() {
   test('会话状态必须用计数而非布尔 —— AI 梳理与打字机注入可重叠', () {
     expect(src.contains('int _clipboardSessions'), isTrue,
         reason: '布尔标志下任一注入先结束就清零，另一个还在写 chunk，等于没防');
-    expect(src.contains('_clipboardSessions > 0) _clipboardSessions--'), isTrue,
-        reason: '计数不得减成负数：异常路径上 _clipEnd 可能比 _clipBegin 多跑一次');
+    // 重复 _clipEnd 必须是 no-op，不能再走一次 native。
+    // native 的 inject_clipboard_end 里 clearContents 是无条件执行的，
+    // 只有 saved != nil 才写回；第二次调用时 saved 已被取走置 nil，
+    // 两个 dispatch_after 几乎同时到期，第二个先跑就会清空用户剪贴板，
+    // 随后第一个因 changeCount 已变而跳过还原 —— 原内容永久丢失。
+    final e = _MethodBodyVisitor('_clipEnd');
+    unit.accept(e);
+    final body = e.body!.toSource();
+    expect(body.contains('_clipboardSessions == 0) return'), isTrue,
+        reason: '_clipEnd 在计数已为 0 时必须直接返回，否则重复调用会清空用户剪贴板');
+    expect(body.indexOf('return') < body.indexOf('_clipboardSessions--'), isTrue,
+        reason: '早退必须在自减之前');
   });
 
   test('native 会话只在最外层开合 —— 它只有一份全局快照', () {

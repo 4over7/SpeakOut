@@ -597,6 +597,13 @@ void inject_clipboard_chunk(const char *text) {
 
 void inject_clipboard_end(void) {
   @autoreleasepool {
+    // 没有进行中的会话就直接返回：下面 clearContents 是无条件的，
+    // 只有 saved != nil 才写回 —— 在无会话状态下再走一遍等于把用户剪贴板清空。
+    // Dart 侧已用会话计数堵住重复调用，这里再兜一层，防别的调用方绕过。
+    if (_savedClipboardItems == nil) {
+      log_to_file("Clipboard streaming: end ignored (no active session)");
+      return;
+    }
     // Restore clipboard after a short delay
     NSArray *saved = _savedClipboardItems;
     _savedClipboardItems = nil;

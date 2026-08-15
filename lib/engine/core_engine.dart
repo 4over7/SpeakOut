@@ -108,9 +108,15 @@ class CoreEngine {
   }
 
   void _clipEnd() {
-    // 不能减成负数：异常路径上 _clipEnd 可能比 _clipBegin 多跑一次
-    // （catch 里兜底 + 正常路径各一次）。
-    if (_clipboardSessions > 0) _clipboardSessions--;
+    // 已经结束过就直接返回，**不能**再调一次 native。
+    // 异常路径上 _clipEnd 会比 _clipBegin 多跑一次（catch 兜底 + 正常路径各一次），
+    // 而 native 的 inject_clipboard_end 里 clearContents 是无条件执行的，
+    // 只有 saved != nil 才写回 —— 第二次调用时 saved 已被第一次取走置 nil，
+    // 两个 dispatch_after 几乎同时到期，若第二个先跑就会
+    // clearContents 后无内容写回 → **用户剪贴板被清空**，
+    // 随后第一个因 changeCount 已变而跳过还原，原内容永久丢失。
+    if (_clipboardSessions == 0) return;
+    _clipboardSessions--;
     if (_clipboardSessions == 0) _nativeInput?.injectClipboardEnd();
   }
 

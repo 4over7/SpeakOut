@@ -67,11 +67,19 @@ void main() {
     await t.pump();
     await t.pump(const Duration(seconds: 6));
 
-    // 上限 3：最多还能再弹 3 条，逐条走完后不应再有横幅
-    for (var i = 0; i < 4; i++) {
-      await t.pump(const Duration(seconds: 6));
+    // 精确计数，不留 off-by-one 容差：上限 3 → 错误过期后恰好再弹 3 条。
+    // 原来「多 pump 几次再断言为空」的写法，上限就算错成 4 也照样通过。
+    //
+    // 采样步长必须小于通知时长：我最初用 6 秒一步，结果一次 pump 里
+    // 「弹出→过期→弹下一条」全跑完了，中间那条永远采不到（实测只数到 2 条）。
+    final seen = <String>{};
+    for (var i = 0; i < 120; i++) {
+      final f = find.textContaining('消息').evaluate();
+      if (f.isNotEmpty) seen.add((f.first.widget as Text).data!);
+      await t.pump(const Duration(milliseconds: 250));
     }
-    expect(find.textContaining('消息'), findsNothing,
-        reason: '队列无上限会把 10 条全部连播完');
+    expect(seen.length, 3,
+        reason: '排队展示了 ${seen.length} 条（$seen），应恰好等于 _maxQueue=3。'
+            '多于 3 说明上限失效，少于 3 说明该排的没排上');
   });
 }
