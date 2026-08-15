@@ -60,6 +60,39 @@ void main() {
     expect(svc.getAccountById('upd-1')!.isEnabled, isFalse);
   });
 
+  test('update 失败时必须把账户列表写回 —— 缓存已被污染', () async {
+    // shared_preferences 的 _setValue 先更新 _preferenceCache 再 await 平台写入，
+    // 平台失败时**缓存不回滚**。所以真实故障下磁盘是旧值、缓存已是新值 ——
+    // 不重写旧列表的话，reload() 会从缓存读出未提交的新 metadata。
+    // 我之前用探针判定这行"冗余"，是因为注入点在碰 prefs 之前就抛了。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'cache-1', providerId: 'moonshot', displayName: '旧名',
+      isEnabled: false, credentials: {'api_key': 'k'},
+    ));
+
+    CloudAccountService.debugFailAccountsWriteAfterCache = true;
+    CloudAccountService.debugFailAccountsWrites = 1;
+    addTearDown(() {
+      CloudAccountService.debugFailAccountsWriteAfterCache = false;
+      CloudAccountService.debugFailAccountsWrites = 0;
+    });
+    await expectLater(
+      svc.updateAccount(CloudAccount(
+        id: 'cache-1', providerId: 'moonshot', displayName: '新名',
+        isEnabled: true, credentials: {'api_key': 'k'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailAccountsWriteAfterCache = false;
+    CloudAccountService.debugFailAccountsWrites = 0;
+
+    await svc.reload();
+    expect(svc.getAccountById('cache-1')!.displayName, '旧名',
+        reason: '缓存里残留着未提交的新 metadata —— 回滚没把旧列表写回去');
+  });
+
   test('update 失败时凭证**值**也要还原 —— 它们是就地覆盖的', () async {
     // 凭证存在 cloud_cred_<accountId>_<key>，account id 不变，
     // 所以写新值等于就地覆盖旧值。只回滚内存和账户列表不够 ——

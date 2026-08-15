@@ -85,6 +85,11 @@ class CloudAccountService {
     _prefs = null;
   }
 
+  /// 仅供测试：与 debugFailAccountsWrites 配合，模拟「缓存已更新、平台写入失败」
+  /// 这个真实故障形态（shared_preferences 先写缓存再 await 平台）。
+  @visibleForTesting
+  static bool debugFailAccountsWriteAfterCache = false;
+
   /// 仅供测试：让**前 N 次** _saveAccounts 抛错（凭证写入照常成功），
   /// 用来构造「凭证已就地覆盖、改动尚未提交」这个边界。
   ///
@@ -201,13 +206,17 @@ class CloudAccountService {
         if (added.isNotEmpty) {
           await _clearCredentials(account.id, added);
         }
-        // 这里**不需要**再写一次账户列表：本方法是「先写凭证、后写列表」，
-        // 走到 catch 说明列表那步没成功 —— 磁盘上仍是完整的旧状态，
-        // 重写一遍只是把相同的值再写一次。
-        //（对比 addAccount：它是「先写列表、后写凭证」，凭证失败时列表已落盘，
-        //  那里的回滚写列表是必要的。）
-        // 我一度在这里也加了 _saveAccounts()，还在 commit 里声称"实测能抓到
-        // 去掉它的退化" —— 探针证明磁盘状态根本没差别，那是个假护栏。
+        // 必须再写一次账户列表 —— 我一度以为这是冗余的，错了：
+        // shared_preferences 的 _setValue 是**先更新 _preferenceCache、
+        // 再 await 平台写入**，平台失败时缓存不回滚
+        //（见 shared_preferences_legacy.dart 的 _setValue）。
+        // 真实故障下磁盘是旧值、进程内缓存却已是新值 ——
+        // 随后 reload() 会从缓存读出未提交的新 metadata。
+        // 重写旧列表能把缓存改回去，并再试一次平台写入。
+        //
+        // 我之前用探针判定「没差别」，是因为注入点在碰 prefs **之前**就抛了，
+        // 没有模拟真实故障 —— 探针没错，被验证的场景不对。
+        await _saveAccounts();
       } catch (e2) {
         AppLog.e('CloudAccountService: 账户 ${account.id} 更新失败后'
             '新增凭证字段清理失败（孤儿明文）: $e2');
@@ -451,6 +460,15 @@ class CloudAccountService {
   Future<void> _saveAccounts() async {
     if (debugFailAccountsWrites > 0) {
       debugFailAccountsWrites--;
+      if (debugFailAccountsWriteAfterCache) {
+        // 模拟**真实**故障：先让 SharedPreferences 更新它的内存缓存，
+        // 再抛错。shared_preferences 的 _setValue 就是这个顺序，且平台
+        // 失败时缓存不回滚 —— 之前的注入在碰 prefs 之前就抛，
+        // 根本没有污染缓存，于是「回滚写列表」测起来像是冗余的。
+        final prefs = await _requirePrefs();
+        await prefs.setString(_kAccountsKey,
+            jsonEncode(_accounts.map((a) => a.toJson()).toList()));
+      }
       throw StateError('debugFailAccountsWrites（仅测试）');
     }
     // 用 ! 而不是 ?.：_prefs 为空时静默什么都不写，调用方却拿到"成功" ——
@@ -462,20 +480,44 @@ class CloudAccountService {
 
   Future<void> _saveCredentials(CloudAccount account) async {
     final prefs = await _requirePrefs();
+    // 逐 key best-effort：某个 key 瞬时失败不该让后面的 key **根本不尝试**。
+    // 全部试完再把失败聚合抛出，调用方的回滚逻辑不变。
+    final failed = <String>[];
+    Object? firstError;
     for (final entry in account.credentials.entries) {
-      // 逐字段一个 hook：默认什么都不做，测试用它在「写了一部分」时抛，
-      // 才构造得出孤儿凭证场景。不把注入逻辑塞进循环体本身 ——
-      // 那样 first 标志之类纯测试用的分支会污染生产代码。
-      await _beforeCredentialWrite?.call();
-      await prefs.setString('cloud_cred_${account.id}_${entry.key}', entry.value);
+      try {
+        // 逐字段一个 hook：默认什么都不做，测试用它在「写了一部分」时抛，
+        // 才构造得出孤儿凭证场景。不把注入逻辑塞进循环体本身 ——
+        // 那样 first 标志之类纯测试用的分支会污染生产代码。
+        await _beforeCredentialWrite?.call();
+        await prefs.setString(
+            'cloud_cred_${account.id}_${entry.key}', entry.value);
+      } catch (e) {
+        failed.add(entry.key);
+        firstError ??= e;
+      }
+    }
+    if (failed.isNotEmpty) {
+      throw StateError('凭证写入失败: ${failed.join(", ")} (首个错误: $firstError)');
     }
   }
 
   Future<void> _clearCredentials(String accountId, Iterable<String> keys) async {
     // 同样惰性获取：静默不删等于明文密钥残留在 SharedPreferences 里
     final prefs = await _requirePrefs();
+    // 逐 key best-effort：一个删不掉不该让其余的明文继续留着
+    final failed = <String>[];
+    Object? firstError;
     for (final key in keys) {
-      await prefs.remove('cloud_cred_${accountId}_$key');
+      try {
+        await prefs.remove('cloud_cred_${accountId}_$key');
+      } catch (e) {
+        failed.add(key);
+        firstError ??= e;
+      }
+    }
+    if (failed.isNotEmpty) {
+      throw StateError('凭证清理失败: ${failed.join(", ")} (首个错误: $firstError)');
     }
   }
 
