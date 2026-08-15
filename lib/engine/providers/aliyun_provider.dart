@@ -30,9 +30,9 @@ class AliyunProvider implements ASRProvider {
   DateTime? _tokenExpireTime;
   String? _taskId;
 
-  /// 本会话是否已证实「服务端会原样回带 task_id」。未证实前不做任何过滤，
-  /// 避免服务端规范化格式时把全部消息误丢。每次 start() 复位。
-  bool _taskIdEchoConfirmed = false;
+  /// 是否已经因 task_id 不匹配丢弃过帧。仅用于「首次丢弃打一条醒目日志」的安全阀，
+  /// 让"服务端行为与文档不符导致消息全丢"这种情况一眼可诊断。
+  bool _droppedStaleFrame = false;
   
   bool _isReady = false;
   
@@ -173,7 +173,7 @@ class AliyunProvider implements ASRProvider {
     
     // Generate new Task ID for this recording session
     _taskId = const Uuid().v4().replaceAll('-', '');
-    _taskIdEchoConfirmed = false;
+    _droppedStaleFrame = false;
 
     // Send Start Directive (reusing existing connection)
     final startCmd = {
@@ -217,24 +217,34 @@ class AliyunProvider implements ASRProvider {
       // 设计的，套到复用连接上会把本次录音的消息也全挡掉（我试过，阿里云直接全废）。
       // task_id 每次 start() 重新生成并随 StartTranscription 下发，服务端原样回带，
       // 是复用连接下唯一可靠的会话标识。
-      // 「先证实、再过滤」：只有当本会话**确实收到过**一条 task_id 与我们
-      // 下发值完全相同的消息，才认为服务端会原样回带，之后才敢丢弃不匹配的帧。
+      // 按 task_id 丢弃过期帧。
       //
-      // 为什么不能直接比对就丢：本项目没有这条 legacy 通道的真实报文
-      // （用户日志里 0 条阿里云记录），我无法证实服务端不会对 task_id 做
-      // 大小写/格式规范化。若它规范化了，无条件比对会把**全部**消息丢掉 ——
-      // 这正是我上一版给 aliyun 加「录音代次」守卫时犯过的错（阿里云直接全废）。
-      // 自适应写法在服务端不回带或格式不一致时永不生效，行为与加过滤前完全一致。
+      // 依据：阿里云 WebSocket 协议规定所有服务端响应都携带本次任务的 task_id，
+      // 且保持客户端下发的原值（task_id 本就由客户端生成，服务端没有规范化的理由）。
+      //
+      // 曾经写成「先收到一条匹配帧、证实服务端会回带，之后才敢过滤」的自适应版本，
+      // 动机是当时缺少这条 legacy 通道的实测报文（用户日志里 0 条阿里云记录），
+      // 怕服务端做格式规范化导致全部消息被误丢 —— 那是我给 aliyun 加「录音代次」
+      // 守卫时踩过的坑。但自适应版本自带一个窟窿：本轮首帧到达前的"确认窗口"里，
+      // 上一轮的迟到 SentenceEnd 照样会被放行并写进本轮 _committedText。
+      // 既然协议已有明确规定，就按规定过滤，不留这个窗口。
+      //
+      // 安全阀：首次丢弃时打一条醒目日志。万一服务端行为与文档不符导致消息全丢，
+      // 日志会直接指出原因，而不是变成一个查不出来的"阿里云没反应"。
       final msgTaskId = header['task_id']?.toString();
-      if (msgTaskId != null && _taskId != null) {
-        if (msgTaskId == _taskId) {
-          _taskIdEchoConfirmed = true;
-        } else if (_taskIdEchoConfirmed) {
-          AppLog.d('[AliyunProvider] 丢弃过期帧 $name '
-              '(task ${msgTaskId.substring(0, 8)}… != 当前 ${_taskId!.substring(0, 8)}…)');
-          return;
+      if (msgTaskId != null && _taskId != null && msgTaskId != _taskId) {
+        if (!_droppedStaleFrame) {
+          _droppedStaleFrame = true;
+          AppLog.d('[AliyunProvider] 开始按 task_id 丢弃过期帧。'
+              '若本次识别完全无输出，请核对服务端是否原样回带 task_id：'
+              '收到 $msgTaskId / 下发 $_taskId');
         }
+        AppLog.d('[AliyunProvider] 丢弃过期帧 $name '
+            '(task ${msgTaskId.substring(0, 8)}… != 当前 ${_taskId!.substring(0, 8)}…)');
+        return;
       }
+      // msgTaskId 为 null 时放行：协议规定应当携带，缺失时无法归属，
+      // 宁可放行也不误丢（间歇性缺失不会被当成过期帧）。
       
       if (name == 'TranscriptionStarted') {
         _isHandshakeComplete = true;
