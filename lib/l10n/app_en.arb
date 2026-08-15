@@ -636,5 +636,15 @@
     "placeholders": {
       "detail": {}
     }
-  }
+  },
+  "chatCopied": "Copied",
+  "chatSavedToDiary": "Saved to notes",
+  "chatSaveFailed": "Save failed: {error}",
+  "@chatSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "chatCopy": "Copy",
+  "chatSaveToDiary": "Save to Notes"
 }

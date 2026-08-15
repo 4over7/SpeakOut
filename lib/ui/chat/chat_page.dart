@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:intl/intl.dart';
 import '../../models/chat_model.dart';
@@ -405,6 +406,7 @@ class _ChatPageState extends State<ChatPage> {
   final Map<String, bool> _expandedComparisons = {};
 
   void _showContextMenu(BuildContext context, Offset position, ChatMessage msg) {
+    final loc = AppLocalizations.of(context)!;
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     
     showMenu(
@@ -415,13 +417,15 @@ class _ChatPageState extends State<ChatPage> {
       ),
       items: [
         PopupMenuItem(
-          child: const Text("Copy"),
+          child: Text(loc.chatCopy),
           onTap: () {
-             // Future: Clipboard
+            // 原来这里是空函数（注释写着 "Future: Clipboard"）—— 点了没反应
+            Clipboard.setData(ClipboardData(text: msg.text));
+            _toast(loc.chatCopied);
           },
         ),
         PopupMenuItem(
-          child: const Text("Save to Diary"),
+          child: Text(loc.chatSaveToDiary),
           onTap: () {
              // Delay to allow menu to close
              Future.delayed(const Duration(milliseconds: 100), () {
@@ -434,9 +438,23 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
   
-  void _saveToDiary(ChatMessage msg) {
-    DiaryService().appendNote("Source: Chat (${DateFormat('HH:mm').format(msg.timestamp)})\n${msg.text}");
-    // Show toast ideally
+  Future<void> _saveToDiary(ChatMessage msg) async {
+    // 原来既不 await 也不看返回值（注释写着 "Show toast ideally"）——
+    // 写盘失败（目录不存在 / 无权限 / 磁盘满）用户毫无察觉，以为存上了。
+    final loc = AppLocalizations.of(context)!;
+    final err = await DiaryService().appendNote(
+        "Source: Chat (${DateFormat('HH:mm').format(msg.timestamp)})\n${msg.text}");
+    if (!mounted) return;
+    _toast(err == null ? loc.chatSavedToDiary : loc.chatSaveFailed(err));
+  }
+
+  void _toast(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(text),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
   }
   
   Widget _buildAvatar(ChatRole role) {

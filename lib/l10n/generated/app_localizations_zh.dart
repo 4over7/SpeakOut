@@ -1399,4 +1399,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String errorNetworkFailed(Object detail) {
     return '网络连接失败，请检查网络设置。\n\n详细信息: $detail';
   }
+
+  @override
+  String get chatCopied => '已复制';
+
+  @override
+  String get chatSavedToDiary => '已存入闪念笔记';
+
+  @override
+  String chatSaveFailed(Object error) {
+    return '保存失败：$error';
+  }
+
+  @override
+  String get chatCopy => '复制';
+
+  @override
+  String get chatSaveToDiary => '存入闪念笔记';
 }

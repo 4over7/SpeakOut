@@ -1463,4 +1463,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorNetworkFailed(Object detail) {
     return 'Network connection failed. Please check your network settings.\n\nDetails: $detail';
   }
+
+  @override
+  String get chatCopied => 'Copied';
+
+  @override
+  String get chatSavedToDiary => 'Saved to notes';
+
+  @override
+  String chatSaveFailed(Object error) {
+    return 'Save failed: $error';
+  }
+
+  @override
+  String get chatCopy => 'Copy';
+
+  @override
+  String get chatSaveToDiary => 'Save to Notes';
 }

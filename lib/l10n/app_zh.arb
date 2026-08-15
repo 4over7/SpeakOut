@@ -596,5 +596,15 @@
     "placeholders": {
       "detail": {}
     }
-  }
+  },
+  "chatCopied": "已复制",
+  "chatSavedToDiary": "已存入闪念笔记",
+  "chatSaveFailed": "保存失败：{error}",
+  "@chatSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "chatCopy": "复制",
+  "chatSaveToDiary": "存入闪念笔记"
 }

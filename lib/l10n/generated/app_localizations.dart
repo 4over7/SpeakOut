@@ -2713,6 +2713,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Network connection failed. Please check your network settings.\n\nDetails: {detail}'**
   String errorNetworkFailed(Object detail);
+
+  /// No description provided for @chatCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get chatCopied;
+
+  /// No description provided for @chatSavedToDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to notes'**
+  String get chatSavedToDiary;
+
+  /// No description provided for @chatSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed: {error}'**
+  String chatSaveFailed(Object error);
+
+  /// No description provided for @chatCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatCopy;
+
+  /// No description provided for @chatSaveToDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Notes'**
+  String get chatSaveToDiary;
 }
 
 class _AppLocalizationsDelegate
