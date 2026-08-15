@@ -41,6 +41,23 @@ void main() {
             '应改调对应的 *Unsafe：\n  ${v.violations.join("\n  ")}');
   });
 
+  test('入链目标必须以 Unsafe 结尾 —— 否则纪律断言扫不到它', () {
+    // 上一条断言只扫 *Unsafe 后缀的方法体。若有人写了个链内 helper
+    // 却不带这个后缀，它内部调公开写方法就没人拦，仍会自死锁。
+    // 这里反向约束命名，把约定闭环：入链的必须叫 *Unsafe。
+    final path = 'lib/services/cloud_account_service.dart';
+    final unit = parseFile(
+      path: File(path).absolute.path,
+      featureSet: FeatureSet.latestLanguageVersion(),
+    ).unit;
+    final v = _ChainTargetVisitor();
+    unit.accept(v);
+    expect(v.targets, isNotEmpty, reason: '一个入链目标都没找到，扫描失效');
+    final bad = v.targets.where((t) => !t.endsWith('Unsafe')).toList();
+    expect(bad, isEmpty,
+        reason: '这些入链目标没有 Unsafe 后缀，纪律断言扫不到它们：$bad');
+  });
+
   test('不得用布尔标志做重入判断', () {
     final src =
         File('lib/services/cloud_account_service.dart').readAsStringSync();
@@ -78,6 +95,33 @@ class _UnsafeBodyVisitor extends RecursiveAstVisitor<void> {
         publicWrites.contains(node.methodName.name)) {
       violations.add('$_current → ${node.methodName.name}()');
     }
+    super.visitMethodInvocation(node);
+  }
+}
+
+/// 收集 _serializedWrite(() => X()) 里的目标方法名
+class _ChainTargetVisitor extends RecursiveAstVisitor<void> {
+  final List<String> targets = [];
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    if (node.methodName.name == '_serializedWrite' &&
+        node.argumentList.arguments.isNotEmpty) {
+      final arg = node.argumentList.arguments.first;
+      final inner = _InnerCallVisitor();
+      arg.accept(inner);
+      targets.addAll(inner.names);
+    }
+    super.visitMethodInvocation(node);
+  }
+}
+
+class _InnerCallVisitor extends RecursiveAstVisitor<void> {
+  final List<String> names = [];
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    names.add(node.methodName.name);
     super.visitMethodInvocation(node);
   }
 }
