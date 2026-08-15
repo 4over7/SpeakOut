@@ -85,6 +85,11 @@ class CloudAccountService {
     _prefs = null;
   }
 
+  /// 仅供测试：让「写账户列表成功之后」的步骤抛错，
+  /// 用来验证删除的第二阶段失败时**不得**回滚。
+  @visibleForTesting
+  static bool debugFailAfterAccountsWrite = false;
+
   /// 仅供测试：让 _doInit 抛错，模拟 SharedPreferences 首次获取瞬时失败。
   @visibleForTesting
   static bool debugFailInit = false;
@@ -175,19 +180,29 @@ class CloudAccountService {
     await _ensureLoaded();
     final account = getAccountById(accountId);
     if (account == null) return;
-    // 同样要回滚：删除失败却把内存里的账户抹掉，界面上账户消失了，
-    // 磁盘上还在 —— 重启后它又"复活"，用户以为删除没生效。
+    // 删除分两个阶段，回滚只能针对第一阶段 —— 这点我第一版写错了：
+    //   阶段一 写账户列表：失败 = 删除**尚未生效**，必须把账户放回内存，
+    //     否则界面上消失、磁盘上还在，重启后"复活"，用户以为删除没生效。
+    //   阶段二 清凭证：此时删除**已经落盘**。再把账户复活回来，
+    //     等于造出一个凭证被部分清掉的残缺账户 —— 比留下孤儿凭证更糟。
+    //     所以这里只记日志，不回滚。
     final idx = _accounts.indexWhere((a) => a.id == accountId);
     _accounts.removeWhere((a) => a.id == accountId);
     try {
       await _saveAccounts();
-      await _clearCredentials(accountId, account.credentials.keys);
     } catch (e) {
       _accounts.insert(idx.clamp(0, _accounts.length), account);
-      try {
-        await _saveAccounts();
-      } catch (_) {}
       rethrow;
+    }
+    try {
+      if (debugFailAfterAccountsWrite) {
+        throw StateError('debugFailAfterAccountsWrite（仅测试）');
+      }
+      await _clearCredentials(accountId, account.credentials.keys);
+    } catch (e) {
+      // 删除已生效，不回滚。凭证清理失败会留下孤儿明文，必须记下来。
+      AppLog.d('CloudAccountService: 账户 $accountId 已删除，'
+          '但凭证清理失败（可能残留明文）: $e');
     }
 
     // 如果被删除的账户正被选用，清除选择

@@ -60,6 +60,32 @@ void main() {
     expect(svc.getAccountById('upd-1')!.isEnabled, isFalse);
   });
 
+  test('remove 第二阶段（清凭证）失败不得把账户复活 —— 删除已经落盘了', () async {
+    // 删除分两阶段：写账户列表 → 清凭证。
+    // 第二阶段失败时删除**已经生效**，把账户复活回来等于造出一个
+    // 凭证被部分清掉的残缺账户，比留下孤儿凭证更糟。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'del-2', providerId: 'gemini', displayName: '两阶段',
+      isEnabled: false, credentials: {'api_key': 'k'},
+    ));
+
+    // 只让清凭证那步失败：_clearCredentials 内部同样走 _requirePrefs，
+    // 但账户列表已经先写成功了
+    CloudAccountService.debugFailAfterAccountsWrite = true;
+    addTearDown(
+        () => CloudAccountService.debugFailAfterAccountsWrite = false);
+    await svc.removeAccount('del-2');
+    CloudAccountService.debugFailAfterAccountsWrite = false;
+
+    expect(svc.getAccountById('del-2'), isNull,
+        reason: '删除已经落盘，不该把账户复活成一个凭证残缺的对象');
+    await svc.reload();
+    expect(svc.getAccountById('del-2'), isNull,
+        reason: '磁盘上也应该已删除');
+  });
+
   test('remove 落盘失败必须把账户放回内存 —— 否则重启后它会「复活」', () async {
     final svc = CloudAccountService();
     await svc.reload();
