@@ -34,6 +34,51 @@ void main() {
     return f.path;
   }
 
+  test('update 落盘失败必须回滚内存 —— 否则显示的状态磁盘上并不存在', () async {
+    // 先改内存再落盘、失败不回滚的话：内存是新值、磁盘是旧值。
+    // 界面刷新会显示一个磁盘上并不存在的状态（开关显示"已启用"，重启又变回去）。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'upd-1', providerId: 'zhipu', displayName: '原名',
+      isEnabled: false, credentials: {'api_key': 'k'},
+    ));
+
+    CloudAccountService.debugFailPersistence = true;
+    addTearDown(() => CloudAccountService.debugFailPersistence = false);
+    await expectLater(
+      svc.updateAccount(CloudAccount(
+        id: 'upd-1', providerId: 'zhipu', displayName: '改后',
+        isEnabled: true, credentials: {'api_key': 'k'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailPersistence = false;
+
+    expect(svc.getAccountById('upd-1')!.displayName, '原名',
+        reason: '内存没回滚 —— 界面会显示一个磁盘上并不存在的值');
+    expect(svc.getAccountById('upd-1')!.isEnabled, isFalse);
+  });
+
+  test('remove 落盘失败必须把账户放回内存 —— 否则重启后它会「复活」', () async {
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'del-1', providerId: 'moonshot', displayName: '待删',
+      isEnabled: false, credentials: {},
+    ));
+
+    CloudAccountService.debugFailPersistence = true;
+    addTearDown(() => CloudAccountService.debugFailPersistence = false);
+    await expectLater(
+        svc.removeAccount('del-1'), throwsA(isA<StateError>()));
+    CloudAccountService.debugFailPersistence = false;
+
+    expect(svc.getAccountById('del-1'), isNotNull,
+        reason: '删除失败却把内存里的账户抹掉了 —— 界面上消失、磁盘上还在，'
+            '重启后又"复活"，用户以为删除没生效');
+  });
+
   test('导入时加载失败必须抛出，不能被吞成「导入 0 条」', () async {
     // importFromFile 的 catch 会 `return 0`。若 _ensureLoaded() 写在 try 里，
     // 加载失败就变成「文件里没内容」—— 指向完全错误的方向。

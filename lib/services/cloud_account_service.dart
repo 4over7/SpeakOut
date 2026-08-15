@@ -154,18 +154,41 @@ class CloudAccountService {
     if (removed.isNotEmpty) {
       await _clearCredentials(account.id, removed);
     }
+    // 与 addAccount 同理：先改内存再落盘，失败必须回滚 ——
+    // 否则内存是新值、磁盘是旧值，下次刷新会显示一个磁盘上并不存在的状态
+    // （比如开关显示"已启用"，重启后又变回去）。
+    final previous = _accounts[idx];
     _accounts[idx] = account;
-    await _saveAccounts();
-    await _saveCredentials(account);
+    try {
+      await _saveAccounts();
+      await _saveCredentials(account);
+    } catch (e) {
+      _accounts[idx] = previous;
+      try {
+        await _saveAccounts();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   Future<void> removeAccount(String accountId) async {
     await _ensureLoaded();
     final account = getAccountById(accountId);
     if (account == null) return;
+    // 同样要回滚：删除失败却把内存里的账户抹掉，界面上账户消失了，
+    // 磁盘上还在 —— 重启后它又"复活"，用户以为删除没生效。
+    final idx = _accounts.indexWhere((a) => a.id == accountId);
     _accounts.removeWhere((a) => a.id == accountId);
-    await _saveAccounts();
-    await _clearCredentials(accountId, account.credentials.keys);
+    try {
+      await _saveAccounts();
+      await _clearCredentials(accountId, account.credentials.keys);
+    } catch (e) {
+      _accounts.insert(idx.clamp(0, _accounts.length), account);
+      try {
+        await _saveAccounts();
+      } catch (_) {}
+      rethrow;
+    }
 
     // 如果被删除的账户正被选用，清除选择
     if (ConfigService().selectedAsrAccountId == accountId) {
