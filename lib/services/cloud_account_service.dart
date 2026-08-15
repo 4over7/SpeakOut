@@ -85,6 +85,10 @@ class CloudAccountService {
     _prefs = null;
   }
 
+  /// 仅供测试：让 _clearCredentials 抛错，用来验证「清理失败不得拖垮列表恢复」。
+  @visibleForTesting
+  static bool debugFailClearCredentials = false;
+
   /// 仅供测试：与 debugFailAccountsWrites 配合，模拟「缓存已更新、平台写入失败」
   /// 这个真实故障形态（shared_preferences 先写缓存再 await 平台）。
   @visibleForTesting
@@ -206,6 +210,14 @@ class CloudAccountService {
         if (added.isNotEmpty) {
           await _clearCredentials(account.id, added);
         }
+      } catch (e2) {
+        AppLog.e('CloudAccountService: 账户 ${account.id} 更新失败后'
+            '新增凭证字段清理失败（孤儿明文）: $e2');
+      }
+      // 第三个独立块：上面任一补偿失败都不该让它不执行。
+      // _clearCredentials 现在会在逐 key 尝试完后聚合抛出 ——
+      // 与写列表串在同一个 try 里的话，一个 key 删不掉就把缓存修复也一起废了。
+      try {
         // 必须再写一次账户列表 —— 我一度以为这是冗余的，错了：
         // shared_preferences 的 _setValue 是**先更新 _preferenceCache、
         // 再 await 平台写入**，平台失败时缓存不回滚
@@ -219,7 +231,7 @@ class CloudAccountService {
         await _saveAccounts();
       } catch (e2) {
         AppLog.e('CloudAccountService: 账户 ${account.id} 更新失败后'
-            '新增凭证字段清理失败（孤儿明文）: $e2');
+            '账户列表恢复失败，缓存可能仍是未提交的新值: $e2');
       }
       rethrow;
     }
@@ -504,6 +516,9 @@ class CloudAccountService {
 
   Future<void> _clearCredentials(String accountId, Iterable<String> keys) async {
     // 同样惰性获取：静默不删等于明文密钥残留在 SharedPreferences 里
+    if (debugFailClearCredentials) {
+      throw StateError('debugFailClearCredentials（仅测试）');
+    }
     final prefs = await _requirePrefs();
     // 逐 key best-effort：一个删不掉不该让其余的明文继续留着
     final failed = <String>[];

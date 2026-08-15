@@ -60,6 +60,42 @@ void main() {
     expect(svc.getAccountById('upd-1')!.isEnabled, isFalse);
   });
 
+  test('清理新增凭证失败，不得连带让账户列表恢复也不执行', () async {
+    // 三个补偿动作必须各自独立。_clearCredentials 逐 key 尝试完后会聚合抛出 ——
+    // 若它与「重写旧列表」串在同一个 try 里，一个 key 删不掉就把缓存修复也废了，
+    // reload() 仍会读出未提交的新 metadata。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'iso-1', providerId: 'minimax', displayName: '旧名',
+      isEnabled: false, credentials: {'api_key': 'k'},
+    ));
+
+    CloudAccountService.debugFailAccountsWriteAfterCache = true;
+    CloudAccountService.debugFailAccountsWrites = 1;
+    CloudAccountService.debugFailClearCredentials = true; // 补偿里的清理也失败
+    addTearDown(() {
+      CloudAccountService.debugFailAccountsWriteAfterCache = false;
+      CloudAccountService.debugFailAccountsWrites = 0;
+      CloudAccountService.debugFailClearCredentials = false;
+    });
+    await expectLater(
+      svc.updateAccount(CloudAccount(
+        id: 'iso-1', providerId: 'minimax', displayName: '新名',
+        isEnabled: true, credentials: {'api_key': 'k', 'extra': 'X'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailAccountsWriteAfterCache = false;
+    CloudAccountService.debugFailAccountsWrites = 0;
+    CloudAccountService.debugFailClearCredentials = false;
+
+    await svc.reload();
+    expect(svc.getAccountById('iso-1')!.displayName, '旧名',
+        reason: '清理失败把「重写旧列表」一起废掉了 —— '
+            '缓存里仍是未提交的新 metadata');
+  });
+
   test('update 失败时必须把账户列表写回 —— 缓存已被污染', () async {
     // shared_preferences 的 _setValue 先更新 _preferenceCache 再 await 平台写入，
     // 平台失败时**缓存不回滚**。所以真实故障下磁盘是旧值、缓存已是新值 ——
