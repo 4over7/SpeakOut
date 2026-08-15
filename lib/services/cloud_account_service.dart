@@ -43,8 +43,17 @@ class CloudAccountService {
   /// 同时进行）必须等同一次加载，不能各加载一遍。
   Future<void> _ensureLoaded() async {
     if (_initialized) return;
-    _initFuture ??= _doInit();
-    await _initFuture;
+    // 失败要复位，否则 `??=` 会把一个已完成(error)的 Future 永久缓存下来 ——
+    // 后续每次调用都立刻重抛同一个错误，再也不会重试。
+    // （实测：三次调用 attempts 一直是 1。）
+    // SharedPreferences 首次获取只要瞬时失败一次，云账户功能就永久不可用。
+    final f = _initFuture ??= _doInit();
+    try {
+      await f;
+    } catch (_) {
+      if (identical(_initFuture, f)) _initFuture = null;
+      rethrow;
+    }
   }
 
   Future<void> _doInit() async {

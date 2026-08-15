@@ -34,6 +34,32 @@ void main() {
     return f.path;
   }
 
+  test('初始化失败后必须允许重试，不能永久卡在失败的 Future', () async {
+    // `_initFuture ??= _doInit()` 会把已完成(error)的 Future 永久缓存，
+    // 后续调用立刻重抛同一个错误 —— SharedPreferences 首次获取只要瞬时失败
+    // 一次，云账户功能就永久不可用。（实测三次调用 attempts 一直是 1。）
+    final svc = CloudAccountService();
+    svc.debugResetForTest();
+
+    CloudAccountService.debugFailPersistence = true;
+    await expectLater(
+      svc.addAccount(CloudAccount(
+        id: 'retry-1', providerId: 'zhipu', displayName: 'r',
+        isEnabled: false, credentials: {},
+      )),
+      throwsA(isA<StateError>()),
+    );
+
+    // 故障排除后应当能成功，而不是继续抛同一个错误
+    CloudAccountService.debugFailPersistence = false;
+    await svc.addAccount(CloudAccount(
+      id: 'retry-2', providerId: 'zhipu', displayName: 'r2',
+      isEnabled: false, credentials: {},
+    ));
+    expect(svc.getAccountById('retry-2'), isNotNull,
+        reason: '初始化失败后被永久缓存，故障排除也恢复不了');
+  });
+
   test('未初始化时写入不得覆盖磁盘上已有的账户', () async {
     // 真实时序：窗口可能在 AppService.init() 完成前就显示（托盘/重开路径），
     // 用户进云账户页 → _ensureAllProvidersExist → addAccount，
