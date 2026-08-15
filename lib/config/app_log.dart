@@ -128,12 +128,46 @@ class AppLog {
 
   /// 错误日志：**不受 verbose 开关控制**，默认配置下也会落盘。
   ///
-  /// d() 在 enabled=false（生产默认，见 AppConstants.kVerboseLogging）时首行就
-  /// return —— 用它记「回滚失败」「凭证残留」「悬空引用」这类兜底，
-  /// 等于什么都没记：用户真遇到时磁盘处于混合状态，却没有任何线索。
-  /// 这类事件稀少且必须可诊断，所以单开一个不看开关的通道。
+  /// d() 在 enabled=false（生产默认 kVerboseLogging=false）时首行就 return ——
+  /// 用它记「回滚失败」「凭证残留」「悬空引用」这类兜底，等于什么都没记：
+  /// 用户真遇到时磁盘处于混合状态，却没有任何线索。
+  ///
+  /// 光「不看 enabled」还不够：AppService.applyVerboseLogging() 在关闭 verbose 时
+  /// 会调 AppLog.dispose() **主动关掉 _sink**，于是 _write 里的 `_sink?.writeln`
+  /// 直接短路 —— 又绕回「记了等于没记」。所以这里在 sink 缺席时走一条独立的
+  /// 同步追加路径，只写这一类稀少事件，不受 verbose 生命周期影响。
+  ///
   /// 注意：调用方仍要自己用 redact() 处理敏感内容，这里不做脱敏。
-  static void e(String message) => _write('[ERROR] $message');
+  static void e(String message) {
+    final line = '${DateTime.now().toIso8601String()} [ERROR] $message';
+    debugPrint(line);
+    if (_sink != null) {
+      _write('[ERROR] $message');
+      return;
+    }
+    // sink 不可用（verbose 关闭 / 尚未 init）：直接追加到错误日志文件。
+    // 同步写：这类事件极少，且必须在进程可能随后退出的情况下也落盘。
+    try {
+      final dir = customLogDirectory != null && customLogDirectory!.isNotEmpty
+          ? Directory(customLogDirectory!)
+          : _fallbackDir;
+      if (dir == null) return;
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      final f = File('${dir.path}/speakout_errors.log');
+      // 别无限增长：超过 1MB 就截断，这类事件本来就该很少
+      if (f.existsSync() && f.lengthSync() > 1024 * 1024) {
+        f.writeAsStringSync('');
+      }
+      f.writeAsStringSync('$line\n', mode: FileMode.append);
+    } catch (_) {
+      // 日志绝不能拖垮调用方
+    }
+  }
+
+  /// 错误日志的兜底目录。由 AppService 在启动早期设置一次，
+  /// 使 verbose 关闭时 e() 仍有地方可写。
+  static Directory? _fallbackDir;
+  static set fallbackLogDirectory(Directory? d) => _fallbackDir = d;
 
   static void _write(String message) {
     try {

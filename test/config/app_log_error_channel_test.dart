@@ -17,6 +17,7 @@ void main() {
   });
   tearDown(() {
     AppLog.enabled = false;
+    AppLog.customLogDirectory = null;
     if (tmp.existsSync()) tmp.deleteSync(recursive: true);
   });
 
@@ -35,6 +36,21 @@ void main() {
         reason: 'e() 受 verbose 开关影响了 —— '
             '那些「失败只记日志」的兜底在默认配置下等于没记');
     expect(content.contains('[ERROR]'), isTrue, reason: 'e() 应带错误标记');
+  });
+
+  test('sink 已 dispose 时 e() 仍必须落盘 —— 这是默认配置的真实状态', () async {
+    // AppService.applyVerboseLogging() 在关闭 verbose 时会调 AppLog.dispose()
+    // 主动关掉 _sink。若 e() 只走 _sink?.writeln，就又回到「记了等于没记」。
+    AppLog.enabled = false;
+    AppLog.customLogDirectory = tmp.path;
+    await AppLog.dispose(); // 模拟默认配置：sink 不存在
+
+    AppLog.e('磁盘处于混合状态');
+
+    final f = File('${tmp.path}/speakout_errors.log');
+    expect(f.existsSync(), isTrue,
+        reason: 'sink 缺席时 e() 没有独立落盘路径 —— 诊断信息全丢了');
+    expect(f.readAsStringSync().contains('磁盘处于混合状态'), isTrue);
   });
 
   test('verbose 打开时两者都落盘', () async {

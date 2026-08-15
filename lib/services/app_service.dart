@@ -13,6 +13,7 @@ import 'audio_device_service.dart';
 import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// 管理应用程序生命周期与核心业务逻辑
 /// Central Hub for initialization and logic.
@@ -100,6 +101,9 @@ class AppService {
   /// Apply verbose logging + log directory to AppLog and native C layer.
   /// Call this after ConfigService.init() and whenever settings change.
   Future<void> applyVerboseLogging() async {
+    // 错误通道的兜底目录：verbose 关闭时 AppLog.dispose() 会关掉 sink，
+    // e() 需要一个与 verbose 生命周期无关的落点。
+    AppLog.fallbackLogDirectory = await getApplicationSupportDirectory();
     final enabled = ConfigService().verboseLogging;
     AppLog.enabled = enabled;
     AppLog.logSensitive = ConfigService().logSensitiveContent;
