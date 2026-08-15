@@ -97,6 +97,44 @@ void main() {
 
   });
 
+  test('并发写必须串行 —— 先发失败的补偿不得覆盖后发成功的结果', () async {
+    // add/update/remove 都是「改内存 → 分步落盘 → 失败则补偿」。
+    // 不串行的话，先发那个失败后的补偿会用它的 previous 快照
+    // 覆盖掉后发那个**已经成功**的改动 —— 用户看到自己刚保存的被莫名回退。
+    final svc = CloudAccountService();
+    await svc.reload();
+    await svc.addAccount(CloudAccount(
+      id: 'race-1', providerId: 'zhipu', displayName: '初始',
+      isEnabled: false, credentials: {'api_key': 'k'},
+    ));
+
+    // 第一个 update 会失败（缓存已污染 → 触发补偿，previous.displayName='初始'）
+    CloudAccountService.debugFailAccountsWriteAfterCache = true;
+    CloudAccountService.debugFailAccountsWrites = 1;
+    addTearDown(() {
+      CloudAccountService.debugFailAccountsWriteAfterCache = false;
+      CloudAccountService.debugFailAccountsWrites = 0;
+    });
+
+    final failing = svc.updateAccount(CloudAccount(
+      id: 'race-1', providerId: 'zhipu', displayName: '失败的',
+      isEnabled: true, credentials: {'api_key': 'k'},
+    ));
+    // 紧接着发第二个 update（不 await 第一个）——真实 UI 双击就是这形态
+    final succeeding = svc.updateAccount(CloudAccount(
+      id: 'race-1', providerId: 'zhipu', displayName: '成功的',
+      isEnabled: true, credentials: {'api_key': 'k2'},
+    ));
+
+    await expectLater(failing, throwsA(isA<StateError>()));
+    await succeeding;
+
+    await svc.reload();
+    expect(svc.getAccountById('race-1')!.displayName, '成功的',
+        reason: '先发失败操作的补偿把后发成功的改动覆盖了');
+    expect(svc.getAccountById('race-1')!.credentials['api_key'], 'k2');
+  });
+
   test('清理多个新增字段时，首个失败不得让其余明文留下', () async {
     // 逐 key best-effort 的另一半。上一条用例的清理集合只有一个 key，
     // 验不了这件事（探针显示 keys=[extra]）—— 必须让新增字段有多个。

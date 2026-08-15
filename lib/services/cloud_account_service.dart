@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -140,9 +141,36 @@ class CloudAccountService {
     return _prefs ??= await SharedPreferences.getInstance();
   }
 
+  /// 写操作串行化。
+  ///
+  /// add/update/remove 都是「改内存 → 分几步落盘 → 失败则补偿」。
+  /// 并发跑两个 update 时，先发那个失败后的补偿会用它的 previous 快照
+  /// 覆盖掉后发那个**已经成功**的凭证与列表 —— 用户看到的是自己刚保存的改动
+  /// 被莫名回退。UI 侧的开关没有防重入，这不是纯理论场景。
+  ///
+  /// 用 Future 链而不是加锁：Dart 单线程，只需保证「上一个写操作完全结束
+  /// （含补偿）后才开始下一个」。异常不会打断链条 —— 每一环都自行兜住，
+  /// 只把结果转交给各自的调用方。
+  Future<void> _writeChain = Future.value();
+
+  Future<T> _serializedWrite<T>(Future<T> Function() op) {
+    final done = Completer<T>();
+    _writeChain = _writeChain.then((_) async {
+      try {
+        done.complete(await op());
+      } catch (e, st) {
+        done.completeError(e, st);
+      }
+    });
+    return done.future;
+  }
+
   // ── CRUD ──
 
-  Future<String> addAccount(CloudAccount account) async {
+  Future<String> addAccount(CloudAccount account) =>
+      _serializedWrite(() => _addAccountUnsafe(account));
+
+  Future<String> _addAccountUnsafe(CloudAccount account) async {
     await _ensureLoaded();
     // 先入内存再落盘：任一步抛异常都必须回滚，否则 UI 允许重试时会用新 uuid
     // 再追加一个，第二次成功就把两条一起持久化 —— 重复账户。
@@ -168,7 +196,10 @@ class CloudAccountService {
     return account.id;
   }
 
-  Future<void> updateAccount(CloudAccount account) async {
+  Future<void> updateAccount(CloudAccount account) =>
+      _serializedWrite(() => _updateAccountUnsafe(account));
+
+  Future<void> _updateAccountUnsafe(CloudAccount account) async {
     await _ensureLoaded();
     final idx = _accounts.indexWhere((a) => a.id == account.id);
     if (idx < 0) return;
@@ -250,7 +281,10 @@ class CloudAccountService {
     }
   }
 
-  Future<void> removeAccount(String accountId) async {
+  Future<void> removeAccount(String accountId) =>
+      _serializedWrite(() => _removeAccountUnsafe(accountId));
+
+  Future<void> _removeAccountUnsafe(String accountId) async {
     await _ensureLoaded();
     final account = getAccountById(accountId);
     if (account == null) return;
@@ -266,6 +300,15 @@ class CloudAccountService {
       await _saveAccounts();
     } catch (e) {
       _accounts.insert(idx.clamp(0, _accounts.length), account);
+      // 与 update 同源：shared_preferences 先更新 _preferenceCache 再 await
+      // 平台写入，失败时缓存不回滚 —— 只把账户插回内存的话，缓存里仍是
+      // 「已删除」的列表，reload() 会读出这个未提交状态。
+      try {
+        await _saveAccounts();
+      } catch (e2) {
+        AppLog.e('CloudAccountService: 账户 $accountId 删除失败后'
+            '列表恢复也失败，缓存可能仍是「已删除」: $e2');
+      }
       rethrow;
     }
     try {

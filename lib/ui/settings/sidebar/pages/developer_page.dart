@@ -154,14 +154,18 @@ class _DeveloperPageState extends State<DeveloperPage> {
           Directory(ConfigService().logDirectory),
         await getApplicationSupportDirectory(),
       ];
-      final copied = <String>{};
-      for (final dir in logDirs) {
+      // 按来源分子目录，**不要**按文件名去重：两个目录常常都有 speakout.log
+      // （用户切换过日志目录时，旧目录里往往正是故障发生时的那份）。
+      // 按名字丢弃会静默少一份，排障的人可能据此误判「故障从未发生」。
+      final labels = <String>['custom', 'app-support'];
+      for (var i = 0; i < logDirs.length; i++) {
+        final dir = logDirs[i];
         if (!dir.existsSync()) continue;
+        final sub = Directory('${appLogsDest.path}/${labels[i]}');
+        sub.createSync(recursive: true);
         for (final entity in dir.listSync()) {
           if (entity is! File || !entity.path.endsWith('.log')) continue;
-          final name = entity.uri.pathSegments.last;
-          if (!copied.add(name)) continue; // 同名只收第一个（自定义目录优先）
-          await entity.copy('${appLogsDest.path}/$name');
+          await entity.copy('${sub.path}/${entity.uri.pathSegments.last}');
         }
       }
 
