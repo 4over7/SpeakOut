@@ -13,6 +13,9 @@ import 'config_service.dart';
 /// Singleton. 管理所有云服务商的账户 CRUD、持久化、旧数据迁移。
 /// 凭证存储在 SharedPreferences。
 /// TODO: 拿到苹果开发者账号后迁移到 Keychain (flutter_secure_storage)。
+/// 测试用的落盘失败注入模式，见 CloudAccountService.debugFailPersistence
+enum DebugPersistFailure { none, all, credentialsOnly }
+
 class CloudAccountService {
   static final CloudAccountService _instance = CloudAccountService._internal();
   factory CloudAccountService() => _instance;
@@ -41,10 +44,29 @@ class CloudAccountService {
     await _loadAccounts();
   }
 
-  /// 仅供测试：构造「落盘失败」场景。
-  /// 生产代码不要调用 —— 置空后所有写入都会抛 StateError。
+  /// 仅供测试：强制落盘抛错，用来验证失败回滚。生产代码不要碰。
+  /// - all：所有写入都抛（验内存回滚）
+  /// - credentialsOnly：账户列表写成功、凭证写到一半才抛
+  ///   （验孤儿凭证清理 —— 只有这种时序才构造得出孤儿）
   @visibleForTesting
-  void debugSetPrefsForTest(SharedPreferences? prefs) => _prefs = prefs;
+  static DebugPersistFailure debugFailPersistence = DebugPersistFailure.none;
+
+  /// 取 prefs 用于**写入**。
+  ///
+  /// 惰性获取而不是要求先 init()：窗口可能在 AppService.init() 完成前就显示
+  /// （托盘/重开路径各有一处 windowManager.show），用户此时进云账户页会触发
+  /// _ensureAllProvidersExist → addAccount。
+  /// - 用 `_prefs?.setString` 会静默什么都不写，调用方却拿到"成功" → 数据丢失
+  /// - 直接抛 StateError 又会变成未处理异常 + 页面空白（我上一版就是这样）
+  /// 惰性获取两者都避开：写入真正发生。
+  Future<SharedPreferences> _requirePrefs({bool credentials = false}) async {
+    final f = debugFailPersistence;
+    if (f == DebugPersistFailure.all ||
+        (f == DebugPersistFailure.credentialsOnly && credentials)) {
+      throw StateError('debugFailPersistence=$f: 强制落盘失败（仅测试）');
+    }
+    return _prefs ??= await SharedPreferences.getInstance();
+  }
 
   // ── CRUD ──
 
@@ -58,7 +80,14 @@ class CloudAccountService {
     } catch (e) {
       _accounts.removeWhere((a) => a.id == account.id);
       try {
-        await _saveAccounts(); // 尽力把已落盘的部分改回去
+        // 必须先清凭证再回写账户列表：_saveCredentials 是逐字段写的，
+        // 前几个 cloud_cred_<uuid>_* 可能已经落盘。账户 metadata 一旦删掉，
+        // 这些 key 就再也定位不到（removeAccount 找不到它们），
+        // 而用户重试会用新 uuid —— 旧密钥永久残留在 SharedPreferences 里。
+        await _clearCredentials(account.id, account.credentials.keys);
+      } catch (_) {}
+      try {
+        await _saveAccounts(); // 尽力把已落盘的账户列表改回去
       } catch (_) {}
       rethrow;
     }
@@ -263,27 +292,27 @@ class CloudAccountService {
   Future<void> _saveAccounts() async {
     // 用 ! 而不是 ?.：_prefs 为空时静默什么都不写，调用方却拿到"成功" ——
     // 那是静默数据丢失。宁可抛出来让上层看见。
-    final prefs = _prefs;
-    if (prefs == null) {
-      throw StateError('CloudAccountService 未初始化，无法保存账户');
-    }
+    final prefs = await _requirePrefs();
     final json = jsonEncode(_accounts.map((a) => a.toJson()).toList());
     await prefs.setString(_kAccountsKey, json);
   }
 
   Future<void> _saveCredentials(CloudAccount account) async {
-    final prefs = _prefs;
-    if (prefs == null) {
-      throw StateError('CloudAccountService 未初始化，无法保存凭证');
-    }
+    // 先拿真 prefs 写第一个字段，再触发失败 —— 这样才构造得出「部分已落盘」
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    var first = true;
     for (final entry in account.credentials.entries) {
+      if (!first) await _requirePrefs(credentials: true);
+      first = false;
       await prefs.setString('cloud_cred_${account.id}_${entry.key}', entry.value);
     }
   }
 
   Future<void> _clearCredentials(String accountId, Iterable<String> keys) async {
+    // 同样惰性获取：静默不删等于明文密钥残留在 SharedPreferences 里
+    final prefs = await _requirePrefs();
     for (final key in keys) {
-      await _prefs?.remove('cloud_cred_${accountId}_$key');
+      await prefs.remove('cloud_cred_${accountId}_$key');
     }
   }
 
@@ -460,10 +489,7 @@ class CloudAccountService {
 
     // 同样不能静默：这个标志没写成功，下次启动会重跑迁移，
     // 而迁移里会 addAccount —— 可能造出重复账户。
-    final prefs = _prefs;
-    if (prefs == null) {
-      throw StateError('CloudAccountService 未初始化，无法写入迁移标志');
-    }
+    final prefs = await _requirePrefs();
     await prefs.setBool(_kMigratedKey, true);
     if (migrated > 0) {
       AppLog.d('CloudAccountService: migrated $migrated legacy accounts');

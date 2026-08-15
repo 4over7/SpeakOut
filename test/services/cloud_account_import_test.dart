@@ -34,53 +34,41 @@ void main() {
     return f.path;
   }
 
-  test('任一落盘方法都不得静默 no-op（_prefs 为空必须抛）', () async {
-    // `_prefs?.setString(...)` 在 _prefs 为空时什么都不写，调用方却拿到"成功" ——
-    // 静默数据丢失。上面那条回滚测试只要有**任意一个**方法抛就会通过，
-    // 挡不住「只有一个改回 ?. 」的退化，所以这里逐个方法单独验。
+  test('_prefs 未初始化时写入必须真正发生，而不是静默跳过', () async {
+    // 窗口可能在 AppService.init() 完成前就显示（托盘/重开路径），
+    // 用户此时进云账户页会触发 addAccount。
+    // 旧实现 `_prefs?.setString` 静默什么都不写却返回成功 → 数据丢失；
+    // 我上一版改成抛 StateError 又变成未处理异常 + 页面空白。
+    // 正解是惰性获取：写入真正发生。
     final svc = CloudAccountService();
     await svc.reload();
-    svc.debugSetPrefsForTest(null);
-
-    // _saveAccounts 路径（removeAccount 只调它，不调 _saveCredentials）
-    await svc.reload();
     await svc.addAccount(CloudAccount(
-      id: 'probe', providerId: 'zhipu', displayName: 'p',
-      isEnabled: false, credentials: {},
+      id: 'lazy-1', providerId: 'zhipu', displayName: 'z',
+      isEnabled: false, credentials: {'api_key': 'k1'},
     ));
-    svc.debugSetPrefsForTest(null);
-    await expectLater(svc.removeAccount('probe'), throwsA(isA<StateError>()),
-        reason: '_saveAccounts 在 _prefs 为空时静默 no-op 了');
-
-    // _saveCredentials 没法用行为测试隔离：仓库里没有「只调它、不调
-    // _saveAccounts」的路径，后者必先抛。改用一条精确的源码断言补上 ——
-    // 判据很窄（写入不得用 `_prefs?.`），不是那种能被等价改写绕过的宽泛规则。
-    final src =
-        File('lib/services/cloud_account_service.dart').readAsStringSync();
-    final silentWrites = RegExp(r'_prefs\?\.\s*set\w+\(')
-        .allMatches(src)
-        .map((m) => m.group(0)!)
-        .toList();
-    expect(silentWrites, isEmpty,
-        reason: '写入用了 `_prefs?.` —— _prefs 为空时静默什么都不写，'
-            '调用方却拿到"成功"，等于静默数据丢失：$silentWrites');
+    // 重新加载一遍，证明是真落盘了而不是只在内存里
+    await svc.reload();
+    expect(svc.getAccountById('lazy-1'), isNotNull,
+        reason: '写入没有真正落盘 —— 静默丢失');
+    expect(svc.getAccountById('lazy-1')!.credentials['api_key'], 'k1');
   });
 
-  test('落盘失败必须回滚内存，否则重试会造出重复账户', () async {
-    // addAccount 先把账户加进 _accounts 再落盘。若落盘抛异常而不回滚，
-    // UI 的重试会用新 uuid 再追加一个，第二次成功时两条一起持久化。
-    // 这里用「未初始化的 _prefs」构造落盘失败 —— 它现在会抛 StateError
-    // 而不是像以前那样 `_prefs?.setString` 静默 no-op（静默 = 数据丢失）。
+  test('落盘失败必须回滚内存，且不留孤儿凭证', () async {
+    // addAccount 先入内存再落盘。失败不回滚的话，UI 重试会用新 uuid
+    // 再追加一个，第二次成功就把两条一起持久化 —— 重复账户。
+    // 而 _saveCredentials 是逐字段写的，回滚时若不清凭证，
+    // 账户 metadata 一删这些 cloud_cred_<uuid>_* 就再也定位不到，明文永久残留。
     final svc = CloudAccountService();
     await svc.reload();
     final before = svc.accounts.length;
 
-    // 把 prefs 置空：模拟未初始化 / 平台通道不可用
-    svc.debugSetPrefsForTest(null);
+    CloudAccountService.debugFailPersistence = DebugPersistFailure.all;
+    addTearDown(() =>
+        CloudAccountService.debugFailPersistence = DebugPersistFailure.none);
     await expectLater(
       svc.addAccount(CloudAccount(
         id: 'fail-1', providerId: 'deepseek', displayName: 'x',
-        isEnabled: true, credentials: {'api_key': 'k'},
+        isEnabled: true, credentials: {'api_key': 'k', 'model': 'm'},
       )),
       throwsA(isA<StateError>()),
       reason: '落盘失败必须抛出来，不能静默成功',
@@ -88,6 +76,55 @@ void main() {
     expect(svc.accounts.length, before,
         reason: '失败后账户仍留在内存里 —— 重试会造出第二个重复账户');
     expect(svc.getAccountById('fail-1'), isNull);
+
+  });
+
+  test('凭证写到一半失败，回滚必须清掉已落盘的孤儿凭证', () async {
+    // 这个场景只有「账户列表写成功、凭证写到第二个字段才失败」才构造得出 ——
+    // 用 all 模式的话 _saveAccounts 第一步就抛，根本走不到写凭证。
+    // （我第一版就是这么写的，导致「回滚不清凭证」的退化漏报。）
+    final svc = CloudAccountService();
+    await svc.reload();
+
+    CloudAccountService.debugFailPersistence = DebugPersistFailure.credentialsOnly;
+    addTearDown(() =>
+        CloudAccountService.debugFailPersistence = DebugPersistFailure.none);
+    await expectLater(
+      svc.addAccount(CloudAccount(
+        id: 'orphan-1', providerId: 'deepseek', displayName: 'x',
+        isEnabled: true, credentials: {'api_key': 'SECRET', 'model': 'm'},
+      )),
+      throwsA(isA<StateError>()),
+    );
+    CloudAccountService.debugFailPersistence = DebugPersistFailure.none;
+
+    final prefs = await SharedPreferences.getInstance();
+    final orphans = prefs
+        .getKeys()
+        .where((k) => k.startsWith('cloud_cred_orphan-1_'))
+        .toList();
+    expect(orphans, isEmpty,
+        reason: '账户 metadata 已删但凭证还在 —— 这些 key 再也定位不到，'
+            '明文密钥永久残留：$orphans');
+  });
+
+  test('写入路径不得使用 `_prefs?.` —— 静默 no-op 等于数据丢失', () {
+    // _saveCredentials / _clearCredentials 没法用行为测试隔离
+    // （仓库里没有只调它们、不先调 _saveAccounts 的路径）。
+    // 判据很窄：**写入**不得走可空调用；读取（getString/getBool）不在此列，
+    // 读不到走默认值是正常语义。
+    final src =
+        File('lib/services/cloud_account_service.dart').readAsStringSync();
+    final silent = <String>[];
+    for (final line in src.split('\n')) {
+      final t = line.trim();
+      if (t.startsWith('//') || t.startsWith('///')) continue;
+      final m = RegExp(r'_prefs\?\.\s*(set\w+|remove)\(').firstMatch(t);
+      if (m != null) silent.add(t);
+    }
+    expect(silent, isEmpty,
+        reason: '这些写入用了 `_prefs?.`，_prefs 为空时什么都不写却返回成功：'
+            '\n  ${silent.join("\n  ")}');
   });
 
   test('导出不含 credentials 值，只含字段名清单', () async {
