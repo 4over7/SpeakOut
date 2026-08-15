@@ -547,12 +547,18 @@ static void inject_via_clipboard(const char *text) {
 
 // --- Streaming clipboard injection (for typewriter effect) ---
 // Saves clipboard once at begin, pastes each chunk, restores at end.
+static BOOL _clipboardSessionActive = NO;
 static NSArray *_savedClipboardItems = nil;
 // 最后一次 chunk 写入后的 changeCount，供 end 判断剪贴板有没有易主
 static NSInteger _lastChunkChangeCount = -1;
 
 void inject_clipboard_begin(void) {
   @autoreleasepool {
+    // 会话状态必须用独立标志，**不能**拿 _savedClipboardItems 是否为 nil 代表：
+    // 用户剪贴板本来就为空时，下面第 19 行会把快照设成 nil ——
+    // 那样 end 会误判成「无会话」直接返回，注入的语音文本永久留在剪贴板里
+    // （既违反恢复契约，也是口述内容泄漏）。
+    _clipboardSessionActive = true;
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
     NSArray *oldContents = [pasteboard pasteboardItems];
     if (oldContents.count > 0) {
@@ -600,10 +606,14 @@ void inject_clipboard_end(void) {
     // 没有进行中的会话就直接返回：下面 clearContents 是无条件的，
     // 只有 saved != nil 才写回 —— 在无会话状态下再走一遍等于把用户剪贴板清空。
     // Dart 侧已用会话计数堵住重复调用，这里再兜一层，防别的调用方绕过。
-    if (_savedClipboardItems == nil) {
+    //
+    // 判据是独立标志而不是 _savedClipboardItems == nil：原剪贴板为空时
+    // 快照本来就是 nil，用它判断会让 end 误早退、注入文本留在剪贴板。
+    if (!_clipboardSessionActive) {
       log_to_file("Clipboard streaming: end ignored (no active session)");
       return;
     }
+    _clipboardSessionActive = false;
     // Restore clipboard after a short delay
     NSArray *saved = _savedClipboardItems;
     _savedClipboardItems = nil;
