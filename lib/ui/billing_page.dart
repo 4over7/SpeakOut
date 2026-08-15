@@ -385,11 +385,11 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   void _showError(String msg) {
-    NotificationService().notify(msg);
+    NotificationService().notifyError(msg);
   }
 
   void _showSuccess(String msg) {
-    NotificationService().notify(msg);
+    NotificationService().notifySuccess(msg);
   }
 
   String _planDisplayName(String planId) {

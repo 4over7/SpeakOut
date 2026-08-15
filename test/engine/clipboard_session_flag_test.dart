@@ -40,8 +40,8 @@ void main() {
 
   test('包装方法必须真的设置/清除标志，且不得自我递归', () {
     for (final (fn, flag, api) in [
-      ('_clipBegin', '_clipboardInjecting = true', 'injectClipboardBegin'),
-      ('_clipEnd', '_clipboardInjecting = false', 'injectClipboardEnd'),
+      ('_clipBegin', '_clipboardSessions++', 'injectClipboardBegin'),
+      ('_clipEnd', '_clipboardSessions--', 'injectClipboardEnd'),
     ]) {
       final v = _MethodBodyVisitor(fn);
       unit.accept(v);
@@ -51,6 +51,13 @@ void main() {
       expect(body.contains(api), isTrue, reason: '$fn 没有调用原生 $api');
       expect(body.contains('$fn()'), isFalse, reason: '$fn 自我递归了');
     }
+  });
+
+  test('会话状态必须用计数而非布尔 —— AI 梳理与打字机注入可重叠', () {
+    expect(src.contains('int _clipboardSessions'), isTrue,
+        reason: '布尔标志下任一注入先结束就清零，另一个还在写 chunk，等于没防');
+    expect(src.contains('_clipboardSessions > 0) _clipboardSessions--'), isTrue,
+        reason: '计数不得减成负数：异常路径上 _clipEnd 可能比 _clipBegin 多跑一次');
   });
 
   test('UI 能通过 AppService facade 读到注入状态', () {

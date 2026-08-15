@@ -91,18 +91,24 @@ class CoreEngine {
   /// 剪贴板注入会话进行中。注入用剪贴板搬运文本，期间用户若自己复制，
   /// 会被下一个 chunk 覆盖、收尾还原时再抹一次 —— UI 需要据此拒绝复制并提示，
   /// 而不是让用户以为复制成功了。
-  bool _clipboardInjecting = false;
-  bool get isClipboardInjecting => _clipboardInjecting;
+  /// 用计数而不是布尔：AI 梳理与打字机注入可以重叠 ——
+  /// 梳理只在入口检查录音状态，进入后状态仍是 idle，等 LLM 期间用户可以开始录音，
+  /// 打字机路径于是再来一次 _clipBegin()。布尔的话任一先结束就把标志清成 false，
+  /// 另一个还在写 chunk，UI 又放行复制，等于没防。
+  int _clipboardSessions = 0;
+  bool get isClipboardInjecting => _clipboardSessions > 0;
 
-  /// 成对包装：标志只在这两个方法里维护，避免各调用点自己维护而漂移。
+  /// 成对包装：计数只在这两个方法里维护，避免各调用点自己维护而漂移。
   void _clipBegin() {
-    _clipboardInjecting = true;
+    _clipboardSessions++;
     _nativeInput?.injectClipboardBegin();
   }
 
   void _clipEnd() {
     _nativeInput?.injectClipboardEnd();
-    _clipboardInjecting = false;
+    // 不能减成负数：异常路径上 _clipEnd 可能比 _clipBegin 多跑一次
+    // （catch 里兜底 + 正常路径各一次）。
+    if (_clipboardSessions > 0) _clipboardSessions--;
   }
 
   bool get _shouldConsumeAudio =>

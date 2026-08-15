@@ -456,15 +456,20 @@ class _ChatPageState extends State<ChatPage> {
     final err = await DiaryService().appendNote(
         "Source: Chat (${DateFormat('HH:mm').format(msg.timestamp)})\n${msg.text}");
     if (!mounted) return;
-    _toast(err == null ? loc.chatSavedToDiary : loc.chatSaveFailed(err));
+    _toast(err == null ? loc.chatSavedToDiary : loc.chatSaveFailed(err),
+        error: err != null);
   }
 
-  void _toast(String text) {
+  void _toast(String text, {bool error = false}) {
     // 不能用 ScaffoldMessenger：macOS 的根是 MacosApp（基于 WidgetsApp），
     // 没有 ScaffoldMessenger 祖先，of(context) 会抛
     // "No ScaffoldMessenger widget found."（已用 widget 测试实证）。
     // NotificationService 是本 App 里真正接了消费者的提示通道（main.dart:251）。
-    NotificationService().notify(text);
+    if (error) {
+      NotificationService().notifyError(text);
+    } else {
+      NotificationService().notifySuccess(text);
+    }
   }
   
   Widget _buildAvatar(ChatRole role) {

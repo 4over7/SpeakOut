@@ -1345,7 +1345,7 @@ class ModeTabState extends State<ModeTab> {
               onPressed: () async {
                 await ConfigService().setAliyunCredentials(_akIdController.text, _akSecretController.text, _appKeyController.text);
                 if (mounted) {
-                  NotificationService().notify(loc.commonSaved);
+                  NotificationService().notifySuccess(loc.commonSaved);
                 }
               },
               child: Text(loc.saveApply),

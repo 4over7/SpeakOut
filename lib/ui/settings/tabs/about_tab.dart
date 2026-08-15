@@ -466,9 +466,11 @@ class _AboutTabState extends State<AboutTab> {
                       if (path != null) {
                         final result = await ConfigBackupService.exportToFile(path);
                         if (context.mounted) {
-                          NotificationService().notify(result.success
-                                ? loc.aboutExportSuccess(result.message)
-                                : loc.aboutExportFailed(result.error ?? ''));
+                          result.success
+                              ? NotificationService()
+                                  .notifySuccess(loc.aboutExportSuccess(result.message))
+                              : NotificationService()
+                                  .notifyError(loc.aboutExportFailed(result.error ?? ''));
                         }
                       }
                     },
@@ -493,9 +495,11 @@ class _AboutTabState extends State<AboutTab> {
                         final importResult = await ConfigBackupService.importFromFile(result.files.single.path!);
                         if (context.mounted) {
                           setState(() {});
-                          NotificationService().notify(importResult.success
-                                ? loc.aboutImportSuccess(importResult.message)
-                                : loc.aboutImportFailed(importResult.error ?? ''));
+                          importResult.success
+                              ? NotificationService()
+                                  .notifySuccess(loc.aboutImportSuccess(importResult.message))
+                              : NotificationService()
+                                  .notifyError(loc.aboutImportFailed(importResult.error ?? ''));
                         }
                       }
                     },

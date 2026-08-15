@@ -187,7 +187,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   bool? _lastLlmSuccess; // null=未调用, true=成功, false=失败
   String _versionString = "";
   
-  AppNotification? _currentNotification;
   Timer? _notificationTimer;
 
   // Auto-update state
@@ -247,18 +246,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
       });
     });
     
-    // Subscribe to Notifications
-    _notifSub = NotificationService().stream.listen((n) {
-      if (mounted) {
-        setState(() => _currentNotification = n);
-        _notificationTimer?.cancel();
-        _notificationTimer = Timer(n.duration, () {
-          if (mounted && _currentNotification == n) {
-             setState(() => _currentNotification = null);
-          }
-        });
-      }
-    });
+    // 通知横幅已上移到 MacosApp.builder（NotificationOverlay），此处不再订阅
 
     _recordingSub = _appService.engine.recordingStream.listen((isRecording) {
       if (mounted) {
@@ -612,61 +600,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                       ),
                     ),
                   
-                  // Notification Banner (Top Center, above Mic)
-                  if (_currentNotification != null)
-                    Positioned(
-                      top: 80, 
-                      left: 0, 
-                      right: 0,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _currentNotification!.type == NotificationType.error 
-                                ? AppTheme.errorColor 
-                                : (_currentNotification!.type == NotificationType.success 
-                                    ? MacosColors.systemGreenColor 
-                                    : (_currentNotification!.type == NotificationType.audioDeviceSwitch
-                                        ? MacosColors.systemOrangeColor
-                                        : MacosColors.systemBlueColor)),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha:0.2), blurRadius: 10, offset: const Offset(0, 4))
-                            ]
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _currentNotification!.message,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                              // Action button if present
-                              if (_currentNotification!.actionLabel != null && _currentNotification!.onAction != null) ...[
-                                const SizedBox(width: 12),
-                                GestureDetector(
-                                  onTap: () {
-                                    _currentNotification!.onAction!();
-                                    setState(() => _currentNotification = null);
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha:0.25),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      _currentNotification!.actionLabel!,
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  // 通知横幅已上移到 MacosApp.builder（NotificationOverlay），
+                  // 以便盖在聊天页/设置页等上层 route 之上
                   
                   // Main content area - FIXED POSITIONS using LayoutBuilder
                   Positioned(
