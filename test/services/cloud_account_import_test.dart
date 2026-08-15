@@ -34,6 +34,23 @@ void main() {
     return f.path;
   }
 
+  test('导入时加载失败必须抛出，不能被吞成「导入 0 条」', () async {
+    // importFromFile 的 catch 会 `return 0`。若 _ensureLoaded() 写在 try 里，
+    // 加载失败就变成「文件里没内容」—— 指向完全错误的方向。
+    final svc = CloudAccountService();
+    await svc.reload();
+    final path = await writeBackup([
+      {'providerId': 'deepseek', 'isEnabled': true,
+       'credentials': {'api_key': 'k'}},
+    ]);
+
+    svc.debugResetForTest();
+    CloudAccountService.debugFailInit = true;
+    addTearDown(() => CloudAccountService.debugFailInit = false);
+    await expectLater(svc.importFromFile(path), throwsA(isA<StateError>()),
+        reason: '加载失败被吞成 return 0 了 —— 用户会以为文件是空的');
+  });
+
   test('未初始化时导入，不得给磁盘上已有的 provider 重复建账户', () async {
     // 复合操作在**读取**时就要求已加载：importFromFile 用
     // getAccountByProviderId 判重，未加载时它恒为 null ——

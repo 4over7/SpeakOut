@@ -613,5 +613,11 @@
     "placeholders": {
       "error": {}
     }
+  },
+  "cloudAccountLoadFailed": "云账户加载失败：{error}",
+  "@cloudAccountLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
   }
 }

@@ -1489,4 +1489,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String cloudAccountSaveFailed(Object error) {
     return 'Save failed: $error';
   }
+
+  @override
+  String cloudAccountLoadFailed(Object error) {
+    return 'Failed to load cloud accounts: $error';
+  }
 }

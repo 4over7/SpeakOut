@@ -653,5 +653,11 @@
     "placeholders": {
       "error": {}
     }
+  },
+  "cloudAccountLoadFailed": "Failed to load cloud accounts: {error}",
+  "@cloudAccountLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
   }
 }

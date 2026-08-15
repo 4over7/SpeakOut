@@ -2755,6 +2755,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save failed: {error}'**
   String cloudAccountSaveFailed(Object error);
+
+  /// No description provided for @cloudAccountLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load cloud accounts: {error}'**
+  String cloudAccountLoadFailed(Object error);
 }
 
 class _AppLocalizationsDelegate

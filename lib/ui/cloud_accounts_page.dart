@@ -53,7 +53,18 @@ class _CloudAccountsPageState extends State<CloudAccountsPage> {
   }
 
   Future<void> _refreshAccounts() async {
-    await _ensureAllProvidersExist();
+    // initState 里是 fire-and-forget 调用的：这里不兜住异常的话，
+    // init/落盘失败会变成未处理错误，页面永远停在空列表且没有任何提示。
+    try {
+      await _ensureAllProvidersExist();
+    } catch (e) {
+      if (!mounted) return;
+      NotificationService()
+          .notifyError(AppLocalizations.of(context)!.cloudAccountLoadFailed(
+        e.toString(),
+      ));
+      // 加载失败也要把已有内容渲染出来，不要停在空白页
+    }
     if (!mounted) return;
     setState(() {
       _accounts = List.of(CloudAccountService().accounts);

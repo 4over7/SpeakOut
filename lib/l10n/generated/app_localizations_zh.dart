@@ -1424,4 +1424,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String cloudAccountSaveFailed(Object error) {
     return '保存失败：$error';
   }
+
+  @override
+  String cloudAccountLoadFailed(Object error) {
+    return '云账户加载失败：$error';
+  }
 }
