@@ -90,9 +90,13 @@ void main() {
     // 但 CI 上跨秒边界就会翻转，等于埋一颗随机变红的炸弹。
     // 日志字面量会原样进入 __cstring 段，改了源码没重编译就一定查不到。
     final src = File('native_lib/native_input.m').readAsStringSync();
+    // 跳过含非 ASCII 的字面量：strings(1) 只提取连续 ASCII 序列，
+    // 一个中文或破折号就会把整条切成两半，判据于是假阳性
+    // （实测被这条绊过一次：日志里写了「—」）。
     final lits = RegExp(r'log_to_file\(\s*"([^"%\\]{20,})"')
         .allMatches(src)
         .map((m) => m.group(1)!)
+        .where((l) => l.codeUnits.every((c) => c >= 0x20 && c < 0x7f))
         .toSet()
         .toList();
     expect(lits.length, greaterThan(3),

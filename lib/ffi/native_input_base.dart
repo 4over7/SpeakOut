@@ -135,8 +135,8 @@ typedef PressKeyDart = void Function(int keyCode, int modifierFlags);
 // Clipboard streaming injection
 typedef InjectClipboardBeginC = Void Function();
 typedef InjectClipboardBeginDart = void Function();
-typedef InjectClipboardChunkC = Void Function(Pointer<Utf8> text);
-typedef InjectClipboardChunkDart = void Function(Pointer<Utf8> text);
+typedef InjectClipboardChunkC = Int32 Function(Pointer<Utf8> text);
+typedef InjectClipboardChunkDart = int Function(Pointer<Utf8> text);
 typedef InjectClipboardEndC = Void Function();
 typedef InjectClipboardEndDart = void Function();
 
@@ -204,7 +204,9 @@ abstract class NativeInputBase {
 
   // Clipboard streaming injection (for typewriter effect)
   void injectClipboardBegin();
-  void injectClipboardChunk(String text);
+  /// 返回这段 chunk 是否真的粘贴出去了。
+  /// 和 [inject] 同理：静默失败会让整段流式注入被当成成功。
+  bool injectClipboardChunk(String text);
   void injectClipboardEnd();
 
   // Audio spectrum (7-band FFT for waveform visualization)

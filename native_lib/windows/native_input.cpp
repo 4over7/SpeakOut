@@ -229,10 +229,14 @@ EXPORT int inject_text(const char* text) {
         inputs[i * 2 + 1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
     }
 
-    SendInput(inputCount, inputs, sizeof(INPUT));
+    // SendInput 返回**实际投递成功的事件数**。忽略它就会在被 UIPI /
+    // 系统策略拦截时照样报成功 —— 用户口述的话一个字没进去，界面却显示就绪。
+    const UINT sent = SendInput(inputCount, inputs, sizeof(INPUT));
+    const bool ok = (sent == inputCount);
 
     free(inputs);
     free(wideText);
+    if (!ok) return 0;
     return 1;
 }
 

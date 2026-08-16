@@ -139,24 +139,23 @@ void main() {
       // 只在收尾时查，只挡得住「最后一次内部写之后」的用户复制：
       //   X → chunk(A) → 用户复制 Z → chunk(B) 把 Z 清掉并更新 expected
       //   → 收尾看到匹配，还原 X。Z 永久丢失，用户毫无察觉。
+      // 不写死判据长什么样 —— 它从 changeCount 换成过内容、又换成 token。
+      // 不变量是「动剪贴板之前先判所有权，不是我们的就重拍快照」。
       final body = bodyOfFn('tx_paste_locked');
-      expect(body, isNotNull);
-      final checkAt = body.indexOf('pb.changeCount != _txExpectedChangeCount');
+      final checkAt = body.indexOf('tx_snapshot_stable_locked');
       final clearAt = body.indexOf('clearContents');
-      expect(checkAt, greaterThanOrEqualTo(0), reason: '写之前没有易主检查');
-      expect(checkAt, lessThan(clearAt), reason: '检查必须在清空剪贴板之前');
-      expect(body.contains('tx_snapshot_stable_locked'), isTrue,
-          reason: '发现易主后要把用户当前内容作为新的还原目标'
-              '（且必须走与 changeCount 同版本的稳定快照）');
+      expect(checkAt, greaterThanOrEqualTo(0), reason: '写之前没有所有权检查');
+      expect(clearAt, greaterThanOrEqualTo(0));
+      expect(checkAt, lessThan(clearAt),
+          reason: '检查必须在清空剪贴板之前，且发现易主要重拍快照');
     });
 
     test('推进代次的每条路径都必须有人收尾', () {
       // chunk / copy_selection 在没有 hold 罩着时会把代次推高，让先前安排的
       // 收尾任务因代次不符早退，自己却不安排新任务 —— 事务从此挂着不放，
       // _txActive 永为 YES，之后每次注入都沿用一份很旧的快照。
-      for (final fn in ['void inject_clipboard_chunk(const char *text)',
-                        'void copy_selection(void)']) {
-        final body = bodyOf(fn);
+      for (final fn in ['inject_clipboard_chunk', 'copy_selection']) {
+        final body = bodyOfFn(fn);
         expect(body.contains('tx_schedule_finish'), isTrue,
             reason: '$fn 推进了代次却不安排收尾');
         expect(body.contains('_txHoldDepth == 0'), isTrue,
@@ -204,17 +203,34 @@ void main() {
   });
 
   group('线上事故：注入文字滞留剪贴板', () {
-    test('还原判据必须比内容，不能只比 changeCount', () {
-      // changeCount 会被任何「重新声明 pasteboard」的旁观者推高 ——
-      // 屏幕共享的 SSPasteboardHelper、剪贴板管理器、同步工具都会碰它。
-      // 拿它当判据的后果：这些东西一动就永远判成「用户易主」而跳过还原，
-      // 注入的文字永久滞留。2026-08-16 线上实测：注入 5 分钟后用户 Cmd+V，
-      // 贴出来的还是那次识别结果。
-      final body = bodyOfFn('tx_finish_locked');
-      expect(body.contains('stringForType'), isTrue,
-          reason: '必须读回当前内容比对，而不是只看 changeCount');
-      expect(body.contains('_txLastInjected'), isTrue,
-          reason: '要记住我们写进去的是什么，才能判断「还是不是我们的」');
+    test('所有权判据必须是我们自己写的 token', () {
+      // changeCount 反映的是 ownership 变更，任何重新声明剪贴板的进程都会推高它，
+      // 不等于「用户换了内容」；而文本内容也不行 —— 用户完全可能从别处复制到
+      // 一模一样的文字，那时东西是他的，还原回去就吃掉了他刚复制的内容。
+      // token 写在私有 type 里，别人复制同样文字不会带上它。
+      //
+      // 注：2026-08-16 那次线上故障的根因**至今未定案**，曾归因为
+      // 「旁观者推高 changeCount」但探针证伪、已作废。这条断言守的是
+      // 判据本身的正确性，不是那次故障的修复证明。
+      for (final fn in ['tx_finish_locked', 'tx_paste_locked', 'copy_selection']) {
+        final body = stripComments(bodyOfFn(fn));
+        expect(body.contains('kSpeakOutOwnerType'), isTrue,
+            reason: '$fn 仍在用代理量判断所有权');
+      }
+      final finish = stripComments(bodyOfFn('tx_finish_locked'));
+      expect(finish.contains('_txToken'), isTrue);
+    });
+
+    test('setString / writeObjects / Cmd+V 投递的失败都不得被吞', () {
+      final paste = stripComments(bodyOfFn('tx_paste_locked'));
+      expect(paste.contains('![pb setString:text'), isTrue,
+          reason: 'setString 在 ownership 变化时会返回 false，必须看');
+      expect(paste.contains('!post_command_key'), isTrue,
+          reason: 'CGEvent 创建失败时不能照样报成功');
+      final finish = stripComments(bodyOfFn('tx_finish_locked'));
+      expect(finish.contains('[pb writeObjects:_txOriginal]'), isTrue);
+      expect(finish.contains('RESTORE WRITE FAILED'), isTrue,
+          reason: '还原写入失败时剪贴板已被清空，不能记成 restored');
     });
 
     test('发 Cmd+V 之前必须确认剪贴板已生效', () {
@@ -255,11 +271,11 @@ void main() {
       // 「先照写、收尾时不还原」不是可用的失败策略 —— 那等于把用户剪贴板
       // 换成我们注入的文字并永久留在那里（口述内容还会泄漏在剪贴板里）。
       for (final fn in [
-        'static void inject_via_clipboard(const char *text)',
-        'void inject_clipboard_begin(void)',
-        'void inject_clipboard_chunk(const char *text)',
+        'inject_via_clipboard',
+        'inject_clipboard_begin',
+        'inject_clipboard_chunk',
       ]) {
-        final body = bodyOf(fn);
+        final body = bodyOfFn(fn);
         expect(body.contains('if (!tx_begin_locked('), isTrue,
             reason: '$fn 没有检查快照是否拿到');
         final guardAt = body.indexOf('if (!tx_begin_locked(');
@@ -272,10 +288,10 @@ void main() {
     });
 
     test('中途重拍失败返回 0，调用方不得安排收尾', () {
-      final chunk = bodyOf('void inject_clipboard_chunk(const char *text)');
+      final chunk = bodyOfFn('inject_clipboard_chunk');
       expect(chunk.contains('gen == 0'), isTrue,
           reason: 'chunk 没处理「没写成」的返回值');
-      final oneShot = bodyOf('static void inject_via_clipboard(const char *text)');
+      final oneShot = bodyOfFn('inject_via_clipboard');
       expect(oneShot.contains('gen != 0'), isTrue,
           reason: '一次性注入没处理「没写成」的返回值');
     });
@@ -335,10 +351,11 @@ void main() {
 
     test('copy_selection 发 Cmd+C 之前也要查易主', () {
       // delta == 1 只说明「观察到一次变化」，证明不了事务开始后没有先发生外部变化
-      final body = bodyOf('void copy_selection(void)');
-      final checkAt = body.indexOf('pb.changeCount != _txExpectedChangeCount');
+      final body = bodyOfFn('copy_selection');
+      final checkAt = body.indexOf('tx_snapshot_stable_locked');
       final postAt = body.indexOf('post_command_key');
-      expect(checkAt, greaterThanOrEqualTo(0), reason: '发 Cmd+C 前没查易主');
+      expect(checkAt, greaterThanOrEqualTo(0), reason: '发 Cmd+C 前没查所有权');
+      expect(postAt, greaterThanOrEqualTo(0));
       expect(checkAt, lessThan(postAt), reason: '检查必须在发 Cmd+C 之前');
     });
 

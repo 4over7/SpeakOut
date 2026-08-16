@@ -1321,6 +1321,10 @@ class CoreEngine {
             final batchBuffer = StringBuffer();
             bool firstChunk = true;
             bool streamInjected = false;
+            // 只要有一段 chunk 没粘出去，整段流式注入就不算成功 ——
+            // 原先只看「调没调过 chunk」，chunk 静默失败时照样报 Ready，
+            // 用户口述的话就这么没了。
+            bool chunkFailed = false;
             var lastInjectTime = DateTime.now();
             const batchInterval = Duration(milliseconds: AppConstants.kTypewriterBatchIntervalMs);
 
@@ -1345,7 +1349,11 @@ class CoreEngine {
               // Flush batch via clipboard paste
               final now = DateTime.now();
               if (now.difference(lastInjectTime) >= batchInterval && batchBuffer.isNotEmpty) {
-                _nativeInput?.injectClipboardChunk(batchBuffer.toString());
+                if (_nativeInput?.injectClipboardChunk(
+                        batchBuffer.toString()) !=
+                    true) {
+                  chunkFailed = true;
+                }
                 batchBuffer.clear();
                 lastInjectTime = now;
                 streamInjected = true;
@@ -1354,7 +1362,11 @@ class CoreEngine {
 
             // Flush remaining batch
             if (batchBuffer.isNotEmpty) {
-              _nativeInput?.injectClipboardChunk(batchBuffer.toString());
+              if (_nativeInput?.injectClipboardChunk(
+                      batchBuffer.toString()) !=
+                  true) {
+                chunkFailed = true;
+              }
               streamInjected = true;
             }
             _clipEnd();
@@ -1370,8 +1382,18 @@ class CoreEngine {
               // Timeout with no data: fall back to raw ASR text
               _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish timeout, using raw ASR text");
             }
-            if (streamInjected) {
+            // chunk 有失败就**不**标记「已注入」，让后面走一次性注入兜底。
+            // 部分成功时重放全文会重复，所以只在一段都没成时才回退。
+            if (streamInjected && !chunkFailed) {
               _typewriterInjected = true;
+            } else if (chunkFailed) {
+              _log("[Typewriter] chunk 注入失败 (streamInjected=$streamInjected)");
+              if (streamInjected) {
+                // 已经粘出去一部分，回退重放会造成重复 —— 只提示，不重放
+                _typewriterInjected = true;
+                _statusController
+                    .add(EngineStatus.error("注入不完整，完整文字已存到聊天记录"));
+              }
             }
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
           } else if (mode != RecordingMode.diary) {

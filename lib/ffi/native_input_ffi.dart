@@ -570,12 +570,14 @@ class NativeInputFFI implements NativeInputBase {
   }
 
   @override
-  void injectClipboardChunk(String text) {
+  bool injectClipboardChunk(String text) {
     _bindClipboardFunctions();
-    if (!_clipboardBound) return;
+    // 绑不上就是没注入 —— 不能 return 出去让调用方以为成功
+    if (!_clipboardBound) return false;
     final ptr = text.toNativeUtf8();
-    _injectClipboardChunk(ptr);
+    final ok = _injectClipboardChunk(ptr);
     calloc.free(ptr);
+    return ok == 1;
   }
 
   @override

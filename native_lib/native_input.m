@@ -589,17 +589,20 @@ static void inject_via_keyboard(const char *text) {
 //   a) 发送 Command 键本身的 down/up，不能只打 flags 标记
 //   b) flags 补上低位设备相关位：左Command | 非合并 —— 真实按键都带着
 //   c) 事件间留间隔，否则四个事件会被系统合并掉（实测只有前两个能到达）
-static void post_command_key(CGKeyCode key, CGEventTapLocation tap) {
+// 返回是否**四个事件都成功构造并投递**。原先是 void：source 或任一事件
+// 创建失败时静默返回，外层照样报告注入成功 —— 用户口述的话没进去，界面却显示就绪。
+static BOOL post_command_key(CGKeyCode key, CGEventTapLocation tap) {
   CGEventSourceRef source =
       CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-  if (!source) return;
+  if (!source) return NO;
   const CGEventFlags kCmdFlags =
       kCGEventFlagMaskCommand | NX_DEVICELCMDKEYMASK | NX_NONCOALSESCEDMASK;
   CGEventRef cmdDown = CGEventCreateKeyboardEvent(source, 55, true);
   CGEventRef keyDown = CGEventCreateKeyboardEvent(source, key, true);
   CGEventRef keyUp = CGEventCreateKeyboardEvent(source, key, false);
   CGEventRef cmdUp = CGEventCreateKeyboardEvent(source, 55, false);
-  if (cmdDown && keyDown && keyUp && cmdUp) {
+  const BOOL allCreated = (cmdDown && keyDown && keyUp && cmdUp);
+  if (allCreated) {
     CGEventSetFlags(cmdDown, kCmdFlags);
     CGEventSetFlags(keyDown, kCmdFlags);
     CGEventSetFlags(keyUp, kCmdFlags);
@@ -622,6 +625,8 @@ static void post_command_key(CGKeyCode key, CGEventTapLocation tap) {
   if (keyUp) CFRelease(keyUp);
   if (cmdUp) CFRelease(cmdUp);
   CFRelease(source);
+  if (!allCreated) log_to_file("post_command_key: CGEvent creation failed");
+  return allCreated;
 }
 
 // 深拷贝当前剪贴板内容，供之后还原。
@@ -698,12 +703,18 @@ static NSArray *_txOriginal = nil;           // 事务开启前的剪贴板内�
 static uint64_t _txGeneration = 0;           // 我们每改一次剪贴板就 +1
 static NSInteger _txExpectedChangeCount = -1; // 只有我们动过的话，现在该是多少
 static BOOL _txOriginalValid = NO;           // 快照是否可信（拍不稳时为 NO）
-// 最近一次注入是否因为「剪贴板没生效」而放弃了 Cmd+V。inject_text 读它决定
-// 返回值，好让 Dart 侧告诉用户「这次没注入成功」而不是静默吞掉。
+// 本次一次性注入是否失败。**整段 inject_text 都在 injectTextMutex 里跑**，
+// 所以同一时刻只有一个 inject_text 在用它 —— 否则这个全局标志表达不了
+// 「哪一次调用」的结果：A 失败后、A 读取前 B 把它重置，A 就会错报成功。
+// 流式 chunk 也会置位，但流式调用方不读它，且被同一把锁挡在外面。
+static pthread_mutex_t injectTextMutex = PTHREAD_MUTEX_INITIALIZER;
 static BOOL _txPasteFailed = NO;
-// 我们最后一次写进剪贴板的文字。收尾时用它判断「剪贴板还是不是我们的」——
-// 比 changeCount 靠谱得多，理由见 tx_finish_locked。
-static NSString *_txLastInjected = nil;
+// 私有 pasteboard type：只用来放我们本次事务的 token。
+// 目标 App 只读它认识的类型（纯文本等），多这一个自定义 UTI 对粘贴内容无影响。
+static NSString *const kSpeakOutOwnerType = @"com.speakout.injection-token";
+// 本次事务的 token。收尾时靠它判断「剪贴板还是不是我们放的」，
+// 理由见 tx_finish_locked —— changeCount 和文本内容都是不可靠的代理量。
+static NSString *_txToken = nil;
 static int _txHoldDepth = 0;                 // 流式会话深度，>0 时挂起还原
 
 // 以下 tx_* 全部要求调用方已持有 clipTxMutex。
@@ -754,41 +765,51 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   if (!_txActive) return;
   if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
   if (_txHoldDepth > 0) return;     // 流式会话还开着，等它 end
-  // 判据是**内容**，不是 changeCount。
+  // 判据是**我们自己写进去的一枚 token**，不是 changeCount，也不是文本内容。
   //
-  // changeCount 会被任何「重新声明 pasteboard」的旁观者推高，而不只是用户复制：
-  // 屏幕共享的 SSPasteboardHelper、各类剪贴板管理器、同步类工具都会碰它。
-  // 用 changeCount 当判据的后果是：这些东西一动，我们就永远判定「用户易主」
-  // 而跳过还原 —— **注入的文字于是永久滞留在剪贴板里**。
-  // 2026-08-16 线上就是这么中的：注入 5 分钟后用户 Cmd+V，贴出来的还是那次
-  // 识别结果（见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md）。
+  // 为什么不用 changeCount：它反映的是 pasteboard ownership 变更，
+  // 任何重新声明剪贴板的进程都会推高它，而不只是「用户换了内容」。
+  // 拿它当判据，就可能在没人真正接管的情况下跳过还原，把注入文字永久留下。
   //
-  // 真正要区分的是「剪贴板里现在还是不是我们放进去的那份」：
-  // 是 → 没人真正接管过，还原回去天经地义；
-  // 不是 → 用户确实换了内容，别去盖他的。
-  NSString *current = [pb stringForType:NSPasteboardTypeString];
-  const BOOL stillOurs = (_txLastInjected != nil)
-                             ? (current != nil &&
-                                [current isEqualToString:_txLastInjected])
+  // 为什么不用文本内容：用户完全可能从别处复制到一模一样的文字（甚至带格式），
+  // 那时内容相等但**东西是他的**，还原回去就吃掉了他刚复制的内容。
+  // 而且 stringForType: 会把多个 item 的字符串拼起来，不同组合也可能撞出相同文本。
+  //
+  // token 写在私有 type 里，随文本一起进同一次声明。别人重新复制同样的文字，
+  // 不会带上这枚 token —— 这才是「这份剪贴板还是不是我们放的」的直接证据。
+  //
+  // ⚠️ 说明：2026-08-16 那次线上故障（注入 5 分钟后 Cmd+V 贴出识别结果）
+  // **根因至今未定案**。曾一度归因为「旁观者推高 changeCount」，
+  // 但探针连采 5 次都没观察到旁观者改动，该归因已作废。
+  // 本改动是**严格的健壮性改进**，不要当成那次故障的已验证修复。
+  // 详见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md。
+  NSString *token = [pb stringForType:kSpeakOutOwnerType];
+  const BOOL stillOurs = (_txToken != nil)
+                             ? (token != nil && [token isEqualToString:_txToken])
                              // 本事务一次都没写过剪贴板（比如 begin/end 之间
-                             // LLM 就失败了），只能退回比 changeCount
+                             // LLM 就失败了），没 token 可比，只能退回 changeCount
                              : (pb.changeCount == _txExpectedChangeCount);
   if (!_txOriginalValid) {
     // 快照当时就没拍稳，还原等于拿不可信内容覆盖现状 —— 什么都不做
     log_to_file("Clipboard tx: skipped restore (snapshot was never stable)");
   } else if (stillOurs) {
     [pb clearContents];
-    if (_txOriginal.count > 0) {
-      [pb writeObjects:_txOriginal];
+    if (_txOriginal.count == 0) {
+      log_to_file("Clipboard tx: restored (original was empty)");
+    } else if ([pb writeObjects:_txOriginal]) {
+      log_to_file("Clipboard tx: restored");
+    } else {
+      // 不能记成功：此刻剪贴板已被 clearContents 清空，用户的内容真的没了。
+      // 记成 restored 会让下次排查直接跳过这一段。
+      log_to_file("Clipboard tx: RESTORE WRITE FAILED, clipboard left empty");
     }
-    log_to_file("Clipboard tx: restored");
   } else {
     log_to_file("Clipboard tx: skipped restore (clipboard content is no longer ours)");
   }
   _txActive = NO;
   _txOriginal = nil;
   _txOriginalValid = NO;
-  _txLastInjected = nil;
+  _txToken = nil;
   _txExpectedChangeCount = -1;
 }
 
@@ -813,27 +834,44 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   //   X → chunk(A)（expected=A）→ 用户复制 Z → chunk(B) 把 Z 清掉、expected=B
   //   → 收尾看到 B==expected，还原 X。Z 永久丢失，而且用户毫无察觉。
   // 一旦发现易主，用户手里那份才是该还原的目标，旧快照已经过期，重新拍。
-  if (pb.changeCount != _txExpectedChangeCount) {
-    log_to_file("Clipboard tx: user changed clipboard mid-transaction, re-snapshot");
+  // 写之前先确认剪贴板还是我们的。判据同样是 token 而不是 changeCount ——
+  // 只改收尾那一处是不够的：某个工具重新声明了同样的内容，changeCount 会变，
+  // 这里就会把「我们自己刚注入的文字」重新拍成「用户的原始内容」，
+  // 收尾再把它还原回去，注入文本照样滞留。
+  const BOOL ours = (_txToken != nil)
+                        ? [_txToken isEqualToString:
+                                        [pb stringForType:kSpeakOutOwnerType] ?: @""]
+                        : (pb.changeCount == _txExpectedChangeCount);
+  if (!ours) {
+    log_to_file("Clipboard tx: clipboard no longer ours mid-transaction, re-snapshot");
     if (!tx_snapshot_stable_locked(pb)) return 0; // 0 = 没写，调用方别安排收尾
   }
   NSInteger cc = [pb clearContents];
-  [pb setString:text forType:NSPasteboardTypeString];
   // 无论后面粘不粘得成，剪贴板已经被我们改了，基线必须跟上 ——
   // 否则下一次写前检查会把「我们自己刚写进去的文字」当成用户的新内容重新拍快照。
-  _txLastInjected = text;
+  if (![pb setString:text forType:NSPasteboardTypeString]) {
+    // setString 在 ownership 已经变化时会返回 false。忽略它就会白等 200ms
+    // 才发现问题，而且分不清「没写进去」和「写进去了但没生效」。
+    log_to_file("Clipboard tx: setString failed (ownership changed?)");
+    return 0;
+  }
+  _txToken = [[NSUUID UUID] UUIDString];
+  [pb setString:_txToken forType:kSpeakOutOwnerType];
   const uint64_t gen = tx_note_mutation_locked(cc);
 
-  // **确认剪贴板里真的是我们写的那份，再发 Cmd+V。**
+  // 确认剪贴板里确实是我们写的那份，再发 Cmd+V。校验不过就不发 ——
+  // 宁可这次注入失败（调用方会告知用户），也不能把别的内容贴进用户文档。
   //
-  // 出货版这里是 `usleep(10000)` 然后直接发键 —— 纯猜的等待，没有任何校验。
-  // 跨进程 pasteboard 可见性没有时限保证，机器忙的时候 10ms 完全可能不够，
-  // 结果就是 Cmd+V 把**剪贴板里的旧内容**贴进用户文档。
-  // 2026-08-16 线上就复现了一次「贴出来的是上一次语音识别的文字」，
-  // 见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md。
+  // **这个校验能证明什么、不能证明什么，必须说清楚：**
+  // 它是在**我们自己的进程里**读回来比对。`setString:` 已经返回成功的前提下，
+  // 这一读几乎必然立刻命中 —— 所以它**证明不了目标 App 那边看到了新内容**，
+  // 跨进程 pasteboard 可见性依然没有保证。
+  // 它真正挡住的是：`setString` 声称成功但内容并非我们写的那份
+  // （例如紧接着有别的进程重新声明了剪贴板）。
   //
-  // 校验不过就**不发 Cmd+V**：宁可这次注入失败（调用方会告知用户），
-  // 也绝不能把上一次的识别结果贴进去 —— 那是用户完全无法预期的错误内容。
+  // 换句话说：出货版那句 `usleep(10000)` 想解决的「跨进程传播竞态」，
+  // 这里**并没有解决**，只是把「盲等 10ms」换成了「确认自己这边写对了」。
+  // 要真正解决，需要目标进程的粘贴回执，而 macOS 没有提供这种机制。
   BOOL visible = NO;
   for (int i = 0; i < 40; i++) { // 最多 200ms
     NSString *now = [pb stringForType:NSPasteboardTypeString];
@@ -854,15 +892,25 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
     return gen;
   }
 
-  post_command_key(9, kCGHIDEventTap);
+  if (!post_command_key(9, kCGHIDEventTap)) {
+    log_to_file("Clipboard tx: Cmd+V post failed");
+    _txPasteFailed = YES;
+  }
   return gen;
 }
 
 static void inject_via_clipboard(const char *text) {
   @autoreleasepool {
     NSString *newText = [NSString stringWithUTF8String:text];
-    if (newText == nil || newText.length == 0)
+    if (newText == nil || newText.length == 0) {
+      // 非法 UTF-8 也是一次失败。原先直接 return，_txPasteFailed 没置位，
+      // inject_text 于是返回 1 —— 明明什么都没注入却报成功。
+      pthread_mutex_lock(&clipTxMutex);
+      _txPasteFailed = YES;
+      pthread_mutex_unlock(&clipTxMutex);
+      log_to_file("Clipboard tx: invalid UTF-8 text, nothing injected");
       return;
+    }
 
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
@@ -907,27 +955,32 @@ void inject_clipboard_begin(void) {
   }
 }
 
-void inject_clipboard_chunk(const char *text) {
+// 返回 1 = 这段 chunk 已发出粘贴；0 = 没有。
+// **不能继续返回 void**：chunk 静默失败时 Dart 仍会把整段流式注入算成功，
+// 既不回退也不提示，用户口述的话就这么没了。
+int inject_clipboard_chunk(const char *text) {
   if (text == NULL || text[0] == '\0')
-    return;
+    return 0;
 
   @autoreleasepool {
     NSString *newText = [NSString stringWithUTF8String:text];
     if (newText == nil || newText.length == 0)
-      return;
+      return 0;
 
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
+    _txPasteFailed = NO; // 只反映这一段 chunk 的结果
     if (!tx_begin_locked(pb)) { // 没走 begin 也能兜住
       pthread_mutex_unlock(&clipTxMutex);
       log_to_file("Clipboard tx: chunk aborted (no trustworthy snapshot)");
-      return;
+      return 0;
     }
     const uint64_t gen = tx_paste_locked(pb, newText);
     if (gen == 0) { // 中途重拍失败，没写成，别安排收尾
       pthread_mutex_unlock(&clipTxMutex);
-      return;
+      return 0;
     }
+    const BOOL pasted = !_txPasteFailed;
     usleep(30000); // 30ms for paste to complete before next chunk
     const BOOL orphan = (_txHoldDepth == 0);
     pthread_mutex_unlock(&clipTxMutex);
@@ -937,6 +990,7 @@ void inject_clipboard_chunk(const char *text) {
     // 早退，自己却不安排新任务 —— 事务从此挂着不放，_txActive 永为 YES，
     // 之后每次注入都沿用一份很旧的快照。
     if (orphan) tx_schedule_finish(gen);
+    return pasted ? 1 : 0;
   }
 }
 
@@ -975,8 +1029,12 @@ void copy_selection(void) {
     //   begin 在 X 上开事务 → 用户复制 Z → copy_selection 读到 Z 的 count
     //   → Cmd+C 复制出 Y，delta 恰好是 1 → 记成内部变更
     //   → 收尾还原 X，Z 被覆盖。
-    if (_txActive && pb.changeCount != _txExpectedChangeCount) {
-      log_to_file("Clipboard tx: clipboard changed before copy_selection, re-snapshot");
+    const BOOL stillOursBeforeCopy =
+        (_txToken != nil)
+            ? [_txToken isEqualToString:[pb stringForType:kSpeakOutOwnerType] ?: @""]
+            : (pb.changeCount == _txExpectedChangeCount);
+    if (_txActive && !stillOursBeforeCopy) {
+      log_to_file("Clipboard tx: clipboard no longer ours before copy_selection, re-snapshot");
       tx_snapshot_stable_locked(pb); // 失败也继续：这里只是复制，不覆盖剪贴板
     }
     // **基线必须取自稳定快照那一刻，不能在这里重读。** 重读的话，重拍返回之后
@@ -1138,6 +1196,9 @@ int inject_text(const char *text) {
   if (text == NULL || text[0] == '\0')
     return 0;
 
+  // 把「重置 → 注入 → 读结果」整段串起来，否则并发调用会互相吃掉对方的结果
+  pthread_mutex_lock(&injectTextMutex);
+
   pthread_mutex_lock(&clipTxMutex);
   _txPasteFailed = NO;
   pthread_mutex_unlock(&clipTxMutex);
@@ -1147,6 +1208,8 @@ int inject_text(const char *text) {
   pthread_mutex_lock(&clipTxMutex);
   const BOOL failed = _txPasteFailed;
   pthread_mutex_unlock(&clipTxMutex);
+
+  pthread_mutex_unlock(&injectTextMutex);
   return failed ? 0 : 1;
 }
 
