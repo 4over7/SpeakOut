@@ -13,6 +13,8 @@
 | [`dont-feature-creep-in-bug-fix.md`](./dont-feature-creep-in-bug-fix.md) | 修 bug 时不要顺手 refactor 不相关代码 |
 | [`dont-skip-full-test-on-release.md`](./dont-skip-full-test-on-release.md) | 发版必跑完整 `flutter test`，不要问"是否跳过" |
 | [`dont-amend-after-hook-failure.md`](./dont-amend-after-hook-failure.md) | pre-commit hook 失败后用新 commit 修，不要 `--amend` |
+| [`dont-trust-green-tests-without-probing.md`](./dont-trust-green-tests-without-probing.md) | 测试绿 ≠ 那条路径被验证过，用探针确认它真跑到了 |
+| [`dont-let-injection-shape-production-code.md`](./dont-let-injection-shape-production-code.md) | 测试注入用外部钩子，别在实现里加只为造失败的分支 |
 
 ### 🏗️ 架构铁律
 

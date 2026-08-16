@@ -170,6 +170,8 @@ sidebar 内部跳转用 `SidebarNavigation.of(context)?.goto('page_id')`，**不
 | [`dont-feature-creep-in-bug-fix`](./docs/anti-patterns/dont-feature-creep-in-bug-fix.md) | 修 bug 时不要顺手 refactor 不相关代码 |
 | [`dont-skip-full-test-on-release`](./docs/anti-patterns/dont-skip-full-test-on-release.md) | 发版必跑完整 `flutter test`，不要问"是否跳过" |
 | [`dont-amend-after-hook-failure`](./docs/anti-patterns/dont-amend-after-hook-failure.md) | pre-commit hook 失败后用新 commit 修，不要 `--amend` |
+| [`dont-trust-green-tests-without-probing`](./docs/anti-patterns/dont-trust-green-tests-without-probing.md) | 测试绿 ≠ 那条路径被验证过，用探针确认 |
+| [`dont-let-injection-shape-production-code`](./docs/anti-patterns/dont-let-injection-shape-production-code.md) | 测试注入用外部钩子，别污染生产逻辑 |
 | [`dont-bypass-configservice`](./docs/anti-patterns/dont-bypass-configservice.md) | 不要直接 `SharedPreferences.getInstance()` |
 | [`dont-onnavigatetotab-int`](./docs/anti-patterns/dont-onnavigatetotab-int.md) | 跨页跳转不要用 `onNavigateToTab(int)` |
 | [`dont-pick-pilot-by-tech-friendliness`](./docs/anti-patterns/dont-pick-pilot-by-tech-friendliness.md) | 选试点 App：用户实际高频 > 技术友好性 |
