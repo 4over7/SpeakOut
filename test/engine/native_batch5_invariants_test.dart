@@ -11,10 +11,11 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
 
-  /// 去掉注释后的源码。「不得再出现某标识符」这类断言必须看**代码** ——
-  /// 否则解释性注释里提到的旧名字会把断言带偏（这条就绊过一次）。
-  /// 只用于否定断言：行内 `//` 剥离会误伤字符串里的 URL，肯定断言仍看 src。
-  final code = src
+  /// 去掉注释。「不得再出现某某」这类**否定断言必须看代码** ——
+  /// 否则解释性注释里提到的旧写法会把断言带偏。这个坑已经绊过三次，
+  /// 所以做成可复用的，别再逐处打补丁。
+  /// 只用于否定断言：行内 `//` 剥离会误伤字符串里的 URL，肯定断言仍看原文。
+  String stripComments(String text) => text
       .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '')
       .split('\n')
       .map((l) {
@@ -22,6 +23,8 @@ void main() {
         return i >= 0 ? l.substring(0, i) : l;
       })
       .join('\n');
+
+  final code = stripComments(src);
 
   String bodyOf(String signature) {
     final m = RegExp('${RegExp.escape(signature)} \\{([\\s\\S]*?)\\n\\}')
@@ -197,6 +200,44 @@ void main() {
       final body = bodyOf('static void start_tap_log_drain(void)');
       expect(body.contains('dispatch_once'), isTrue,
           reason: '裸 if (timer != nil) 不是线程安全的');
+    });
+  });
+
+  group('线上事故：注入文字滞留剪贴板', () {
+    test('还原判据必须比内容，不能只比 changeCount', () {
+      // changeCount 会被任何「重新声明 pasteboard」的旁观者推高 ——
+      // 屏幕共享的 SSPasteboardHelper、剪贴板管理器、同步工具都会碰它。
+      // 拿它当判据的后果：这些东西一动就永远判成「用户易主」而跳过还原，
+      // 注入的文字永久滞留。2026-08-16 线上实测：注入 5 分钟后用户 Cmd+V，
+      // 贴出来的还是那次识别结果。
+      final body = bodyOfFn('tx_finish_locked');
+      expect(body.contains('stringForType'), isTrue,
+          reason: '必须读回当前内容比对，而不是只看 changeCount');
+      expect(body.contains('_txLastInjected'), isTrue,
+          reason: '要记住我们写进去的是什么，才能判断「还是不是我们的」');
+    });
+
+    test('发 Cmd+V 之前必须确认剪贴板已生效', () {
+      // 出货版是 usleep(10000) 然后直接发键 —— 纯猜的等待。
+      // 跨进程 pasteboard 可见性没有时限保证，等不够就会把旧内容贴进用户文档。
+      final body = bodyOfFn('tx_paste_locked');
+      expect(stripComments(body).contains('usleep(10000)'), isFalse,
+          reason: '不能靠固定等待，要校验');
+      expect(body.contains('isEqualToString:text'), isTrue,
+          reason: '必须读回来确认就是我们写的那份');
+      final checkAt = body.indexOf('isEqualToString:text');
+      final postAt = body.indexOf('post_command_key');
+      expect(checkAt, lessThan(postAt), reason: '校验必须在发键之前');
+    });
+
+    test('注入失败必须能传回 Dart，不能静默', () {
+      // 注入失败 = 用户刚口述的整段话没进输入框。静默吞掉的话，
+      // 他只会对着没变化的界面发愣，还以为是识别没成功。
+      expect(RegExp(r'int inject_text\(const char \*text\)').hasMatch(src), isTrue,
+          reason: 'inject_text 必须返回成败，不能是 void');
+      final dart = File('lib/engine/core_engine.dart').readAsStringSync();
+      expect(dart.contains('注入失败'), isTrue,
+          reason: 'CoreEngine 必须把注入失败暴露给用户');
     });
   });
 

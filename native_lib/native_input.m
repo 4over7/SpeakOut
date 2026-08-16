@@ -701,6 +701,9 @@ static BOOL _txOriginalValid = NO;           // 快照是否可信（拍不稳�
 // 最近一次注入是否因为「剪贴板没生效」而放弃了 Cmd+V。inject_text 读它决定
 // 返回值，好让 Dart 侧告诉用户「这次没注入成功」而不是静默吞掉。
 static BOOL _txPasteFailed = NO;
+// 我们最后一次写进剪贴板的文字。收尾时用它判断「剪贴板还是不是我们的」——
+// 比 changeCount 靠谱得多，理由见 tx_finish_locked。
+static NSString *_txLastInjected = nil;
 static int _txHoldDepth = 0;                 // 流式会话深度，>0 时挂起还原
 
 // 以下 tx_* 全部要求调用方已持有 clipTxMutex。
@@ -751,21 +754,41 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   if (!_txActive) return;
   if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
   if (_txHoldDepth > 0) return;     // 流式会话还开着，等它 end
+  // 判据是**内容**，不是 changeCount。
+  //
+  // changeCount 会被任何「重新声明 pasteboard」的旁观者推高，而不只是用户复制：
+  // 屏幕共享的 SSPasteboardHelper、各类剪贴板管理器、同步类工具都会碰它。
+  // 用 changeCount 当判据的后果是：这些东西一动，我们就永远判定「用户易主」
+  // 而跳过还原 —— **注入的文字于是永久滞留在剪贴板里**。
+  // 2026-08-16 线上就是这么中的：注入 5 分钟后用户 Cmd+V，贴出来的还是那次
+  // 识别结果（见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md）。
+  //
+  // 真正要区分的是「剪贴板里现在还是不是我们放进去的那份」：
+  // 是 → 没人真正接管过，还原回去天经地义；
+  // 不是 → 用户确实换了内容，别去盖他的。
+  NSString *current = [pb stringForType:NSPasteboardTypeString];
+  const BOOL stillOurs = (_txLastInjected != nil)
+                             ? (current != nil &&
+                                [current isEqualToString:_txLastInjected])
+                             // 本事务一次都没写过剪贴板（比如 begin/end 之间
+                             // LLM 就失败了），只能退回比 changeCount
+                             : (pb.changeCount == _txExpectedChangeCount);
   if (!_txOriginalValid) {
     // 快照当时就没拍稳，还原等于拿不可信内容覆盖现状 —— 什么都不做
     log_to_file("Clipboard tx: skipped restore (snapshot was never stable)");
-  } else if (pb.changeCount == _txExpectedChangeCount) {
+  } else if (stillOurs) {
     [pb clearContents];
     if (_txOriginal.count > 0) {
       [pb writeObjects:_txOriginal];
     }
     log_to_file("Clipboard tx: restored");
   } else {
-    log_to_file("Clipboard tx: skipped restore (user changed clipboard)");
+    log_to_file("Clipboard tx: skipped restore (clipboard content is no longer ours)");
   }
   _txActive = NO;
   _txOriginal = nil;
   _txOriginalValid = NO;
+  _txLastInjected = nil;
   _txExpectedChangeCount = -1;
 }
 
@@ -798,6 +821,7 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   [pb setString:text forType:NSPasteboardTypeString];
   // 无论后面粘不粘得成，剪贴板已经被我们改了，基线必须跟上 ——
   // 否则下一次写前检查会把「我们自己刚写进去的文字」当成用户的新内容重新拍快照。
+  _txLastInjected = text;
   const uint64_t gen = tx_note_mutation_locked(cc);
 
   // **确认剪贴板里真的是我们写的那份，再发 Cmd+V。**
