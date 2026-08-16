@@ -1,4 +1,5 @@
 import Cocoa
+import Security
 import FlutterMacOS
 
 @main
@@ -53,29 +54,32 @@ class AppDelegate: FlutterAppDelegate {
 
   /// 是否运行在 App Sandbox 里。沙盒下 bookmark 失败 = 目录不可用，必须报错；
   /// 非沙盒下 bookmark 只是锦上添花，失败了普通文件权限照样能写，不该打扰用户。
-  private var isSandboxed: Bool {
-    ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
-  }
+  ///
+  /// **不能用 `APP_SANDBOX_CONTAINER_ID` 这个环境变量判断** —— 那是运行环境的
+  /// 实现细节而非公开契约，已知有沙盒进程读不到它。误判的代价是实打实的：
+  /// 漏判成非沙盒时，拿不到持久授权也照样把路径返回给 Dart，重启后闪念静默失效。
+  /// 这里读自己的 entitlement，是 Apple 给的标准做法。
+  private lazy var isSandboxed: Bool = {
+    guard let task = SecTaskCreateFromSelf(nil) else { return false }
+    let value = SecTaskCopyValueForEntitlement(
+      task, "com.apple.security.app-sandbox" as CFString, nil)
+    return (value as? Bool) ?? false
+  }()
 
-  @discardableResult
-  private func persistDiaryBookmark(for url: URL) -> Bool {
+  private func makeBookmark(for url: URL) -> Data? {
     do {
-      let data = try url.bookmarkData(options: [.withSecurityScope],
-                                      includingResourceValuesForKeys: nil,
-                                      relativeTo: nil)
-      UserDefaults.standard.set(data, forKey: Self.diaryBookmarkKey)
-      return true
+      return try url.bookmarkData(options: [.withSecurityScope],
+                                  includingResourceValuesForKeys: nil,
+                                  relativeTo: nil)
     } catch {
       NSLog("[Sandbox] 创建 bookmark 失败: %@", String(describing: error))
-      return false
+      return nil
     }
   }
 
-  @discardableResult
-  private func restoreScopedDiaryAccess() -> Bool {
-    guard let data = UserDefaults.standard.data(forKey: Self.diaryBookmarkKey) else {
-      return false
-    }
+  /// 解析 bookmark 并真正取得访问权。成功才返回 URL —— 调用方据此决定
+  /// 要不要提交这次目录切换。
+  private func acquireScope(from data: Data) -> URL? {
     var stale = false
     do {
       let url = try URL(resolvingBookmarkData: data,
@@ -84,24 +88,47 @@ class AppDelegate: FlutterAppDelegate {
                         bookmarkDataIsStale: &stale)
       guard url.startAccessingSecurityScopedResource() else {
         NSLog("[Sandbox] startAccessingSecurityScopedResource 失败: %@", url.path)
-        return false
+        return nil
       }
-      scopedDiaryURL = url
       // stale 说明目录被移动/改名过，此刻立刻重建，否则下次启动就解析不出来了
-      if stale { persistDiaryBookmark(for: url) }
-      NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", url.path)
-      return true
+      if stale, let fresh = makeBookmark(for: url) {
+        UserDefaults.standard.set(fresh, forKey: Self.diaryBookmarkKey)
+      }
+      return url
     } catch {
       NSLog("[Sandbox] 解析 bookmark 失败: %@", String(describing: error))
-      return false
+      return nil
     }
   }
 
-  // 只在**换目录**时需要放掉旧 scope（长期运行的进程不该攒着不放）。
-  // 进程退出不用管：scope 随进程消失，专门挂个 willTerminate 只是徒增噪音。
-  private func releaseScopedDiaryAccess() {
-    scopedDiaryURL?.stopAccessingSecurityScopedResource()
+  @discardableResult
+  private func restoreScopedDiaryAccess() -> Bool {
+    guard let data = UserDefaults.standard.data(forKey: Self.diaryBookmarkKey) else {
+      return false
+    }
+    guard let url = acquireScope(from: data) else { return false }
+    scopedDiaryURL = url
+    NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", url.path)
+    return true
+  }
+
+  /// 切换闪念目录。**整件事要么全成、要么什么都不动。**
+  /// 上一版是「建 bookmark → 放掉旧 scope → 试着恢复 → 不管成没成都返回路径」：
+  /// 新目录能生成 bookmark 但解析/取权失败时，旧授权已经放掉、旧 bookmark 已被
+  /// 覆盖，用户配置却指向一个写不进去的目录 —— 本次会话靠 Powerbox 临时授权
+  /// 还能写，重启后就静默失效。所以先拿到新权限，再提交。
+  private func switchDiaryDirectory(to url: URL) -> Bool {
+    guard let data = makeBookmark(for: url) else { return false }
+    let previous = scopedDiaryURL
     scopedDiaryURL = nil
+    guard let acquired = acquireScope(from: data) else {
+      scopedDiaryURL = previous // 新的没拿到，旧 scope 原样留着
+      return false
+    }
+    previous?.stopAccessingSecurityScopedResource()
+    scopedDiaryURL = acquired
+    UserDefaults.standard.set(data, forKey: Self.diaryBookmarkKey)
+    return true
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
@@ -392,21 +419,16 @@ class AppDelegate: FlutterAppDelegate {
         result(url.path)
         return
       }
-      // **先确认新目录真的能持久授权，再放掉旧的。** 顺序反了的话，
-      // 新 bookmark 建失败时旧 scope 已经放掉、新的又没拿到，
-      // 却仍把新路径交给 Dart —— 用户配置指向一个写不进去的目录。
-      let ok = self.persistDiaryBookmark(for: url)
+      let ok = self.switchDiaryDirectory(to: url)
       if !ok && self.isSandboxed {
         // 沙盒下拿不到跨启动授权 = 这个目录用不了。不能静默返回路径，
         // 否则用户这次能写、重启后闪念就静默丢失，而且看不到任何原因。
-        // 这条只进日志：给用户看的文案由 Dart 侧走 i18n
+        // message 只进日志：给用户看的文案由 Dart 侧走 i18n
         result(FlutterError(code: "bookmark_failed",
-                            message: "security-scoped bookmark creation failed",
+                            message: "security-scoped bookmark unavailable",
                             details: url.path))
         return
       }
-      self.releaseScopedDiaryAccess()
-      self.restoreScopedDiaryAccess()
       result(url.path)
     }
   }

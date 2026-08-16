@@ -19,16 +19,24 @@
 // Debug logging flag — disabled by default, enabled via set_debug_logging(1)
 static atomic_int debugLoggingEnabled = 0;
 
+// 生产者开关与「落盘是否启用」必须分开。合成一个的话，同步排空读完 write
+// 游标之后、置零之前，tap 线程还能再发布一条 —— 那条会被下一轮 timer 读到，
+// 但那时 log_to_file 已经因为 flag=0 直接返回，日志照样丢。
+// 关闭顺序：先停生产者 → 同步排空（此时落盘仍开着）→ 再关落盘。
+static atomic_int tapLogProducerEnabled = 0;
 static void start_tap_log_drain(void);
 static void flush_tap_log_sync(void);
 
 void set_debug_logging(int enabled) {
   if (enabled) {
     atomic_store(&debugLoggingEnabled, 1);
+    atomic_store(&tapLogProducerEnabled, 1);
     start_tap_log_drain();
     return;
   }
-  // 先排空再置零 —— 顺序反了就会丢掉最后一批 tap 日志（见 flush_tap_log_sync）
+  // 三步顺序不能乱：停生产者 → 排空 → 关落盘。
+  // 少了第一步，排空读完游标后 tap 线程还能再写一条，那条必丢。
+  atomic_store(&tapLogProducerEnabled, 0);
   flush_tap_log_sync();
   atomic_store(&debugLoggingEnabled, 0);
   // 不撤 drain timer：撤销要跨线程同步 source 的生命周期，代价远大于
@@ -114,7 +122,7 @@ static dispatch_queue_t tapLogQueue = nil;
 
 __attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,
                                                                ...) {
-  if (!atomic_load(&debugLoggingEnabled)) return;
+  if (!atomic_load(&tapLogProducerEnabled)) return;
   const unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_relaxed);
   const unsigned r = atomic_load_explicit(&tapLogRead, memory_order_acquire);
   if (w - r >= TAP_LOG_SLOTS) { // 环已满：丢这一条，别去踩读者手里的槽
@@ -145,16 +153,20 @@ static void drain_tap_log(void) {
 }
 
 static void start_tap_log_drain(void) {
-  if (tapLogDrainTimer != nil) return;
-  tapLogQueue = dispatch_queue_create("com.speakout.taplog", DISPATCH_QUEUE_SERIAL);
-  tapLogDrainTimer =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, tapLogQueue);
-  dispatch_source_set_timer(tapLogDrainTimer, DISPATCH_TIME_NOW,
-                            200 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
-  dispatch_source_set_event_handler(tapLogDrainTimer, ^{
-    drain_tap_log();
+  // dispatch_once：set_debug_logging 可能从不止一个线程进来，
+  // 裸 `if (timer != nil)` 本身不是线程安全的
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    tapLogQueue = dispatch_queue_create("com.speakout.taplog", DISPATCH_QUEUE_SERIAL);
+    tapLogDrainTimer =
+        dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, tapLogQueue);
+    dispatch_source_set_timer(tapLogDrainTimer, DISPATCH_TIME_NOW,
+                              200 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
+    dispatch_source_set_event_handler(tapLogDrainTimer, ^{
+      drain_tap_log();
+    });
+    dispatch_resume(tapLogDrainTimer);
   });
-  dispatch_resume(tapLogDrainTimer);
 }
 
 // 关 verbose 前必须先把环里剩下的排空：log_to_file 自己也受这个开关控制，
@@ -691,6 +703,15 @@ static void tx_schedule_finish(uint64_t gen) {
 // 把文本放上剪贴板并粘贴。锁一直持到 Cmd+V 发出为止 ——
 // 中途放锁的话，另一次注入可以在我们粘贴之前改掉剪贴板，粘出来就是别的内容。
 static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
+  // **每次内部写之前都要看剪贴板有没有易主。** 只在收尾时查是不够的 ——
+  // 那只挡得住「最后一次内部写之后」的用户复制：
+  //   X → chunk(A)（expected=A）→ 用户复制 Z → chunk(B) 把 Z 清掉、expected=B
+  //   → 收尾看到 B==expected，还原 X。Z 永久丢失，而且用户毫无察觉。
+  // 一旦发现易主，用户手里那份才是该还原的目标，旧快照已经过期，重新拍。
+  if (pb.changeCount != _txExpectedChangeCount) {
+    log_to_file("Clipboard tx: user changed clipboard mid-transaction, re-snapshot");
+    _txOriginal = snapshot_pasteboard(pb);
+  }
   NSInteger cc = [pb clearContents];
   [pb setString:text forType:NSPasteboardTypeString];
   const uint64_t gen = tx_note_mutation_locked(cc);
@@ -745,9 +766,16 @@ void inject_clipboard_chunk(const char *text) {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
     tx_begin_locked(pb); // 没走 begin 也能兜住
-    tx_paste_locked(pb, newText);
+    const uint64_t gen = tx_paste_locked(pb, newText);
     usleep(30000); // 30ms for paste to complete before next chunk
+    const BOOL orphan = (_txHoldDepth == 0);
     pthread_mutex_unlock(&clipTxMutex);
+
+    // **推进了代次就必须有人收尾。** 没有 hold 罩着的 chunk（比如 end 之后
+    // 迟到的那一条）会把代次推到 gen+1，让先前安排的收尾任务因代次不符而
+    // 早退，自己却不安排新任务 —— 事务从此挂着不放，_txActive 永为 YES，
+    // 之后每次注入都沿用一份很旧的快照。
+    if (orphan) tx_schedule_finish(gen);
   }
 }
 
@@ -789,15 +817,32 @@ void copy_selection(void) {
     // 把他刚复制的内容覆盖掉。改成轮询等自己的 Cmd+C 落地，拿到就走 ——
     // 之后用户再复制，changeCount 就对不上，还原会被正确跳过。
     NSInteger observed = before;
-    for (int i = 0; i < 20; i++) { // 最多 100ms
+    for (int i = 0; i < 50; i++) { // 最多 250ms：目标 App 卡顿时 100ms 常常不够
       usleep(5000);
       observed = pb.changeCount;
       if (observed != before) break;
     }
-    if (_txActive && observed != before) {
-      tx_note_mutation_locked(observed);
+    // **必须恰好变了一次才算我们的。** changeCount 每次 clearContents/declareTypes
+    // 加一，所以增量 > 1 说明这段时间里还有别人动过剪贴板 —— 此时把当前值
+    // 记成「我们造成的」，收尾就会拿旧快照把用户刚复制的内容盖掉。
+    const NSInteger delta = observed - before;
+    BOOL orphan = NO;
+    uint64_t gen = 0;
+    if (_txActive && delta == 1) {
+      gen = tx_note_mutation_locked(observed);
+      orphan = (_txHoldDepth == 0);
+    } else if (delta > 1) {
+      log_to_file("Clipboard tx: copy_selection saw %ld changes, treating as external",
+                  (long)delta);
+    } else if (delta == 0) {
+      // 我们的 Cmd+C 250ms 内没落地。它可能稍后才生效，届时 changeCount 与
+      // expected 对不上，收尾会跳过还原 —— 结果是剪贴板留着这份复制内容，
+      // 而不是用户原来的。分不出来，就宁可不动（还原反而可能盖掉用户的东西）。
+      log_to_file("Clipboard tx: copy_selection timed out waiting for clipboard");
     }
     pthread_mutex_unlock(&clipTxMutex);
+    if (orphan) tx_schedule_finish(gen);
+    return;
   }
 }
 
@@ -1048,6 +1093,16 @@ static pthread_mutex_t levelMutex = PTHREAD_MUTEX_INITIALIZER;
 static float smoothedLevel = 0.0f;
 static uint64_t smoothedLevelStamp = 0;
 
+// 新录音开始时复位：停止录音时 get_audio_level 直接返回 0 且不更新状态，
+// 上一段以高电平收尾、几百毫秒后又开一段的话，新会话的第一批低音量样本
+// 会接着旧的高电平往下衰减 —— 波形虚高，静音判定也跟着延后。
+static void smoothed_level_reset(void) {
+  pthread_mutex_lock(&levelMutex);
+  smoothedLevel = 0.0f;
+  smoothedLevelStamp = mach_absolute_time();
+  pthread_mutex_unlock(&levelMutex);
+}
+
 static float smoothed_level_update(float level) {
   const uint64_t now = mach_absolute_time();
   mach_timebase_info_data_t tb;
@@ -1189,6 +1244,9 @@ int start_audio_recording() {
     log_to_file("Audio: Already recording");
     return 1;
   }
+
+  // 波形/静音检测的平滑状态也要复位，否则上一段的高电平会被这一段继承
+  smoothed_level_reset();
 
   // Reset ring buffer cursors
   atomic_store_explicit(&ringWritePos, 0, memory_order_relaxed);

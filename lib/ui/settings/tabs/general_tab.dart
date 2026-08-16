@@ -7,6 +7,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../config/app_constants.dart';
 import '../../../services/config_service.dart';
 import '../../../services/audio_device_service.dart';
+import '../../../config/app_log.dart';
 import '../../../services/app_service.dart';
 import '../../../services/notification_service.dart';
 import '../../theme.dart';
@@ -638,7 +639,19 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     final statusText = granted ? loc.permissionsGranted : loc.permissionsNotGranted;
     return SettingsCard(
       padding: const EdgeInsets.all(16),
-      onTap: () => onTapOverride != null ? onTapOverride(url) : launchUrl(Uri.parse(url)),
+      // onTap 是 VoidCallback：直接把 Future 交出去等于把异常丢进全局 Zone，
+      // 用户只会看到「点了没反应」。这里自己 await 并兜住。
+      onTap: () async {
+        try {
+          await (onTapOverride != null
+              ? onTapOverride(url)
+              : launchUrl(Uri.parse(url)));
+        } catch (e) {
+          AppLog.e('permission card tap failed: $e');
+          if (!mounted) return;
+          NotificationService().notifyError(loc.permissionsNotGranted);
+        }
+      },
       children: [
         Row(
           children: [

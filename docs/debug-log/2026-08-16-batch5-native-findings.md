@@ -151,3 +151,60 @@ codex 给出了可达路径，说明那个判断是错的。
   （`MODEL_TEST_MAX_MB` 默认 `infinity`），一轮 25 分钟且随机挂。
   项目规则要求「发版必跑完整 flutter test」，而这个套件当前不确定 ——
   **是否把默认值改成有限值，需要项目所有者定**，本轮不擅自改。
+
+---
+
+## 第三轮（第 34 轮复审）
+
+### 现象
+
+对第二轮修复的复审给出 **2 条 P1、4 条 P2、2 条 P3**，仍不 clean。
+codex 还逐条推演了 8 个剪贴板交错场景，其中 6 个结果正确，2 个暴露缺口。
+
+### 假设 · 判断原因
+
+| # | 问题 | 判断 |
+|---|---|---|
+| P1-1 | 事务只挡得住「最后一次内部写之后」的用户复制 | **成立，且是这轮最有价值的一条**。`X → chunk(A) → 用户复制 Z → chunk(B) 清掉 Z 并更新 expected → 收尾看到匹配、还原 X`，Z 永久丢失。我只在收尾时查易主，没在每次写之前查 |
+| P1-2 | bookmark 换目录不是事务 | **成立**。「建 bookmark → 放旧 scope → 试恢复 → 不管成没成都返回路径」：解析或取权失败时旧授权已放、旧 bookmark 已覆盖，配置却指向一个写不进去的目录。**与上一轮 P1-2 是同一类错误，我只修了它指出的那一处** |
+| P2-1 | `APP_SANDBOX_CONTAINER_ID` 不是可靠判据 | **成立**。运行环境细节而非公开契约，已知有沙盒进程读不到它。改用 `SecTaskCopyValueForEntitlement` 读自己的 entitlement |
+| P2-2 | 无 hold 的 chunk 推进代次却不安排收尾 | **成立**。`_txActive` 会永远挂着，之后每次注入都沿用一份很旧的快照 |
+| P2-3 | `copy_selection` 归因仍不可靠 | **成立**。同一轮询间隔里两次变化会被当成一次 |
+| P2-4 | 平滑电平跨录音会话残留 | **成立**。上一段以高电平收尾，下一段接着往下衰减 |
+| P3-1 | 「先 flush 再置零」仍有竞态 | **成立**。排空读完游标后 tap 线程还能再写一条 |
+| P3-2 | `onTap` 丢弃 Future | **成立** |
+
+### 措施
+
+- `tx_paste_locked` **每次写之前**比对 `changeCount` 与 expected；不符就把用户当前
+  内容重新拍成还原目标（旧快照已过期）。
+- `switchDiaryDirectory` 改成真事务：建 bookmark → 解析并取权 → **成功之后**才写
+  UserDefaults、放旧 scope、换 `scopedDiaryURL`；任一步失败保留旧状态并（沙盒下）报错。
+  `releaseScopedDiaryAccess` 因此成为孤儿，一并移除。
+- `isSandboxed` 改用 `SecTaskCreateFromSelf` + `SecTaskCopyValueForEntitlement`。
+- `inject_clipboard_chunk` / `copy_selection` 在无 hold 时自己 `tx_schedule_finish`。
+- `copy_selection` 轮询期限 100ms→250ms，并要求 `delta == 1`；`delta > 1` 视为外部介入，
+  `delta == 0`（超时）记日志且不归因。
+- 新增 `smoothed_level_reset()`，`start_audio_recording` 里调用。
+- 拆出 `tapLogProducerEnabled`：关闭顺序改为 停生产者 → 排空 → 关落盘；
+  `start_tap_log_drain` 用 `dispatch_once`。
+- `_permissionCard.onTap` 改成 async 包装，自己 await 并兜异常。
+
+### 验证结果
+
+- clang 零警告，`swiftc -parse` 通过，`flutter analyze` 干净（81.5s）。
+- **全量测试 734 通过 / 10 skip / 0 失败**（`MODEL_TEST_MAX_MB=1`，23 秒）。
+- 断言 16 → 22 条，**5 个新变异探针**逐一确认能抓到：去掉写前易主检查 /
+  孤儿 chunk 不安排收尾 / copy_selection 放宽成「变了就算」/ 录音开始不复位电平 /
+  关 verbose 不先停生产者。
+
+### 复盘
+
+- **P1-2 是「同类残留没清零」的典型**：上一轮 codex 指出「bookmark 创建失败仍返回路径」，
+  我只修了创建失败这一处，没想到**取权失败**是同一个形状。项目准则里那条
+  「改完一类问题后 grep 全文同源、可操作残留清零」，我这次是按「按点修」在做。
+  正确做法应该是先把「这个函数里所有可能失败的步骤」列出来，逐个问「失败了还返回成功吗」。
+- P1-1 属于**我的抽象漏了一个维度**：我把「谁最后动的剪贴板」建成了单点判据
+  （收尾时比一次），而真实语义是「整段事务期间有没有别人插手」，那是每次写都要看的。
+- 三轮下来，同一块代码 codex 每轮都还能找出 P1。趋势是收敛的（P1 的严重度和数量在降），
+  但**「我认为已经想全了」这个判断本身，三轮都是错的**。

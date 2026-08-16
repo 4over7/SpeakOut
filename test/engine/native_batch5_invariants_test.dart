@@ -129,6 +129,77 @@ void main() {
     });
   });
 
+  group('R34 事务协调器的三条硬约束', () {
+    test('每次内部写之前都要检查剪贴板有没有易主', () {
+      // 只在收尾时查，只挡得住「最后一次内部写之后」的用户复制：
+      //   X → chunk(A) → 用户复制 Z → chunk(B) 把 Z 清掉并更新 expected
+      //   → 收尾看到匹配，还原 X。Z 永久丢失，用户毫无察觉。
+      final body =
+          RegExp(r'static uint64_t tx_paste_locked\(NSPasteboard \*pb, NSString \*text\) \{([\s\S]*?)\n\}')
+              .firstMatch(src)
+              ?.group(1);
+      expect(body, isNotNull);
+      final checkAt = body!.indexOf('pb.changeCount != _txExpectedChangeCount');
+      final clearAt = body.indexOf('clearContents');
+      expect(checkAt, greaterThanOrEqualTo(0), reason: '写之前没有易主检查');
+      expect(checkAt, lessThan(clearAt), reason: '检查必须在清空剪贴板之前');
+      expect(body.contains('snapshot_pasteboard'), isTrue,
+          reason: '发现易主后要把用户当前内容作为新的还原目标');
+    });
+
+    test('推进代次的每条路径都必须有人收尾', () {
+      // chunk / copy_selection 在没有 hold 罩着时会把代次推高，让先前安排的
+      // 收尾任务因代次不符早退，自己却不安排新任务 —— 事务从此挂着不放，
+      // _txActive 永为 YES，之后每次注入都沿用一份很旧的快照。
+      for (final fn in ['void inject_clipboard_chunk(const char *text)',
+                        'void copy_selection(void)']) {
+        final body = bodyOf(fn);
+        expect(body.contains('tx_schedule_finish'), isTrue,
+            reason: '$fn 推进了代次却不安排收尾');
+        expect(body.contains('_txHoldDepth == 0'), isTrue,
+            reason: '$fn 需要判断有没有 hold 罩着');
+      }
+    });
+
+    test('copy_selection 必须要求「恰好变了一次」', () {
+      // changeCount 每次 clearContents 加一，增量 > 1 说明这段时间还有别人
+      // 动过剪贴板 —— 此时把当前值记成我们的，收尾就会盖掉用户刚复制的内容。
+      final body = bodyOf('void copy_selection(void)');
+      expect(body.contains('delta == 1'), isTrue,
+          reason: '只看「变了」不够，必须恰好变一次');
+    });
+  });
+
+  group('R34 其余回归', () {
+    test('新录音开始必须复位平滑电平', () {
+      final body = bodyOf('int start_audio_recording()');
+      expect(body.contains('smoothed_level_reset()'), isTrue,
+          reason: '不复位的话上一段的高电平会被这一段继承，波形虚高、静音判定延后');
+    });
+
+    test('生产者开关与落盘开关必须分开', () {
+      // 合成一个的话，同步排空读完游标之后、置零之前 tap 线程还能再写一条，
+      // 那条会被下一轮 timer 读到，但那时 log_to_file 已经短路了。
+      final produce = bodyOf(
+          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      expect(produce.contains('tapLogProducerEnabled'), isTrue,
+          reason: '生产者应看自己的开关，而不是落盘开关');
+      final setter = bodyOf('void set_debug_logging(int enabled)');
+      final stopAt = setter.indexOf('atomic_store(&tapLogProducerEnabled, 0)');
+      final flushAt = setter.indexOf('flush_tap_log_sync()');
+      final offAt = setter.indexOf('atomic_store(&debugLoggingEnabled, 0)');
+      expect(stopAt, greaterThanOrEqualTo(0));
+      expect(stopAt, lessThan(flushAt), reason: '必须先停生产者再排空');
+      expect(flushAt, lessThan(offAt), reason: '必须排空之后才关落盘');
+    });
+
+    test('drain timer 初始化必须线程安全', () {
+      final body = bodyOf('static void start_tap_log_drain(void)');
+      expect(body.contains('dispatch_once'), isTrue,
+          reason: '裸 if (timer != nil) 不是线程安全的');
+    });
+  });
+
   group('N6 流式会话不得共用上一次会话的 changeCount', () {
     test('判据必须随事务开启而重置', () {
       // 不复位的话：AI 梳理里 begin 后 Cmd+C 改了剪贴板、LLM 又在首个
