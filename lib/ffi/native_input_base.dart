@@ -8,8 +8,8 @@ typedef StartKeyboardListenerDart = int Function(Pointer<NativeFunction<KeyCallb
 typedef StopKeyboardListenerC = Void Function();
 typedef StopKeyboardListenerDart = void Function();
 
-typedef InjectTextC = Void Function(Pointer<Utf8> text);
-typedef InjectTextDart = void Function(Pointer<Utf8> text);
+typedef InjectTextC = Int32 Function(Pointer<Utf8> text);
+typedef InjectTextDart = int Function(Pointer<Utf8> text);
 
 typedef CheckPermissionC = Bool Function();
 typedef CheckPermissionDart = bool Function();
@@ -149,7 +149,10 @@ typedef GetFrontmostAppInfoDart = Pointer<Utf8> Function();
 abstract class NativeInputBase {
   bool startListener(Pointer<NativeFunction<KeyCallbackC>> callback);
   void stopListener();
-  void inject(String text);
+  /// 返回是否真的把文字粘贴出去了。
+  /// **false 必须让用户看见** —— 注入失败等于他刚口述的整段话没了，
+  /// 静默吞掉的话他只会对着没变化的输入框发愣。
+  bool inject(String text);
   bool checkPermission();
   bool isKeyPressed(int keyCode);
 

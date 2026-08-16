@@ -698,6 +698,9 @@ static NSArray *_txOriginal = nil;           // 事务开启前的剪贴板内�
 static uint64_t _txGeneration = 0;           // 我们每改一次剪贴板就 +1
 static NSInteger _txExpectedChangeCount = -1; // 只有我们动过的话，现在该是多少
 static BOOL _txOriginalValid = NO;           // 快照是否可信（拍不稳时为 NO）
+// 最近一次注入是否因为「剪贴板没生效」而放弃了 Cmd+V。inject_text 读它决定
+// 返回值，好让 Dart 侧告诉用户「这次没注入成功」而不是静默吞掉。
+static BOOL _txPasteFailed = NO;
 static int _txHoldDepth = 0;                 // 流式会话深度，>0 时挂起还原
 
 // 以下 tx_* 全部要求调用方已持有 clipTxMutex。
@@ -793,8 +796,40 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   }
   NSInteger cc = [pb clearContents];
   [pb setString:text forType:NSPasteboardTypeString];
+  // 无论后面粘不粘得成，剪贴板已经被我们改了，基线必须跟上 ——
+  // 否则下一次写前检查会把「我们自己刚写进去的文字」当成用户的新内容重新拍快照。
   const uint64_t gen = tx_note_mutation_locked(cc);
-  usleep(10000); // 10ms for pasteboard propagation
+
+  // **确认剪贴板里真的是我们写的那份，再发 Cmd+V。**
+  //
+  // 出货版这里是 `usleep(10000)` 然后直接发键 —— 纯猜的等待，没有任何校验。
+  // 跨进程 pasteboard 可见性没有时限保证，机器忙的时候 10ms 完全可能不够，
+  // 结果就是 Cmd+V 把**剪贴板里的旧内容**贴进用户文档。
+  // 2026-08-16 线上就复现了一次「贴出来的是上一次语音识别的文字」，
+  // 见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md。
+  //
+  // 校验不过就**不发 Cmd+V**：宁可这次注入失败（调用方会告知用户），
+  // 也绝不能把上一次的识别结果贴进去 —— 那是用户完全无法预期的错误内容。
+  BOOL visible = NO;
+  for (int i = 0; i < 40; i++) { // 最多 200ms
+    NSString *now = [pb stringForType:NSPasteboardTypeString];
+    if (now != nil && [now isEqualToString:text]) {
+      visible = YES;
+      if (i > 2) {
+        log_to_file("Clipboard tx: pasteboard took %dms to reflect our text", (i + 1) * 5);
+      }
+      break;
+    }
+    usleep(5000);
+  }
+  if (!visible) {
+    // 返回 gen 而不是 0：剪贴板已经被我们污染了，收尾任务必须照常安排，
+    // 把用户原来的内容放回去。
+    log_to_file("Clipboard tx: pasteboard never reflected our text, paste skipped");
+    _txPasteFailed = YES;
+    return gen;
+  }
+
   post_command_key(9, kCGHIDEventTap);
   return gen;
 }
@@ -810,11 +845,16 @@ static void inject_via_clipboard(const char *text) {
     // 拿不到可信快照就**放弃这次注入**：照写下去等于把用户剪贴板换成
     // 我们的文字且再也换不回来（口述内容还会留在剪贴板里）。
     if (!tx_begin_locked(pasteboard)) {
+      _txPasteFailed = YES;
       pthread_mutex_unlock(&clipTxMutex);
       log_to_file("Clipboard tx: inject aborted (no trustworthy snapshot)");
       return;
     }
     const uint64_t gen = tx_paste_locked(pasteboard, newText);
+    if (gen == 0) _txPasteFailed = YES; // 中途重拍失败，压根没写成
+    log_to_file("Clipboard tx: inject len=%lu gen=%llu%s",
+                (unsigned long)newText.length, (unsigned long long)gen,
+                _txPasteFailed ? " FAILED" : "");
     pthread_mutex_unlock(&clipTxMutex);
 
     if (gen != 0) tx_schedule_finish(gen);
@@ -1067,11 +1107,23 @@ const char *get_frontmost_app_info(void) {
 // Main entry: always use clipboard paste for reliability.
 // CGEvent keyboard injection drops characters in apps with heavy UI (WeChat, Slack, etc.)
 // due to async HID event queue. Clipboard paste is 100% reliable.
-void inject_text(const char *text) {
+// 返回 1 = 已发出粘贴；0 = 没注入（快照拿不到，或剪贴板没生效所以放弃了 Cmd+V）。
+// **不能继续返回 void 静默吞掉**：注入失败时用户口述的整段话就没了，
+// 他需要知道这一次没成，而不是对着没有变化的输入框发愣。
+int inject_text(const char *text) {
   if (text == NULL || text[0] == '\0')
-    return;
+    return 0;
+
+  pthread_mutex_lock(&clipTxMutex);
+  _txPasteFailed = NO;
+  pthread_mutex_unlock(&clipTxMutex);
 
   inject_via_clipboard(text);
+
+  pthread_mutex_lock(&clipTxMutex);
+  const BOOL failed = _txPasteFailed;
+  pthread_mutex_unlock(&clipTxMutex);
+  return failed ? 0 : 1;
 }
 
 // 4. Check Permission (with prompt dialog)

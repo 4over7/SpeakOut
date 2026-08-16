@@ -231,8 +231,10 @@ EXPORT int check_key_pressed(int keyCode) {
 // 3. TEXT INJECTION (xdotool)
 // ============================================================
 
-EXPORT void inject_text(const char* text) {
-    if (!text || !text[0]) return;
+// 返回 1 = 已注入，0 = 没注入。签名与 macOS 保持一致：
+// Dart 侧按 Int32 绑定，这里若仍是 void，读到的返回值是垃圾。
+EXPORT int inject_text(const char* text) {
+    if (!text || !text[0]) return 0;
 
     /* Use xdotool for X11, ydotool for Wayland */
     const char* session_type = getenv("XDG_SESSION_TYPE");
@@ -250,7 +252,9 @@ EXPORT void inject_text(const char* text) {
     if (ret != 0) {
         fprintf(stderr, "[NativeInput] Text injection failed (ret=%d). "
                 "Install xdotool (X11) or wtype (Wayland).\n", ret);
+        return 0;
     }
+    return 1;
 }
 
 // ============================================================

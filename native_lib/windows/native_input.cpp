@@ -189,22 +189,24 @@ EXPORT int check_key_pressed(int keyCode) {
 // 3. TEXT INJECTION
 // ============================================================
 
-EXPORT void inject_text(const char* text) {
-    if (!text) return;
+// 返回 1 = 已注入，0 = 没注入。签名与 macOS 保持一致：
+// Dart 侧按 Int32 绑定，这里若仍是 void，读到的返回值是垃圾。
+EXPORT int inject_text(const char* text) {
+    if (!text) return 0;
 
     // Convert UTF-8 to UTF-16
     int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
-    if (wideLen <= 0) return;
+    if (wideLen <= 0) return 0;
 
     WCHAR* wideText = (WCHAR*)malloc(wideLen * sizeof(WCHAR));
-    if (!wideText) return;
+    if (!wideText) return 0;
     MultiByteToWideChar(CP_UTF8, 0, text, -1, wideText, wideLen);
 
     // Count actual characters (exclude null terminator)
     int charCount = wideLen - 1;
     if (charCount <= 0) {
         free(wideText);
-        return;
+        return 0;
     }
 
     // Allocate INPUT array: 2 events per character (down + up)
@@ -212,7 +214,7 @@ EXPORT void inject_text(const char* text) {
     INPUT* inputs = (INPUT*)calloc(inputCount, sizeof(INPUT));
     if (!inputs) {
         free(wideText);
-        return;
+        return 0;
     }
 
     for (int i = 0; i < charCount; i++) {
@@ -231,6 +233,7 @@ EXPORT void inject_text(const char* text) {
 
     free(inputs);
     free(wideText);
+    return 1;
 }
 
 // ============================================================

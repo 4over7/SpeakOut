@@ -114,10 +114,11 @@ class NativeInputFFI implements NativeInputBase {
   }
 
   @override
-  void inject(String text) {
+  bool inject(String text) {
     final ptr = text.toNativeUtf8();
-    _injectText(ptr);
+    final ok = _injectText(ptr);
     calloc.free(ptr);
+    return ok == 1;
   }
 
   @override

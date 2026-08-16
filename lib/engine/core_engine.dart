@@ -1447,12 +1447,21 @@ class CoreEngine {
             _log("Diary Save Error: $err");
           }
         } else {
+          var injected = true;
           if (!_typewriterInjected) {
-            _nativeInput?.inject(finalText);
+            injected = _nativeInput?.inject(finalText) ?? false;
           }
           _typewriterInjected = false;
+          // 文字仍然进聊天记录 —— 注入失败时那里是用户唯一能找回这段话的地方
           ChatService().addDictation(finalText, asrOriginal: originalAsrText);
-          _statusController.add(EngineStatus.ready("Ready"));
+          if (injected) {
+            _statusController.add(EngineStatus.ready("Ready"));
+          } else {
+            // 注入失败绝不能静默：用户刚口述的整段话没进输入框，
+            // 不说的话他只会对着没变化的界面发愣，还以为识别没成功。
+            _log("[Inject] FAILED — text kept in chat history");
+            _statusController.add(EngineStatus.error("注入失败，文字已存到聊天记录"));
+          }
         }
         _log("[PERF] +${sw.elapsedMilliseconds}ms — inject/save done");
       } else {
