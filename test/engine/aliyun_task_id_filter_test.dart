@@ -47,34 +47,20 @@ void main() {
     // **锚点必须是「不匹配的拒绝判断」本身，不能是第一个 task_id** ——
     // task_id 在这个方法里出现多次（读 header、日志、比较）。拿第一个的话，
     // 把真正的拒绝分支挪到 _textController.add 之后，断言照样绿。
-    final rejectAt = body.indexOf('msgTaskId != _taskId');
     final firstPublish = body.indexOf('_textController.add');
-    expect(rejectAt, greaterThan(-1), reason: '没找到 task_id 不匹配的拒绝判断');
     expect(firstPublish, greaterThan(-1), reason: '没找到文本发布点');
-    expect(rejectAt, lessThan(firstPublish),
+    expect(body.indexOf('msgTaskId != _taskId'), lessThan(firstPublish),
         reason: 'task_id 过滤必须早于任何 _textController.add，'
             '否则过期帧已经污染了字幕');
-    // **return 必须属于拒绝分支本身**，不能只是「两者之间存在 return」——
-    //   if (msgTaskId != _taskId) { AppLog.d('stale'); }
-    //   if (别的条件) return;
-    // 这样也满足「之间有 return」，但过期帧照样会被发布。
-    // 按大括号配平取出该 if 自己的块再查。
-    final open = body.indexOf('{', rejectAt);
-    expect(open, greaterThan(-1), reason: '拒绝判断后面没有块');
-    var depth = 0;
-    var close = -1;
-    for (var i = open; i < body.length; i++) {
-      if (body[i] == '{') depth++;
-      if (body[i] == '}') {
-        depth--;
-        if (depth == 0) {
-          close = i;
-          break;
-        }
-      }
-    }
-    expect(close, greaterThan(open), reason: '大括号不配平');
-    expect(body.substring(open, close).contains('return'), isTrue,
+    // **用 AST 判断包含关系，不要再做字符串解析。**
+    // 字符串解析会被诱饵骗：`AppLog.d('{ return }')` 里那个 return 会被
+    // contains 命中，而过期帧其实照样往下走。
+    final rejectIf = _FindIfVisitor('msgTaskId != _taskId');
+    unit.accept(rejectIf);
+    expect(rejectIf.node, isNotNull, reason: '没找到 task_id 不匹配的判断');
+    final hasReturn = _HasReturnVisitor();
+    rejectIf.node!.thenStatement.accept(hasReturn);
+    expect(hasReturn.found, isTrue,
         reason: 'task_id 不匹配的分支自己没有 return —— 只打日志等于没过滤');
   });
 
@@ -109,5 +95,29 @@ class _MethodBodyVisitor extends RecursiveAstVisitor<void> {
   void visitMethodDeclaration(MethodDeclaration node) {
     if (node.name.lexeme == name) body = node.body;
     super.visitMethodDeclaration(node);
+  }
+}
+
+class _FindIfVisitor extends RecursiveAstVisitor<void> {
+  _FindIfVisitor(this.condFragment);
+  final String condFragment;
+  IfStatement? node;
+
+  @override
+  void visitIfStatement(IfStatement n) {
+    if (node == null && n.expression.toSource().contains(condFragment)) {
+      node = n;
+    }
+    super.visitIfStatement(n);
+  }
+}
+
+class _HasReturnVisitor extends RecursiveAstVisitor<void> {
+  bool found = false;
+
+  @override
+  void visitReturnStatement(ReturnStatement n) {
+    found = true;
+    super.visitReturnStatement(n);
   }
 }

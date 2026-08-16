@@ -75,55 +75,35 @@ void main() {
     // 不写死成一整行字面量 —— 那样把 if 拆成多行（比如加了失败处理）
     // 就会让断言失效，而不变量根本没变。
     void assertGuarded(String method, String nativeCall) {
-      final v = _MethodBodyVisitor(method);
-      unit.accept(v);
-      expect(v.body, isNotNull, reason: '没找到 $method');
-      final body = v.body!.toSource();
-      final callAt = body.indexOf(nativeCall);
-      expect(callAt, greaterThanOrEqualTo(0), reason: '$method 没调 $nativeCall');
+      // **用 AST 判断包含关系。** 字符串解析会被诱饵骗：
+      //   if (_clipboardSessions == 0) { _log('injectClipboardBegin'); }
+      //   _nativeInput?.injectClipboardBegin();
+      // 这里 indexOf 会命中字符串里的假调用，把真正裸奔的 native 调用
+      // 判成受保护（实测漏报过一次）。
+      final decl = _MethodDeclVisitor(method);
+      unit.accept(decl);
+      expect(decl.node, isNotNull, reason: '没找到 $method');
 
-      // **必须证明「调用在那个判断的块里面」，不能只比位置。**
-      // _clipEnd 里有两处 `_clipboardSessions == 0`（入口的「已为零就 return」
-      // 和真正罩住 native 调用的那个）。只比位置的话，把后者删掉、
-      // 让 native 调用裸奔，前者仍在它前面 —— 断言照样绿（实测漏报过）。
-      final guardAt = body.lastIndexOf('_clipboardSessions == 0', callAt);
-      expect(guardAt, greaterThanOrEqualTo(0),
-          reason: '$method 的 native 调用之前没有「计数为 0」判断');
-      // 判断体有两种形态，都要支持：
-      //   带大括号：if (...) { ... }        → 按大括号配平取
-      //   单语句：  if (...) doSomething(); → 取到分号为止
-      // （_clipBegin 是前者，_clipEnd 是后者）
-      final condClose = body.indexOf(')', guardAt);
-      expect(condClose, greaterThan(guardAt), reason: '$method 的判断没有闭括号');
-      var k = condClose + 1;
-      while (k < body.length && body[k].trim().isEmpty) {
-        k++;
+      final calls = _FindInvocationVisitor(nativeCall);
+      decl.node!.accept(calls);
+      expect(calls.nodes, isNotEmpty,
+          reason: '$method 没调 $nativeCall（AST 层面，字符串不算）');
+
+      final guards = _FindIfVisitor('_clipboardSessions == 0');
+      decl.node!.accept(guards);
+      expect(guards.nodes, isNotEmpty,
+          reason: '$method 没有「计数为 0」的判断');
+
+      for (final call in calls.nodes) {
+        final guarded = guards.nodes.any((g) {
+          final t = g.thenStatement;
+          return call.offset >= t.offset && call.end <= t.end;
+        });
+        expect(guarded, isTrue,
+            reason: '$method 的 $nativeCall 不在任何「计数为 0」判断的 then 分支内 —— '
+                'native 只有一份全局快照，内层也调的话，'
+                '第二次 begin 会覆盖第一次的快照，第一次 end 会提前恢复');
       }
-      int open, close;
-      if (k < body.length && body[k] == '{') {
-        open = k;
-        var depth = 0;
-        close = -1;
-        for (var i = open; i < body.length; i++) {
-          if (body[i] == '{') depth++;
-          if (body[i] == '}') {
-            depth--;
-            if (depth == 0) {
-              close = i;
-              break;
-            }
-          }
-        }
-        expect(close, greaterThan(open), reason: '$method 的块大括号不配平');
-      } else {
-        open = condClose;
-        close = body.indexOf(';', k);
-        expect(close, greaterThan(open), reason: '$method 的单语句判断没有分号');
-      }
-      expect(callAt > open && callAt < close, isTrue,
-          reason: '$method 的 $nativeCall 不在「计数为 0」的块里 —— '
-              'native 只有一份全局快照，内层也调的话，'
-              '第二次 begin 会覆盖第一次的快照，第一次 end 会提前恢复');
     }
 
     assertGuarded('_clipBegin', 'injectClipboardBegin');
@@ -172,5 +152,41 @@ class _MethodBodyVisitor extends RecursiveAstVisitor<void> {
   void visitMethodDeclaration(MethodDeclaration node) {
     if (node.name.lexeme == name) body = node.body;
     super.visitMethodDeclaration(node);
+  }
+}
+
+class _MethodDeclVisitor extends RecursiveAstVisitor<void> {
+  _MethodDeclVisitor(this.name);
+  final String name;
+  MethodDeclaration? node;
+
+  @override
+  void visitMethodDeclaration(MethodDeclaration n) {
+    if (n.name.lexeme == name) node = n;
+    super.visitMethodDeclaration(n);
+  }
+}
+
+class _FindIfVisitor extends RecursiveAstVisitor<void> {
+  _FindIfVisitor(this.condFragment);
+  final String condFragment;
+  final List<IfStatement> nodes = [];
+
+  @override
+  void visitIfStatement(IfStatement n) {
+    if (n.expression.toSource().contains(condFragment)) nodes.add(n);
+    super.visitIfStatement(n);
+  }
+}
+
+class _FindInvocationVisitor extends RecursiveAstVisitor<void> {
+  _FindInvocationVisitor(this.name);
+  final String name;
+  final List<MethodInvocation> nodes = [];
+
+  @override
+  void visitMethodInvocation(MethodInvocation n) {
+    if (n.methodName.name == name) nodes.add(n);
+    super.visitMethodInvocation(n);
   }
 }

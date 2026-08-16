@@ -22,39 +22,124 @@ const String kNativeAbiFingerprint = 'd80931139e77ae930faa0b50c417df930d231071';
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
 
-  /// 去掉注释。「不得再出现某某」这类**否定断言必须看代码** ——
-  /// 否则解释性注释里提到的旧写法会把断言带偏。这个坑已经绊过三次，
-  /// 所以做成可复用的，别再逐处打补丁。
-  /// 只用于否定断言：行内 `//` 剥离会误伤字符串里的 URL，肯定断言仍看原文。
-  String stripComments(String text) => text
-      .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '')
-      .split('\n')
-      .map((l) {
-        final i = l.indexOf('//');
-        return i >= 0 ? l.substring(0, i) : l;
-      })
-      .join('\n');
+  /// 去掉注释 —— **但要跳过字符串字面量**。
+  /// 朴素做法（见到 `//` 就截断）会被字符串里的 `//` 或 `/*` 骗到，
+  /// 把后面真实的代码连同大括号一起删掉，后续配平就全错了。
+  String stripComments(String text) {
+    final out = StringBuffer();
+    var i = 0;
+    while (i < text.length) {
+      final c = text[i];
+      if (c == '"' || c == "'") {
+        // 字符串/字符字面量原样保留，内部的 // 和 {} 都不算数
+        final quote = c;
+        out.write(c);
+        i++;
+        while (i < text.length) {
+          if (text[i] == r'\') {
+            out.write(text[i]);
+            if (i + 1 < text.length) out.write(text[i + 1]);
+            i += 2;
+            continue;
+          }
+          out.write(text[i]);
+          if (text[i] == quote) {
+            i++;
+            break;
+          }
+          i++;
+        }
+        continue;
+      }
+      if (c == '/' && i + 1 < text.length && text[i + 1] == '/') {
+        while (i < text.length && text[i] != '\n') {
+          i++;
+        }
+        continue;
+      }
+      if (c == '/' && i + 1 < text.length && text[i + 1] == '*') {
+        i += 2;
+        while (i + 1 < text.length && !(text[i] == '*' && text[i + 1] == '/')) {
+          i++;
+        }
+        i += 2;
+        continue;
+      }
+      out.write(c);
+      i++;
+    }
+    return out.toString();
+  }
 
   final code = stripComments(src);
 
-  /// 从 `body` 中 `condIndex` 处的条件开始，取它**自己那个 `{...}` 块**。
+  /// 取 `condIndex` 处那个 `if` **自己的 then 分支**。
   ///
-  /// 固定长度 substring 是这批断言反复出问题的根源：窗口太短会假红，
-  /// 太长会借用**后面别的分支**的语句 —— 实测「删掉拒绝分支的 _txPasteFailed」
-  /// 时，320 字符窗口命中了后面 gen == 0 分支里的同名赋值，断言照样绿。
-  /// 这里按大括号配平取，边界与代码结构一致，不依赖字符距离。
-  String braceBlockAt(String body, int condIndex) {
-    final open = body.indexOf('{', condIndex);
-    expect(open, greaterThan(-1), reason: '条件后面没有 { 块');
+  /// 三件事必须做对，少一件就会「位置先后冒充包含关系」：
+  ///   1. 先配平**条件自身的圆括号**，拿到条件的闭括号 —— 否则
+  ///      `indexOf('{')` 可能落到后面另一个分支上；
+  ///   2. 要求闭括号之后第一个非空白字符就是 `{`（带块）或按单语句取到 `;`；
+  ///   3. 扫描时跳过字符串/字符字面量与转义 —— 代码里一句
+  ///      `log_to_file("{")` 就能让朴素配平吞掉后面整段。
+  /// 调用方传进来的 body 应已 stripComments。
+  String thenBlockAt(String body, int condIndex) {
+    final parenOpen = body.indexOf('(', condIndex);
+    expect(parenOpen, greaterThan(-1), reason: 'if 后面没有条件括号');
     var depth = 0;
-    for (var i = open; i < body.length; i++) {
-      if (body[i] == '{') depth++;
-      if (body[i] == '}') {
+    var parenClose = -1;
+    for (var i = parenOpen; i < body.length; i++) {
+      final ch = body[i];
+      if (ch == '"' || ch == "'") {
+        final q = ch;
+        i++;
+        while (i < body.length && body[i] != q) {
+          if (body[i] == r'\') i++;
+          i++;
+        }
+        continue;
+      }
+      if (ch == '(') depth++;
+      if (ch == ')') {
         depth--;
-        if (depth == 0) return body.substring(open + 1, i);
+        if (depth == 0) {
+          parenClose = i;
+          break;
+        }
       }
     }
-    fail('大括号不配平，取不到块');
+    expect(parenClose, greaterThan(parenOpen), reason: '条件圆括号不配平');
+
+    var k = parenClose + 1;
+    while (k < body.length && body[k].trim().isEmpty) {
+      k++;
+    }
+    if (k >= body.length) fail('条件后面没有语句');
+
+    if (body[k] != '{') {
+      // 单语句形式：取到分号
+      final semi = body.indexOf(';', k);
+      expect(semi, greaterThan(k), reason: '单语句分支没有分号');
+      return body.substring(k, semi + 1);
+    }
+    var d = 0;
+    for (var i = k; i < body.length; i++) {
+      final ch = body[i];
+      if (ch == '"' || ch == "'") {
+        final q = ch;
+        i++;
+        while (i < body.length && body[i] != q) {
+          if (body[i] == r'\') i++;
+          i++;
+        }
+        continue;
+      }
+      if (ch == '{') d++;
+      if (ch == '}') {
+        d--;
+        if (d == 0) return body.substring(k + 1, i);
+      }
+    }
+    fail('then 块大括号不配平');
   }
 
   /// 按方法名取 Dart 方法体源码。**必须按方法取，不能全文件 indexOf** ——
@@ -470,16 +555,27 @@ void main() {
       // 已经不可信的事务状态；如果之后没有注入了，标志就永远悬在那里。
       for (final fn in ['inject_via_clipboard', 'inject_clipboard_chunk']) {
         final body = stripComments(bodyOfFn(fn));
-        final zeroAt = body.indexOf('gen == 0');
+        final zeroAt = body.indexOf('if (gen == 0)');
         expect(zeroAt, greaterThanOrEqualTo(0), reason: '$fn 没处理 gen == 0');
-        final block = braceBlockAt(body, zeroAt);
+        final block = thenBlockAt(body, zeroAt);
         expect(block.contains('tx_abandon_locked'), isTrue,
             reason: '$fn 在「一个字都没写进去」时没有清理事务状态');
-        expect(block.contains('_txHoldDepth == 0'), isTrue,
-            reason: '只有没被 hold 罩着时才该清理 —— 条件写反会破坏进行中的会话');
+        // **必须证明清理受 hold 判断保护，不能只是同块共现** ——
+        //   `const BOOL noHold = (_txHoldDepth == 0); tx_abandon_locked();`
+        // 这种写法也含这两个字符串，却会在流式 hold 期间无条件销毁快照。
+        final holdAt = block.indexOf('if (_txHoldDepth == 0)');
+        expect(holdAt, greaterThanOrEqualTo(0),
+            reason: '$fn 没有「没被 hold 罩着」的判断');
+        expect(thenBlockAt(block, holdAt).contains('tx_abandon_locked'), isTrue,
+            reason: '$fn 的清理不在 hold 判断的分支内 —— '
+                '流式会话进行中也会被销毁快照');
       }
       // helper 本身必须把状态清干净，少清一项就还是悬挂
       final helper = stripComments(bodyOfFn('tx_abandon_locked'));
+      // 字段必须是**无条件的顶层赋值** —— 全塞进一个永不成立的条件块里，
+      // 「contains」照样为真，但一个都不会执行。
+      expect(helper.contains('if ('), isFalse,
+          reason: 'tx_abandon_locked 里出现条件分支 —— 清理可能根本不执行');
       for (final f in ['_txActive = NO', '_txOriginal = nil',
                        '_txOriginalValid = NO', '_txToken = nil',
                        '_txExpectedChangeCount = -1']) {
@@ -493,6 +589,21 @@ void main() {
       expect(paste.substring(ccAt).contains('return 0;'), isFalse,
           reason: 'clearContents 之后还有 return 0 —— '
               '那会让调用方以为剪贴板没动过，从而销毁快照、不安排还原');
+      // setString 失败分支的三条语句都要在**它自己的块**里，
+      // 而且基线必须是 cc（clearContents 的返回值）——
+      // 重读 pb.changeCount 会把「外部已接管」吸收成我们的基线，
+      // 收尾时反而会清掉别人刚写的内容。
+      final setFailAt = paste.indexOf('if (![pb setString:text');
+      expect(setFailAt, greaterThanOrEqualTo(0), reason: '没找到 setString 失败分支');
+      final setFailBlock = thenBlockAt(paste, setFailAt);
+      expect(setFailBlock.contains('tx_note_mutation_locked(cc)'), isTrue,
+          reason: '基线必须用 cc，不能重读 changeCount');
+      expect(setFailBlock.contains('pb.changeCount'), isFalse,
+          reason: '失败分支里不得重读 pb.changeCount');
+      expect(setFailBlock.contains('_txToken = nil'), isTrue,
+          reason: '文本没写进去，token 必须清掉');
+      expect(setFailBlock.contains('_txPasteFailed = YES'), isTrue,
+          reason: '没发 Cmd+V 却不置失败位，会向 Dart 报成功');
     });
 
     test('pending 生命周期：置位、极性、返回值、解除，逐项锁定', () {
@@ -512,10 +623,10 @@ void main() {
       // 于是把 guard 的 return 改成 YES 也照样绿（实测漏报过）。
       // 按大括号配平取块：indexOf('\n  }') 依赖缩进格式，
       // 嵌套块会截到内层结尾，单行 if 又找不到结尾（正确代码反而红）。
-      final guardBlock = braceBlockAt(begin, guardAt);
+      final guardBlock = thenBlockAt(begin, guardAt);
       // 而且 return 必须是这个块的**直接语句**，不能藏在嵌套条件里 ——
       // `if (_txRestorePending) { if (别的条件) return NO; }` 会让 pending 穿透。
-      expect(braceBlockAt(begin, guardAt).contains('if ('), isFalse,
+      expect(thenBlockAt(begin, guardAt).contains('if ('), isFalse,
           reason: 'guard 块里还有嵌套条件 —— pending 可能穿透');
       expect(guardBlock.contains('return NO'), isTrue,
           reason: 'pending 期间必须拒绝开新事务（return NO）');
@@ -777,7 +888,7 @@ void main() {
         expect(guardAt, greaterThanOrEqualTo(0), reason: '$fn 没有 guard');
         // **取 guard 自己的块**，不是固定长度窗口 —— 窗口会借用后面
         // gen == 0 分支里的同名语句，删掉这里的照样绿（实测如此）。
-        final block = braceBlockAt(body, guardAt);
+        final block = thenBlockAt(body, guardAt);
         expect(block.contains('pthread_mutex_unlock'), isTrue,
             reason: '$fn 的拒绝分支没解锁');
         expect(block.contains(ret), isTrue,
@@ -786,7 +897,7 @@ void main() {
       // 一次性路径还必须把失败告诉 Dart，否则什么都没注入却报成功
       final oneShot = stripComments(bodyOfFn('inject_via_clipboard'));
       final gAt = oneShot.indexOf('if (!tx_begin_locked(');
-      expect(braceBlockAt(oneShot, gAt).contains('_txPasteFailed = YES'), isTrue,
+      expect(thenBlockAt(oneShot, gAt).contains('_txPasteFailed = YES'), isTrue,
           reason: '拿不到快照却不置失败位，inject_text 会返回成功');
     });
 
