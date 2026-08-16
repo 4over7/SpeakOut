@@ -9,7 +9,7 @@ import 'package:speakout/config/app_log.dart';
 /// 只需提供各自平台的动态库路径即可复用全部 FFI 绑定代码。
 /// 与 `native_input.m` 里的 `SPEAKOUT_NATIVE_ABI_VERSION` 必须一致。
 /// 改任何导出函数的签名时两边一起 +1。
-const int kExpectedNativeAbiVersion = 2;
+const int kExpectedNativeAbiVersion = 3;
 
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
@@ -544,17 +544,17 @@ class NativeInputFFI implements NativeInputBase {
   }
 
   @override
-  void copySelection() {
+  bool copySelection() {
     _bindOrganizeFunctions();
-    if (!_organizeBound) return;
-    _copySelection();
+    if (!_organizeBound) return false;
+    return _copySelection() == 1;
   }
 
   @override
-  void pressKey(int keyCode, int modifierFlags) {
+  bool pressKey(int keyCode, int modifierFlags) {
     _bindOrganizeFunctions();
-    if (!_organizeBound) return;
-    _pressKey(keyCode, modifierFlags);
+    if (!_organizeBound) return false;
+    return _pressKey(keyCode, modifierFlags) == 1;
   }
 
   // ============ CLIPBOARD STREAMING INJECTION ============

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../engine/engine_status.dart';
+import '../status_localization.dart';
 import '../../services/app_service.dart';
 import '../../services/config_service.dart';
 import '../../services/notification_service.dart';
@@ -57,8 +58,8 @@ class _LinuxHomePageState extends State<LinuxHomePage> with WidgetsBindingObserv
       setState(() {
         // 按 kind 判断，不再匹配文案 —— 文案改动或本地化都不会影响这里
         _ready = status.isReady;
-        _lastError = status.isProblem ? status.message : "";
-        _status = status.message;
+        _lastError = status.isProblem ? localizedEngineStatus(context, status) : "";
+        _status = localizedEngineStatus(context, status);
         if (status.isReady) _subscribeToPartialResults();
       });
     });

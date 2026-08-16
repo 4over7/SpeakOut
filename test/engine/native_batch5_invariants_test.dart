@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,6 +11,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// 要么要真的操作系统剪贴板），所以沿用仓库既有做法：对 native_input.m
 /// 做源码级断言，把「改回去就会复发」的那几行钉住。
 /// 每一条都对应一个已经发生过或已被确认可触发的缺陷。
+/// 导出签名的指纹。**改了任何导出函数的签名就要连同 ABI 版本一起更新。**
+/// 值由「导出签名一变，ABI 版本必须跟着变」这条测试的失败信息给出。
+const String kNativeAbiFingerprint = 'c2ea60ae860d7df2d1c9b0ad4b4c6e3ce3c4a9b1';
+
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
 
@@ -26,22 +33,17 @@ void main() {
 
   final code = stripComments(src);
 
-  String bodyOf(String signature) {
-    final m = RegExp('${RegExp.escape(signature)} \\{([\\s\\S]*?)\\n\\}')
-        .firstMatch(src);
-    expect(m, isNotNull, reason: '没找到 $signature —— 断言已失效，先修扫描');
-    return m!.group(1)!;
-  }
-
   /// 按**函数名**取函数体，不写死返回类型。
   /// 写死完整签名的代价已经付过三次了：把 void 改成 BOOL 这种与断言意图
   /// 完全无关的改动，会让一批断言集体失效。断言要盯的是函数体内容。
+  /// 按**函数名**取函数体。前缀（返回类型、static、`__attribute__((...))`）
+  /// 和跨行参数表都不参与匹配 —— 写死完整签名这个坑已经绊过六次，
+  /// 每次都是「与断言意图完全无关的改动」让一批断言集体失效。
   String bodyOfFn(String name) {
     final m = RegExp(
-            r'^\s*(?:static\s+)?[A-Za-z_][A-Za-z0-9_ *]*\b' +
+            r'(?:^|\n)(?!\s*//)[^\n;{}]*\b' +
                 RegExp.escape(name) +
-                r'\s*\([^)]*\)\s*\{([\s\S]*?)\n\}',
-            multiLine: true)
+                r'\s*\([^;{}]*?\)\s*\{([\s\S]*?)\n\}')
         .firstMatch(src);
     expect(m, isNotNull, reason: '没找到函数 $name —— 断言已失效，先修扫描');
     return m!.group(1)!;
@@ -72,8 +74,7 @@ void main() {
       // 这个回调跑在主 RunLoop 上且有系统时限 —— 磁盘忙一下，系统就判定
       // tap 无响应并禁用它。打开 verbose 日志本来是为了排查别的问题，
       // 却把键盘监听搞挂，因果完全错位。
-      final body = bodyOf('CGEventRef myCGEventCallback(CGEventTapProxy proxy, '
-          'CGEventType type,\n                             CGEventRef event, void *refcon)');
+      final body = bodyOfFn('myCGEventCallback');
       expect(body.contains('log_to_file('), isFalse,
           reason: '回调里出现同步文件 I/O，会导致 tap 被系统禁用');
       expect(body.contains('log_from_tap('), isTrue,
@@ -81,8 +82,7 @@ void main() {
     });
 
     test('log_from_tap 不得有堆分配或文件操作', () {
-      final body = bodyOf(
-          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      final body = bodyOfFn('log_from_tap');
       for (final forbidden in ['fopen', 'NSLog', 'alloc', 'malloc', 'strdup', 'dispatch_']) {
         expect(body.contains(forbidden), isFalse,
             reason: 'log_from_tap 里出现 $forbidden —— 回调侧必须零分配零系统调用');
@@ -166,7 +166,7 @@ void main() {
     test('copy_selection 必须要求「恰好变了一次」', () {
       // changeCount 每次 clearContents 加一，增量 > 1 说明这段时间还有别人
       // 动过剪贴板 —— 此时把当前值记成我们的，收尾就会盖掉用户刚复制的内容。
-      final body = bodyOf('void copy_selection(void)');
+      final body = bodyOfFn('copy_selection');
       expect(body.contains('delta == 1'), isTrue,
           reason: '只看「变了」不够，必须恰好变一次');
     });
@@ -174,7 +174,7 @@ void main() {
 
   group('R34 其余回归', () {
     test('新录音开始必须复位平滑电平', () {
-      final body = bodyOf('int start_audio_recording()');
+      final body = bodyOfFn('start_audio_recording');
       expect(body.contains('smoothed_level_reset()'), isTrue,
           reason: '不复位的话上一段的高电平会被这一段继承，波形虚高、静音判定延后');
     });
@@ -182,11 +182,10 @@ void main() {
     test('生产者开关与落盘开关必须分开', () {
       // 合成一个的话，同步排空读完游标之后、置零之前 tap 线程还能再写一条，
       // 那条会被下一轮 timer 读到，但那时 log_to_file 已经短路了。
-      final produce = bodyOf(
-          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      final produce = bodyOfFn('log_from_tap');
       expect(produce.contains('tapLogProducerEnabled'), isTrue,
           reason: '生产者应看自己的开关，而不是落盘开关');
-      final setter = bodyOf('void set_debug_logging(int enabled)');
+      final setter = bodyOfFn('set_debug_logging');
       final stopAt = setter.indexOf('atomic_store(&tapLogProducerEnabled, 0)');
       final flushAt = setter.indexOf('flush_tap_log_sync()');
       final offAt = setter.indexOf('atomic_store(&debugLoggingEnabled, 0)');
@@ -196,7 +195,7 @@ void main() {
     });
 
     test('drain timer 初始化必须线程安全', () {
-      final body = bodyOf('static void start_tap_log_drain(void)');
+      final body = bodyOfFn('start_tap_log_drain');
       expect(body.contains('dispatch_once'), isTrue,
           reason: '裸 if (timer != nil) 不是线程安全的');
     });
@@ -232,6 +231,36 @@ void main() {
       expect(unlockAt, lessThan(loopAt),
           reason: '最长 250ms 的等待不该占着锁 —— 我们等的是目标 App 响应 Cmd+C，'
               '跟事务状态无关');
+    });
+
+    test('导出签名一变，ABI 版本必须跟着变（指纹锁）', () {
+      // 「四处数字相等」拦不住「忘记升级」—— 我自己就在把
+      // inject_clipboard_begin 从 void 改成 int 之后忘了升，
+      // 而那正是这个握手要防的情形（Dart 按 Int32 去调旧的 void 函数，
+      // 读到返回寄存器里的残值）。
+      //
+      // 这里把**所有导出函数的规范化签名**做成指纹钉住：签名一变指纹就变，
+      // 测试失败 → 逼你同时升 ABI 版本和这里记录的指纹。
+      final src = File('native_lib/native_input.m').readAsStringSync();
+      // 取所有非 static 的顶层函数定义（导出面）
+      final sigs = RegExp(
+              r'^((?!static)[A-Za-z_][A-Za-z0-9_ *]*?)\s+([a-z_][a-z0-9_]*)\s*\(([^)]*)\)\s*\{',
+              multiLine: true)
+          .allMatches(src)
+          .map((m) =>
+              '${m.group(1)!.trim()} ${m.group(2)} (${m.group(3)!.replaceAll(RegExp(r'\s+'), ' ').trim()})')
+          .toList()
+        ..sort();
+      expect(sigs.length, greaterThan(20), reason: '没扫到足够的导出函数，判据失效');
+
+      final digest = sha1.convert(utf8.encode(sigs.join('\n'))).toString();
+      const recorded = kNativeAbiFingerprint;
+      expect(digest, recorded,
+          reason: '导出签名变了。请同时做两件事：\n'
+              '  1. 三个平台的 SPEAKOUT_NATIVE_ABI_VERSION 和 '
+              'kExpectedNativeAbiVersion 一起 +1\n'
+              '  2. 把本文件顶部的 kNativeAbiFingerprint 更新为 $digest\n'
+              '只改其中一件仍会红 —— 这正是要防的「忘记升版本」。');
     });
 
     test('三个平台都必须导出 ABI 版本，且与 Dart 侧一致', () {
@@ -274,21 +303,40 @@ void main() {
 
   group('线上事故：注入文字滞留剪贴板', () {
     test('所有权判据必须是我们自己写的 token', () {
-      // changeCount 反映的是 ownership 变更，任何重新声明剪贴板的进程都会推高它，
-      // 不等于「用户换了内容」；而文本内容也不行 —— 用户完全可能从别处复制到
-      // 一模一样的文字，那时东西是他的，还原回去就吃掉了他刚复制的内容。
-      // token 写在私有 type 里，别人复制同样文字不会带上它。
+      // 所有权判定必须集中在一处，且三条判据齐全。
+      // token 不是访问控制：general pasteboard 对所有进程可读，
+      // 别的进程能原样重放它 —— 所以 token 只是辅助，
+      // 真正的 ownership 判据仍是 changeCount。
       //
       // 注：2026-08-16 那次线上故障的根因**至今未定案**，曾归因为
       // 「旁观者推高 changeCount」但探针证伪、已作废。这条断言守的是
       // 判据本身的正确性，不是那次故障的修复证明。
+      // 三处必须走**同一个**判定函数，而不是各自拼判据 ——
+      // 分散写正是上一轮「只改收尾那一处」的复发温床。
       for (final fn in ['tx_finish_locked', 'tx_paste_locked', 'copy_selection']) {
         final body = stripComments(bodyOfFn(fn));
-        expect(body.contains('kSpeakOutOwnerType'), isTrue,
-            reason: '$fn 仍在用代理量判断所有权');
+        expect(body.contains('tx_still_ours_locked'), isTrue,
+            reason: '$fn 没有走统一的所有权判定');
       }
-      final finish = stripComments(bodyOfFn('tx_finish_locked'));
-      expect(finish.contains('_txToken'), isTrue);
+      // 判定本身三条缺一不可：
+      //   changeCount —— Apple 文档里判断 ownership 是否还在自己手上的正规机制
+      //   单 item     —— stringForType 会合并所有提供该 type 的 item
+      //   token 匹配  —— 挡住「用户从别处复制到一模一样的文字」
+      final judge = stripComments(bodyOfFn('tx_still_ours_locked'));
+      expect(judge.contains('_txExpectedChangeCount'), isTrue,
+          reason: 'changeCount 才是 ownership 的正规判据，不能丢');
+      expect(judge.contains('pasteboardItems.count != 1'), isTrue,
+          reason: 'stringForType 会合并所有 item，必须限定单 item');
+      expect(judge.contains('_txToken'), isTrue);
+
+      // token 写入必须检查并读回：写失败却把 _txToken 记下来的话，
+      // 收尾时永远判成「不是我们的」，还原被**永久**跳过。
+      final paste = stripComments(bodyOfFn('tx_paste_locked'));
+      expect(paste.contains('![pb setString:tok forType:kSpeakOutOwnerType]'),
+          isTrue,
+          reason: 'token 写入的返回值必须检查');
+      expect(paste.contains('token write failed'), isTrue,
+          reason: 'token 写失败要能在日志里查到，且必须判为注入失败');
     });
 
     test('setString / writeObjects / Cmd+V 投递的失败都不得被吞', () {
@@ -385,14 +433,28 @@ void main() {
       // 重读的话，重拍返回之后到读 before 之间用户又复制一次，
       // before 就把那次外部变更吸收了，我们的 Cmd+C 让 delta 恰好为 1 ——
       // 误判成纯内部变更，收尾把用户刚复制的内容覆盖掉。
-      final body = bodyOf('void copy_selection(void)');
-      expect(body.contains('_txExpectedChangeCount : pb.changeCount'), isTrue,
-          reason: '事务活跃时 before 必须用基线');
+      final body = bodyOfFn('copy_selection');
+      expect(body.contains('? _txExpectedChangeCount'), isTrue,
+          reason: '事务活跃时 before 必须取自基线，不能重读 changeCount');
+      // 放锁等待期间事务可能被别的线程换掉，重新取锁后必须逐项核对
+      // 放锁 → 等待 → 重新取锁：中间事务可能被别的线程换掉。
+      // 必须逐项核对并在不符时**放弃归因**，否则 expected 会倒退、
+      // 凭空造出一个不存在的新代次。
+      final code = stripComments(body);
+      expect(code.contains('stateIntact'), isTrue, reason: '缺少 TOCTOU 核对');
+      final checkAt = code.indexOf('!stateIntact');
+      final noteAt = code.indexOf('tx_note_mutation_locked');
+      expect(checkAt, greaterThanOrEqualTo(0), reason: '核对结果没有被使用');
+      expect(noteAt, greaterThan(checkAt),
+          reason: '必须先核对、不符就返回，之后才允许 note_mutation');
+      for (final v in ['_txGeneration == genBefore', '_txToken == tokenBefore',
+                       'pb.changeCount == observed']) {
+        expect(code.contains(v), isTrue, reason: 'TOCTOU 核对漏了 $v');
+      }
     });
 
     test('tap 日志必须先登记在途再复查开关', () {
-      final body = bodyOf(
-          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      final body = bodyOfFn('log_from_tap');
       final addAt = body.indexOf('atomic_fetch_add_explicit(&tapLogInFlight');
       final gateAt = body.indexOf('atomic_load(&tapLogProducerEnabled)');
       expect(addAt, greaterThanOrEqualTo(0));
@@ -447,7 +509,7 @@ void main() {
     test('关闭 verbose 必须等在途写者归零', () {
       // 停开关只挡新进入者：回调可能刚读到 enabled、正在 vsnprintf，
       // 排空看不到它，随后落盘也关了 —— 那条日志照样丢。
-      final body = bodyOf('void set_debug_logging(int enabled)');
+      final body = bodyOfFn('set_debug_logging');
       expect(body.contains('tapLogInFlight'), isTrue,
           reason: '缺少静默屏障，停开关不等于没有在途写者');
       final waitAt = body.indexOf('tapLogInFlight');
@@ -477,7 +539,7 @@ void main() {
     test('copy_selection 不得固定 sleep 后把「当前值」认作自己造成的', () {
       // 固定睡 100ms 的话，用户恰好在这窗口内自己复制了东西，那个值会被
       // 记成我们的变更，之后收尾就拿旧快照把他刚复制的内容覆盖掉。
-      final body = bodyOf('void copy_selection(void)');
+      final body = bodyOfFn('copy_selection');
       expect(body.contains('usleep(100000)'), isFalse,
           reason: '不能固定睡满再归因，要轮询等自己的 Cmd+C 落地');
       expect(body.contains('observed != before'), isTrue,
@@ -499,7 +561,7 @@ void main() {
     test('查询与请求必须是两个函数', () {
       expect(src.contains('int microphone_permission_status(void)'), isTrue);
       expect(src.contains('void request_microphone_permission(void)'), isTrue);
-      final body = bodyOf('int microphone_permission_status(void)');
+      final body = bodyOfFn('microphone_permission_status');
       expect(body.contains('requestAccess'), isFalse,
           reason: '查询函数不得弹框');
     });
@@ -517,7 +579,7 @@ void main() {
     });
 
     test('衰减按经过时间算，而不是按调用次数', () {
-      final body = bodyOf('static float smoothed_level_update(float level)');
+      final body = bodyOfFn('smoothed_level_update');
       expect(body.contains('pow(0.88'), isTrue,
           reason: 'keep 系数应由 elapsed 推出，与调用频率无关');
       expect(body.contains('pthread_mutex_lock(&levelMutex)'), isTrue);
@@ -531,8 +593,7 @@ void main() {
     test('写者必须看得见读游标', () {
       // 覆盖未消费的槽位不是「日志撕裂」这么轻 —— 读者 memcpy 与写者
       // vsnprintf 同一个 char[]，在 C 内存模型下是数据竞争，是 UB。
-      final body = bodyOf(
-          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      final body = bodyOfFn('log_from_tap');
       expect(body.contains('tapLogRead'), isTrue, reason: '写者没读游标，会覆盖未消费的槽');
       expect(body.contains('w - r >= TAP_LOG_SLOTS'), isTrue,
           reason: '环满时必须丢新的这条');
@@ -543,7 +604,7 @@ void main() {
     test('关闭 verbose 前必须先同步排空', () {
       // log_to_file 自己也受这个开关控制，先置零就会丢掉最后 200ms 那批 ——
       // 往往正是用户关开关前想看的那几行。
-      final body = bodyOf('void set_debug_logging(int enabled)');
+      final body = bodyOfFn('set_debug_logging');
       final flushAt = body.indexOf('flush_tap_log_sync()');
       final zeroAt = body.indexOf('atomic_store(&debugLoggingEnabled, 0)');
       expect(flushAt, greaterThanOrEqualTo(0), reason: '关闭路径没有排空');

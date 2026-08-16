@@ -130,10 +130,10 @@ typedef LaunchUpdaterC = Void Function(Pointer<Utf8> scriptPath);
 typedef LaunchUpdaterDart = void Function(Pointer<Utf8> scriptPath);
 
 // AI 梳理: copy selection (Cmd+C) and press key
-typedef CopySelectionC = Void Function();
-typedef CopySelectionDart = void Function();
-typedef PressKeyC = Void Function(Int32 keyCode, Int32 modifierFlags);
-typedef PressKeyDart = void Function(int keyCode, int modifierFlags);
+typedef CopySelectionC = Int32 Function();
+typedef CopySelectionDart = int Function();
+typedef PressKeyC = Int32 Function(Int32 keyCode, Int32 modifierFlags);
+typedef PressKeyDart = int Function(int keyCode, int modifierFlags);
 
 // Clipboard streaming injection
 typedef InjectClipboardBeginC = Int32 Function();
@@ -202,8 +202,13 @@ abstract class NativeInputBase {
   bool isLikelyTelephoneQuality();
 
   // AI 梳理: copy selection and simulate keypress
-  void copySelection();
-  void pressKey(int keyCode, int modifierFlags);
+  /// 返回剪贴板是否确实因为这次 Cmd+C 变了。
+  /// **false 必须中止梳理** —— 否则会把剪贴板里的旧内容（可能完全无关、
+  /// 甚至敏感）当成用户选中的文字发给 LLM。
+  bool copySelection();
+  /// 返回按键是否已投递。梳理靠它移动光标/换行，
+  /// 失败却继续的话结果会插到错误位置、甚至覆盖用户原来的选区。
+  bool pressKey(int keyCode, int modifierFlags);
 
   // Clipboard streaming injection (for typewriter effect)
   /// 返回会话是否真的开启了。false 时**不要**继续发 chunk：

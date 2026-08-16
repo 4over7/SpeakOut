@@ -755,7 +755,18 @@ class CoreEngine {
         await overlay.hide();
         return;
       }
-      ni.copySelection();
+      if (!ni.copySelection()) {
+        // Cmd+C 没生效：继续下去会把**剪贴板里的旧内容**当成用户选中的文字
+        // 发给 LLM —— 可能完全无关，也可能是敏感内容。
+        _log("[Organize] 复制选中文字失败，中止");
+        _clipEnd();
+        overlay.recordingMode = "organize";
+        overlay.updateText("未能读取选中文字");
+        await overlay.show();
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
       await Future.delayed(const Duration(milliseconds: 150));
 
       // 2. 读取剪贴板
@@ -792,14 +803,23 @@ class CoreEngine {
       }
 
       // 5. 光标移到选区末尾 → 换行 → 粘贴结果
-      ni.pressKey(124, 0); // → 键，取消选区
+      // 每一步都要看结果：光标没移走 / 换行没发出去的话，
+      // 梳理结果会插到错误位置甚至覆盖用户原来的选区。
+      final moved = ni.pressKey(124, 0); // → 键，取消选区
       await Future.delayed(const Duration(milliseconds: 50));
-      ni.pressKey(36, 0);  // Return 换行
+      final newline = moved && ni.pressKey(36, 0); // Return 换行
       await Future.delayed(const Duration(milliseconds: 50));
-      ni.injectClipboardChunk(result);
+      final pasted = newline && ni.injectClipboardChunk(result);
       await Future.delayed(const Duration(milliseconds: 100));
       _clipEnd();
 
+      if (!pasted) {
+        _log("[Organize] 注入失败 (moved=$moved newline=$newline)");
+        overlay.updateText("梳理结果注入失败");
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
       overlay.updateText("✓");
       _log("[Organize] 完成，输出 ${result.length} 字");
       await Future.delayed(const Duration(seconds: 1));
@@ -1339,6 +1359,10 @@ class CoreEngine {
             final streamBuffer = StringBuffer();
             final batchBuffer = StringBuffer();
             bool firstChunk = true;
+            // **语义是「至少有一段真的粘出去了」，不是「调用过 chunk」。**
+            // 原先无条件置 true：唯一那段 chunk 失败时也算「部分成功」，
+            // 于是 _typewriterInjected=true 挡掉了一次性注入兜底，
+            // 用户口述的话一个字都没进去，界面却显示就绪。
             bool streamInjected = false;
             // 只要有一段 chunk 没粘出去，整段流式注入就不算成功 ——
             // 原先只看「调没调过 chunk」，chunk 静默失败时照样报 Ready，
@@ -1372,24 +1396,26 @@ class CoreEngine {
               final now = DateTime.now();
               if (now.difference(lastInjectTime) >= batchInterval && batchBuffer.isNotEmpty) {
                 if (_nativeInput?.injectClipboardChunk(
-                        batchBuffer.toString()) !=
+                        batchBuffer.toString()) ==
                     true) {
+                  streamInjected = true;
+                } else {
                   chunkFailed = true;
                 }
                 batchBuffer.clear();
                 lastInjectTime = now;
-                streamInjected = true;
               }
             }
 
             // Flush remaining batch
             if (batchBuffer.isNotEmpty) {
               if (_nativeInput?.injectClipboardChunk(
-                      batchBuffer.toString()) !=
+                      batchBuffer.toString()) ==
                   true) {
+                streamInjected = true;
+              } else {
                 chunkFailed = true;
               }
-              streamInjected = true;
             }
             _clipEnd();
             typewriterBegan = false;
@@ -1409,7 +1435,10 @@ class CoreEngine {
             if (streamInjected && !chunkFailed) {
               _typewriterInjected = true;
             } else if (chunkFailed) {
-              _log("[Typewriter] chunk 注入失败 (streamInjected=$streamInjected)");
+              _log("[Typewriter] chunk 注入失败 "
+                  "(anySucceeded=$streamInjected)");
+              // 一段都没成 → 不标记，后面走一次性注入把全文补上。
+              // 部分成功 → 重放会造成重复，只提示。
               if (streamInjected) {
                 // 已经粘出去一部分，回退重放会造成重复 —— 只提示，不重放
                 _typewriterInjected = true;

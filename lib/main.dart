@@ -10,6 +10,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'services/config_service.dart';
 import 'ui/settings_page.dart';
 import 'engine/engine_status.dart';
+import 'ui/status_localization.dart';
 import 'services/app_service.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
@@ -207,22 +208,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   StreamSubscription<String>? _partialSub;
   StreamSubscription<UpdateState>? _updateStateSub;
   StreamSubscription<double>? _updateProgressSub;
-  /// 引擎给的是稳定错误码（三层架构铁律：Engine 不能 import AppLocalizations），
-  /// 文案在这里映射。没有码的老状态回退到 message —— 那批中文硬编码是既有技术债，
-  /// 逐步用码替换，不在这里一次性重写。
-  String _localizedStatus(EngineStatus status) {
-    final loc = AppLocalizations.of(context);
-    if (loc == null || status.code == null) return status.message;
-    switch (status.code) {
-      case 'inject_failed':
-        return loc.engineInjectFailed;
-      case 'inject_partial':
-        return loc.engineInjectPartial;
-      default:
-        return status.message;
-    }
-  }
-
 
   @override
   void initState() {
@@ -247,13 +232,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
       setState(() {
         switch (status.kind) {
           case EngineStatusKind.error:
-            _lastError = _localizedStatus(status);
+            _lastError = localizedEngineStatus(context, status);
             _ready = false;
             _permissionMissing = !(_appService.engine.checkInputMonitoringPermission() &&
                                    _appService.engine.checkAccessibilityPermission());
           case EngineStatusKind.warning:
             // 可用但降级（如监听已启动却缺「辅助功能」，注入不可用）
-            _lastError = _localizedStatus(status);
+            _lastError = localizedEngineStatus(context, status);
             _ready = true;
             _subscribeToPartialResults();
           case EngineStatusKind.ready:

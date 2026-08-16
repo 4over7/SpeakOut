@@ -41,7 +41,7 @@ static void flush_tap_log_sync(void);
 // 改签名时**必须**同时 +1，Dart 侧在初始化时校验。
 // 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
 // 而不是悄悄读垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 2
+#define SPEAKOUT_NATIVE_ABI_VERSION 3
 int native_input_abi_version(void) { return SPEAKOUT_NATIVE_ABI_VERSION; }
 
 void set_debug_logging(int enabled) {
@@ -774,6 +774,27 @@ static uint64_t tx_note_mutation_locked(NSInteger newChangeCount) {
   return ++_txGeneration;
 }
 
+// 剪贴板是否仍归本事务所有。**三个条件缺一不可：**
+//
+// 1. `changeCount == _txExpectedChangeCount` —— 这是 Apple 文档里
+//    判断 ownership 是否还在自己手上的**正规机制**。我一度想用 token 取代它，
+//    那是过度反应：当时怀疑「旁观者会推高 changeCount」，探针已证伪。
+// 2. 恰好一个 item —— `stringForType:` 会把**所有**提供该 type 的 item 合并，
+//    别人往剪贴板里加一个 item 也可能读出同样的 token。
+// 3. token 精确匹配 —— 挡住「用户从别处复制到一模一样的文字」，
+//    那时 changeCount 也变了，但多一层不吃亏。
+//
+// ⚠️ token 不是访问控制：general pasteboard 对所有进程可读，
+// 别的进程完全可以原样重放它。所以 token 只是**辅助**证据，
+// 真正的 ownership 判据仍是 changeCount。
+static BOOL tx_still_ours_locked(NSPasteboard *pb) {
+  if (pb.changeCount != _txExpectedChangeCount) return NO;
+  if (_txToken == nil) return YES; // 本事务没写过剪贴板，changeCount 已足够
+  if (pb.pasteboardItems.count != 1) return NO;
+  NSString *token = [pb stringForType:kSpeakOutOwnerType];
+  return token != nil && [token isEqualToString:_txToken];
+}
+
 static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   if (!_txActive) return;
   if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
@@ -796,12 +817,7 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   // 但探针连采 5 次都没观察到旁观者改动，该归因已作废。
   // 本改动是**严格的健壮性改进**，不要当成那次故障的已验证修复。
   // 详见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md。
-  NSString *token = [pb stringForType:kSpeakOutOwnerType];
-  const BOOL stillOurs = (_txToken != nil)
-                             ? (token != nil && [token isEqualToString:_txToken])
-                             // 本事务一次都没写过剪贴板（比如 begin/end 之间
-                             // LLM 就失败了），没 token 可比，只能退回 changeCount
-                             : (pb.changeCount == _txExpectedChangeCount);
+  const BOOL stillOurs = tx_still_ours_locked(pb);
   if (!_txOriginalValid) {
     // 快照当时就没拍稳，还原等于拿不可信内容覆盖现状 —— 什么都不做
     log_to_file("Clipboard tx: skipped restore (snapshot was never stable)");
@@ -851,11 +867,7 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   // 只改收尾那一处是不够的：某个工具重新声明了同样的内容，changeCount 会变，
   // 这里就会把「我们自己刚注入的文字」重新拍成「用户的原始内容」，
   // 收尾再把它还原回去，注入文本照样滞留。
-  const BOOL ours = (_txToken != nil)
-                        ? [_txToken isEqualToString:
-                                        [pb stringForType:kSpeakOutOwnerType] ?: @""]
-                        : (pb.changeCount == _txExpectedChangeCount);
-  if (!ours) {
+  if (!tx_still_ours_locked(pb)) {
     log_to_file("Clipboard tx: clipboard no longer ours mid-transaction, re-snapshot");
     if (!tx_snapshot_stable_locked(pb)) return 0; // 0 = 没写，调用方别安排收尾
   }
@@ -868,8 +880,17 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
     log_to_file("Clipboard tx: setString failed (ownership changed?)");
     return 0;
   }
-  _txToken = [[NSUUID UUID] UUIDString];
-  [pb setString:_txToken forType:kSpeakOutOwnerType];
+  // token 先用局部变量：写成功**且读得回**才认，否则 _txToken 与剪贴板实际
+  // 内容不符 —— 收尾时永远判成「不是我们的」，还原被永久跳过。
+  NSString *tok = [[NSUUID UUID] UUIDString];
+  if (![pb setString:tok forType:kSpeakOutOwnerType] ||
+      ![tok isEqualToString:[pb stringForType:kSpeakOutOwnerType] ?: @""]) {
+    log_to_file("Clipboard tx: token write failed, aborting paste");
+    _txToken = nil;
+    _txPasteFailed = YES;
+    return tx_note_mutation_locked(cc); // 剪贴板已被我们改脏，仍要安排收尾
+  }
+  _txToken = tok;
   const uint64_t gen = tx_note_mutation_locked(cc);
 
   // 确认剪贴板里确实是我们写的那份，再发 Cmd+V。校验不过就不发 ——
@@ -1034,7 +1055,11 @@ void inject_clipboard_end(void) {
 // --- AI 梳理辅助函数 ---
 
 // 模拟 Cmd+C 复制选中文字到剪贴板
-void copy_selection(void) {
+// 返回 1 = 剪贴板确实因为我们的 Cmd+C 变了；0 = 没有（事件没造出来、
+// 目标 App 没响应、或期间还有别人动过）。
+// **不能返回 void**：Cmd+C 没生效时 Dart 会把**旧剪贴板内容**当成用户选中的
+// 文字发给 LLM —— 那可能是完全无关、甚至敏感的内容。
+int copy_selection(void) {
   @autoreleasepool {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
@@ -1043,11 +1068,7 @@ void copy_selection(void) {
     //   begin 在 X 上开事务 → 用户复制 Z → copy_selection 读到 Z 的 count
     //   → Cmd+C 复制出 Y，delta 恰好是 1 → 记成内部变更
     //   → 收尾还原 X，Z 被覆盖。
-    const BOOL stillOursBeforeCopy =
-        (_txToken != nil)
-            ? [_txToken isEqualToString:[pb stringForType:kSpeakOutOwnerType] ?: @""]
-            : (pb.changeCount == _txExpectedChangeCount);
-    if (_txActive && !stillOursBeforeCopy) {
+    if (_txActive && !tx_still_ours_locked(pb)) {
       log_to_file("Clipboard tx: clipboard no longer ours before copy_selection, re-snapshot");
       tx_snapshot_stable_locked(pb); // 失败也继续：这里只是复制，不覆盖剪贴板
     }
@@ -1057,7 +1078,11 @@ void copy_selection(void) {
     // 收尾把用户刚复制的内容覆盖掉。
     const NSInteger before =
         (_txActive && _txOriginalValid) ? _txExpectedChangeCount : pb.changeCount;
-    post_command_key(8, kCGAnnotatedSessionEventTap); // 8 = 'c'
+    if (!post_command_key(8, kCGAnnotatedSessionEventTap)) { // 8 = 'c'
+      pthread_mutex_unlock(&clipTxMutex);
+      log_to_file("Clipboard tx: Cmd+C post failed");
+      return 0;
+    }
 
     // **不能固定睡 100ms 再把「当前值」认作自己造成的变更。** 用户恰好在这
     // 100ms 内自己复制了东西的话，那个值会被记成我们的，之后收尾就会拿旧快照
@@ -1066,6 +1091,15 @@ void copy_selection(void) {
     // **等待放在锁外。** 这一等最长 250ms，占着 clipTxMutex 等的话，
     // 还原任务和别的注入都被陪绑 —— 而我们等的只是目标 App 响应 Cmd+C，
     // 跟事务状态无关。锁在这里放掉，拿到结果后再重新取。
+    //
+    // 放锁 = 事务状态可能被别的线程改掉，所以把这一刻的状态全部拍下来，
+    // 重新取锁后逐项核对。不核对的话就是 TOCTOU：别人推进了代次、
+    // 换了 token / expected，我们却拿放锁前的 before 去 note_mutation，
+    // 让 expected 倒退、凭空造出一个不存在的「新代次」。
+    const uint64_t genBefore = _txGeneration;
+    const BOOL activeBefore = _txActive;
+    const BOOL validBefore = _txOriginalValid;
+    NSString *tokenBefore = _txToken;
     pthread_mutex_unlock(&clipTxMutex);
     NSInteger observed = before;
     for (int i = 0; i < 50; i++) { // 最多 250ms：目标 App 卡顿时 100ms 常常不够
@@ -1074,6 +1108,19 @@ void copy_selection(void) {
       if (observed != before) break;
     }
     pthread_mutex_lock(&clipTxMutex);
+
+    // 逐项核对放锁期间事务有没有被换过；换过就放弃本轮归因 ——
+    // 硬记进去只会污染别人的事务。
+    const BOOL stateIntact = (_txGeneration == genBefore) &&
+                             (_txActive == activeBefore) &&
+                             (_txOriginalValid == validBefore) &&
+                             (_txToken == tokenBefore) &&
+                             (pb.changeCount == observed);
+    if (!stateIntact) {
+      log_to_file("Clipboard tx: tx changed during copy_selection wait, skip attribution");
+      pthread_mutex_unlock(&clipTxMutex);
+      return 0;
+    }
 
     // **必须恰好变了一次才算我们的。** changeCount 每次 clearContents/declareTypes
     // 加一，所以增量 > 1 说明这段时间里还有别人动过剪贴板 —— 此时把当前值
@@ -1093,17 +1140,20 @@ void copy_selection(void) {
       // 而不是用户原来的。分不出来，就宁可不动（还原反而可能盖掉用户的东西）。
       log_to_file("Clipboard tx: copy_selection timed out waiting for clipboard");
     }
+    const BOOL copied = (delta == 1);
     pthread_mutex_unlock(&clipTxMutex);
     if (orphan) tx_schedule_finish(gen);
-    return;
+    return copied ? 1 : 0;
   }
 }
 
 // 模拟任意按键（用于 → 取消选区、Return 换行等）
-void press_key(int keyCode, int modifierFlags) {
+// 返回 1 = 按键已投递。AI 梳理靠它移动光标/换行，构造失败却不上报的话，
+// 结果会插到错误位置、甚至覆盖用户原来的选区。
+int press_key(int keyCode, int modifierFlags) {
   @autoreleasepool {
     CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-    if (!source) return;
+    if (!source) return 0;
     CGEventRef keyDown = CGEventCreateKeyboardEvent(source, (CGKeyCode)keyCode, true);
     CGEventRef keyUp   = CGEventCreateKeyboardEvent(source, (CGKeyCode)keyCode, false);
     if (keyDown && keyUp) {
@@ -1118,9 +1168,11 @@ void press_key(int keyCode, int modifierFlags) {
       CGEventPost(kCGAnnotatedSessionEventTap, keyDown);
       CGEventPost(kCGAnnotatedSessionEventTap, keyUp);
     }
+    const BOOL ok = (keyDown != NULL && keyUp != NULL);
     if (keyDown) CFRelease(keyDown);
     if (keyUp) CFRelease(keyUp);
     CFRelease(source);
+    return ok ? 1 : 0;
   }
 }
 
