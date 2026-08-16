@@ -982,6 +982,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get permissionsMicrophoneDesc => 'Audio capture';
 
   @override
+  String get permissionsMicrophoneRestricted =>
+      'Microphone access is restricted by system policy';
+
+  @override
   String get permissionsOpen => 'Open';
 
   @override
@@ -1163,6 +1167,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryDirPick => 'Please select a save directory to grant access';
+
+  @override
+  String get diaryDirBookmarkFailed =>
+      'Cannot obtain persistent access to that folder — please pick another one';
 
   @override
   String get diaryDesc =>

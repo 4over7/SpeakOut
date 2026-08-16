@@ -1868,6 +1868,12 @@ abstract class AppLocalizations {
   /// **'Audio capture'**
   String get permissionsMicrophoneDesc;
 
+  /// No description provided for @permissionsMicrophoneRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is restricted by system policy'**
+  String get permissionsMicrophoneRestricted;
+
   /// No description provided for @permissionsOpen.
   ///
   /// In en, this message translates to:
@@ -2185,6 +2191,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please select a save directory to grant access'**
   String get diaryDirPick;
+
+  /// No description provided for @diaryDirBookmarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot obtain persistent access to that folder — please pick another one'**
+  String get diaryDirBookmarkFailed;
 
   /// No description provided for @diaryDesc.
   ///

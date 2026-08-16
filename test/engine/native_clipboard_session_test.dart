@@ -15,46 +15,49 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
 
-  test('必须有独立的会话标志', () {
-    expect(src.contains('_clipboardSessionActive'), isTrue,
-        reason: '会话状态没有独立标志');
+  test('必须有独立的会话状态，不能拿快照是否为 nil 代表', () {
+    expect(src.contains('_txHoldDepth'), isTrue, reason: '会话状态没有独立计数');
   });
 
-  test('end 的早退判据不得是 _savedClipboardItems == nil', () {
-    final end = RegExp(r'void inject_clipboard_end\(void\) \{([\s\S]*?)\n\}')
-        .firstMatch(src)
-        ?.group(1);
-    expect(end, isNotNull, reason: '没找到 inject_clipboard_end');
-    expect(RegExp(r'if\s*\(\s*_savedClipboardItems\s*==\s*nil\s*\)').hasMatch(end!),
+  test('收尾的早退判据不得是「快照为 nil」', () {
+    final finish =
+        RegExp(r'static void tx_finish_locked\(NSPasteboard \*pb, uint64_t gen\) \{([\s\S]*?)\n\}')
+            .firstMatch(src)
+            ?.group(1);
+    expect(finish, isNotNull, reason: '没找到 tx_finish_locked');
+    expect(RegExp(r'if\s*\(\s*_txOriginal\s*==\s*nil\s*\)').hasMatch(finish!),
         isFalse,
-        reason: '拿快照当会话哨兵：用户剪贴板为空时 begin 就把它设成 nil，'
-            'end 会误早退，注入文本永久留在剪贴板');
-    expect(end.contains('!_clipboardSessionActive'), isTrue,
-        reason: 'end 必须按独立标志早退');
+        reason: '拿快照当会话哨兵：用户剪贴板为空时快照本来就是 nil，'
+            '会误早退，注入文本永久留在剪贴板');
+    expect(finish.contains('_txHoldDepth > 0'), isTrue,
+        reason: '流式会话开着时必须挂起还原');
   });
 
-  test('begin 必须置位、end 必须清位', () {
+  test('begin/end 必须成对增减会话深度', () {
     final begin = RegExp(r'void inject_clipboard_begin\(void\) \{([\s\S]*?)\n\}')
         .firstMatch(src)!
         .group(1)!;
-    expect(begin.contains('_clipboardSessionActive = true'), isTrue);
+    expect(begin.contains('_txHoldDepth++'), isTrue);
     final end = RegExp(r'void inject_clipboard_end\(void\) \{([\s\S]*?)\n\}')
         .firstMatch(src)!
         .group(1)!;
-    expect(end.contains('_clipboardSessionActive = false'), isTrue);
+    expect(end.contains('_txHoldDepth--'), isTrue);
+    expect(end.contains('_txHoldDepth == 0'), isTrue,
+        reason: '无会话时 end 必须早退，否则 clearContents 会清空用户剪贴板');
   });
 
-  test('空剪贴板仍会开启会话（这条分支正是事故来源）', () {
-    final begin = RegExp(r'void inject_clipboard_begin\(void\) \{([\s\S]*?)\n\}')
-        .firstMatch(src)!
-        .group(1)!;
-    // 置位必须在「快照是否为空」的分支之前，否则空剪贴板路径可能漏置
-    final flagAt = begin.indexOf('_clipboardSessionActive = true');
-    final branchAt = begin.indexOf('oldContents.count > 0');
-    expect(flagAt, greaterThanOrEqualTo(0));
-    expect(branchAt, greaterThanOrEqualTo(0));
-    expect(flagAt, lessThan(branchAt),
-        reason: '置位必须早于空/非空分支，否则空剪贴板时会漏置');
+  test('空剪贴板仍会开启事务（这条分支正是事故来源）', () {
+    // tx_begin_locked 无条件置 _txActive，快照为不为空是后面的事
+    final begin =
+        RegExp(r'static void tx_begin_locked\(NSPasteboard \*pb\) \{([\s\S]*?)\n\}')
+            .firstMatch(src)!
+            .group(1)!;
+    final activeAt = begin.indexOf('_txActive = YES');
+    final snapAt = begin.indexOf('snapshot_pasteboard');
+    expect(activeAt, greaterThanOrEqualTo(0));
+    expect(snapAt, greaterThanOrEqualTo(0));
+    expect(activeAt, lessThan(snapAt),
+        reason: '置位必须早于拍快照，否则空剪贴板时可能漏置');
   });
 
   // 只在 macOS 跑：dylib 是 macOS 专属产物，且判据依赖 `strings`

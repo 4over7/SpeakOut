@@ -8,6 +8,7 @@ import '../../../config/app_constants.dart';
 import '../../../services/config_service.dart';
 import '../../../services/audio_device_service.dart';
 import '../../../services/app_service.dart';
+import '../../../services/notification_service.dart';
 import '../../theme.dart';
 import '../../widgets/settings_widgets.dart';
 import '../settings_shared.dart';
@@ -592,6 +593,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
               'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
               loc,
               granted: _microphoneGranted,
+              onTapOverride: _handleMicrophoneTap,
             ),
           ],
         ),
@@ -599,8 +601,34 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     );
   }
 
+  /// 麦克风跟另外两个权限不一样：从没请求过时（status=0）系统还没把本 App
+  /// 列进「隐私与安全性 > 麦克风」，把用户丢去系统设置他根本找不到开关。
+  /// 这种情况要先弹系统授权框；已拒绝（status=2）才是去系统设置的场景。
+  /// （onboarding 已经这么做了，这里是同一条分支 —— 之前只改了 onboarding，
+  ///   选了「稍后设置」的用户从设置页进来就卡死在找不到开关。）
+  Future<void> _handleMicrophoneTap(String url) async {
+    final loc = AppLocalizations.of(context)!;
+    final status = AppService().microphonePermissionStatus();
+    if (status == 1) {
+      NotificationService().notifyError(loc.permissionsMicrophoneRestricted);
+      return;
+    }
+    if (status == 0) {
+      AppService().requestMicrophonePermission();
+      for (int i = 0; i < 20; i++) {
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (!mounted) return;
+        _refreshPermissions();
+        if (_microphoneGranted) return;
+      }
+      return;
+    }
+    await launchUrl(Uri.parse(url));
+  }
+
   Widget _permissionCard(String label, String desc, IconData icon, String url,
-      AppLocalizations loc, {required bool granted}) {
+      AppLocalizations loc,
+      {required bool granted, Future<void> Function(String url)? onTapOverride}) {
     final statusColor = granted
         ? MacosColors.systemGreenColor
         : MacosColors.systemOrangeColor;
@@ -610,7 +638,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     final statusText = granted ? loc.permissionsGranted : loc.permissionsNotGranted;
     return SettingsCard(
       padding: const EdgeInsets.all(16),
-      onTap: () => launchUrl(Uri.parse(url)),
+      onTap: () => onTapOverride != null ? onTapOverride(url) : launchUrl(Uri.parse(url)),
       children: [
         Row(
           children: [

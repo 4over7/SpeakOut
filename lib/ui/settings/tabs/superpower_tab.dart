@@ -8,6 +8,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../../services/config_service.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/app_log.dart';
+import '../../../services/notification_service.dart';
 import '../../theme.dart';
 import '../sidebar/sidebar_shell.dart';
 import '../../widgets/settings_widgets.dart';
@@ -307,6 +308,13 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
         await _validateDiaryDirectory();
         setState(() {});
       }
+    } on PlatformException catch (e) {
+      // 沙盒版拿不到该目录的持久授权。只记日志的话用户这次能写、重启后
+      // 闪念静默丢失且看不到任何原因 —— 必须把它摆到台面上。
+      AppLog.e('Pick Directory Failed: ${e.code} ${e.message}');
+      if (!mounted) return;
+      NotificationService()
+          .notifyError(AppLocalizations.of(context)!.diaryDirBookmarkFailed);
     } catch (e) {
       AppLog.d('Pick Directory Failed: $e');
     }

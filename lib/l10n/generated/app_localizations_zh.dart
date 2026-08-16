@@ -934,6 +934,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get permissionsMicrophoneDesc => '语音采集';
 
   @override
+  String get permissionsMicrophoneRestricted => '麦克风被系统策略限制，无法自行开启';
+
+  @override
   String get permissionsOpen => '打开';
 
   @override
@@ -1107,6 +1110,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get diaryDirPick => '请选择保存目录以授权访问';
+
+  @override
+  String get diaryDirBookmarkFailed => '无法获得该目录的持久访问权限，请换一个目录';
 
   @override
   String get diaryDesc => '随时随地语音记录灵感，自动保存为 Markdown 日记。';

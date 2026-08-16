@@ -51,20 +51,30 @@ class AppDelegate: FlutterAppDelegate {
   private static let diaryBookmarkKey = "SpeakOutDiaryDirBookmark"
   private var scopedDiaryURL: URL?
 
-  private func persistDiaryBookmark(for url: URL) {
+  /// 是否运行在 App Sandbox 里。沙盒下 bookmark 失败 = 目录不可用，必须报错；
+  /// 非沙盒下 bookmark 只是锦上添花，失败了普通文件权限照样能写，不该打扰用户。
+  private var isSandboxed: Bool {
+    ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+  }
+
+  @discardableResult
+  private func persistDiaryBookmark(for url: URL) -> Bool {
     do {
       let data = try url.bookmarkData(options: [.withSecurityScope],
                                       includingResourceValuesForKeys: nil,
                                       relativeTo: nil)
       UserDefaults.standard.set(data, forKey: Self.diaryBookmarkKey)
+      return true
     } catch {
       NSLog("[Sandbox] 创建 bookmark 失败: %@", String(describing: error))
+      return false
     }
   }
 
-  private func restoreScopedDiaryAccess() {
+  @discardableResult
+  private func restoreScopedDiaryAccess() -> Bool {
     guard let data = UserDefaults.standard.data(forKey: Self.diaryBookmarkKey) else {
-      return
+      return false
     }
     var stale = false
     do {
@@ -74,14 +84,16 @@ class AppDelegate: FlutterAppDelegate {
                         bookmarkDataIsStale: &stale)
       guard url.startAccessingSecurityScopedResource() else {
         NSLog("[Sandbox] startAccessingSecurityScopedResource 失败: %@", url.path)
-        return
+        return false
       }
       scopedDiaryURL = url
       // stale 说明目录被移动/改名过，此刻立刻重建，否则下次启动就解析不出来了
       if stale { persistDiaryBookmark(for: url) }
       NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", url.path)
+      return true
     } catch {
       NSLog("[Sandbox] 解析 bookmark 失败: %@", String(describing: error))
+      return false
     }
   }
 
@@ -372,16 +384,30 @@ class AppDelegate: FlutterAppDelegate {
     panel.prompt = "Select"
 
     panel.begin { [weak self] response in
-      if response == .OK, let url = panel.url {
-        // 换目录先放掉旧的 scope，再按 bookmark 重新持有 ——
-        // 走和「重启后恢复」完全同一条路径，避免只有首次会话能写。
-        self?.releaseScopedDiaryAccess()
-        self?.persistDiaryBookmark(for: url)
-        self?.restoreScopedDiaryAccess()
-        result(url.path)
-      } else {
+      guard response == .OK, let url = panel.url else {
         result(nil)
+        return
       }
+      guard let self = self else {
+        result(url.path)
+        return
+      }
+      // **先确认新目录真的能持久授权，再放掉旧的。** 顺序反了的话，
+      // 新 bookmark 建失败时旧 scope 已经放掉、新的又没拿到，
+      // 却仍把新路径交给 Dart —— 用户配置指向一个写不进去的目录。
+      let ok = self.persistDiaryBookmark(for: url)
+      if !ok && self.isSandboxed {
+        // 沙盒下拿不到跨启动授权 = 这个目录用不了。不能静默返回路径，
+        // 否则用户这次能写、重启后闪念就静默丢失，而且看不到任何原因。
+        // 这条只进日志：给用户看的文案由 Dart 侧走 i18n
+        result(FlutterError(code: "bookmark_failed",
+                            message: "security-scoped bookmark creation failed",
+                            details: url.path))
+        return
+      }
+      self.releaseScopedDiaryAccess()
+      self.restoreScopedDiaryAccess()
+      result(url.path)
     }
   }
 

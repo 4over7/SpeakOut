@@ -20,11 +20,18 @@
 static atomic_int debugLoggingEnabled = 0;
 
 static void start_tap_log_drain(void);
+static void flush_tap_log_sync(void);
 
 void set_debug_logging(int enabled) {
-  atomic_store(&debugLoggingEnabled, enabled ? 1 : 0);
-  if (enabled) start_tap_log_drain();
-  // 关掉时不撤 drain timer：撤销要跨线程同步 source 的生命周期，代价远大于
+  if (enabled) {
+    atomic_store(&debugLoggingEnabled, 1);
+    start_tap_log_drain();
+    return;
+  }
+  // 先排空再置零 —— 顺序反了就会丢掉最后一批 tap 日志（见 flush_tap_log_sync）
+  flush_tap_log_sync();
+  atomic_store(&debugLoggingEnabled, 0);
+  // 不撤 drain timer：撤销要跨线程同步 source 的生命周期，代价远大于
   // 200ms 空转一次的开销 —— 此时 ring 已无写入，handler 立刻返回。
 }
 
@@ -88,23 +95,32 @@ void log_to_file(const char *fmt, ...) {
 // 磁盘忙或日志系统卡一下，系统就判定 tap 无响应并禁用它，快捷键随之失效。
 // 打开 verbose 日志本来是为了排查别的问题，却把键盘监听搞挂 —— 因果完全错位。
 //
-// 这里改成单写者/单读者环形缓冲：回调侧只做一次栈上 vsnprintf + 一个 release
-// store，无堆分配、无系统调用；后台队列每 200ms 排空一次，真正的 I/O 在那边做。
+// 单写者（tap 线程）/ 单读者（drain 队列）环形缓冲：回调侧只做一次栈上
+// vsnprintf + 一个 release store，无堆分配、无系统调用；后台队列每 200ms
+// 排空一次，真正的 I/O 在那边做。
 //
-// 溢出（200ms 内超过 TAP_LOG_SLOTS 条）丢最旧的若干条并留一行标记。写者覆盖
-// 正在被读的槽位时最坏结果是那一行内容撕裂 —— 读侧整块 memcpy 后强制补 NUL，
-// 不会越界。调试日志可以容忍撕裂，不能容忍拖慢回调。
+// **写满时丢新的，绝不覆盖读者尚未取走的槽位。** 上一版是覆盖最旧的，
+// 那不是「日志撕裂」这么轻 —— 读者正在 memcpy 某个槽、写者同时 vsnprintf
+// 同一个 char[]，在 C 内存模型下就是数据竞争，是 UB。为此写者必须看得见
+// 读游标，所以 tapLogRead 也是原子量。
 #define TAP_LOG_SLOTS 256
 #define TAP_LOG_LINE 192
 static char tapLogRing[TAP_LOG_SLOTS][TAP_LOG_LINE];
 static atomic_uint tapLogWrite = 0;
-static unsigned tapLogRead = 0;
+static atomic_uint tapLogRead = 0;
+static atomic_uint tapLogDropped = 0;
 static dispatch_source_t tapLogDrainTimer = nil;
+static dispatch_queue_t tapLogQueue = nil;
 
 __attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,
                                                                ...) {
   if (!atomic_load(&debugLoggingEnabled)) return;
-  unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_relaxed);
+  const unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_relaxed);
+  const unsigned r = atomic_load_explicit(&tapLogRead, memory_order_acquire);
+  if (w - r >= TAP_LOG_SLOTS) { // 环已满：丢这一条，别去踩读者手里的槽
+    atomic_fetch_add_explicit(&tapLogDropped, 1, memory_order_relaxed);
+    return;
+  }
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(tapLogRing[w % TAP_LOG_SLOTS], TAP_LOG_LINE, fmt, ap);
@@ -113,33 +129,41 @@ __attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,
 }
 
 static void drain_tap_log(void) {
-  unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_acquire);
-  if (w - tapLogRead > TAP_LOG_SLOTS) {
-    unsigned dropped = (w - tapLogRead) - TAP_LOG_SLOTS;
-    tapLogRead = w - TAP_LOG_SLOTS;
-    log_to_file("[tap-log] dropped %u lines (ring overflow)", dropped);
+  const unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_acquire);
+  unsigned r = atomic_load_explicit(&tapLogRead, memory_order_relaxed);
+  while (r != w) {
+    log_to_file("%s", tapLogRing[r % TAP_LOG_SLOTS]);
+    r++;
+    // 逐条推进读游标：写者据此判断有没有空槽，攒到最后再发布会让它白等一轮
+    atomic_store_explicit(&tapLogRead, r, memory_order_release);
   }
-  while (tapLogRead != w) {
-    char line[TAP_LOG_LINE];
-    memcpy(line, tapLogRing[tapLogRead % TAP_LOG_SLOTS], TAP_LOG_LINE);
-    line[TAP_LOG_LINE - 1] = '\0';
-    log_to_file("%s", line);
-    tapLogRead++;
+  const unsigned dropped =
+      atomic_exchange_explicit(&tapLogDropped, 0, memory_order_relaxed);
+  if (dropped > 0) {
+    log_to_file("[tap-log] dropped %u lines (ring full)", dropped);
   }
 }
 
 static void start_tap_log_drain(void) {
   if (tapLogDrainTimer != nil) return;
-  dispatch_queue_t q =
-      dispatch_queue_create("com.speakout.taplog", DISPATCH_QUEUE_SERIAL);
+  tapLogQueue = dispatch_queue_create("com.speakout.taplog", DISPATCH_QUEUE_SERIAL);
   tapLogDrainTimer =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, tapLogQueue);
   dispatch_source_set_timer(tapLogDrainTimer, DISPATCH_TIME_NOW,
                             200 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
   dispatch_source_set_event_handler(tapLogDrainTimer, ^{
     drain_tap_log();
   });
   dispatch_resume(tapLogDrainTimer);
+}
+
+// 关 verbose 前必须先把环里剩下的排空：log_to_file 自己也受这个开关控制，
+// 先置零的话，最后 200ms 那批（往往正是用户关开关前想看的那几行）永远落不了盘。
+static void flush_tap_log_sync(void) {
+  if (tapLogQueue == nil) return;
+  dispatch_sync(tapLogQueue, ^{
+    drain_tap_log();
+  });
 }
 
 // Callback function type defined in Dart (v2: added modifierFlags for combo key support)
@@ -584,21 +608,96 @@ static NSArray *snapshot_pasteboard(NSPasteboard *pasteboard) {
   return items;
 }
 
-// --- 一次性剪贴板注入的还原事务 ---
+// ============================================================================
+// 剪贴板事务协调器 —— 一次性注入 / 流式注入 / Cmd+C 共用同一套状态
+// ============================================================================
 //
-// 快照**必须按事务拍一次**，不能每次注入都重拍。原先每次都读当前剪贴板当
-// 「原始内容」，于是 CLIPBOARD_RESTORE_DELAY_MS 内连注两次时：
-//   原剪贴板 X → 注入 A（存 X）→ 注入 B（存到的却是 A）
-//   → A 的还原任务看到 changeCount 变了，跳过 → B 的还原任务写回 A
-// 结果 X 永久丢失，剪贴板里留着 SpeakOut 自己注入的文本。连续听写、
-// 或普通注入紧接打字机注入都能触发。
+// **不能给两条注入路径各留一套快照。** 上一版就是这么写的（一次性用
+// _txSavedItems，流式用 _savedClipboardItems），靠 Dart 侧的会话计数推断
+// 两者不会交错 —— 但那个计数只合并流式会话，管不到普通 inject()，
+// 更管不到 native 这边 800ms 的延迟还原窗口。可达路径：
 //
-// 现在：只有当前没有待还原任务时才拍快照；之后的注入只推进代次，
-// 唯有最后一代的任务负责把最初那份快照写回去。
-static pthread_mutex_t clipboardTxMutex = PTHREAD_MUTEX_INITIALIZER;
-static NSArray *_txSavedItems = nil;   // 事务开始前的原始剪贴板
-static BOOL _txRestorePending = NO;
-static uint64_t _txGeneration = 0;
+//   剪贴板 X → 普通听写注入 A（事务存下 X，等 800ms）
+//   → 800ms 内触发 AI 梳理：流式 begin 把 **A** 当成原始快照，Cmd+C 又改了
+//     changeCount → 普通注入的还原任务认为剪贴板已易主，跳过还原 X
+//   → 梳理结束时流式会话把 **A** 写回去
+//   最终剪贴板是 A，X 永久丢失。反向顺序（流式 end 后 800ms 内普通注入）同理。
+//
+// 现在只有一套事务：
+//   - 原始快照只在事务开启时拍一次，两条路径共用
+//   - 每次我们改动剪贴板都推进代次，只有最后一代负责收尾
+//   - _txExpectedChangeCount 记「如果只有我们动过，现在该是多少」，
+//     对不上就说明用户自己复制了东西，不还原（否则会吃掉他刚复制的内容）
+//   - 流式会话用 _txHoldDepth 挂起还原：会话期间不收尾，end 时才安排
+//
+// 互斥锁覆盖「快照 + clearContents/setString + 记代次」和
+// 「校验 + 还原 + 清状态」两整段。只保护 bookkeeping 是不够的 ——
+// 还原任务如果先清掉 pending 再去还原，中间插进来的注入会把已被污染的
+// 剪贴板当成新事务的原始快照，用户内容照样丢。
+static pthread_mutex_t clipTxMutex = PTHREAD_MUTEX_INITIALIZER;
+static BOOL _txActive = NO;                  // 事务已开启（持有原始快照）
+static NSArray *_txOriginal = nil;           // 事务开启前的剪贴板内容
+static uint64_t _txGeneration = 0;           // 我们每改一次剪贴板就 +1
+static NSInteger _txExpectedChangeCount = -1; // 只有我们动过的话，现在该是多少
+static int _txHoldDepth = 0;                 // 流式会话深度，>0 时挂起还原
+
+// 以下 tx_* 全部要求调用方已持有 clipTxMutex。
+
+static void tx_begin_locked(NSPasteboard *pb) {
+  if (_txActive) return; // 已有事务在跑就沿用它的原始快照，绝不重拍
+  _txActive = YES;
+  _txOriginal = snapshot_pasteboard(pb);
+  // 基线也要记：会话期间我们一次都没动剪贴板、而用户自己复制了东西时，
+  // 靠它才分得清「该还原」和「别碰用户刚复制的内容」。
+  _txExpectedChangeCount = pb.changeCount;
+}
+
+static uint64_t tx_note_mutation_locked(NSInteger newChangeCount) {
+  _txExpectedChangeCount = newChangeCount;
+  return ++_txGeneration;
+}
+
+static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
+  if (!_txActive) return;
+  if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
+  if (_txHoldDepth > 0) return;     // 流式会话还开着，等它 end
+  if (pb.changeCount == _txExpectedChangeCount) {
+    [pb clearContents];
+    if (_txOriginal.count > 0) {
+      [pb writeObjects:_txOriginal];
+    }
+    log_to_file("Clipboard tx: restored");
+  } else {
+    log_to_file("Clipboard tx: skipped restore (user changed clipboard)");
+  }
+  _txActive = NO;
+  _txOriginal = nil;
+  _txExpectedChangeCount = -1;
+}
+
+static void tx_schedule_finish(uint64_t gen) {
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, CLIPBOARD_RESTORE_DELAY_MS * NSEC_PER_MSEC),
+      dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        @autoreleasepool {
+          NSPasteboard *pb = [NSPasteboard generalPasteboard];
+          pthread_mutex_lock(&clipTxMutex);
+          tx_finish_locked(pb, gen);
+          pthread_mutex_unlock(&clipTxMutex);
+        }
+      });
+}
+
+// 把文本放上剪贴板并粘贴。锁一直持到 Cmd+V 发出为止 ——
+// 中途放锁的话，另一次注入可以在我们粘贴之前改掉剪贴板，粘出来就是别的内容。
+static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
+  NSInteger cc = [pb clearContents];
+  [pb setString:text forType:NSPasteboardTypeString];
+  const uint64_t gen = tx_note_mutation_locked(cc);
+  usleep(10000); // 10ms for pasteboard propagation
+  post_command_key(9, kCGHIDEventTap);
+  return gen;
+}
 
 static void inject_via_clipboard(const char *text) {
   @autoreleasepool {
@@ -607,72 +706,30 @@ static void inject_via_clipboard(const char *text) {
       return;
 
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    pthread_mutex_lock(&clipTxMutex);
+    tx_begin_locked(pasteboard);
+    const uint64_t gen = tx_paste_locked(pasteboard, newText);
+    pthread_mutex_unlock(&clipTxMutex);
 
-    // 1. 事务级快照：已有待还原任务说明我们仍持有更早的原始内容，别覆盖它
-    pthread_mutex_lock(&clipboardTxMutex);
-    if (!_txRestorePending) {
-      _txSavedItems = snapshot_pasteboard(pasteboard);
-      _txRestorePending = YES;
-    }
-    const uint64_t myGen = ++_txGeneration;
-    pthread_mutex_unlock(&clipboardTxMutex);
-
-    // 2. Put text on clipboard
-    NSInteger ourChangeCount = [pasteboard clearContents];
-    [pasteboard setString:newText forType:NSPasteboardTypeString];
-    usleep(10000); // 10ms for pasteboard propagation
-
-    // 3. Simulate Cmd+V
-    post_command_key(9, kCGHIDEventTap);
-
-    // 4. 还原剪贴板。等待期变长后，用户很可能在这期间自己复制了别的东西 ——
-    //    changeCount 变了就说明剪贴板已易主，此时还原等于把用户刚复制的内容吃掉。
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, CLIPBOARD_RESTORE_DELAY_MS * NSEC_PER_MSEC),
-        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-          pthread_mutex_lock(&clipboardTxMutex);
-          if (myGen != _txGeneration) { // 后面还有更新的注入，交给它收尾
-            pthread_mutex_unlock(&clipboardTxMutex);
-            return;
-          }
-          NSArray *saved = _txSavedItems;
-          _txSavedItems = nil;
-          _txRestorePending = NO;
-          pthread_mutex_unlock(&clipboardTxMutex);
-
-          if (pasteboard.changeCount != ourChangeCount) return;
-          [pasteboard clearContents];
-          if (saved != nil && saved.count > 0) {
-            [pasteboard writeObjects:saved];
-          }
-        });
+    tx_schedule_finish(gen);
   }
 }
 
 // --- Streaming clipboard injection (for typewriter effect) ---
-// Saves clipboard once at begin, pastes each chunk, restores at end.
-static BOOL _clipboardSessionActive = NO;
-static NSArray *_savedClipboardItems = nil;
-// 本会话最后一次由我们自己造成的 changeCount，供 end 判断剪贴板有没有易主。
-// -1 表示本会话还没动过剪贴板 —— 此时应无条件还原。
-static NSInteger _lastChunkChangeCount = -1;
+// begin 挂起还原，chunk 逐段粘贴，end 解除挂起并安排还原。
 
 void inject_clipboard_begin(void) {
   @autoreleasepool {
-    // 会话状态必须用独立标志，**不能**拿 _savedClipboardItems 是否为 nil 代表：
-    // 用户剪贴板本来就为空时，下面第 19 行会把快照设成 nil ——
-    // 那样 end 会误判成「无会话」直接返回，注入的语音文本永久留在剪贴板里
-    // （既违反恢复契约，也是口述内容泄漏）。
-    _clipboardSessionActive = true;
-    // **必须复位**：这是跨会话共享的静态量，不清零的话上一次会话留下的
-    // changeCount 会被这一次的 end 当判据 —— AI 梳理里 begin 后 Cmd+C 改了
-    // 剪贴板、LLM 又在首个 chunk 之前失败时，end 拿旧值一比就判成「已易主」
-    // 而跳过还原，用户开梳理前的剪贴板内容就这么没了。
-    _lastChunkChangeCount = -1;
-    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    _savedClipboardItems = snapshot_pasteboard(pasteboard);
-    log_to_file("Clipboard streaming: begin (saved %lu items)",
-                (unsigned long)(_savedClipboardItems ? _savedClipboardItems.count : 0));
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    pthread_mutex_lock(&clipTxMutex);
+    // 会话状态必须是独立的深度计数，**不能**拿 _txOriginal 是否为 nil 代表：
+    // 用户剪贴板本来就为空时快照就是 nil，那样 end 会误判成「无会话」直接返回，
+    // 注入的语音文本永久留在剪贴板里（既违反恢复契约，也是口述内容泄漏）。
+    tx_begin_locked(pb);
+    _txHoldDepth++;
+    log_to_file("Clipboard tx: hold++ (depth=%d, saved %lu items)", _txHoldDepth,
+                (unsigned long)(_txOriginal ? _txOriginal.count : 0));
+    pthread_mutex_unlock(&clipTxMutex);
   }
 }
 
@@ -685,48 +742,35 @@ void inject_clipboard_chunk(const char *text) {
     if (newText == nil || newText.length == 0)
       return;
 
-    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    _lastChunkChangeCount = [pasteboard clearContents];
-    [pasteboard setString:newText forType:NSPasteboardTypeString];
-    usleep(10000); // 10ms for pasteboard propagation
-
-    post_command_key(9, kCGHIDEventTap);
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    pthread_mutex_lock(&clipTxMutex);
+    tx_begin_locked(pb); // 没走 begin 也能兜住
+    tx_paste_locked(pb, newText);
     usleep(30000); // 30ms for paste to complete before next chunk
+    pthread_mutex_unlock(&clipTxMutex);
   }
 }
 
 void inject_clipboard_end(void) {
   @autoreleasepool {
-    // 没有进行中的会话就直接返回：下面 clearContents 是无条件的，
-    // 只有 saved != nil 才写回 —— 在无会话状态下再走一遍等于把用户剪贴板清空。
+    pthread_mutex_lock(&clipTxMutex);
+    // 没有进行中的会话就直接返回：下面的还原是无条件 clearContents，
+    // 无会话状态下再走一遍等于把用户剪贴板清空。
     // Dart 侧已用会话计数堵住重复调用，这里再兜一层，防别的调用方绕过。
-    //
-    // 判据是独立标志而不是 _savedClipboardItems == nil：原剪贴板为空时
-    // 快照本来就是 nil，用它判断会让 end 误早退、注入文本留在剪贴板。
-    if (!_clipboardSessionActive) {
-      log_to_file("Clipboard streaming: end ignored (no active session)");
+    if (_txHoldDepth == 0) {
+      pthread_mutex_unlock(&clipTxMutex);
+      log_to_file("Clipboard tx: end ignored (no active session)");
       return;
     }
-    _clipboardSessionActive = false;
-    // Restore clipboard after a short delay
-    NSArray *saved = _savedClipboardItems;
-    _savedClipboardItems = nil;
-    const NSInteger expected = _lastChunkChangeCount;
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, CLIPBOARD_RESTORE_DELAY_MS * NSEC_PER_MSEC),
-        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-          NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-          // 剪贴板已易主（用户自己复制了东西）就别还原，否则会吃掉他刚复制的内容
-          if (expected >= 0 && pasteboard.changeCount != expected) {
-            log_to_file("Clipboard streaming: end (skipped restore, clipboard changed)");
-            return;
-          }
-          [pasteboard clearContents];
-          if (saved != nil && saved.count > 0) {
-            [pasteboard writeObjects:saved];
-          }
-          log_to_file("Clipboard streaming: end (restored)");
-        });
+    _txHoldDepth--;
+    if (_txHoldDepth > 0 || !_txActive) {
+      pthread_mutex_unlock(&clipTxMutex);
+      return;
+    }
+    const uint64_t gen = _txGeneration;
+    pthread_mutex_unlock(&clipTxMutex);
+
+    tx_schedule_finish(gen);
   }
 }
 
@@ -735,14 +779,25 @@ void inject_clipboard_end(void) {
 // 模拟 Cmd+C 复制选中文字到剪贴板
 void copy_selection(void) {
   @autoreleasepool {
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    pthread_mutex_lock(&clipTxMutex);
+    const NSInteger before = pb.changeCount;
     post_command_key(8, kCGAnnotatedSessionEventTap); // 8 = 'c'
-    usleep(100000); // 100ms 等待剪贴板更新
-    // 会话进行中的 Cmd+C 也是「我们自己造成的变更」，要记进判据。
-    // 否则 end 会把它当成用户易主而跳过还原；反过来，用户在这之后真的自己
-    // 复制了东西，changeCount 就会对不上，还原被正确跳过 —— 两种情形分得开。
-    if (_clipboardSessionActive) {
-      _lastChunkChangeCount = [[NSPasteboard generalPasteboard] changeCount];
+
+    // **不能固定睡 100ms 再把「当前值」认作自己造成的变更。** 用户恰好在这
+    // 100ms 内自己复制了东西的话，那个值会被记成我们的，之后收尾就会拿旧快照
+    // 把他刚复制的内容覆盖掉。改成轮询等自己的 Cmd+C 落地，拿到就走 ——
+    // 之后用户再复制，changeCount 就对不上，还原会被正确跳过。
+    NSInteger observed = before;
+    for (int i = 0; i < 20; i++) { // 最多 100ms
+      usleep(5000);
+      observed = pb.changeCount;
+      if (observed != before) break;
     }
+    if (_txActive && observed != before) {
+      tx_note_mutation_locked(observed);
+    }
+    pthread_mutex_unlock(&clipTxMutex);
   }
 }
 
@@ -981,39 +1036,39 @@ static _Atomic uint64_t recordingStartPos = 0;
 //    「每调一次乘 0.88」是按「80ms 一个轮询器」设计的，实际有三个轮询器，
 //    衰减就快约三倍 —— 波形掉得比设计快，静音检测也跟着提前触发。
 //    改成按 elapsed 算 keep 系数后，结果与谁在轮询、轮询多密都无关。
-static _Atomic uint32_t smoothedLevelBits = 0;
-static _Atomic uint64_t smoothedLevelStamp = 0;
+// **用一把锁，不要拆成两个原子量。** 上一版把 level 和时间戳分别放进两个
+// atomic，看着无锁，实际提交不了一个一致状态：
+//   T1 CAS 成功写了 bits，在写 stamp 前被抢占
+//   → T2 读到「新 bits + 旧 stamp」，把已经算过的那段衰减又算一遍
+//   → T1 恢复后把 stamp 写回更早的值，时间倒退，下一次再重复衰减一遍
+// 更糟的一种交错会让 now < oldStamp，无符号相减下溢成天文数字，
+// keep≈0，电平瞬间塌到当前输入 —— 正好是这次要修掉的那类异常下降。
+// 这个函数每秒只调几十次，一把 mutex 的代价可以忽略。
+static pthread_mutex_t levelMutex = PTHREAD_MUTEX_INITIALIZER;
+static float smoothedLevel = 0.0f;
+static uint64_t smoothedLevelStamp = 0;
 
 static float smoothed_level_update(float level) {
   const uint64_t now = mach_absolute_time();
   mach_timebase_info_data_t tb;
   mach_timebase_info(&tb);
-  for (;;) {
-    uint32_t oldBits = atomic_load(&smoothedLevelBits);
-    const uint64_t oldStamp = atomic_load(&smoothedLevelStamp);
-    float prev;
-    memcpy(&prev, &oldBits, sizeof(prev));
 
-    float next;
-    if (level >= prev) {
-      next = level; // instant rise
-    } else {
-      // stamp 与 bits 不是一次原子读到的，可能取到稍旧的时间戳；
-      // 那只会让这一次衰减多算一点，不产生 UB，也不会累积偏差。
-      const double ms =
-          (double)(now - oldStamp) * tb.numer / tb.denom / 1000000.0;
-      // 原系数 0.88 的语义是「每 80ms 保留 88%」，这里把它还原成时间函数
-      const double keep = pow(0.88, ms / 80.0);
-      next = (float)(prev * keep + level * (1.0 - keep));
-    }
-
-    uint32_t newBits;
-    memcpy(&newBits, &next, sizeof(newBits));
-    if (atomic_compare_exchange_weak(&smoothedLevelBits, &oldBits, newBits)) {
-      atomic_store(&smoothedLevelStamp, now);
-      return next;
-    }
+  pthread_mutex_lock(&levelMutex);
+  if (level >= smoothedLevel) {
+    smoothedLevel = level; // instant rise
+  } else {
+    // now < stamp 只可能来自异常时钟，钳成 0 —— 无符号相减一旦下溢，
+    // keep 会算成 0，电平直接塌到当前输入。
+    const uint64_t delta = now > smoothedLevelStamp ? now - smoothedLevelStamp : 0;
+    const double ms = (double)delta * tb.numer / tb.denom / 1000000.0;
+    // 原系数 0.88 的语义是「每 80ms 保留 88%」，这里把它还原成时间函数
+    const double keep = pow(0.88, ms / 80.0);
+    smoothedLevel = (float)(smoothedLevel * keep + level * (1.0 - keep));
   }
+  smoothedLevelStamp = now;
+  const float result = smoothedLevel;
+  pthread_mutex_unlock(&levelMutex);
+  return result;
 }
 
 // Exported: returns current RMS audio level (0.0 = silence, 1.0 = loud).

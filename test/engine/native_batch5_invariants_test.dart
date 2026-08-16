@@ -11,6 +11,18 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
 
+  /// 去掉注释后的源码。「不得再出现某标识符」这类断言必须看**代码** ——
+  /// 否则解释性注释里提到的旧名字会把断言带偏（这条就绊过一次）。
+  /// 只用于否定断言：行内 `//` 剥离会误伤字符串里的 URL，肯定断言仍看 src。
+  final code = src
+      .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '')
+      .split('\n')
+      .map((l) {
+        final i = l.indexOf('//');
+        return i >= 0 ? l.substring(0, i) : l;
+      })
+      .join('\n');
+
   String bodyOf(String signature) {
     final m = RegExp('${RegExp.escape(signature)} \\{([\\s\\S]*?)\\n\\}')
         .firstMatch(src);
@@ -62,43 +74,87 @@ void main() {
     });
   });
 
-  group('N3 一次性剪贴板注入必须是事务级快照', () {
-    test('只有无待还原任务时才拍快照', () {
-      // 每次注入都重拍快照的话：原剪贴板 X → 注入 A（存 X）→ 800ms 内
-      // 注入 B（存到的却是 A）→ A 的还原任务见 changeCount 变了而跳过
-      // → B 的还原任务写回 A。X 永久丢失，剪贴板留着我们自己注入的文本。
-      final body = bodyOf('static void inject_via_clipboard(const char *text)');
-      expect(body.contains('if (!_txRestorePending)'), isTrue,
-          reason: '快照必须按事务拍一次，不能每次注入都重拍');
-      expect(body.contains('++_txGeneration'), isTrue,
-          reason: '需要代次，让只有最后一代的任务负责还原');
-      expect(body.contains('myGen != _txGeneration'), isTrue,
-          reason: '还原任务必须先确认自己是最后一代');
+  group('N3+P1 剪贴板事务：两条注入路径必须共用同一套状态', () {
+    test('只有一套事务状态，不得再有第二份快照', () {
+      // 上一版一次性用 _txSavedItems、流式用 _savedClipboardItems，
+      // 靠 Dart 的会话计数推断两者不会交错 —— 但那个计数管不到普通 inject()，
+      // 更管不到 native 这边 800ms 的延迟还原窗口。可达路径：
+      //   X → 普通注入 A（存 X，等 800ms）→ 800ms 内触发 AI 梳理，
+      //   流式 begin 把 A 当原始快照 → 普通注入的还原任务判定已易主而跳过
+      //   → 梳理结束写回 A。X 永久丢失。
+      expect(code.contains('_savedClipboardItems'), isFalse,
+          reason: '流式不得再持有自己的快照');
+      expect(code.contains('_txSavedItems'), isFalse);
+      expect(src.contains('_txOriginal'), isTrue, reason: '应只剩一份原始快照');
     });
 
-    test('事务状态的读写都在互斥锁内', () {
-      final body = bodyOf('static void inject_via_clipboard(const char *text)');
-      expect('pthread_mutex_lock(&clipboardTxMutex)'.allMatches(body).length,
-          greaterThanOrEqualTo(2),
-          reason: '注入侧与还原任务侧分别在两个线程上，都要持锁');
+    test('原始快照只在事务开启时拍一次', () {
+      final body =
+          RegExp(r'static void tx_begin_locked\(NSPasteboard \*pb\) \{([\s\S]*?)\n\}')
+              .firstMatch(src)
+              ?.group(1);
+      expect(body, isNotNull);
+      expect(body!.contains('if (_txActive) return'), isTrue,
+          reason: '已有事务在跑就必须沿用它的快照，绝不重拍');
+    });
+
+    test('收尾必须在同一把锁里完成「校验+还原+清状态」', () {
+      // 先清 pending 再去还原的话，中间插进来的注入会把已被污染的剪贴板
+      // 当成新事务的原始快照，用户内容照样丢。
+      final body =
+          RegExp(r'static void tx_finish_locked\(NSPasteboard \*pb, uint64_t gen\) \{([\s\S]*?)\n\}')
+              .firstMatch(src)
+              ?.group(1);
+      expect(body, isNotNull);
+      final restoreAt = body!.indexOf('writeObjects');
+      final clearAt = body.indexOf('_txActive = NO');
+      expect(restoreAt, greaterThanOrEqualTo(0));
+      expect(clearAt, greaterThanOrEqualTo(0));
+      expect(restoreAt, lessThan(clearAt),
+          reason: '必须先还原再清事务状态');
+      expect(body.contains('gen != _txGeneration'), isTrue,
+          reason: '只有最后一代负责收尾');
+    });
+
+    test('粘贴序列全程持锁 —— 不能在写剪贴板和 Cmd+V 之间放锁', () {
+      // 放锁的话另一次注入可以在我们粘贴之前改掉剪贴板，粘出来是别的内容。
+      final body =
+          RegExp(r'static uint64_t tx_paste_locked\(NSPasteboard \*pb, NSString \*text\) \{([\s\S]*?)\n\}')
+              .firstMatch(src)
+              ?.group(1);
+      expect(body, isNotNull, reason: '没找到 tx_paste_locked');
+      expect(body!.contains('pthread_mutex_unlock'), isFalse,
+          reason: '这个函数内部不得放锁');
+      expect(body.contains('post_command_key'), isTrue);
     });
   });
 
   group('N6 流式会话不得共用上一次会话的 changeCount', () {
-    test('begin 必须复位 _lastChunkChangeCount', () {
+    test('判据必须随事务开启而重置', () {
       // 不复位的话：AI 梳理里 begin 后 Cmd+C 改了剪贴板、LLM 又在首个
       // chunk 之前失败时，end 拿上一次会话的旧值一比就判成「已易主」
       // 而跳过还原 —— 用户开梳理前的剪贴板内容就这么没了。
-      final body = bodyOf('void inject_clipboard_begin(void)');
-      expect(body.contains('_lastChunkChangeCount = -1'), isTrue,
-          reason: 'begin 没复位，判据会跨会话残留');
+      // 跨会话共享的判据必须随事务生命周期走，不能是永不复位的静态量
+      expect(code.contains('_lastChunkChangeCount'), isFalse,
+          reason: '旧的跨会话静态判据应已随事务协调器一起去掉');
+      final body =
+          RegExp(r'static void tx_begin_locked\(NSPasteboard \*pb\) \{([\s\S]*?)\n\}')
+              .firstMatch(src)!
+              .group(1)!;
+      expect(body.contains('_txExpectedChangeCount = pb.changeCount'), isTrue,
+          reason: '事务开启时要记基线，否则「我们没动过而用户动了」这种情形分不出来');
     });
 
-    test('copy_selection 在会话中要把自己造成的变更记进判据', () {
+    test('copy_selection 不得固定 sleep 后把「当前值」认作自己造成的', () {
+      // 固定睡 100ms 的话，用户恰好在这窗口内自己复制了东西，那个值会被
+      // 记成我们的变更，之后收尾就拿旧快照把他刚复制的内容覆盖掉。
       final body = bodyOf('void copy_selection(void)');
-      expect(body.contains('_clipboardSessionActive'), isTrue);
-      expect(body.contains('_lastChunkChangeCount'), isTrue,
-          reason: '会话内的 Cmd+C 也是我们造成的变更，不记就会被当成用户易主');
+      expect(body.contains('usleep(100000)'), isFalse,
+          reason: '不能固定睡满再归因，要轮询等自己的 Cmd+C 落地');
+      expect(body.contains('observed != before'), isTrue,
+          reason: '必须与调用前的基线比较，确认变更确实发生了才归因');
+      expect(body.contains('tx_note_mutation_locked'), isTrue,
+          reason: '会话内的 Cmd+C 也是我们造成的变更，要记进判据');
     });
   });
 
@@ -107,7 +163,7 @@ void main() {
       // 旧实现等 5 秒就返回初值 0（=拒绝）：用户读一眼提示再点「允许」
       // 就超时，这次录音被判无权限直接中止。而且它跑在 UI isolate 上，
       // 等于界面冻 5 秒。`__block int result` 还是无同步的数据竞争。
-      expect(src.contains('dispatch_semaphore_wait'), isFalse,
+      expect(code.contains('dispatch_semaphore_wait'), isFalse,
           reason: '同步 FFI 不能等一个要人点的 UI');
     });
 
@@ -120,23 +176,50 @@ void main() {
     });
   });
 
-  group('N8 音频电平平滑必须与调用频率无关', () {
-    test('不得再用非原子的裸 float 累积', () {
-      // 三个调用方分布在两个线程：Dart UI isolate（波形 + 静音检测）
-      // 和 AppKit 主线程（80ms Timer）。除了数据竞争，更实际的问题是
-      // 「每调一次乘 0.88」让衰减速度跟着调用次数走 —— 离线探针实测
-      // 三个轮询器时 480ms 后衰减到 0.1002，而设计值是 0.4644。
-      expect(RegExp(r'static float smoothedLevel\s*=').hasMatch(src), isFalse,
-          reason: '裸 float 既是数据竞争，衰减也会随轮询器个数变快');
-      expect(src.contains('_Atomic uint32_t smoothedLevelBits'), isTrue);
+  group('N8 音频电平平滑必须与调用频率无关且状态一致', () {
+    test('不得用两个独立原子量拼一个状态', () {
+      // level 和 stamp 分别放进两个 atomic 提交不了一致状态：
+      // 线程 A CAS 写完 bits 尚未写 stamp 时，线程 B 读到「新 bits + 旧 stamp」
+      // 会把已算过的衰减再算一遍；A 恢复后写回更早的 stamp 让时间倒退。
+      // 另一种交错让 now < oldStamp，无符号相减下溢，keep≈0，电平瞬间塌掉。
+      expect(code.contains('smoothedLevelBits'), isFalse,
+          reason: '双原子拼状态不成立，应改用一把锁');
+      expect(src.contains('pthread_mutex_t levelMutex'), isTrue);
     });
 
     test('衰减按经过时间算，而不是按调用次数', () {
       final body = bodyOf('static float smoothed_level_update(float level)');
       expect(body.contains('pow(0.88'), isTrue,
           reason: 'keep 系数应由 elapsed 推出，与调用频率无关');
-      expect(body.contains('atomic_compare_exchange_weak'), isTrue,
-          reason: '读改写要用 CAS 循环');
+      expect(body.contains('pthread_mutex_lock(&levelMutex)'), isTrue);
+      expect(body.contains('now > smoothedLevelStamp ? now - smoothedLevelStamp : 0'),
+          isTrue,
+          reason: '必须钳住时钟倒退，否则无符号下溢会让电平直接塌到当前输入');
+    });
+  });
+
+  group('P2 tap 日志环形缓冲：满则丢新，绝不覆盖读者手里的槽', () {
+    test('写者必须看得见读游标', () {
+      // 覆盖未消费的槽位不是「日志撕裂」这么轻 —— 读者 memcpy 与写者
+      // vsnprintf 同一个 char[]，在 C 内存模型下是数据竞争，是 UB。
+      final body = bodyOf(
+          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      expect(body.contains('tapLogRead'), isTrue, reason: '写者没读游标，会覆盖未消费的槽');
+      expect(body.contains('w - r >= TAP_LOG_SLOTS'), isTrue,
+          reason: '环满时必须丢新的这条');
+      expect(src.contains('static atomic_uint tapLogRead'), isTrue,
+          reason: '读游标要跨线程可见，必须是原子量');
+    });
+
+    test('关闭 verbose 前必须先同步排空', () {
+      // log_to_file 自己也受这个开关控制，先置零就会丢掉最后 200ms 那批 ——
+      // 往往正是用户关开关前想看的那几行。
+      final body = bodyOf('void set_debug_logging(int enabled)');
+      final flushAt = body.indexOf('flush_tap_log_sync()');
+      final zeroAt = body.indexOf('atomic_store(&debugLoggingEnabled, 0)');
+      expect(flushAt, greaterThanOrEqualTo(0), reason: '关闭路径没有排空');
+      expect(zeroAt, greaterThanOrEqualTo(0));
+      expect(flushAt, lessThan(zeroAt), reason: '必须先排空再置零');
     });
   });
 }
