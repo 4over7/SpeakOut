@@ -383,6 +383,7 @@
   "permissionsMicrophoneRestricted": "Microphone access is restricted by system policy",
   "engineInjectFailed": "Injection failed — the text is saved in chat history",
   "engineInjectPartial": "Injection incomplete — the full text is saved in chat history",
+  "engineClipboardRestoreFailed": "Clipboard could not be restored — its previous contents may be lost",
   "permissionsOpen": "Open",
   "aboutDeveloper": "Developer",
   "aboutVerboseLogging": "Verbose Logging",

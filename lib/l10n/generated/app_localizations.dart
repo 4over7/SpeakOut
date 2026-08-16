@@ -1886,6 +1886,12 @@ abstract class AppLocalizations {
   /// **'Injection incomplete — the full text is saved in chat history'**
   String get engineInjectPartial;
 
+  /// No description provided for @engineClipboardRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard could not be restored — its previous contents may be lost'**
+  String get engineClipboardRestoreFailed;
+
   /// No description provided for @permissionsOpen.
   ///
   /// In en, this message translates to:

@@ -343,6 +343,7 @@
   "permissionsMicrophoneRestricted": "麦克风被系统策略限制，无法自行开启",
   "engineInjectFailed": "注入失败，文字已存到聊天记录",
   "engineInjectPartial": "注入不完整，完整文字已存到聊天记录",
+  "engineClipboardRestoreFailed": "剪贴板未能还原，原有内容可能已丢失",
   "permissionsOpen": "打开",
   "aboutDeveloper": "开发者",
   "aboutVerboseLogging": "详细日志",

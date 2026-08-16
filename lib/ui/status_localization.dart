@@ -21,6 +21,8 @@ String localizedEngineStatus(BuildContext context, EngineStatus status) {
       return loc.engineInjectFailed;
     case 'inject_partial':
       return loc.engineInjectPartial;
+    case 'clipboard_restore_failed':
+      return loc.engineClipboardRestoreFailed;
     default:
       return status.message;
   }

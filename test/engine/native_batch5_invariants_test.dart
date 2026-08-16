@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// 每一条都对应一个已经发生过或已被确认可触发的缺陷。
 /// 导出签名的指纹。**改了任何导出函数的签名就要连同 ABI 版本一起更新。**
 /// 值由「导出签名一变，ABI 版本必须跟着变」这条测试的失败信息给出。
-const String kNativeAbiFingerprint = 'c2ea60ae860d7df2d1c9b0ad4b4c6e3ce3c4a9b1';
+const String kNativeAbiFingerprint = 'bb09cbf753496d95908c81454c5c99073a424c8d';
 
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
@@ -239,28 +239,94 @@ void main() {
       // 而那正是这个握手要防的情形（Dart 按 Int32 去调旧的 void 函数，
       // 读到返回寄存器里的残值）。
       //
-      // 这里把**所有导出函数的规范化签名**做成指纹钉住：签名一变指纹就变，
-      // 测试失败 → 逼你同时升 ABI 版本和这里记录的指纹。
-      final src = File('native_lib/native_input.m').readAsStringSync();
-      // 取所有非 static 的顶层函数定义（导出面）
-      final sigs = RegExp(
-              r'^((?!static)[A-Za-z_][A-Za-z0-9_ *]*?)\s+([a-z_][a-z0-9_]*)\s*\(([^)]*)\)\s*\{',
-              multiLine: true)
-          .allMatches(src)
-          .map((m) =>
-              '${m.group(1)!.trim()} ${m.group(2)} (${m.group(3)!.replaceAll(RegExp(r'\s+'), ' ').trim()})')
-          .toList()
-        ..sort();
-      expect(sigs.length, greaterThan(20), reason: '没扫到足够的导出函数，判据失效');
+      // 这里把**三个平台**所有导出函数的规范化签名做成指纹钉住。
+      // 只扫 macOS 是不够的：Linux/Windows 那两份实现单独改签名时，
+      // 指纹不变、版本也不用升，同样会撞上 ABI 不匹配。
+      //
+      // 返回指针类型的函数（`const char *foo(void)`）星号与函数名之间没有空格，
+      // 早期的正则漏掉了 6 个 —— 实测 `nm -gU` 有 47 个导出，正则只扫到 41。
+      // 现在要求「扫到的数量」也钉死，正则退化会立刻暴露。
+      List<String> sigsOf(String path) {
+        final text = File(path).readAsStringSync();
+        return RegExp(
+                r'^(?!static\b)([A-Za-z_][A-Za-z0-9_ ]*?[ *]+)'
+                r'([A-Za-z_][A-Za-z0-9_]*)\s*\(([^;{}]*?)\)\s*\{',
+                multiLine: true)
+            .allMatches(text)
+            .map((m) =>
+                '${m.group(1)!.trim()} ${m.group(2)} '
+                '(${m.group(3)!.replaceAll(RegExp(r'\s+'), ' ').trim()})')
+            .toList();
+      }
 
-      final digest = sha1.convert(utf8.encode(sigs.join('\n'))).toString();
-      const recorded = kNativeAbiFingerprint;
-      expect(digest, recorded,
-          reason: '导出签名变了。请同时做两件事：\n'
-              '  1. 三个平台的 SPEAKOUT_NATIVE_ABI_VERSION 和 '
-              'kExpectedNativeAbiVersion 一起 +1\n'
-              '  2. 把本文件顶部的 kNativeAbiFingerprint 更新为 $digest\n'
-              '只改其中一件仍会红 —— 这正是要防的「忘记升版本」。');
+      final all = <String>[];
+      for (final f in [
+        'native_lib/native_input.m',
+        'native_lib/linux/native_input.c',
+        'native_lib/windows/native_input.cpp',
+      ]) {
+        final sigs = sigsOf(f);
+        expect(sigs.length, greaterThan(5), reason: '$f 没扫到足够导出，正则退化了');
+        all.addAll(sigs.map((x) => '$f :: $x'));
+      }
+      all.sort();
+      // 正则扫到的导出面必须与 dylib 里**真实的**导出符号对得上。
+      // 写死一个数字太脆（每加一个导出都要改），而且它证明不了「扫全了」；
+      // 跟 `nm -gU` 对账才是真判据 —— 早期正则漏掉 6 个返回指针的函数
+      // （`const char *foo(void)` 星号与名字之间没空格），就是这么发现的。
+      if (Platform.isMacOS) {
+        final nm = Process.runSync(
+            'sh', ['-c', "nm -gU native_lib/libnative_input.dylib | awk '{print \$3}'"]);
+        expect(nm.exitCode, 0, reason: 'nm 执行失败: ${nm.stderr}');
+        final exported = (nm.stdout as String)
+            .split('\n')
+            .map((l) => l.trim())
+            .where((l) => l.startsWith('_'))
+            .map((l) => l.substring(1))
+            .toSet();
+        final scanned = RegExp(
+                r'^(?!static\b)([A-Za-z_][A-Za-z0-9_ ]*?[ *]+)'
+                r'([A-Za-z_][A-Za-z0-9_]*)\s*\(([^;{}]*?)\)\s*\{',
+                multiLine: true)
+            .allMatches(File('native_lib/native_input.m').readAsStringSync())
+            .map((m) => m.group(2)!)
+            .toSet();
+        expect(exported.difference(scanned), isEmpty,
+            reason: '这些函数真的导出了，但指纹正则没扫到 —— '
+                '它们改签名不会被任何东西发现');
+      }
+
+      final digest = sha1.convert(utf8.encode(all.join('\n'))).toString();
+      final expectedAbi = int.parse(digest.substring(0, 6), radix: 16);
+
+      // **版本号 = 指纹前 6 位十六进制。**
+      // 上一版是「手动递增的序号 + 一条比较四处相等的断言」，那拦不住
+      // 「改了签名却忘了升」—— 四处都不改，断言当然全绿（我就这么漏过一次）。
+      // 现在版本是签名的**函数**：改签名 → 指纹变 → 期望版本变 →
+      // 四处写死的旧值全部对不上。只改一半在结构上不可能。
+      // 锚到定义本身，不能只匹配名字 —— 注释里也会提到它（实测踩过）
+      final defineRe = RegExp(r'#define SPEAKOUT_NATIVE_ABI_VERSION (\S+)');
+      final sources = {
+        'native_lib/native_input.m': defineRe,
+        'native_lib/linux/native_input.c': defineRe,
+        'native_lib/windows/native_input.cpp': defineRe,
+        'lib/ffi/native_input_ffi.dart':
+            RegExp(r'const int kExpectedNativeAbiVersion = (\S+);'),
+      };
+      final wrong = <String, String>{};
+      sources.forEach((f, re) {
+        final m = re.firstMatch(File(f).readAsStringSync());
+        expect(m, isNotNull, reason: '$f 找不到 ABI 版本');
+        final got = int.parse(m!.group(1)!.replaceFirst('0x', ''), radix: 16);
+        if (got != expectedAbi) wrong[f] = m.group(1)!;
+      });
+      expect(wrong, isEmpty,
+          reason: '导出签名变了，ABI 版本必须跟着变。\n'
+              '  期望：0x${expectedAbi.toRadixString(16).padLeft(6, '0')}\n'
+              '  实际：$wrong\n'
+              '  同时把 kNativeAbiFingerprint 更新为 $digest');
+      expect(digest, kNativeAbiFingerprint,
+          reason: '指纹变了，请更新 kNativeAbiFingerprint 为 $digest');
     });
 
     test('三个平台都必须导出 ABI 版本，且与 Dart 侧一致', () {
@@ -447,8 +513,17 @@ void main() {
       expect(checkAt, greaterThanOrEqualTo(0), reason: '核对结果没有被使用');
       expect(noteAt, greaterThan(checkAt),
           reason: '必须先核对、不符就返回，之后才允许 note_mutation');
-      for (final v in ['_txGeneration == genBefore', '_txToken == tokenBefore',
-                       'pb.changeCount == observed']) {
+      // 五项缺一不可。漏掉 expected 曾经无人发现：另一次 copy_selection
+      // 因 ownership 变化而重拍快照时，**只更新 expected，不推进 generation、
+      // 不换 token** —— 只比其余四项的话这种交错会全部「成立」。
+      for (final v in [
+        '_txGeneration == genBefore',
+        '_txActive == activeBefore',
+        '_txOriginalValid == validBefore',
+        '_txToken == tokenBefore',
+        '_txExpectedChangeCount == expectedBefore',
+        'pb.changeCount == observed',
+      ]) {
         expect(code.contains(v), isTrue, reason: 'TOCTOU 核对漏了 $v');
       }
     });

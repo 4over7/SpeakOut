@@ -38,10 +38,24 @@ static void flush_tap_log_sync(void);
 // 于是「注入成功了吗」变成掷骰子。正常 DMG/install 是整包替换不会混搭，
 // 但手工替换、部分更新、加载路径残留都可能撞上。
 //
-// 改签名时**必须**同时 +1，Dart 侧在初始化时校验。
+// **版本号不是手动递增的整数，而是「导出签名指纹的前 6 位十六进制」。**
+// 手动递增靠自觉，而我自己就漏过一次（把 inject_clipboard_begin 从 void 改成
+// int 却没升版本，正好是这个握手要防的情形）。现在版本是签名的**函数**：
+// 改了任何导出签名，指纹变、版本就必须跟着变，结构上不可能只改一半。
+// 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
 // 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
 // 而不是悄悄读垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 3
+#define SPEAKOUT_NATIVE_ABI_VERSION 0xbb09cb
+// 剪贴板还原最终失败的累计次数。还原发生在注入之后 800ms 的异步任务里，
+// 没法用返回值告诉 Dart —— 只记日志的话，用户的剪贴板被清空了却毫不知情。
+// Dart 侧在下一次注入时读一下这个计数，涨了就提示。
+static atomic_uint clipboardRestoreFailures = 0;
+
+// 剪贴板还原最终失败的累计次数（见 clipboardRestoreFailures 的说明）
+unsigned clipboard_restore_failures(void) {
+  return atomic_load_explicit(&clipboardRestoreFailures, memory_order_relaxed);
+}
+
 int native_input_abi_version(void) { return SPEAKOUT_NATIVE_ABI_VERSION; }
 
 void set_debug_logging(int enabled) {
@@ -728,6 +742,7 @@ static NSString *const kSpeakOutOwnerType = @"com.speakout.injection-token";
 // 本次事务的 token。收尾时靠它判断「剪贴板还是不是我们放的」，
 // 理由见 tx_finish_locked —— changeCount 和文本内容都是不可靠的代理量。
 static NSString *_txToken = nil;
+
 static int _txHoldDepth = 0;                 // 流式会话深度，>0 时挂起还原
 
 // 以下 tx_* 全部要求调用方已持有 clipTxMutex。
@@ -789,7 +804,11 @@ static uint64_t tx_note_mutation_locked(NSInteger newChangeCount) {
 // 真正的 ownership 判据仍是 changeCount。
 static BOOL tx_still_ours_locked(NSPasteboard *pb) {
   if (pb.changeCount != _txExpectedChangeCount) return NO;
-  if (_txToken == nil) return YES; // 本事务没写过剪贴板，changeCount 已足够
+  // _txToken 为 nil 有三种来源：刚 begin 还没写过、copy_selection 只复制没写
+  // token、以及 token 写入失败。三种情况下文本要么不是我们写的、要么已由我们
+  // 写入且 changeCount 仍等于 clearContents 的返回值 —— 按 Apple 的 ownership
+  // 语义，此时仍算我们持有，可以还原。
+  if (_txToken == nil) return YES;
   if (pb.pasteboardItems.count != 1) return NO;
   NSString *token = [pb stringForType:kSpeakOutOwnerType];
   return token != nil && [token isEqualToString:_txToken];
@@ -799,23 +818,14 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   if (!_txActive) return;
   if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
   if (_txHoldDepth > 0) return;     // 流式会话还开着，等它 end
-  // 判据是**我们自己写进去的一枚 token**，不是 changeCount，也不是文本内容。
+  // 所有权判定见 tx_still_ours_locked()：changeCount + 单 item + token，三条齐全。
   //
-  // 为什么不用 changeCount：它反映的是 pasteboard ownership 变更，
-  // 任何重新声明剪贴板的进程都会推高它，而不只是「用户换了内容」。
-  // 拿它当判据，就可能在没人真正接管的情况下跳过还原，把注入文字永久留下。
+  // ⚠️ 别再想着「用 token 取代 changeCount」—— 我干过一次，是错的：
+  // changeCount 才是 Apple 文档里判断 ownership 的正规机制，
+  // 而 token 连访问控制都不是（general pasteboard 对所有进程可读，能被原样重放）。
   //
-  // 为什么不用文本内容：用户完全可能从别处复制到一模一样的文字（甚至带格式），
-  // 那时内容相等但**东西是他的**，还原回去就吃掉了他刚复制的内容。
-  // 而且 stringForType: 会把多个 item 的字符串拼起来，不同组合也可能撞出相同文本。
-  //
-  // token 写在私有 type 里，随文本一起进同一次声明。别人重新复制同样的文字，
-  // 不会带上这枚 token —— 这才是「这份剪贴板还是不是我们放的」的直接证据。
-  //
-  // ⚠️ 说明：2026-08-16 那次线上故障（注入 5 分钟后 Cmd+V 贴出识别结果）
-  // **根因至今未定案**。曾一度归因为「旁观者推高 changeCount」，
-  // 但探针连采 5 次都没观察到旁观者改动，该归因已作废。
-  // 本改动是**严格的健壮性改进**，不要当成那次故障的已验证修复。
+  // ⚠️ 2026-08-16 那次线上故障（注入 5 分钟后 Cmd+V 贴出识别结果）
+  // **根因至今未定案**。本实现是健壮性改进，不是那次故障的已验证修复。
   // 详见 docs/debug-log/2026-08-16-paste-yields-previous-recognition.md。
   const BOOL stillOurs = tx_still_ours_locked(pb);
   if (!_txOriginalValid) {
@@ -828,9 +838,23 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
     } else if ([pb writeObjects:_txOriginal]) {
       log_to_file("Clipboard tx: restored");
     } else {
-      // 不能记成功：此刻剪贴板已被 clearContents 清空，用户的内容真的没了。
-      // 记成 restored 会让下次排查直接跳过这一段。
-      log_to_file("Clipboard tx: RESTORE WRITE FAILED, clipboard left empty");
+      // 重试几次：writeObjects 的失败常常是瞬时的 ownership 争用。
+      BOOL recovered = NO;
+      for (int i = 0; i < 3 && !recovered; i++) {
+        usleep(50000);
+        [pb clearContents];
+        recovered = [pb writeObjects:_txOriginal];
+      }
+      if (recovered) {
+        log_to_file("Clipboard tx: restored after retry");
+      } else {
+        // 不能记成功：此刻剪贴板已被 clearContents 清空，用户的内容真的没了。
+        // 计数让 Dart 侧能发现 —— 还原是异步的，没法用返回值告诉调用方，
+        // 只记日志的话用户永远不知道自己的剪贴板被清空了。
+        atomic_fetch_add_explicit(&clipboardRestoreFailures, 1,
+                                  memory_order_relaxed);
+        log_to_file("Clipboard tx: RESTORE WRITE FAILED, clipboard left empty");
+      }
     }
   } else {
     log_to_file("Clipboard tx: skipped restore (clipboard content is no longer ours)");
@@ -863,10 +887,9 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   //   X → chunk(A)（expected=A）→ 用户复制 Z → chunk(B) 把 Z 清掉、expected=B
   //   → 收尾看到 B==expected，还原 X。Z 永久丢失，而且用户毫无察觉。
   // 一旦发现易主，用户手里那份才是该还原的目标，旧快照已经过期，重新拍。
-  // 写之前先确认剪贴板还是我们的。判据同样是 token 而不是 changeCount ——
-  // 只改收尾那一处是不够的：某个工具重新声明了同样的内容，changeCount 会变，
-  // 这里就会把「我们自己刚注入的文字」重新拍成「用户的原始内容」，
-  // 收尾再把它还原回去，注入文本照样滞留。
+  // 写之前先确认剪贴板还是我们的，判据与收尾**共用同一个函数** ——
+  // 只改收尾那一处是不够的：写前如果不查，就会把「我们自己刚注入的文字」
+  // 重新拍成「用户的原始内容」，收尾再把它还原回去，注入文本照样滞留。
   if (!tx_still_ours_locked(pb)) {
     log_to_file("Clipboard tx: clipboard no longer ours mid-transaction, re-snapshot");
     if (!tx_snapshot_stable_locked(pb)) return 0; // 0 = 没写，调用方别安排收尾
@@ -1100,6 +1123,10 @@ int copy_selection(void) {
     const BOOL activeBefore = _txActive;
     const BOOL validBefore = _txOriginalValid;
     NSString *tokenBefore = _txToken;
+    // expected 也要拍：另一次 copy_selection 因 ownership 变化而重拍快照时，
+    // **只更新 expected，不推进 generation、不换 token** —— 只比那三项的话，
+    // 这种交错会全部「成立」，我们却拿着过期的 before 去归因。
+    const NSInteger expectedBefore = _txExpectedChangeCount;
     pthread_mutex_unlock(&clipTxMutex);
     NSInteger observed = before;
     for (int i = 0; i < 50; i++) { // 最多 250ms：目标 App 卡顿时 100ms 常常不够
@@ -1115,6 +1142,7 @@ int copy_selection(void) {
                              (_txActive == activeBefore) &&
                              (_txOriginalValid == validBefore) &&
                              (_txToken == tokenBefore) &&
+                             (_txExpectedChangeCount == expectedBefore) &&
                              (pb.changeCount == observed);
     if (!stateIntact) {
       log_to_file("Clipboard tx: tx changed during copy_selection wait, skip attribution");
@@ -1144,6 +1172,39 @@ int copy_selection(void) {
     pthread_mutex_unlock(&clipTxMutex);
     if (orphan) tx_schedule_finish(gen);
     return copied ? 1 : 0;
+  }
+}
+
+// 复制选中文字**并把它直接返回**，调用方用 native_free 释放。
+// 失败返回 NULL。
+//
+// **为什么不能沿用「copy_selection() 然后 Dart 自己读剪贴板」：**
+// 那是两次独立的 FFI，中间有两个窗口都会读到别的东西：
+//   1. native 只证明「观察到一次 changeCount 变化」，证明不了那次变化
+//      就是我们的 Cmd+C 造成的；
+//   2. native 返回后 Dart 还固定等 150ms 才读，这段时间里剪贴板可能又被改了。
+// 两个窗口任一命中，送进 LLM 的就是无关内容 —— 甚至是用户剪贴板里的敏感信息。
+//
+// 这里把「发 Cmd+C → 等变化 → 读文本」收进同一次调用，并用
+// 「读前 changeCount == 读后 changeCount」保证读到的是同一版内容。
+const char *copy_selection_text(void) {
+  @autoreleasepool {
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    if (copy_selection() != 1) return NULL;
+
+    // 稳定读：读前读后 changeCount 一致，才能确定这份文本没被中途换掉
+    for (int i = 0; i < 8; i++) {
+      const NSInteger before = pb.changeCount;
+      NSString *text = [pb stringForType:NSPasteboardTypeString];
+      if (pb.changeCount != before) continue; // 读的过程中被换了，重来
+      if (text == nil) return NULL;
+      const char *utf8 = [text UTF8String];
+      if (utf8 == NULL) return NULL;
+      char *copy = strdup(utf8);
+      return copy; // Dart 侧负责 native_free
+    }
+    log_to_file("Clipboard tx: copy_selection_text unstable read");
+    return NULL;
   }
 }
 

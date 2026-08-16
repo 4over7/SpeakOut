@@ -7,9 +7,12 @@ import 'package:speakout/config/app_log.dart';
 ///
 /// macOS / Windows / Linux 的 NativeInput 实现都继承此类，
 /// 只需提供各自平台的动态库路径即可复用全部 FFI 绑定代码。
-/// 与 `native_input.m` 里的 `SPEAKOUT_NATIVE_ABI_VERSION` 必须一致。
-/// 改任何导出函数的签名时两边一起 +1。
-const int kExpectedNativeAbiVersion = 3;
+/// 与三个平台的 `SPEAKOUT_NATIVE_ABI_VERSION` 必须一致。
+/// **它是导出签名指纹的前 6 位十六进制，不是手动递增的序号** ——
+/// 手动递增靠自觉，而我漏过一次（改了 inject_clipboard_begin 的签名却没升，
+/// 正好是这个握手要防的情形）。现在版本是签名的函数，只改一半不可能。
+/// 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
+const int kExpectedNativeAbiVersion = 0xbb09cb;
 
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
@@ -524,6 +527,8 @@ class NativeInputFFI implements NativeInputBase {
   // ============ AI ORGANIZE (copy_selection / press_key) ============
 
   bool _organizeBound = false;
+  CopySelectionTextDart? _copySelectionText;
+  ClipboardRestoreFailuresDart? _clipboardRestoreFailures;
   late CopySelectionDart _copySelection;
   late PressKeyDart _pressKey;
 
@@ -536,11 +541,42 @@ class NativeInputFFI implements NativeInputBase {
       _pressKey = _dylib
           .lookup<NativeFunction<PressKeyC>>('press_key')
           .asFunction();
+      try {
+        _copySelectionText = _dylib
+            .lookup<NativeFunction<CopySelectionTextC>>('copy_selection_text')
+            .asFunction();
+        _clipboardRestoreFailures = _dylib
+            .lookup<NativeFunction<ClipboardRestoreFailuresC>>(
+                'clipboard_restore_failures')
+            .asFunction();
+      } catch (_) {
+        _copySelectionText = null; // 老 dylib 没有；调用方会回退
+        _clipboardRestoreFailures = null;
+      }
       _organizeBound = true;
       _log("Organize FFI bindings SUCCESS");
     } catch (e) {
       _log("Organize FFI bindings FAILED: $e");
     }
+  }
+
+  @override
+  int clipboardRestoreFailures() {
+    _bindOrganizeFunctions();
+    return _clipboardRestoreFailures?.call() ?? 0;
+  }
+
+  @override
+  String? copySelectionText() {
+    _bindOrganizeFunctions();
+    if (!_organizeBound) return null;
+    final fn = _copySelectionText;
+    if (fn == null) return null;
+    final ptr = fn();
+    if (ptr == nullptr) return null;
+    final text = ptr.toDartString();
+    nativeFree(ptr.cast());
+    return text;
   }
 
   @override

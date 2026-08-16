@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import '../ffi/native_input_base.dart';
 import '../ffi/native_input_factory.dart';
@@ -99,6 +98,20 @@ class CoreEngine {
   bool get isClipboardInjecting => _clipboardSessions > 0;
 
   /// 成对包装：计数只在这两个方法里维护，避免各调用点自己维护而漂移。
+  int _lastRestoreFailures = 0;
+
+  /// 剪贴板还原是注入之后 800ms 的异步任务，失败没法用返回值上报 ——
+  /// 而失败意味着**用户的剪贴板被清空了**。这里在下一次注入结束时对一下计数，
+  /// 涨了就告诉他，别让他以为是自己手滑。
+  void _reportClipboardRestoreFailures() {
+    final n = _nativeInput?.clipboardRestoreFailures() ?? 0;
+    if (n <= _lastRestoreFailures) return;
+    _lastRestoreFailures = n;
+    _log("[Clipboard] 还原失败累计 $n 次");
+    _statusController.add(EngineStatus.error(
+        "Clipboard could not be restored", code: 'clipboard_restore_failed'));
+  }
+
   /// 返回会话是否真的开启。**false 时调用方必须放弃流式注入** ——
   /// 原先这里返回 void：native begin 因为拿不到可信快照而中止时，
   /// Dart 照样把计数 +1，打字机以为有 hold 罩着继续发 chunk，
@@ -755,9 +768,12 @@ class CoreEngine {
         await overlay.hide();
         return;
       }
-      if (!ni.copySelection()) {
-        // Cmd+C 没生效：继续下去会把**剪贴板里的旧内容**当成用户选中的文字
-        // 发给 LLM —— 可能完全无关，也可能是敏感内容。
+      // **复制与读取必须是同一次调用。** 拆成「copySelection() + 自己读剪贴板」
+      // 的话中间有两个窗口会读到别的内容：native 观察到的 changeCount 变化
+      // 未必来自我们的 Cmd+C；返回后到这里读之间剪贴板还可能再被改。
+      // 任一命中，送进 LLM 的就是无关内容 —— 甚至是用户剪贴板里的敏感信息。
+      final copied = ni.copySelectionText();
+      if (copied == null) {
         _log("[Organize] 复制选中文字失败，中止");
         _clipEnd();
         overlay.recordingMode = "organize";
@@ -767,11 +783,9 @@ class CoreEngine {
         await overlay.hide();
         return;
       }
-      await Future.delayed(const Duration(milliseconds: 150));
 
       // 2. 读取剪贴板
-      final clipData = await Clipboard.getData('text/plain');
-      final selectedText = clipData?.text?.trim() ?? '';
+      final selectedText = copied.trim();
       if (selectedText.isEmpty) {
         _log("[Organize] 未检测到选中文字");
         _clipEnd();
@@ -1528,6 +1542,7 @@ class CoreEngine {
           _typewriterInjected = false;
           // 文字仍然进聊天记录 —— 注入失败时那里是用户唯一能找回这段话的地方
           ChatService().addDictation(finalText, asrOriginal: originalAsrText);
+          _reportClipboardRestoreFailures();
           if (injected) {
             _statusController.add(EngineStatus.ready("Ready"));
           } else {

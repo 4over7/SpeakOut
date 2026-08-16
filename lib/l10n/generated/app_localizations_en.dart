@@ -994,6 +994,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Injection incomplete — the full text is saved in chat history';
 
   @override
+  String get engineClipboardRestoreFailed =>
+      'Clipboard could not be restored — its previous contents may be lost';
+
+  @override
   String get permissionsOpen => 'Open';
 
   @override

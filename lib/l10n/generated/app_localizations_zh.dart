@@ -943,6 +943,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get engineInjectPartial => '注入不完整，完整文字已存到聊天记录';
 
   @override
+  String get engineClipboardRestoreFailed => '剪贴板未能还原，原有内容可能已丢失';
+
+  @override
   String get permissionsOpen => '打开';
 
   @override

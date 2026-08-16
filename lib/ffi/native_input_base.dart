@@ -130,6 +130,12 @@ typedef LaunchUpdaterC = Void Function(Pointer<Utf8> scriptPath);
 typedef LaunchUpdaterDart = void Function(Pointer<Utf8> scriptPath);
 
 // AI 梳理: copy selection (Cmd+C) and press key
+typedef ClipboardRestoreFailuresC = Uint32 Function();
+typedef ClipboardRestoreFailuresDart = int Function();
+
+typedef CopySelectionTextC = Pointer<Utf8> Function();
+typedef CopySelectionTextDart = Pointer<Utf8> Function();
+
 typedef CopySelectionC = Int32 Function();
 typedef CopySelectionDart = int Function();
 typedef PressKeyC = Int32 Function(Int32 keyCode, Int32 modifierFlags);
@@ -206,6 +212,19 @@ abstract class NativeInputBase {
   /// **false 必须中止梳理** —— 否则会把剪贴板里的旧内容（可能完全无关、
   /// 甚至敏感）当成用户选中的文字发给 LLM。
   bool copySelection();
+
+  /// 复制选中文字**并直接返回它**。失败返回 null。
+  ///
+  /// **不要退回「copySelection() + 自己读剪贴板」那两步写法** ——
+  /// 中间有两个窗口会读到别的内容（native 观察到的 changeCount 变化未必来自
+  /// 我们的 Cmd+C；返回后到 Dart 读取之间剪贴板还可能再变）。任一命中，
+  /// 送进 LLM 的就是无关内容，甚至是用户剪贴板里的敏感信息。
+  String? copySelectionText();
+
+  /// 剪贴板还原**最终失败**的累计次数。
+  /// 还原是注入之后 800ms 的异步任务，没法用返回值上报 ——
+  /// 失败意味着用户的剪贴板被清空了，不让他知道是不可接受的。
+  int clipboardRestoreFailures();
   /// 返回按键是否已投递。梳理靠它移动光标/换行，
   /// 失败却继续的话结果会插到错误位置、甚至覆盖用户原来的选区。
   bool pressKey(int keyCode, int modifierFlags);
