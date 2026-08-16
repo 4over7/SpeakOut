@@ -14,6 +14,30 @@ import 'config_service.dart';
 /// Singleton. 管理所有云服务商的账户 CRUD、持久化、旧数据迁移。
 /// 凭证存储在 SharedPreferences。
 /// TODO: 拿到苹果开发者账号后迁移到 Keychain (flutter_secure_storage)。
+/// ## 持久化一致性：已做到哪里、剩下什么
+///
+/// 这个类的写路径经过 31 轮 review 逐层加固，同一条失败链剥出了十几层
+/// （静默 no-op → 抛错 → 惰性获取 → 写前加载 → 读前加载 → 抛了没人接 →
+///  内存没回滚 → 回滚跨阶段 → 凭证值没还原 → 补偿互相拖累 → 缓存污染 →
+///  并发覆盖 → 重入标志打穿串行）。**可用非事务手段能做的已经做完**：
+///
+/// - 所有写操作经 `_serializedWrite` 串行，复合操作整体入链
+/// - 写前 / 读前都确保已加载，避免基于空快照判重或覆盖磁盘
+/// - 失败回滚内存 + 凭证值 + 账户列表（缓存污染必须靠重写列表修复）
+/// - 回滚按阶段划分：改动未生效才回滚，已生效只记日志
+/// - 补偿动作彼此独立 best-effort，单 key 级也不互相拖累
+/// - 失败诊断走 `AppLog.e`（不受 verbose 开关控制，且有独立落盘路径）
+///
+/// **剩余边界只能靠事务型存储解决**，继续叠 try/catch 不会收敛：
+///
+/// 1. 进程在多个 SharedPreferences key 写入之间退出 → 部分提交
+/// 2. 进程在补偿执行期间退出 → 新旧混合值
+/// 3. 列表提交后、旧凭证清理前退出 → 孤儿明文 key
+/// 4. 平台写持续失败 → best-effort 恢复无法保证缓存与磁盘一致
+///
+/// 要消除这四条，需要事务日志 / 版本化快照 / 单 key 原子写
+/// （把整个账户集合序列化进**一个** key），而不是继续加补偿分支。
+/// 迁移到 Keychain 时正好一并处理（见类内 TODO）。
 class CloudAccountService {
   static final CloudAccountService _instance = CloudAccountService._internal();
   factory CloudAccountService() => _instance;
