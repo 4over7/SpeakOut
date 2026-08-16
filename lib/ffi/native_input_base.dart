@@ -136,8 +136,6 @@ typedef ClipboardRestoreFailuresDart = int Function();
 typedef CopySelectionTextC = Pointer<Utf8> Function();
 typedef CopySelectionTextDart = Pointer<Utf8> Function();
 
-typedef CopySelectionC = Int32 Function();
-typedef CopySelectionDart = int Function();
 typedef PressKeyC = Int32 Function(Int32 keyCode, Int32 modifierFlags);
 typedef PressKeyDart = int Function(int keyCode, int modifierFlags);
 
@@ -211,8 +209,6 @@ abstract class NativeInputBase {
   /// 返回剪贴板是否确实因为这次 Cmd+C 变了。
   /// **false 必须中止梳理** —— 否则会把剪贴板里的旧内容（可能完全无关、
   /// 甚至敏感）当成用户选中的文字发给 LLM。
-  bool copySelection();
-
   /// 复制选中文字**并直接返回它**。失败返回 null。
   ///
   /// **不要退回「copySelection() + 自己读剪贴板」那两步写法** ——

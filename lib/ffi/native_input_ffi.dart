@@ -12,7 +12,7 @@ import 'package:speakout/config/app_log.dart';
 /// 手动递增靠自觉，而我漏过一次（改了 inject_clipboard_begin 的签名却没升，
 /// 正好是这个握手要防的情形）。现在版本是签名的函数，只改一半不可能。
 /// 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
-const int kExpectedNativeAbiVersion = 0x7d0948;
+const int kExpectedNativeAbiVersion = 0xd80931;
 
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
@@ -529,15 +529,11 @@ class NativeInputFFI implements NativeInputBase {
   bool _organizeBound = false;
   CopySelectionTextDart? _copySelectionText;
   ClipboardRestoreFailuresDart? _clipboardRestoreFailures;
-  late CopySelectionDart _copySelection;
   late PressKeyDart _pressKey;
 
   void _bindOrganizeFunctions() {
     if (_organizeBound) return;
     try {
-      _copySelection = _dylib
-          .lookup<NativeFunction<CopySelectionC>>('copy_selection')
-          .asFunction();
       _pressKey = _dylib
           .lookup<NativeFunction<PressKeyC>>('press_key')
           .asFunction();
@@ -581,13 +577,6 @@ class NativeInputFFI implements NativeInputBase {
     } finally {
       nativeFree(ptr.cast());
     }
-  }
-
-  @override
-  bool copySelection() {
-    _bindOrganizeFunctions();
-    if (!_organizeBound) return false;
-    return _copySelection() == 1;
   }
 
   @override

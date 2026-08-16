@@ -101,8 +101,11 @@ class CoreEngine {
   int _lastRestoreFailures = 0;
 
   /// 剪贴板还原是注入之后 800ms 的异步任务，失败没法用返回值上报 ——
-  /// 而失败意味着**用户的剪贴板被清空了**。这里在下一次注入结束时对一下计数，
-  /// 涨了就告诉他，别让他以为是自己手滑。
+  /// 而失败意味着**用户的剪贴板被清空了**。
+  ///
+  /// 对账时机是「下一次录音开始 / 下一次剪贴板会话开始」，不是注入结束 ——
+  /// 还原那时根本还没发生。两个入口分别覆盖：一次性注入走 startRecording，
+  /// 流式与 AI 梳理走 _clipBegin。
   void _reportClipboardRestoreFailures() {
     final n = _nativeInput?.clipboardRestoreFailures() ?? 0;
     if (n <= _lastRestoreFailures) return;
@@ -118,6 +121,10 @@ class CoreEngine {
   /// 而 native 那边每个 chunk 都是孤儿、各自安排收尾，
   /// 文字在 chunk 之间就被还原掉了。
   bool _clipBegin() {
+    // 梳理走的是 keyDown 直触发，不经过 startRecording —— 只把对账挂在那里
+    // 的话，只用 AI 梳理的用户永远看不到「剪贴板没还原」的提示。
+    // 放在这里覆盖流式注入与梳理两条；一次性注入走 startRecording。
+    _reportClipboardRestoreFailures();
     // native 侧只有**一份**全局剪贴板快照：第二次 begin 会覆盖第一次的快照，
     // 第一次 end 又会取走并清空它 —— 重叠注入下会提前恢复、且丢掉用户原始剪贴板。
     // 所以 native 会话只在最外层开合，内层只加计数。

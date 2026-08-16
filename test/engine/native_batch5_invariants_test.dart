@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// 每一条都对应一个已经发生过或已被确认可触发的缺陷。
 /// 导出签名的指纹。**改了任何导出函数的签名就要连同 ABI 版本一起更新。**
 /// 值由「导出签名一变，ABI 版本必须跟着变」这条测试的失败信息给出。
-const String kNativeAbiFingerprint = '7d094818ff94a198f613069271bed70857311af5';
+const String kNativeAbiFingerprint = 'd80931139e77ae930faa0b50c417df930d231071';
 
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
@@ -282,6 +282,20 @@ void main() {
       expect(dartTypedefs.length, greaterThan(20),
           reason: 'Dart typedef 没扫到足够条目，正则退化了');
       all.addAll(dartTypedefs);
+
+      // **绑定映射也要纳入。** 只锁「native 签名集合」+「typedef 集合」是
+      // 两个互不关联的集合：把 lookup<NativeFunction<GetAudioLevelC>> 的
+      // symbol 从 'get_audio_level' 误改成 'clipboard_restore_failures'，
+      // 两个集合都没变、指纹和版本都不变、握手通过 ——
+      // 运行时却按 float 返回 ABI 去读一个整数。
+      final bindings = RegExp(
+              r'lookup<NativeFunction<(\w+)>>\(\s*[\x27"]([a-z_][a-z0-9_]*)[\x27"]\s*\)')
+          .allMatches(File('lib/ffi/native_input_ffi.dart').readAsStringSync())
+          .map((m) => 'bind :: ${m.group(2)} -> ${m.group(1)}')
+          .toList();
+      expect(bindings.length, greaterThan(20),
+          reason: '绑定映射没扫到足够条目，正则退化了');
+      all.addAll(bindings);
       all.sort();
       // 正则扫到的导出面必须与 dylib 里**真实的**导出符号对得上。
       // 写死一个数字太脆（每加一个导出都要改），而且它证明不了「扫全了」；
@@ -390,8 +404,63 @@ void main() {
           reason: '首次失败要把待重试内容交给锁外的调用方');
       final sched = stripComments(bodyOfFn('tx_schedule_finish'));
       expect(sched.contains('usleep(50000)'), isTrue, reason: '锁外没有重试');
-      expect(sched.contains('_txActive'), isTrue,
-          reason: '重写之前必须确认没有新事务开起来，否则会盖掉它的内容');
+      // 新事务不是在重试里「检查一下」挡住的，而是在源头被 pending 标志拒绝：
+      // 首次还原失败时剪贴板已被 clearContents 清空，此刻若让新事务开起来，
+      // 它会把「空」拍成自己的原始快照，旧重试再一放弃，用户内容就没了。
+      final begin = stripComments(bodyOfFn('tx_begin_locked'));
+      expect(begin.contains('_txRestorePending'), isTrue,
+          reason: '还原重试期间必须拒绝开新事务');
+      // 而且「核对 + clear + write」必须在同一临界区，只有 usleep 在锁外
+      // **位置必须相对取。** 这个函数里 lock/unlock 出现多次（重试循环之前
+      // 还有一对），用 indexOf 取到的是循环外那个 —— 断言就恒成立了。
+      // 这个坑在别处已经踩过一次，这里精确取「核对前最近的 lock」和
+      // 「写之后最近的 unlock」。
+      final checkAt = sched.indexOf('pb.changeCount != retryExpected');
+      expect(checkAt, greaterThanOrEqualTo(0), reason: '重试前没有核对');
+      final writeAt = sched.indexOf('[pb writeObjects:retryItems]', checkAt);
+      expect(writeAt, greaterThan(checkAt), reason: '写必须在核对之后');
+      final lockAt = sched.lastIndexOf('pthread_mutex_lock', checkAt);
+      expect(lockAt, greaterThanOrEqualTo(0), reason: '核对不在锁内');
+      final unlockBetween =
+          sched.substring(lockAt, writeAt).contains('pthread_mutex_unlock');
+      expect(unlockBetween, isFalse,
+          reason: '核对与写之间放了锁 —— 新注入会插进来，被我们的旧快照覆盖');
+    });
+
+    test('还原基线必须取自 clearContents 的返回值', () {
+      // 在 writeObjects 失败之后重读 pb.changeCount 是错的：写失败那一瞬间
+      // 别的进程可能已经复制了东西，重读等于把「外部接管」当成我们自己的基线，
+      // 下一轮重试就会认为「还是我们的」，把用户刚复制的内容清掉。
+      final finish = stripComments(bodyOfFn('tx_finish_locked'));
+      expect(finish.contains('const NSInteger owned = [pb clearContents]'), isTrue,
+          reason: '必须记住 clearContents 返回的 ownership 基线');
+      expect(finish.contains('*retryExpected = owned'), isTrue,
+          reason: '出参必须用 clearContents 的返回值，不能重读 changeCount');
+      expect(finish.contains('*retryExpected = pb.changeCount'), isFalse,
+          reason: '重读当前值会把外部接管吸收进基线');
+      // 重试循环里同理：下一轮基线取本轮 clearContents 的返回值
+      final sched = stripComments(bodyOfFn('tx_schedule_finish'));
+      expect(sched.contains('retryExpected = [pb clearContents]'), isTrue,
+          reason: '每轮基线都要取自本轮 clearContents');
+    });
+
+    test('归因成功的每条路径都必须写回 outObserved', () {
+      // 不写的话调用方拿到的是 -1，读取版本锁永远失败 —— 功能静默失效。
+      final impl = stripComments(bodyOfFn('copy_selection_impl'));
+      expect(impl.contains('*outObserved = observed'), isTrue);
+      final assignAt = impl.indexOf('*outObserved = observed');
+      final retAt = impl.lastIndexOf('return copied ? 1 : 0');
+      expect(assignAt, greaterThanOrEqualTo(0));
+      expect(retAt, greaterThan(assignAt), reason: '赋值必须在返回之前');
+    });
+
+    test('版本不符必须直接返回 NULL，不能只记日志', () {
+      final body = stripComments(bodyOfFn('copy_selection_text'));
+      final condAt = body.indexOf('before != observed');
+      expect(condAt, greaterThanOrEqualTo(0));
+      final after = body.substring(condAt, condAt + 220);
+      expect(after.contains('return NULL'), isTrue,
+          reason: '只记日志不返回的话，版本锁形同虚设');
     });
 
     test('还原重试前必须核对外部有没有接管剪贴板', () {

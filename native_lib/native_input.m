@@ -45,7 +45,7 @@ static void flush_tap_log_sync(void);
 // 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
 // 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
 // 而不是悄悄读垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 0x7d0948
+#define SPEAKOUT_NATIVE_ABI_VERSION 0xd80931
 // 剪贴板还原最终失败的累计次数。还原发生在注入之后 800ms 的异步任务里，
 // 没法用返回值告诉 Dart —— 只记日志的话，用户的剪贴板被清空了却毫不知情。
 // Dart 侧在下一次注入时读一下这个计数，涨了就提示。
@@ -729,7 +729,9 @@ static BOOL _txActive = NO;                  // 事务已开启（持有原始�
 static NSArray *_txOriginal = nil;           // 事务开启前的剪贴板内容
 static uint64_t _txGeneration = 0;           // 我们每改一次剪贴板就 +1
 static NSInteger _txExpectedChangeCount = -1; // 只有我们动过的话，现在该是多少
-static BOOL _txOriginalValid = NO;           // 快照是否可信（拍不稳时为 NO）
+static BOOL _txOriginalValid = NO;
+// 还原重试进行中。期间禁止开新事务 —— 剪贴板此刻是被清空的状态。
+static BOOL _txRestorePending = NO;           // 快照是否可信（拍不稳时为 NO）
 // 本次一次性注入是否失败。**整段 inject_text 都在 injectTextMutex 里跑**，
 // 所以同一时刻只有一个 inject_text 在用它 —— 否则这个全局标志表达不了
 // 「哪一次调用」的结果：A 失败后、A 读取前 B 把它重置，A 就会错报成功。
@@ -778,6 +780,12 @@ static BOOL tx_snapshot_stable_locked(NSPasteboard *pb) {
 
 // 返回 NO = 快照没拿到，事务未开启，调用方必须放弃这次注入
 static BOOL tx_begin_locked(NSPasteboard *pb) {
+  // 上一个事务的还原正在重试：此刻剪贴板是被 clearContents 清空的状态，
+  // 现在拍快照会把「空」当成用户的原始内容，等于替旧事务把数据丢掉。
+  if (_txRestorePending) {
+    log_to_file("Clipboard tx: begin refused (restore retry pending)");
+    return NO;
+  }
   if (_txActive) return YES; // 已有事务在跑就沿用它的原始快照，绝不重拍
   if (!tx_snapshot_stable_locked(pb)) return NO;
   _txActive = YES;
@@ -835,17 +843,25 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen,
     // 快照当时就没拍稳，还原等于拿不可信内容覆盖现状 —— 什么都不做
     log_to_file("Clipboard tx: skipped restore (snapshot was never stable)");
   } else if (stillOurs) {
-    [pb clearContents];
+    // **基线必须取 clearContents 的返回值**，不能在写失败之后重读
+    // pb.changeCount：写失败的那一瞬间别的进程可能已经复制了东西，
+    // 重读等于把「外部接管」当成我们自己的基线记下来 ——
+    // 下一轮重试就会认为「还是我们的」，把用户刚复制的内容清掉。
+    const NSInteger owned = [pb clearContents];
     if (_txOriginal.count == 0) {
       log_to_file("Clipboard tx: restored (original was empty)");
     } else if ([pb writeObjects:_txOriginal]) {
       log_to_file("Clipboard tx: restored");
     } else {
-      // 首次写入失败。**重试不能在锁里做** —— 三次 50ms 的等待会把注入路径
-      // 一起卡住 150ms。把待重试的内容交给调用方，在锁外重试。
+      // 首次写入失败。重试不能在锁里做（三次 50ms 会把注入卡住），
+      // 但**事务状态不能就此清空** —— 此刻剪贴板已被 clearContents 清空，
+      // 若让新事务在这时开起来，它会把「空剪贴板」拍成自己的原始快照，
+      // 而我们的重试又会因为「有新事务」而放弃，用户内容就这么没了，
+      // 连失败计数都不会涨。所以立一个 pending 标志把新事务挡在外面。
       *retryItems = _txOriginal;
-      *retryExpected = pb.changeCount; // 重试前要拿它核对，见下
-      log_to_file("Clipboard tx: restore write failed, will retry outside lock");
+      *retryExpected = owned;
+      _txRestorePending = YES;
+      log_to_file("Clipboard tx: restore write failed, retry pending");
     }
   } else {
     log_to_file("Clipboard tx: skipped restore (clipboard content is no longer ours)");
@@ -870,38 +886,42 @@ static void tx_schedule_finish(uint64_t gen) {
           pthread_mutex_unlock(&clipTxMutex);
 
           if (retryItems == nil) return;
-          // 锁外重试。每次重写前重新确认没有新事务开起来 ——
-          // 有的话剪贴板已经归它了，我们再写就是把它的内容盖掉。
+          // 只有 usleep 在锁外。**「核对 + clearContents + writeObjects +
+          // 更新状态」必须在同一个临界区里**：分开做的话，核对通过之后、
+          // 我们写之前，新注入可能已经把自己的文本写进去并准备粘贴，
+          // 我们一 clear 一 write 就把它换成了旧快照，用户粘出来的是错的。
           BOOL recovered = NO;
-          for (int i = 0; i < 3 && !recovered; i++) {
+          BOOL abandoned = NO;
+          for (int i = 0; i < 3 && !recovered && !abandoned; i++) {
             usleep(50000);
             pthread_mutex_lock(&clipTxMutex);
-            const BOOL busy = _txActive;
-            pthread_mutex_unlock(&clipTxMutex);
-            if (busy) {
-              log_to_file("Clipboard tx: restore retry aborted (new tx started)");
-              return;
-            }
-            // **只查「有没有新的内部事务」是不够的** —— clipTxMutex 管不到
-            // 别的进程。这 50ms 里用户完全可能自己复制了东西，
-            // 无条件 clearContents 会把它永久盖掉。
-            // 而且 writeObjects 首次失败本身往往就意味着 ownership 已经易主，
-            // 这时候盲目重试风险更大。
+            // clipTxMutex 管不到别的进程：这 50ms 里用户完全可能自己复制了
+            // 东西，无条件 clearContents 会把它永久盖掉。而 writeObjects
+            // 首次失败本身往往就意味着 ownership 已经易主。
             if (pb.changeCount != retryExpected) {
               log_to_file("Clipboard tx: restore retry aborted (clipboard taken over)");
-              return;
+              abandoned = YES;
+            } else {
+              retryExpected = [pb clearContents]; // 本轮的 ownership 基线
+              recovered = [pb writeObjects:retryItems];
             }
-            [pb clearContents];
-            recovered = [pb writeObjects:retryItems];
-            retryExpected = pb.changeCount; // 我们自己刚改的，下一轮以此为准
+            if (recovered || abandoned) {
+              _txRestorePending = NO; // 出口统一在锁内解除
+            }
+            pthread_mutex_unlock(&clipTxMutex);
           }
           if (recovered) {
             log_to_file("Clipboard tx: restored after retry");
             return;
           }
-          // 此刻剪贴板已被 clearContents 清空，用户的内容真的没了。
-          // 计数让 Dart 侧能发现 —— 还原是异步的，没法用返回值告诉调用方，
-          // 只记日志的话用户永远不知道自己的剪贴板被清空了。
+          if (abandoned) return;
+
+          // 三轮都没写进去。此刻剪贴板已被 clearContents 清空，
+          // 用户的内容真的没了。计数让 Dart 侧能发现 —— 还原是异步的，
+          // 没法用返回值告诉调用方，只记日志的话用户永远不知道。
+          pthread_mutex_lock(&clipTxMutex);
+          _txRestorePending = NO;
+          pthread_mutex_unlock(&clipTxMutex);
           atomic_fetch_add_explicit(&clipboardRestoreFailures, 1,
                                     memory_order_relaxed);
           log_to_file("Clipboard tx: RESTORE WRITE FAILED, clipboard left empty");
@@ -1208,8 +1228,6 @@ static int copy_selection_impl(NSInteger *outObserved) {
     return copied ? 1 : 0;
   }
 }
-
-int copy_selection(void) { return copy_selection_impl(NULL); }
 
 // 复制选中文字**并把它直接返回**，调用方用 native_free 释放。
 // 失败返回 NULL。
