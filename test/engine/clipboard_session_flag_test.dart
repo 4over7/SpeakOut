@@ -89,7 +89,7 @@ void main() {
       expect(calls.nodes, isNotEmpty,
           reason: '$method 没调 $nativeCall（AST 层面，字符串不算）');
 
-      final guards = _FindIfVisitor('_clipboardSessions == 0');
+      final guards = _FindIfVisitor();
       decl.node!.accept(guards);
       expect(guards.nodes, isNotEmpty,
           reason: '$method 没有「计数为 0」的判断');
@@ -167,14 +167,32 @@ class _MethodDeclVisitor extends RecursiveAstVisitor<void> {
   }
 }
 
+/// 按**结构**匹配 `_clipboardSessions == 0`，不认字符串 ——
+/// `if (true || _clipboardSessions == 0)` 的 toSource 也含目标片段，
+/// 但那个判断恒真，等于没有保护；
+/// `if (reason == '_clipboardSessions == 0')` 更是纯诱饵。
 class _FindIfVisitor extends RecursiveAstVisitor<void> {
-  _FindIfVisitor(this.condFragment);
-  final String condFragment;
   final List<IfStatement> nodes = [];
+
+  bool _isTarget(Expression e) {
+    if (e is BinaryExpression) {
+      if (e.operator.lexeme == '==' &&
+          e.leftOperand.toSource() == '_clipboardSessions' &&
+          e.rightOperand is IntegerLiteral &&
+          (e.rightOperand as IntegerLiteral).value == 0) {
+        return true;
+      }
+      // 只允许 && 串联（仍是必要条件）；|| 会让它变成非必要项
+      if (e.operator.lexeme == '&&') {
+        return _isTarget(e.leftOperand) || _isTarget(e.rightOperand);
+      }
+    }
+    return false;
+  }
 
   @override
   void visitIfStatement(IfStatement n) {
-    if (n.expression.toSource().contains(condFragment)) nodes.add(n);
+    if (_isTarget(n.expression)) nodes.add(n);
     super.visitIfStatement(n);
   }
 }
@@ -186,7 +204,12 @@ class _FindInvocationVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodInvocation(MethodInvocation n) {
-    if (n.methodName.name == name) nodes.add(n);
+    // receiver 必须是 _nativeInput —— 只看方法名的话，别的对象上的同名方法
+    // 会被误判成 native 调用。
+    final recv = n.target?.toSource() ?? '';
+    if (n.methodName.name == name && recv.contains('_nativeInput')) {
+      nodes.add(n);
+    }
     super.visitMethodInvocation(n);
   }
 }

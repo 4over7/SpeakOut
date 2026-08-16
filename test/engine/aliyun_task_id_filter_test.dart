@@ -47,21 +47,42 @@ void main() {
     // **锚点必须是「不匹配的拒绝判断」本身，不能是第一个 task_id** ——
     // task_id 在这个方法里出现多次（读 header、日志、比较）。拿第一个的话，
     // 把真正的拒绝分支挪到 _textController.add 之后，断言照样绿。
-    final firstPublish = body.indexOf('_textController.add');
-    expect(firstPublish, greaterThan(-1), reason: '没找到文本发布点');
-    expect(body.indexOf('msgTaskId != _taskId'), lessThan(firstPublish),
-        reason: 'task_id 过滤必须早于任何 _textController.add，'
-            '否则过期帧已经污染了字幕');
+    // 位置比较也要用 AST offset —— 字符串 indexOf 会命中日志里的
+    // `AppLog.d('msgTaskId != _taskId')`，把「过滤在发布之后」判成之前。
     // **用 AST 判断包含关系，不要再做字符串解析。**
     // 字符串解析会被诱饵骗：`AppLog.d('{ return }')` 里那个 return 会被
     // contains 命中，而过期帧其实照样往下走。
-    final rejectIf = _FindIfVisitor('msgTaskId != _taskId');
+    final rejectIf = _FindIfVisitor('msgTaskId', '_taskId');
     unit.accept(rejectIf);
-    expect(rejectIf.node, isNotNull, reason: '没找到 task_id 不匹配的判断');
-    final hasReturn = _HasReturnVisitor();
-    rejectIf.node!.thenStatement.accept(hasReturn);
-    expect(hasReturn.found, isTrue,
-        reason: 'task_id 不匹配的分支自己没有 return —— 只打日志等于没过滤');
+    expect(rejectIf.node, isNotNull,
+        reason: '没找到形如 `msgTaskId != _taskId` 的拒绝判断'
+            '（按 AST 结构匹配，不认字符串）');
+
+    // then 分支的**最后一条直接语句**必须是 return —— 递归找 return 会被
+    // `if (false) return;` 和 closure 里的 return 骗过。
+    final then = rejectIf.node!.thenStatement;
+    Statement? last;
+    if (then is Block) {
+      expect(then.statements, isNotEmpty, reason: '拒绝分支是空块');
+      last = then.statements.last;
+    } else {
+      last = then;
+    }
+    expect(last is ReturnStatement, isTrue,
+        reason: '拒绝分支的最后一条语句不是 return —— 过期帧照样会往下走');
+
+    // 拒绝判断必须早于所有真实的发布调用（按 AST offset，不按字符串位置）
+    final publishes = _FindInvocationVisitor('add');
+    unit.accept(publishes);
+    final textAdds = publishes.nodes
+        .where((n) => n.target?.toSource().contains('_textController') ?? false)
+        .toList();
+    expect(textAdds, isNotEmpty, reason: '没找到 _textController.add 调用');
+    for (final pub in textAdds) {
+      expect(rejectIf.node!.offset, lessThan(pub.offset),
+          reason: 'task_id 过滤必须早于每一处 _textController.add，'
+              '否则过期帧已经污染了字幕');
+    }
   });
 
   test('aliyun 不得改用录音代次守卫', () {
@@ -98,26 +119,47 @@ class _MethodBodyVisitor extends RecursiveAstVisitor<void> {
   }
 }
 
+/// 按**结构**找 `左 != 右` 的判断，不认字符串 ——
+/// `if (false && msgTaskId != _taskId)` 的 toSource 也含目标片段，
+/// 但那个条件永远不成立。这里要求 `!=` 是条件的顶层运算符
+/// （允许被 `&&` 串联的合取项，因为那仍然是必要条件）。
 class _FindIfVisitor extends RecursiveAstVisitor<void> {
-  _FindIfVisitor(this.condFragment);
-  final String condFragment;
+  _FindIfVisitor(this.left, this.right);
+  final String left;
+  final String right;
   IfStatement? node;
+
+  bool _isTarget(Expression e) {
+    if (e is BinaryExpression) {
+      if (e.operator.lexeme == '!=' &&
+          e.leftOperand.toSource() == left &&
+          e.rightOperand.toSource() == right) {
+        return true;
+      }
+      // 只允许 && 串联：|| 会让这个条件变成非必要项
+      if (e.operator.lexeme == '&&') {
+        return _isTarget(e.leftOperand) || _isTarget(e.rightOperand);
+      }
+    }
+    return false;
+  }
 
   @override
   void visitIfStatement(IfStatement n) {
-    if (node == null && n.expression.toSource().contains(condFragment)) {
-      node = n;
-    }
+    if (node == null && _isTarget(n.expression)) node = n;
     super.visitIfStatement(n);
   }
 }
 
-class _HasReturnVisitor extends RecursiveAstVisitor<void> {
-  bool found = false;
+class _FindInvocationVisitor extends RecursiveAstVisitor<void> {
+  _FindInvocationVisitor(this.name);
+  final String name;
+  final List<MethodInvocation> nodes = [];
 
   @override
-  void visitReturnStatement(ReturnStatement n) {
-    found = true;
-    super.visitReturnStatement(n);
+  void visitMethodInvocation(MethodInvocation n) {
+    if (n.methodName.name == name) nodes.add(n);
+    super.visitMethodInvocation(n);
   }
 }
+

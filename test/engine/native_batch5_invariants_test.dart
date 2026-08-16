@@ -569,13 +569,29 @@ void main() {
         expect(thenBlockAt(block, holdAt).contains('tx_abandon_locked'), isTrue,
             reason: '$fn 的清理不在 hold 判断的分支内 —— '
                 '流式会话进行中也会被销毁快照');
+        // **整个 gen==0 块里只能有这一次调用。** 多一次（else 分支或裸调用）
+        // 就意味着 hold 期间照样销毁快照，而「存在一次受保护的调用」这个
+        // 断言仍然成立。
+        expect('tx_abandon_locked'.allMatches(block).length, 1,
+            reason: '$fn 的 gen==0 块里有不止一次 tx_abandon_locked —— '
+                'hold 期间会被无条件销毁快照');
+        expect(block.contains('else'), isFalse,
+            reason: '$fn 的 gen==0 块里出现 else —— 可能绕过 hold 保护');
       }
       // helper 本身必须把状态清干净，少清一项就还是悬挂
       final helper = stripComments(bodyOfFn('tx_abandon_locked'));
       // 字段必须是**无条件的顶层赋值** —— 全塞进一个永不成立的条件块里，
       // 「contains」照样为真，但一个都不会执行。
-      expect(helper.contains('if ('), isFalse,
-          reason: 'tx_abandon_locked 里出现条件分支 —— 清理可能根本不执行');
+      // 不能只禁字面量 `if (` —— `if(0)` 没空格就绕过去了（实测）。
+      // 同类还有 while(0)、前置 return、#if 0 包起来。
+      for (final kw in ['if', 'while', 'for', 'switch']) {
+        expect(RegExp('\\b$kw\\s*\\(').hasMatch(helper), isFalse,
+            reason: 'tx_abandon_locked 里出现 $kw —— 清理可能根本不执行');
+      }
+      expect(helper.contains('#if'), isFalse,
+          reason: '预处理条件会让清理整段失活');
+      expect(RegExp(r'\breturn\b').hasMatch(helper), isFalse,
+          reason: '提前 return 会让后面的清理不执行');
       for (final f in ['_txActive = NO', '_txOriginal = nil',
                        '_txOriginalValid = NO', '_txToken = nil',
                        '_txExpectedChangeCount = -1']) {
@@ -586,8 +602,13 @@ void main() {
       final paste = stripComments(bodyOfFn('tx_paste_locked'));
       final ccAt = paste.indexOf('NSInteger cc = [pb clearContents]');
       expect(ccAt, greaterThanOrEqualTo(0));
-      expect(paste.substring(ccAt).contains('return 0;'), isFalse,
-          reason: 'clearContents 之后还有 return 0 —— '
+      // 不能只匹配 `return 0;` —— `return (uint64_t)0;`、`return 0U;`
+      // 都是同一个语义错误。
+      expect(
+          RegExp(r'return\s*\(?\s*(\([A-Za-z_][\w ]*\)\s*)?0[uUlL]*\s*\)?\s*;')
+              .hasMatch(paste.substring(ccAt)),
+          isFalse,
+          reason: 'clearContents 之后还有「返回常量 0」—— '
               '那会让调用方以为剪贴板没动过，从而销毁快照、不安排还原');
       // setString 失败分支的三条语句都要在**它自己的块**里，
       // 而且基线必须是 cc（clearContents 的返回值）——
@@ -598,8 +619,15 @@ void main() {
       final setFailBlock = thenBlockAt(paste, setFailAt);
       expect(setFailBlock.contains('tx_note_mutation_locked(cc)'), isTrue,
           reason: '基线必须用 cc，不能重读 changeCount');
-      expect(setFailBlock.contains('pb.changeCount'), isFalse,
-          reason: '失败分支里不得重读 pb.changeCount');
+      // 禁止**任何拼法**的重读：pb.changeCount / [pb changeCount]
+      expect(RegExp(r'changeCount').hasMatch(setFailBlock), isFalse,
+          reason: '失败分支里不得重读 changeCount（任何拼法）—— '
+              '重读会把「外部已接管」吸收成我们的基线');
+      // 三条语句必须是该分支的**无条件**语句
+      for (final kw in ['if', 'while', 'for', 'switch']) {
+        expect(RegExp('\\b$kw\\s*\\(').hasMatch(setFailBlock), isFalse,
+            reason: '失败分支里出现 $kw —— 三条清理可能根本不执行');
+      }
       expect(setFailBlock.contains('_txToken = nil'), isTrue,
           reason: '文本没写进去，token 必须清掉');
       expect(setFailBlock.contains('_txPasteFailed = YES'), isTrue,
