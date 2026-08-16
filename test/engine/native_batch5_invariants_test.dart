@@ -37,6 +37,26 @@ void main() {
 
   final code = stripComments(src);
 
+  /// 从 `body` 中 `condIndex` 处的条件开始，取它**自己那个 `{...}` 块**。
+  ///
+  /// 固定长度 substring 是这批断言反复出问题的根源：窗口太短会假红，
+  /// 太长会借用**后面别的分支**的语句 —— 实测「删掉拒绝分支的 _txPasteFailed」
+  /// 时，320 字符窗口命中了后面 gen == 0 分支里的同名赋值，断言照样绿。
+  /// 这里按大括号配平取，边界与代码结构一致，不依赖字符距离。
+  String braceBlockAt(String body, int condIndex) {
+    final open = body.indexOf('{', condIndex);
+    expect(open, greaterThan(-1), reason: '条件后面没有 { 块');
+    var depth = 0;
+    for (var i = open; i < body.length; i++) {
+      if (body[i] == '{') depth++;
+      if (body[i] == '}') {
+        depth--;
+        if (depth == 0) return body.substring(open + 1, i);
+      }
+    }
+    fail('大括号不配平，取不到块');
+  }
+
   /// 按方法名取 Dart 方法体源码。**必须按方法取，不能全文件 indexOf** ——
   /// `_reportClipboardRestoreFailures()` 在两个方法里各有一处，
   /// 全文件取第一个的话，删掉任意一处断言都还是绿的（实测如此）。
@@ -452,10 +472,27 @@ void main() {
         final body = stripComments(bodyOfFn(fn));
         final zeroAt = body.indexOf('gen == 0');
         expect(zeroAt, greaterThanOrEqualTo(0), reason: '$fn 没处理 gen == 0');
-        expect(body.substring(zeroAt, zeroAt + 260).contains('tx_abandon_locked'),
-            isTrue,
+        final block = braceBlockAt(body, zeroAt);
+        expect(block.contains('tx_abandon_locked'), isTrue,
             reason: '$fn 在「一个字都没写进去」时没有清理事务状态');
+        expect(block.contains('_txHoldDepth == 0'), isTrue,
+            reason: '只有没被 hold 罩着时才该清理 —— 条件写反会破坏进行中的会话');
       }
+      // helper 本身必须把状态清干净，少清一项就还是悬挂
+      final helper = stripComments(bodyOfFn('tx_abandon_locked'));
+      for (final f in ['_txActive = NO', '_txOriginal = nil',
+                       '_txOriginalValid = NO', '_txToken = nil',
+                       '_txExpectedChangeCount = -1']) {
+        expect(helper.contains(f), isTrue, reason: 'tx_abandon_locked 漏清 $f');
+      }
+      // 而且 gen == 0 必须严格表示「剪贴板一个字都没动过」：
+      // clearContents 之后的失败分支再返回 0，调用方就会销毁快照且不还原。
+      final paste = stripComments(bodyOfFn('tx_paste_locked'));
+      final ccAt = paste.indexOf('NSInteger cc = [pb clearContents]');
+      expect(ccAt, greaterThanOrEqualTo(0));
+      expect(paste.substring(ccAt).contains('return 0;'), isFalse,
+          reason: 'clearContents 之后还有 return 0 —— '
+              '那会让调用方以为剪贴板没动过，从而销毁快照、不安排还原');
     });
 
     test('pending 生命周期：置位、极性、返回值、解除，逐项锁定', () {
@@ -473,9 +510,13 @@ void main() {
       // **窗口必须收到 guard 自己的块内**：取固定长度会越界到后面那句
       // `if (!tx_snapshot_stable_locked(pb)) return NO;`，
       // 于是把 guard 的 return 改成 YES 也照样绿（实测漏报过）。
-      final guardEnd = begin.indexOf('\n  }', guardAt);
-      expect(guardEnd, greaterThan(guardAt), reason: '找不到 guard 块的结尾');
-      final guardBlock = begin.substring(guardAt, guardEnd);
+      // 按大括号配平取块：indexOf('\n  }') 依赖缩进格式，
+      // 嵌套块会截到内层结尾，单行 if 又找不到结尾（正确代码反而红）。
+      final guardBlock = braceBlockAt(begin, guardAt);
+      // 而且 return 必须是这个块的**直接语句**，不能藏在嵌套条件里 ——
+      // `if (_txRestorePending) { if (别的条件) return NO; }` 会让 pending 穿透。
+      expect(braceBlockAt(begin, guardAt).contains('if ('), isFalse,
+          reason: 'guard 块里还有嵌套条件 —— pending 可能穿透');
       expect(guardBlock.contains('return NO'), isTrue,
           reason: 'pending 期间必须拒绝开新事务（return NO）');
       expect(guardBlock.contains('return YES'), isFalse,
@@ -734,8 +775,9 @@ void main() {
         final body = stripComments(bodyOfFn(fn));
         final guardAt = body.indexOf('if (!tx_begin_locked(');
         expect(guardAt, greaterThanOrEqualTo(0), reason: '$fn 没有 guard');
-        // guard 之后紧跟的这一段里必须有解锁 + 对应形式的 return
-        final block = body.substring(guardAt, guardAt + 320);
+        // **取 guard 自己的块**，不是固定长度窗口 —— 窗口会借用后面
+        // gen == 0 分支里的同名语句，删掉这里的照样绿（实测如此）。
+        final block = braceBlockAt(body, guardAt);
         expect(block.contains('pthread_mutex_unlock'), isTrue,
             reason: '$fn 的拒绝分支没解锁');
         expect(block.contains(ret), isTrue,
@@ -744,8 +786,7 @@ void main() {
       // 一次性路径还必须把失败告诉 Dart，否则什么都没注入却报成功
       final oneShot = stripComments(bodyOfFn('inject_via_clipboard'));
       final gAt = oneShot.indexOf('if (!tx_begin_locked(');
-      expect(oneShot.substring(gAt, gAt + 320).contains('_txPasteFailed = YES'),
-          isTrue,
+      expect(braceBlockAt(oneShot, gAt).contains('_txPasteFailed = YES'), isTrue,
           reason: '拿不到快照却不置失败位，inject_text 会返回成功');
     });
 

@@ -54,9 +54,28 @@ void main() {
     expect(rejectAt, lessThan(firstPublish),
         reason: 'task_id 过滤必须早于任何 _textController.add，'
             '否则过期帧已经污染了字幕');
-    // 而且该分支必须真的 return，只打日志不返回等于没过滤
-    expect(body.substring(rejectAt, firstPublish).contains('return'), isTrue,
-        reason: '拒绝分支没有 return —— 过期帧照样会往下走');
+    // **return 必须属于拒绝分支本身**，不能只是「两者之间存在 return」——
+    //   if (msgTaskId != _taskId) { AppLog.d('stale'); }
+    //   if (别的条件) return;
+    // 这样也满足「之间有 return」，但过期帧照样会被发布。
+    // 按大括号配平取出该 if 自己的块再查。
+    final open = body.indexOf('{', rejectAt);
+    expect(open, greaterThan(-1), reason: '拒绝判断后面没有块');
+    var depth = 0;
+    var close = -1;
+    for (var i = open; i < body.length; i++) {
+      if (body[i] == '{') depth++;
+      if (body[i] == '}') {
+        depth--;
+        if (depth == 0) {
+          close = i;
+          break;
+        }
+      }
+    }
+    expect(close, greaterThan(open), reason: '大括号不配平');
+    expect(body.substring(open, close).contains('return'), isTrue,
+        reason: 'task_id 不匹配的分支自己没有 return —— 只打日志等于没过滤');
   });
 
   test('aliyun 不得改用录音代次守卫', () {

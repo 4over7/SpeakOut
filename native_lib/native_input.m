@@ -961,10 +961,21 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   // 无论后面粘不粘得成，剪贴板已经被我们改了，基线必须跟上 ——
   // 否则下一次写前检查会把「我们自己刚写进去的文字」当成用户的新内容重新拍快照。
   if (![pb setString:text forType:NSPasteboardTypeString]) {
-    // setString 在 ownership 已经变化时会返回 false。忽略它就会白等 200ms
-    // 才发现问题，而且分不清「没写进去」和「写进去了但没生效」。
+    // setString 在 ownership 已经变化时会返回 false。
+    //
+    // **这里绝不能返回 0。** 返回值 0 的语义是「剪贴板一个字都没动过」，
+    // 而此刻 clearContents 已经执行、用户的内容已经被清空了。
+    // 调用方看到 0 会走 tx_abandon_locked —— 直接把快照 X 销毁、
+    // 也不安排还原，**剪贴板永久为空**；有 hold 时则因为 expected 没推进，
+    // end 会判成「已易主」而跳过还原，下一个 chunk 还可能把空剪贴板
+    // 重拍成新的原始快照。两条都是静默丢用户数据。
+    //
+    // 正确做法：照常推进代次，让普通的收尾流程把 X 还原回去。
+    // 若那时外部真的接管了，tx_still_ours_locked 会安全地跳过，不会覆盖。
     log_to_file("Clipboard tx: setString failed (ownership changed?)");
-    return 0;
+    _txToken = nil;
+    _txPasteFailed = YES;
+    return tx_note_mutation_locked(cc);
   }
   // token 先用局部变量：写成功**且读得回**才认，否则 _txToken 与剪贴板实际
   // 内容不符 —— 收尾时永远判成「不是我们的」，还原被永久跳过。
