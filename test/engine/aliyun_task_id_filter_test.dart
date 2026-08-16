@@ -42,13 +42,21 @@ void main() {
     expect(body.contains('_droppedStaleFrame'), isTrue,
         reason: '缺少首次丢弃的诊断日志，全丢时会变成查不出的「阿里云没反应」');
 
-    // 过滤必须发生在任何文本发布之前，否则旧句子已经串进去了
-    final filterAt = body.indexOf('task_id');
+    // 过滤必须发生在任何文本发布之前，否则旧句子已经串进去了。
+    //
+    // **锚点必须是「不匹配的拒绝判断」本身，不能是第一个 task_id** ——
+    // task_id 在这个方法里出现多次（读 header、日志、比较）。拿第一个的话，
+    // 把真正的拒绝分支挪到 _textController.add 之后，断言照样绿。
+    final rejectAt = body.indexOf('msgTaskId != _taskId');
     final firstPublish = body.indexOf('_textController.add');
+    expect(rejectAt, greaterThan(-1), reason: '没找到 task_id 不匹配的拒绝判断');
     expect(firstPublish, greaterThan(-1), reason: '没找到文本发布点');
-    expect(filterAt, lessThan(firstPublish),
+    expect(rejectAt, lessThan(firstPublish),
         reason: 'task_id 过滤必须早于任何 _textController.add，'
             '否则过期帧已经污染了字幕');
+    // 而且该分支必须真的 return，只打日志不返回等于没过滤
+    expect(body.substring(rejectAt, firstPublish).contains('return'), isTrue,
+        reason: '拒绝分支没有 return —— 过期帧照样会往下走');
   });
 
   test('aliyun 不得改用录音代次守卫', () {

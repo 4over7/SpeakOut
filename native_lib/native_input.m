@@ -729,9 +729,10 @@ static BOOL _txActive = NO;                  // 事务已开启（持有原始�
 static NSArray *_txOriginal = nil;           // 事务开启前的剪贴板内容
 static uint64_t _txGeneration = 0;           // 我们每改一次剪贴板就 +1
 static NSInteger _txExpectedChangeCount = -1; // 只有我们动过的话，现在该是多少
-static BOOL _txOriginalValid = NO;
-// 还原重试进行中。期间禁止开新事务 —— 剪贴板此刻是被清空的状态。
-static BOOL _txRestorePending = NO;           // 快照是否可信（拍不稳时为 NO）
+static BOOL _txOriginalValid = NO;            // 快照是否可信（拍不稳时为 NO）
+// 还原重试进行中。期间禁止开新事务 —— 剪贴板此刻是被 clearContents 清空的
+// 状态，让新事务在这时拍快照，它会把「空」当成用户的原始内容。
+static BOOL _txRestorePending = NO;
 // 本次一次性注入是否失败。**整段 inject_text 都在 injectTextMutex 里跑**，
 // 所以同一时刻只有一个 inject_text 在用它 —— 否则这个全局标志表达不了
 // 「哪一次调用」的结果：A 失败后、A 读取前 B 把它重置，A 就会错报成功。
@@ -824,6 +825,18 @@ static BOOL tx_still_ours_locked(NSPasteboard *pb) {
 
 // `retryItems` 是出参：首次还原写入失败时，把待写回的内容交出去，
 // 由调用方**在锁外**重试 —— 重试要 sleep，占着锁会把注入一起卡住。
+// 事务开起来了但一个字都没写进剪贴板（写前重拍快照失败）时的收摊。
+// 不清的话 _txActive 会一直挂着：它不像 pending 那样拒绝新注入，
+// 但下一次注入会沿用这份已经不可信的事务状态，而且如果之后没有注入了，
+// 这个标志就永远悬在那里。
+static void tx_abandon_locked(void) {
+  _txActive = NO;
+  _txOriginal = nil;
+  _txOriginalValid = NO;
+  _txToken = nil;
+  _txExpectedChangeCount = -1;
+}
+
 static void tx_finish_locked(NSPasteboard *pb, uint64_t gen,
                              NSArray **retryItems, NSInteger *retryExpected) {
   if (!_txActive) return;
@@ -1025,7 +1038,10 @@ static void inject_via_clipboard(const char *text) {
       return;
     }
     const uint64_t gen = tx_paste_locked(pasteboard, newText);
-    if (gen == 0) _txPasteFailed = YES; // 中途重拍失败，压根没写成
+    if (gen == 0) {
+      _txPasteFailed = YES; // 中途重拍失败，压根没写成
+      if (_txHoldDepth == 0) tx_abandon_locked(); // 没 hold 罩着就别把事务挂那儿
+    }
     log_to_file("Clipboard tx: inject len=%lu gen=%llu%s",
                 (unsigned long)newText.length, (unsigned long long)gen,
                 _txPasteFailed ? " FAILED" : "");
@@ -1083,6 +1099,7 @@ int inject_clipboard_chunk(const char *text) {
     }
     const uint64_t gen = tx_paste_locked(pb, newText);
     if (gen == 0) { // 中途重拍失败，没写成，别安排收尾
+      if (_txHoldDepth == 0) tx_abandon_locked(); // 孤儿 chunk：别留悬挂事务
       pthread_mutex_unlock(&clipTxMutex);
       return 0;
     }

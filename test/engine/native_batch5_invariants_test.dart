@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:crypto/crypto.dart';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +36,20 @@ void main() {
       .join('\n');
 
   final code = stripComments(src);
+
+  /// 按方法名取 Dart 方法体源码。**必须按方法取，不能全文件 indexOf** ——
+  /// `_reportClipboardRestoreFailures()` 在两个方法里各有一处，
+  /// 全文件取第一个的话，删掉任意一处断言都还是绿的（实测如此）。
+  String dartMethod(String file, String name) {
+    final unit = parseFile(
+      path: File(file).absolute.path,
+      featureSet: FeatureSet.latestLanguageVersion(),
+    ).unit;
+    final v = _DartMethodVisitor(name);
+    unit.accept(v);
+    expect(v.body, isNotNull, reason: '$file 里没找到方法 $name');
+    return v.body!;
+  }
 
   /// 按**函数名**取函数体，不写死返回类型。
   /// 写死完整签名的代价已经付过三次了：把 void 改成 BOOL 这种与断言意图
@@ -427,6 +445,79 @@ void main() {
           reason: '核对与写之间放了锁 —— 新注入会插进来，被我们的旧快照覆盖');
     });
 
+    test('没写成任何东西时不得留下悬挂事务', () {
+      // _txActive 挂着不像 pending 那样拒绝新注入，但下一次注入会沿用这份
+      // 已经不可信的事务状态；如果之后没有注入了，标志就永远悬在那里。
+      for (final fn in ['inject_via_clipboard', 'inject_clipboard_chunk']) {
+        final body = stripComments(bodyOfFn(fn));
+        final zeroAt = body.indexOf('gen == 0');
+        expect(zeroAt, greaterThanOrEqualTo(0), reason: '$fn 没处理 gen == 0');
+        expect(body.substring(zeroAt, zeroAt + 260).contains('tx_abandon_locked'),
+            isTrue,
+            reason: '$fn 在「一个字都没写进去」时没有清理事务状态');
+      }
+    });
+
+    test('pending 生命周期：置位、极性、返回值、解除，逐项锁定', () {
+      // codex 列出的四个变异原先都能过：删置位 / 把 return NO 改成 YES /
+      // 删循环内解除 / 删三轮全败后的解除。逐项钉住。
+      final finish = stripComments(bodyOfFn('tx_finish_locked'));
+      expect(finish.contains('_txRestorePending = YES'), isTrue,
+          reason: '首次还原写失败时必须置 pending，'
+              '否则重试窗口里新事务会把「空剪贴板」拍成原始快照');
+
+      // guard 的极性与返回值都要对：只含变量名是不够的
+      final begin = stripComments(bodyOfFn('tx_begin_locked'));
+      final guardAt = begin.indexOf('if (_txRestorePending)');
+      expect(guardAt, greaterThanOrEqualTo(0), reason: 'guard 极性不对或不存在');
+      // **窗口必须收到 guard 自己的块内**：取固定长度会越界到后面那句
+      // `if (!tx_snapshot_stable_locked(pb)) return NO;`，
+      // 于是把 guard 的 return 改成 YES 也照样绿（实测漏报过）。
+      final guardEnd = begin.indexOf('\n  }', guardAt);
+      expect(guardEnd, greaterThan(guardAt), reason: '找不到 guard 块的结尾');
+      final guardBlock = begin.substring(guardAt, guardEnd);
+      expect(guardBlock.contains('return NO'), isTrue,
+          reason: 'pending 期间必须拒绝开新事务（return NO）');
+      expect(guardBlock.contains('return YES'), isFalse,
+          reason: 'guard 里出现 return YES —— 等于完全不拒绝');
+      // 且必须在拍快照之前
+      expect(guardAt, lessThan(begin.indexOf('tx_snapshot_stable_locked')),
+          reason: 'guard 要在拍快照之前，否则已经拍了空快照才拒绝就晚了');
+
+      final sched = stripComments(bodyOfFn('tx_schedule_finish'));
+      expect(sched.contains('if (recovered || abandoned)'), isTrue,
+          reason: '循环内的解除必须同时覆盖成功与放弃');
+      expect(RegExp(r'_txRestorePending = NO').allMatches(sched).length,
+          greaterThanOrEqualTo(2),
+          reason: '循环内出口与三轮全败出口都要解除；'
+              '少一处就会让 pending 永久为真，所有注入被永久拒绝');
+      // 解除必须在锁内 —— tx_begin_locked 在锁内读它
+      final clearAt = sched.indexOf('_txRestorePending = NO');
+      final lockBefore = sched.lastIndexOf('pthread_mutex_lock', clearAt);
+      final unlockBefore = sched.lastIndexOf('pthread_mutex_unlock', clearAt);
+      expect(lockBefore, greaterThan(unlockBefore),
+          reason: 'pending 的解除必须在锁内');
+    });
+
+    test('pending 标志必须在每条出口解除，不能泄漏', () {
+      // 泄漏的后果是灾难性的：tx_begin_locked 会**永久拒绝**所有新事务，
+      // 注入、打字机、AI 梳理全部失效，而且没有任何自愈路径。
+      final sched = stripComments(bodyOfFn('tx_schedule_finish'));
+      // 三条出口：重试成功 / 外部接管放弃 / 三轮全败
+      final clears = RegExp(r'_txRestorePending = NO').allMatches(sched).length;
+      expect(clears, greaterThanOrEqualTo(2),
+          reason: '至少要有「循环内出口」和「三轮全败」两处解除');
+      // 循环内那处必须覆盖 recovered 与 abandoned 两种情况
+      expect(sched.contains('if (recovered || abandoned)'), isTrue,
+          reason: '循环内的解除必须同时覆盖成功与放弃');
+      // 而且解除要在锁内 —— 它被 tx_begin_locked 在锁内读
+      final clearAt = sched.indexOf('_txRestorePending = NO');
+      final unlockAfter = sched.indexOf('pthread_mutex_unlock', clearAt);
+      final lockBefore = sched.lastIndexOf('pthread_mutex_lock', clearAt);
+      expect(lockBefore, greaterThanOrEqualTo(0));
+      expect(unlockAfter, greaterThan(clearAt), reason: 'pending 的解除必须在锁内');
+    });
+
     test('还原基线必须取自 clearContents 的返回值', () {
       // 在 writeObjects 失败之后重读 pb.changeCount 是错的：写失败那一瞬间
       // 别的进程可能已经复制了东西，重读等于把「外部接管」当成我们自己的基线，
@@ -490,14 +581,30 @@ void main() {
     test('还原失败必须能被 Dart 发现，且所有录音路径都对账', () {
       expect(code.contains('clipboard_restore_failures'), isTrue,
           reason: '异步还原失败没有任何上报通道');
-      final engine = File('lib/engine/core_engine.dart').readAsStringSync();
-      // 必须在**录音开始**时对账：还原是注入之后 800ms 才发生的，
-      // 放在注入末尾永远晚一拍；放这里 ptt/闪念/梳理都会经过。
-      final reportAt = engine.indexOf('_reportClipboardRestoreFailures();');
-      final permAt = engine.indexOf('// 1. PERMISSION CHECK');
+      // **两个入口都要有，且必须按方法分别断言。**
+      // 全文件 indexOf 的话，删掉任意一处另一处还在，断言照样绿（实测如此）。
+      //   startRecording —— 覆盖一次性注入（ptt / 闪念）
+      //   _clipBegin     —— 覆盖流式与 AI 梳理（梳理是 keyDown 直触发，
+      //                     根本不经过 startRecording）
+      const eng = 'lib/engine/core_engine.dart';
+      for (final m in ['startRecording', '_clipBegin']) {
+        expect(dartMethod(eng, m).contains('_reportClipboardRestoreFailures()'),
+            isTrue,
+            reason: '$m 里没有对账 —— 走这条路径的用户永远收不到还原失败提示');
+      }
+      // startRecording 里必须早于权限检查（否则无权限时被 return 挡掉）。
+      // 锚点用**代码**不用注释 —— AST 的 toSource() 不含注释。
+      final sr = dartMethod(eng, 'startRecording');
+      final reportAt = sr.indexOf('_reportClipboardRestoreFailures()');
+      final permAt = sr.indexOf('checkMicrophonePermission');
       expect(reportAt, greaterThanOrEqualTo(0));
       expect(permAt, greaterThan(reportAt),
-          reason: '对账要放在录音开始处，不能只挂在某一条注入分支上');
+          reason: '对账要在权限检查之前，否则无权限时永远不对账');
+      // _clipBegin 里必须早于 native begin（begin 可能被 pending 拒绝并 return）
+      final cb = dartMethod(eng, '_clipBegin');
+      expect(cb.indexOf('_reportClipboardRestoreFailures()'),
+          lessThan(cb.indexOf('injectClipboardBegin')),
+          reason: '对账要在 native begin 之前，否则 begin 失败就跳过了');
     });
   });
 
@@ -599,9 +706,47 @@ void main() {
       final after = body.substring(abortAt);
       expect(after.startsWith(RegExp(r'[^;]*;\s*\n\s*return 0;')), isTrue,
           reason: '中止分支必须 return 0，实测「仍返回 1」曾无断言覆盖');
-      final dart = File('lib/engine/core_engine.dart').readAsStringSync();
-      expect(dart.contains('if (!_clipBegin())'), isTrue,
-          reason: 'Dart 侧必须检查 _clipBegin 的返回值');
+      // **两个调用方都要各自检查**。全文件 contains 的话，
+      // 删掉其中一个 guard 另一个还在，断言照样绿。
+      //   _handleOrganize —— 会话没开就继续读剪贴板发给 LLM
+      //   打字机          —— 会话没开就继续发 chunk，chunk 之间会被提前还原
+      //   _handleOrganize —— 会话没开就继续读剪贴板发给 LLM
+      //   stopRecording   —— 打字机路径，会话没开就继续发 chunk，
+      //                      而 chunk 在 native 那边是孤儿、会被提前还原
+      for (final m in ['_handleOrganize', 'stopRecording']) {
+        final body = dartMethod('lib/engine/core_engine.dart', m);
+        expect(body.contains('if (!_clipBegin())'), isTrue,
+            reason: '$m 调了 _clipBegin 却不检查返回值 —— '
+                '删掉任一处 guard 都会让另一处把断言撑绿');
+      }
+    });
+
+    test('三个注入入口拿不到快照时必须**真的 return**，且不得谎报成功', () {
+      // 原断言只查「guard 在 tx_paste_locked 之前」，删掉 return 照样绿：
+      //   一次性路径会在已解锁、事务未开的状态继续调 tx_paste_locked；
+      //   chunk 路径会无锁调用后再 unlock —— 未定义行为。
+      final specs = {
+        'inject_via_clipboard': 'return;',
+        'inject_clipboard_begin': 'return 0;',
+        'inject_clipboard_chunk': 'return 0;',
+      };
+      specs.forEach((fn, ret) {
+        final body = stripComments(bodyOfFn(fn));
+        final guardAt = body.indexOf('if (!tx_begin_locked(');
+        expect(guardAt, greaterThanOrEqualTo(0), reason: '$fn 没有 guard');
+        // guard 之后紧跟的这一段里必须有解锁 + 对应形式的 return
+        final block = body.substring(guardAt, guardAt + 320);
+        expect(block.contains('pthread_mutex_unlock'), isTrue,
+            reason: '$fn 的拒绝分支没解锁');
+        expect(block.contains(ret), isTrue,
+            reason: '$fn 的拒绝分支没有 $ret —— 会带着未开启的事务继续往下走');
+      });
+      // 一次性路径还必须把失败告诉 Dart，否则什么都没注入却报成功
+      final oneShot = stripComments(bodyOfFn('inject_via_clipboard'));
+      final gAt = oneShot.indexOf('if (!tx_begin_locked(');
+      expect(oneShot.substring(gAt, gAt + 320).contains('_txPasteFailed = YES'),
+          isTrue,
+          reason: '拿不到快照却不置失败位，inject_text 会返回成功');
     });
 
     test('三个注入入口在拿不到快照时都必须提前返回', () {
@@ -822,4 +967,16 @@ void main() {
       expect(flushAt, lessThan(zeroAt), reason: '必须先排空再置零');
     });
   });
+}
+
+class _DartMethodVisitor extends RecursiveAstVisitor<void> {
+  _DartMethodVisitor(this.name);
+  final String name;
+  String? body;
+
+  @override
+  void visitMethodDeclaration(MethodDeclaration node) {
+    if (node.name.lexeme == name) body = node.body.toSource();
+    super.visitMethodDeclaration(node);
+  }
 }

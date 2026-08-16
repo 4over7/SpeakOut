@@ -956,7 +956,8 @@ class CoreEngine {
 
     // 上一轮的剪贴板还原是注入之后 800ms 的异步任务，注入结束时还没发生 ——
     // 所以在**下一次录音开始时**对账，而不是在注入末尾（那永远晚一拍）。
-    // 放这里还有个好处：ptt / 闪念 / 梳理所有路径都会经过，不会漏。
+    // 这里覆盖 ptt / 闪念；**AI 梳理是 keyDown 直触发、不经过这里**，
+    // 它由 _clipBegin 里的同一个调用覆盖。
     _reportClipboardRestoreFailures();
 
     // 1. PERMISSION CHECK
