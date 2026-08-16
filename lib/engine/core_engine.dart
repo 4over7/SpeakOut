@@ -897,6 +897,11 @@ class CoreEngine {
     // 1. PERMISSION CHECK
     if (_nativeInput == null || !_nativeInput.checkMicrophonePermission()) {
       _log("Permission DENIED by native check.");
+      // 从没决定过就补弹一次系统授权框：查询本身不再弹框（之前它会弹框并同步
+      // 等 5 秒，超时按拒绝算），不在这里补的话首次按下热键连提示都看不到。
+      if (_nativeInput?.microphonePermissionStatus() == 0) {
+        _nativeInput!.requestMicrophonePermission();
+      }
       _statusController.add(EngineStatus.error("需要麦克风权限"));
       return;
     }

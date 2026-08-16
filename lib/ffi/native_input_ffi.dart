@@ -29,6 +29,9 @@ class NativeInputFFI implements NativeInputBase {
   late StopAudioRecordingDart _stopAudioRecording;
   late IsAudioRecordingDart _isAudioRecording;
   late CheckMicrophonePermissionDart _checkMicPermission;
+  // 可选：macOS only。Windows/Linux dylib 尚未导出这两个 symbol
+  MicrophonePermissionStatusDart? _micPermissionStatus;
+  RequestMicrophonePermissionDart? _requestMicPermission;
   // 可选：macOS only。Windows/Linux dylib 可能不导出此 symbol
   CheckScreenRecordingPermissionDart? _checkScreenRecordingPermission;
   late NativeFreeDart _nativeFree;
@@ -217,6 +220,17 @@ class NativeInputFFI implements NativeInputBase {
       } catch (_) {
         _checkScreenRecordingPermission = null;
       }
+      try {
+        _micPermissionStatus = _dylib
+            .lookup<NativeFunction<MicrophonePermissionStatusC>>('microphone_permission_status')
+            .asFunction();
+        _requestMicPermission = _dylib
+            .lookup<NativeFunction<RequestMicrophonePermissionC>>('request_microphone_permission')
+            .asFunction();
+      } catch (_) {
+        _micPermissionStatus = null;
+        _requestMicPermission = null;
+      }
     } catch (e) {
       _log("Audio FFI bindings FAILED: $e");
     }
@@ -252,6 +266,23 @@ class NativeInputFFI implements NativeInputBase {
     if (!_audioBound) return false;
     final result = _checkMicPermission();
     return result == 1;
+  }
+
+  @override
+  int microphonePermissionStatus() {
+    _bindAudioFunctions();
+    if (!_audioBound) return 2; // 绑不上就当没权限，不要谎报已授权
+    final fn = _micPermissionStatus;
+    // 老 dylib 没导出细分状态：只能退化成「授权 / 已拒绝」两态
+    if (fn == null) return checkMicrophonePermission() ? 3 : 2;
+    return fn();
+  }
+
+  @override
+  void requestMicrophonePermission() {
+    _bindAudioFunctions();
+    if (!_audioBound) return;
+    _requestMicPermission?.call();
   }
 
   @override

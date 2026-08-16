@@ -55,6 +55,9 @@ class AppService {
   bool checkInputMonitoringPermission() => engine.nativeInput?.checkInputMonitoringPermission() ?? false;
   bool checkAccessibilityPermission() => engine.nativeInput?.checkAccessibilityPermission() ?? false;
   bool checkMicrophonePermission() => engine.nativeInput?.checkMicrophonePermission() ?? false;
+  /// 0=未决定 1=受限 2=已拒绝 3=已授权
+  int microphonePermissionStatus() => engine.nativeInput?.microphonePermissionStatus() ?? 2;
+  void requestMicrophonePermission() => engine.nativeInput?.requestMicrophonePermission();
 
   // ── 标点初始化 ──
   Future<void> initPunctuation(String modelPath, {String activeModelName = ''}) =>

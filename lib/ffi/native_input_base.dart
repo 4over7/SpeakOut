@@ -33,6 +33,12 @@ typedef IsAudioRecordingDart = int Function();
 typedef CheckMicrophonePermissionC = Int32 Function();
 typedef CheckMicrophonePermissionDart = int Function();
 
+typedef MicrophonePermissionStatusC = Int32 Function();
+typedef MicrophonePermissionStatusDart = int Function();
+
+typedef RequestMicrophonePermissionC = Void Function();
+typedef RequestMicrophonePermissionDart = void Function();
+
 typedef CheckScreenRecordingPermissionC = Int32 Function();
 typedef CheckScreenRecordingPermissionDart = int Function();
 
@@ -156,6 +162,15 @@ abstract class NativeInputBase {
   void stopAudioRecording();
   bool isAudioRecording();
   bool checkMicrophonePermission();
+
+  /// 当前麦克风授权状态，取值对齐 `AVAuthorizationStatus`：
+  /// 0=未决定 1=受限 2=已拒绝 3=已授权。**只查询，不弹窗、不阻塞。**
+  int microphonePermissionStatus();
+
+  /// 仅在「未决定」时弹系统授权框，立即返回。
+  /// 结果不通过返回值给出 —— 调用方轮询 [microphonePermissionStatus]。
+  void requestMicrophonePermission();
+
   bool checkScreenRecordingPermission();
   void nativeFree(Pointer<Void> ptr);
   int getAvailableAudioSamples();

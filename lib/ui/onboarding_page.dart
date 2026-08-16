@@ -144,6 +144,20 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
   }
 
   Future<void> _openMicrophoneSettings() async {
+    // 还没决定过就走系统授权框 —— 一次点击就能给，比把人赶去「系统设置」强。
+    // （原先 checkMicrophonePermission 自己会弹框并同步等 5 秒，界面跟着冻住；
+    //   现在查询不弹框，弹框由这里显式发起。）
+    if (_app.microphonePermissionStatus() == 0) {
+      setState(() => _microphoneAttempted = true);
+      _app.requestMicrophonePermission();
+      for (int i = 0; i < 20; i++) {
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (!mounted) return;
+        await _checkPermissions();
+        if (_microphoneGranted) return;
+      }
+      return;
+    }
     await _openAndPollPermission('Privacy_Microphone',
       () => _microphoneGranted ? 'granted' : '',
       () => setState(() => _microphoneAttempted = true));

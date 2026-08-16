@@ -19,8 +19,13 @@
 // Debug logging flag — disabled by default, enabled via set_debug_logging(1)
 static atomic_int debugLoggingEnabled = 0;
 
+static void start_tap_log_drain(void);
+
 void set_debug_logging(int enabled) {
   atomic_store(&debugLoggingEnabled, enabled ? 1 : 0);
+  if (enabled) start_tap_log_drain();
+  // 关掉时不撤 drain timer：撤销要跨线程同步 source 的生命周期，代价远大于
+  // 200ms 空转一次的开销 —— 此时 ring 已无写入，handler 立刻返回。
 }
 
 // Log file path — defaults to ~/Downloads/speakout_native.log
@@ -74,6 +79,67 @@ void log_to_file(const char *fmt, ...) {
   NSLog(@"[NativeInput] %@", msg);
   va_end(args_copy);
   va_end(args);
+}
+
+// --- CGEventTap 回调专用日志 ---
+//
+// **回调里绝不能调 log_to_file。** 它做 fopen / vfprintf / fclose / NSString
+// 分配 / NSLog，全是同步阻塞操作，而这个回调跑在主 RunLoop 上、有系统时限：
+// 磁盘忙或日志系统卡一下，系统就判定 tap 无响应并禁用它，快捷键随之失效。
+// 打开 verbose 日志本来是为了排查别的问题，却把键盘监听搞挂 —— 因果完全错位。
+//
+// 这里改成单写者/单读者环形缓冲：回调侧只做一次栈上 vsnprintf + 一个 release
+// store，无堆分配、无系统调用；后台队列每 200ms 排空一次，真正的 I/O 在那边做。
+//
+// 溢出（200ms 内超过 TAP_LOG_SLOTS 条）丢最旧的若干条并留一行标记。写者覆盖
+// 正在被读的槽位时最坏结果是那一行内容撕裂 —— 读侧整块 memcpy 后强制补 NUL，
+// 不会越界。调试日志可以容忍撕裂，不能容忍拖慢回调。
+#define TAP_LOG_SLOTS 256
+#define TAP_LOG_LINE 192
+static char tapLogRing[TAP_LOG_SLOTS][TAP_LOG_LINE];
+static atomic_uint tapLogWrite = 0;
+static unsigned tapLogRead = 0;
+static dispatch_source_t tapLogDrainTimer = nil;
+
+__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,
+                                                               ...) {
+  if (!atomic_load(&debugLoggingEnabled)) return;
+  unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_relaxed);
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(tapLogRing[w % TAP_LOG_SLOTS], TAP_LOG_LINE, fmt, ap);
+  va_end(ap);
+  atomic_store_explicit(&tapLogWrite, w + 1, memory_order_release);
+}
+
+static void drain_tap_log(void) {
+  unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_acquire);
+  if (w - tapLogRead > TAP_LOG_SLOTS) {
+    unsigned dropped = (w - tapLogRead) - TAP_LOG_SLOTS;
+    tapLogRead = w - TAP_LOG_SLOTS;
+    log_to_file("[tap-log] dropped %u lines (ring overflow)", dropped);
+  }
+  while (tapLogRead != w) {
+    char line[TAP_LOG_LINE];
+    memcpy(line, tapLogRing[tapLogRead % TAP_LOG_SLOTS], TAP_LOG_LINE);
+    line[TAP_LOG_LINE - 1] = '\0';
+    log_to_file("%s", line);
+    tapLogRead++;
+  }
+}
+
+static void start_tap_log_drain(void) {
+  if (tapLogDrainTimer != nil) return;
+  dispatch_queue_t q =
+      dispatch_queue_create("com.speakout.taplog", DISPATCH_QUEUE_SERIAL);
+  tapLogDrainTimer =
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
+  dispatch_source_set_timer(tapLogDrainTimer, DISPATCH_TIME_NOW,
+                            200 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
+  dispatch_source_set_event_handler(tapLogDrainTimer, ^{
+    drain_tap_log();
+  });
+  dispatch_resume(tapLogDrainTimer);
 }
 
 // Callback function type defined in Dart (v2: added modifierFlags for combo key support)
@@ -132,13 +198,16 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     return event;
   }
 
-  if (type == kCGEventTapDisabledByTimeout) {
-    log_to_file("EventTap Disabled by Timeout. Re-enabling...");
-    CGEventTapEnable(eventTap, true);
-    return event;
-  }
-
-  if (type == kCGEventTapDisabledByUserInput) {
+  // 两类禁用都必须重启，**不能只处理 Timeout**：
+  // ByUserInput 之后不重启的话，此后所有快捷键事件都收不到 —— PTT / 闪念 /
+  // 翻译全部静默失效，进程还活着、也不报错，用户只会觉得「快捷键坏了」。
+  // 无条件重启是安全的：全仓 CGEventTapEnable 只有这里和 start 处，都传 true，
+  // 没有「有意禁用」的路径会跟它打架。
+  if (type == kCGEventTapDisabledByTimeout ||
+      type == kCGEventTapDisabledByUserInput) {
+    log_from_tap("EventTap disabled (%s). Re-enabling...",
+                 type == kCGEventTapDisabledByTimeout ? "timeout" : "user input");
+    if (eventTap) CGEventTapEnable(eventTap, true);
     return event;
   }
 
@@ -151,7 +220,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
       (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
   // Log every 10th event or specific keys (58=Option)
   if (keyCode == 58) {
-    log_to_file("Event: Key 58 (Option) Type: %d", type);
+    log_from_tap("Event: Key 58 (Option) Type: %d", type);
   }
 
   // Capture Key events
@@ -167,13 +236,13 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
         uint64_t elapsed = mach_absolute_time() - lastFn63Time;
         double elapsedMs = (double)elapsed * tbInfo.numer / tbInfo.denom / 1000000.0;
         if (elapsedMs < 100.0) {
-          log_to_file("Globe key 179: suppressed (FlagsChanged 63 was %.0fms ago)", elapsedMs);
+          log_from_tap("Globe key 179: suppressed (FlagsChanged 63 was %.0fms ago)", elapsedMs);
           return event;
         }
       }
       lastGlobe179Time = mach_absolute_time();
       mappedKeyCode = 63;
-      log_to_file("Globe key 179 -> mapped to Fn 63 (%s)",
+      log_from_tap("Globe key 179 -> mapped to Fn 63 (%s)",
                   type == kCGEventKeyDown ? "DOWN" : "UP");
     }
 
@@ -187,7 +256,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     mach_timebase_info_data_t info;
     mach_timebase_info(&info);
     double ms = (double)(t1 - t0) * info.numer / info.denom / 1000000.0;
-    log_to_file("Key %d %s: dartCallback took %.2f ms", mappedKeyCode,
+    log_from_tap("Key %d %s: dartCallback took %.2f ms", mappedKeyCode,
                 type == kCGEventKeyDown ? "DOWN" : "UP", ms);
   } else if (type == kCGEventFlagsChanged) {
     CGEventFlags flags = CGEventGetFlags(event);
@@ -235,7 +304,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
         uint64_t elapsed = mach_absolute_time() - lastGlobe179Time;
         double elapsedMs = (double)elapsed * tbInfo.numer / tbInfo.denom / 1000000.0;
         if (elapsedMs < 100.0) {
-          log_to_file("FN FlagsChanged 63: suppressed (Globe 179 was %.0fms ago)", elapsedMs);
+          log_from_tap("FN FlagsChanged 63: suppressed (Globe 179 was %.0fms ago)", elapsedMs);
           return event;
         }
       }
@@ -255,12 +324,12 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
         }
       }
       lastFn63Time = mach_absolute_time();
-      log_to_file("FN Key 63 (legacy): flags=0x%llx, fnFlagSet=%d, isDown=%d",
+      log_from_tap("FN Key 63 (legacy): flags=0x%llx, fnFlagSet=%d, isDown=%d",
                   (unsigned long long)flags, fnFlagSet, isDown);
     }
 
     if (keyCode == 58 || keyCode == 61) {
-      log_to_file("FlagsChanged: Key %d. IsDown: %d. devFlags: 0x%04x", keyCode, isDown, devFlags);
+      log_from_tap("FlagsChanged: Key %d. IsDown: %d. devFlags: 0x%04x", keyCode, isDown, devFlags);
     }
 
     dartCallback((int)keyCode, isDown, devFlags);
@@ -497,6 +566,40 @@ static void post_command_key(CGKeyCode key, CGEventTapLocation tap) {
   CFRelease(source);
 }
 
+// 深拷贝当前剪贴板内容，供之后还原。空剪贴板返回 nil。
+static NSArray *snapshot_pasteboard(NSPasteboard *pasteboard) {
+  NSArray *oldContents = [pasteboard pasteboardItems];
+  if (oldContents.count == 0) return nil;
+  NSMutableArray *items = [NSMutableArray array];
+  for (NSPasteboardItem *item in oldContents) {
+    NSPasteboardItem *copy = [[NSPasteboardItem alloc] init];
+    for (NSString *type in [item types]) {
+      NSData *data = [item dataForType:type];
+      if (data) {
+        [copy setData:data forType:type];
+      }
+    }
+    [items addObject:copy];
+  }
+  return items;
+}
+
+// --- 一次性剪贴板注入的还原事务 ---
+//
+// 快照**必须按事务拍一次**，不能每次注入都重拍。原先每次都读当前剪贴板当
+// 「原始内容」，于是 CLIPBOARD_RESTORE_DELAY_MS 内连注两次时：
+//   原剪贴板 X → 注入 A（存 X）→ 注入 B（存到的却是 A）
+//   → A 的还原任务看到 changeCount 变了，跳过 → B 的还原任务写回 A
+// 结果 X 永久丢失，剪贴板里留着 SpeakOut 自己注入的文本。连续听写、
+// 或普通注入紧接打字机注入都能触发。
+//
+// 现在：只有当前没有待还原任务时才拍快照；之后的注入只推进代次，
+// 唯有最后一代的任务负责把最初那份快照写回去。
+static pthread_mutex_t clipboardTxMutex = PTHREAD_MUTEX_INITIALIZER;
+static NSArray *_txSavedItems = nil;   // 事务开始前的原始剪贴板
+static BOOL _txRestorePending = NO;
+static uint64_t _txGeneration = 0;
+
 static void inject_via_clipboard(const char *text) {
   @autoreleasepool {
     NSString *newText = [NSString stringWithUTF8String:text];
@@ -505,23 +608,14 @@ static void inject_via_clipboard(const char *text) {
 
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
 
-    // 1. Save current clipboard contents
-    NSArray *savedItems = nil;
-    NSArray *oldContents = [pasteboard pasteboardItems];
-    if (oldContents.count > 0) {
-      NSMutableArray *items = [NSMutableArray array];
-      for (NSPasteboardItem *item in oldContents) {
-        NSPasteboardItem *copy = [[NSPasteboardItem alloc] init];
-        for (NSString *type in [item types]) {
-          NSData *data = [item dataForType:type];
-          if (data) {
-            [copy setData:data forType:type];
-          }
-        }
-        [items addObject:copy];
-      }
-      savedItems = items;
+    // 1. 事务级快照：已有待还原任务说明我们仍持有更早的原始内容，别覆盖它
+    pthread_mutex_lock(&clipboardTxMutex);
+    if (!_txRestorePending) {
+      _txSavedItems = snapshot_pasteboard(pasteboard);
+      _txRestorePending = YES;
     }
+    const uint64_t myGen = ++_txGeneration;
+    pthread_mutex_unlock(&clipboardTxMutex);
 
     // 2. Put text on clipboard
     NSInteger ourChangeCount = [pasteboard clearContents];
@@ -536,10 +630,20 @@ static void inject_via_clipboard(const char *text) {
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, CLIPBOARD_RESTORE_DELAY_MS * NSEC_PER_MSEC),
         dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          pthread_mutex_lock(&clipboardTxMutex);
+          if (myGen != _txGeneration) { // 后面还有更新的注入，交给它收尾
+            pthread_mutex_unlock(&clipboardTxMutex);
+            return;
+          }
+          NSArray *saved = _txSavedItems;
+          _txSavedItems = nil;
+          _txRestorePending = NO;
+          pthread_mutex_unlock(&clipboardTxMutex);
+
           if (pasteboard.changeCount != ourChangeCount) return;
           [pasteboard clearContents];
-          if (savedItems != nil && savedItems.count > 0) {
-            [pasteboard writeObjects:savedItems];
+          if (saved != nil && saved.count > 0) {
+            [pasteboard writeObjects:saved];
           }
         });
   }
@@ -549,7 +653,8 @@ static void inject_via_clipboard(const char *text) {
 // Saves clipboard once at begin, pastes each chunk, restores at end.
 static BOOL _clipboardSessionActive = NO;
 static NSArray *_savedClipboardItems = nil;
-// 最后一次 chunk 写入后的 changeCount，供 end 判断剪贴板有没有易主
+// 本会话最后一次由我们自己造成的 changeCount，供 end 判断剪贴板有没有易主。
+// -1 表示本会话还没动过剪贴板 —— 此时应无条件还原。
 static NSInteger _lastChunkChangeCount = -1;
 
 void inject_clipboard_begin(void) {
@@ -559,24 +664,13 @@ void inject_clipboard_begin(void) {
     // 那样 end 会误判成「无会话」直接返回，注入的语音文本永久留在剪贴板里
     // （既违反恢复契约，也是口述内容泄漏）。
     _clipboardSessionActive = true;
+    // **必须复位**：这是跨会话共享的静态量，不清零的话上一次会话留下的
+    // changeCount 会被这一次的 end 当判据 —— AI 梳理里 begin 后 Cmd+C 改了
+    // 剪贴板、LLM 又在首个 chunk 之前失败时，end 拿旧值一比就判成「已易主」
+    // 而跳过还原，用户开梳理前的剪贴板内容就这么没了。
+    _lastChunkChangeCount = -1;
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    NSArray *oldContents = [pasteboard pasteboardItems];
-    if (oldContents.count > 0) {
-      NSMutableArray *items = [NSMutableArray array];
-      for (NSPasteboardItem *item in oldContents) {
-        NSPasteboardItem *copy = [[NSPasteboardItem alloc] init];
-        for (NSString *type in [item types]) {
-          NSData *data = [item dataForType:type];
-          if (data) {
-            [copy setData:data forType:type];
-          }
-        }
-        [items addObject:copy];
-      }
-      _savedClipboardItems = items;
-    } else {
-      _savedClipboardItems = nil;
-    }
+    _savedClipboardItems = snapshot_pasteboard(pasteboard);
     log_to_file("Clipboard streaming: begin (saved %lu items)",
                 (unsigned long)(_savedClipboardItems ? _savedClipboardItems.count : 0));
   }
@@ -643,6 +737,12 @@ void copy_selection(void) {
   @autoreleasepool {
     post_command_key(8, kCGAnnotatedSessionEventTap); // 8 = 'c'
     usleep(100000); // 100ms 等待剪贴板更新
+    // 会话进行中的 Cmd+C 也是「我们自己造成的变更」，要记进判据。
+    // 否则 end 会把它当成用户易主而跳过还原；反过来，用户在这之后真的自己
+    // 复制了东西，changeCount 就会对不上，还原被正确跳过 —— 两种情形分得开。
+    if (_clipboardSessionActive) {
+      _lastChunkChangeCount = [[NSPasteboard generalPasteboard] changeCount];
+    }
   }
 }
 
@@ -869,7 +969,52 @@ static _Atomic uint64_t recordingStartPos = 0;
 // RMS of latest samples → single 0.0~1.0 value for UI to scale random animation.
 
 // Smoothed level with fast attack / slow decay (VU meter style)
-static float smoothedLevel = 0.0f;
+//
+// 状态用原子位模式保存、衰减按**经过的时间**算，两个原因都成立：
+//
+// 1. 三个调用方分布在两个线程上 —— Dart UI isolate（main.dart 的波形、
+//    core_engine 的静音检测）和 AppKit 主线程（AppDelegate 的 80ms Timer，
+//    通过 dlopen 拿到同一个 dylib 里的同一个静态量）。Flutter 的 UI task
+//    runner 与 platform task runner 本来就是两个线程，普通 float 的
+//    读改写在 C 内存模型下是数据竞争。
+// 2. 比竞争更早暴露的是：**原实现的衰减速度跟着调用次数走**。
+//    「每调一次乘 0.88」是按「80ms 一个轮询器」设计的，实际有三个轮询器，
+//    衰减就快约三倍 —— 波形掉得比设计快，静音检测也跟着提前触发。
+//    改成按 elapsed 算 keep 系数后，结果与谁在轮询、轮询多密都无关。
+static _Atomic uint32_t smoothedLevelBits = 0;
+static _Atomic uint64_t smoothedLevelStamp = 0;
+
+static float smoothed_level_update(float level) {
+  const uint64_t now = mach_absolute_time();
+  mach_timebase_info_data_t tb;
+  mach_timebase_info(&tb);
+  for (;;) {
+    uint32_t oldBits = atomic_load(&smoothedLevelBits);
+    const uint64_t oldStamp = atomic_load(&smoothedLevelStamp);
+    float prev;
+    memcpy(&prev, &oldBits, sizeof(prev));
+
+    float next;
+    if (level >= prev) {
+      next = level; // instant rise
+    } else {
+      // stamp 与 bits 不是一次原子读到的，可能取到稍旧的时间戳；
+      // 那只会让这一次衰减多算一点，不产生 UB，也不会累积偏差。
+      const double ms =
+          (double)(now - oldStamp) * tb.numer / tb.denom / 1000000.0;
+      // 原系数 0.88 的语义是「每 80ms 保留 88%」，这里把它还原成时间函数
+      const double keep = pow(0.88, ms / 80.0);
+      next = (float)(prev * keep + level * (1.0 - keep));
+    }
+
+    uint32_t newBits;
+    memcpy(&newBits, &next, sizeof(newBits));
+    if (atomic_compare_exchange_weak(&smoothedLevelBits, &oldBits, newBits)) {
+      atomic_store(&smoothedLevelStamp, now);
+      return next;
+    }
+  }
+}
 
 // Exported: returns current RMS audio level (0.0 = silence, 1.0 = loud).
 // Dart/Swift polls this every ~80ms.
@@ -901,14 +1046,8 @@ float get_audio_level(void) {
     if (level < 0.0f) level = 0.0f;
     if (level > 1.0f) level = 1.0f;
 
-    // Asymmetric smoothing: instant attack, ~500ms decay
-    // At 80ms poll interval, decay factor 0.88 → half-life ~460ms
-    if (level >= smoothedLevel) {
-        smoothedLevel = level;           // instant rise
-    } else {
-        smoothedLevel = smoothedLevel * 0.88f + level * 0.12f;  // slow fall
-    }
-    return smoothedLevel;
+    // Asymmetric smoothing: instant attack, ~500ms decay (half-life ~460ms)
+    return smoothed_level_update(level);
 }
 
 // Legacy stub — kept for ABI compatibility if old code still links it.
@@ -1163,29 +1302,41 @@ int check_screen_recording_permission(void) {
 }
 
 // Check microphone permission (macOS 10.14+)
-int check_microphone_permission() {
+// 返回当前授权状态，与 AVAuthorizationStatus 取值一致：
+// 0=notDetermined 1=restricted 2=denied 3=authorized。
+// **只查询，绝不弹窗、绝不阻塞。**
+int microphone_permission_status(void) {
   if (@available(macOS 10.14, *)) {
-    AVAuthorizationStatus status =
-        [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
-    if (status == AVAuthorizationStatusAuthorized) {
-      return 1; // Granted
-    } else if (status == AVAuthorizationStatusNotDetermined) {
-      // Request permission
-      __block int result = 0;
-      dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-      [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
-                               completionHandler:^(BOOL granted) {
-                                 result = granted ? 1 : 0;
-                                 dispatch_semaphore_signal(sema);
-                               }];
-      dispatch_semaphore_wait(
-          sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
-      return result;
-    } else {
-      return 0; // Denied or Restricted
-    }
+    return (int)[AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
   }
-  return 1; // Pre-10.14 doesn't require permission
+  return 3; // Pre-10.14 doesn't require permission
+}
+
+// 仅在 notDetermined 时弹系统授权框，**立即返回**，结果靠随后轮询 status 拿。
+void request_microphone_permission(void) {
+  if (@available(macOS 10.14, *)) {
+    if ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio] !=
+        AVAuthorizationStatusNotDetermined) {
+      return;
+    }
+    [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
+                             completionHandler:^(BOOL granted){
+                                 // 结果由调用方轮询 microphone_permission_status 获取
+                             }];
+  }
+}
+
+// 之前这里是「同步 FFI 等一个要人点的 UI」，两个缺陷叠在一起：
+//   1. 等 5 秒就返回。用户读一眼提示、切个窗口再点「允许」就超时，
+//      而此时函数返回初值 0 = 拒绝，这次录音被判无权限直接中止 ——
+//      用户明明点了允许，却被告知没权限。
+//   2. `__block int result` 由 completion block 在任意线程写、超时后由调用
+//      线程读，无任何同步，是实打实的数据竞争。
+// 更根本的是：调用它的是 UI isolate（onboarding 的 _checkPermissions），
+// 阻塞 5 秒等于界面冻 5 秒。所以改成非阻塞查询 + 独立的异步请求，
+// 两个缺陷一起消失。
+int check_microphone_permission() {
+  return microphone_permission_status() == 3 ? 1 : 0;
 }
 
 // ============================================================================

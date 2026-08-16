@@ -37,7 +37,64 @@ class AppDelegate: FlutterAppDelegate {
     NSLog("[Overlay] Audio level function loaded")
   }
 
+  // MARK: - Security-scoped bookmark（沙盒版的闪念目录权限）
+  //
+  // App Store 版开了 app-sandbox，而 NSOpenPanel（Powerbox）给的授权**不跨进程**。
+  // 原来只把 url.path 交回 Dart 存进配置，重启后 Dart 照着这个路径写文件，
+  // 沙盒直接拒绝 —— 闪念笔记从此静默写不进去，用户看不到任何原因。
+  // 要跨启动保住权限，必须存 security-scoped bookmark，启动时解析并
+  // startAccessingSecurityScopedResource()。
+  //
+  // 非沙盒的 Release 版不需要这套，但这段代码在那里也无害。
+  // pickFile（导入模型 .tar.bz2）不需要：它在同一次会话里读完就结束，
+  // Powerbox 的临时授权覆盖得到。
+  private static let diaryBookmarkKey = "SpeakOutDiaryDirBookmark"
+  private var scopedDiaryURL: URL?
+
+  private func persistDiaryBookmark(for url: URL) {
+    do {
+      let data = try url.bookmarkData(options: [.withSecurityScope],
+                                      includingResourceValuesForKeys: nil,
+                                      relativeTo: nil)
+      UserDefaults.standard.set(data, forKey: Self.diaryBookmarkKey)
+    } catch {
+      NSLog("[Sandbox] 创建 bookmark 失败: %@", String(describing: error))
+    }
+  }
+
+  private func restoreScopedDiaryAccess() {
+    guard let data = UserDefaults.standard.data(forKey: Self.diaryBookmarkKey) else {
+      return
+    }
+    var stale = false
+    do {
+      let url = try URL(resolvingBookmarkData: data,
+                        options: [.withSecurityScope],
+                        relativeTo: nil,
+                        bookmarkDataIsStale: &stale)
+      guard url.startAccessingSecurityScopedResource() else {
+        NSLog("[Sandbox] startAccessingSecurityScopedResource 失败: %@", url.path)
+        return
+      }
+      scopedDiaryURL = url
+      // stale 说明目录被移动/改名过，此刻立刻重建，否则下次启动就解析不出来了
+      if stale { persistDiaryBookmark(for: url) }
+      NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", url.path)
+    } catch {
+      NSLog("[Sandbox] 解析 bookmark 失败: %@", String(describing: error))
+    }
+  }
+
+  // 只在**换目录**时需要放掉旧 scope（长期运行的进程不该攒着不放）。
+  // 进程退出不用管：scope 随进程消失，专门挂个 willTerminate 只是徒增噪音。
+  private func releaseScopedDiaryAccess() {
+    scopedDiaryURL?.stopAccessingSecurityScopedResource()
+    scopedDiaryURL = nil
+  }
+
   override func applicationDidFinishLaunching(_ notification: Notification) {
+    restoreScopedDiaryAccess()
+
     // Setup MethodChannel for recording overlay control
     if let controller = mainFlutterWindow?.contentViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(
@@ -314,8 +371,13 @@ class AppDelegate: FlutterAppDelegate {
     panel.canCreateDirectories = true  // Critical: Allow creating new folders
     panel.prompt = "Select"
 
-    panel.begin { response in
+    panel.begin { [weak self] response in
       if response == .OK, let url = panel.url {
+        // 换目录先放掉旧的 scope，再按 bookmark 重新持有 ——
+        // 走和「重启后恢复」完全同一条路径，避免只有首次会话能写。
+        self?.releaseScopedDiaryAccess()
+        self?.persistDiaryBookmark(for: url)
+        self?.restoreScopedDiaryAccess()
         result(url.path)
       } else {
         result(nil)
