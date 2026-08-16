@@ -337,6 +337,21 @@ void main() {
       expect(body.contains('return NO'), isTrue);
     });
 
+    test('begin 拿不到快照必须返回 0，Dart 侧必须据此放弃流式注入', () {
+      // 返回 void（或恒返回 1）的话：native 没开 hold，Dart 照样把会话计数 +1，
+      // 打字机以为有 hold 罩着继续发 chunk，而每个 chunk 在 native 那边都是
+      // 孤儿、各自安排收尾 —— 文字在 chunk 之间就被还原掉了。
+      final body = bodyOfFn('inject_clipboard_begin');
+      final abortAt = body.indexOf('begin aborted');
+      expect(abortAt, greaterThanOrEqualTo(0), reason: '没找到中止分支');
+      final after = body.substring(abortAt);
+      expect(after.startsWith(RegExp(r'[^;]*;\s*\n\s*return 0;')), isTrue,
+          reason: '中止分支必须 return 0，实测「仍返回 1」曾无断言覆盖');
+      final dart = File('lib/engine/core_engine.dart').readAsStringSync();
+      expect(dart.contains('if (!_clipBegin())'), isTrue,
+          reason: 'Dart 侧必须检查 _clipBegin 的返回值');
+    });
+
     test('三个注入入口在拿不到快照时都必须提前返回', () {
       // 「先照写、收尾时不还原」不是可用的失败策略 —— 那等于把用户剪贴板
       // 换成我们注入的文字并永久留在那里（口述内容还会泄漏在剪贴板里）。

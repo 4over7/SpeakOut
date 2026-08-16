@@ -944,7 +944,10 @@ static void inject_via_clipboard(const char *text) {
 // --- Streaming clipboard injection (for typewriter effect) ---
 // begin 挂起还原，chunk 逐段粘贴，end 解除挂起并安排还原。
 
-void inject_clipboard_begin(void) {
+// 返回 1 = 会话已开启；0 = 快照拿不到，会话**没有**开启。
+// **不能返回 void**：Dart 侧照样会把会话计数 +1，于是打字机以为有 hold 罩着，
+// 每个 chunk 都变成孤儿、各自安排收尾，文字在 chunk 之间就被还原掉了。
+int inject_clipboard_begin(void) {
   @autoreleasepool {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
@@ -954,12 +957,13 @@ void inject_clipboard_begin(void) {
     if (!tx_begin_locked(pb)) {
       pthread_mutex_unlock(&clipTxMutex);
       log_to_file("Clipboard tx: begin aborted (no trustworthy snapshot)");
-      return;
+      return 0;
     }
     _txHoldDepth++;
     log_to_file("Clipboard tx: hold++ (depth=%d, saved %lu items)", _txHoldDepth,
                 (unsigned long)(_txOriginal ? _txOriginal.count : 0));
     pthread_mutex_unlock(&clipTxMutex);
+    return 1;
   }
 }
 

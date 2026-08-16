@@ -584,10 +584,10 @@ class NativeInputFFI implements NativeInputBase {
   }
 
   @override
-  void injectClipboardBegin() {
+  bool injectClipboardBegin() {
     _bindClipboardFunctions();
-    if (!_clipboardBound) return;
-    _injectClipboardBegin();
+    if (!_clipboardBound) return false;
+    return _injectClipboardBegin() == 1;
   }
 
   @override

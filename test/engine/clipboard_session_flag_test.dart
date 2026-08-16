@@ -71,15 +71,26 @@ void main() {
   });
 
   test('native 会话只在最外层开合 —— 它只有一份全局快照', () {
-    final b = _MethodBodyVisitor('_clipBegin');
-    unit.accept(b);
-    expect(b.body!.toSource().contains('_clipboardSessions == 0) _nativeInput'), isTrue,
-        reason: '内层 begin 也调 native 的话，第二次会覆盖第一次的剪贴板快照');
-    final e = _MethodBodyVisitor('_clipEnd');
-    unit.accept(e);
-    expect(e.body!.toSource().contains('_clipboardSessions == 0) _nativeInput'), isTrue,
-        reason: '内层 end 也调 native 的话，第一次结束就会提前恢复、'
-            '另一个流程还在写 chunk，且用户原始剪贴板丢失');
+    // 断言的是**不变量**：native 调用必须被「计数为 0」的判断罩住。
+    // 不写死成一整行字面量 —— 那样把 if 拆成多行（比如加了失败处理）
+    // 就会让断言失效，而不变量根本没变。
+    void assertGuarded(String method, String nativeCall) {
+      final v = _MethodBodyVisitor(method);
+      unit.accept(v);
+      expect(v.body, isNotNull, reason: '没找到 $method');
+      final body = v.body!.toSource();
+      final guardAt = body.indexOf('_clipboardSessions == 0');
+      final callAt = body.indexOf(nativeCall);
+      expect(guardAt, greaterThanOrEqualTo(0), reason: '$method 没有最外层判断');
+      expect(callAt, greaterThanOrEqualTo(0), reason: '$method 没调 $nativeCall');
+      expect(guardAt, lessThan(callAt),
+          reason: '$method 的 native 调用必须被「计数为 0」罩住 —— '
+              'native 只有一份全局快照，内层也调的话，'
+              '第二次 begin 会覆盖第一次的快照，第一次 end 会提前恢复');
+    }
+
+    assertGuarded('_clipBegin', 'injectClipboardBegin');
+    assertGuarded('_clipEnd', 'injectClipboardEnd');
   });
 
   test('UI 能通过 AppService facade 读到注入状态', () {

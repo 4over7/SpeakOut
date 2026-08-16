@@ -34,13 +34,21 @@ void main() {
   });
 
   test('begin/end 必须成对增减会话深度', () {
-    final begin = RegExp(r'void inject_clipboard_begin\(void\) \{([\s\S]*?)\n\}')
-        .firstMatch(src)!
-        .group(1)!;
+    // 按函数名匹配，不写死返回类型（签名从 void 变成过 int，绊过多次）
+    String fn(String name) {
+      final m = RegExp(
+              r'^\s*(?:static\s+)?[A-Za-z_][A-Za-z0-9_ *]*\b' +
+                  name +
+                  r'\s*\([^)]*\)\s*\{([\s\S]*?)\n\}',
+              multiLine: true)
+          .firstMatch(src);
+      expect(m, isNotNull, reason: '没找到 $name —— 断言已失效，先修扫描');
+      return m!.group(1)!;
+    }
+
+    final begin = fn('inject_clipboard_begin');
     expect(begin.contains('_txHoldDepth++'), isTrue);
-    final end = RegExp(r'void inject_clipboard_end\(void\) \{([\s\S]*?)\n\}')
-        .firstMatch(src)!
-        .group(1)!;
+    final end = fn('inject_clipboard_end');
     expect(end.contains('_txHoldDepth--'), isTrue);
     expect(end.contains('_txHoldDepth == 0'), isTrue,
         reason: '无会话时 end 必须早退，否则 clearContents 会清空用户剪贴板');

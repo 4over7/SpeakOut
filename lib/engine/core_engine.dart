@@ -99,12 +99,23 @@ class CoreEngine {
   bool get isClipboardInjecting => _clipboardSessions > 0;
 
   /// 成对包装：计数只在这两个方法里维护，避免各调用点自己维护而漂移。
-  void _clipBegin() {
+  /// 返回会话是否真的开启。**false 时调用方必须放弃流式注入** ——
+  /// 原先这里返回 void：native begin 因为拿不到可信快照而中止时，
+  /// Dart 照样把计数 +1，打字机以为有 hold 罩着继续发 chunk，
+  /// 而 native 那边每个 chunk 都是孤儿、各自安排收尾，
+  /// 文字在 chunk 之间就被还原掉了。
+  bool _clipBegin() {
     // native 侧只有**一份**全局剪贴板快照：第二次 begin 会覆盖第一次的快照，
     // 第一次 end 又会取走并清空它 —— 重叠注入下会提前恢复、且丢掉用户原始剪贴板。
     // 所以 native 会话只在最外层开合，内层只加计数。
-    if (_clipboardSessions == 0) _nativeInput?.injectClipboardBegin();
+    if (_clipboardSessions == 0) {
+      if (_nativeInput?.injectClipboardBegin() != true) {
+        _log("[Clipboard] begin 失败，放弃流式注入");
+        return false;
+      }
+    }
     _clipboardSessions++;
+    return true;
   }
 
   void _clipEnd() {
@@ -735,7 +746,15 @@ class CoreEngine {
 
     try {
       // 1. 保存剪贴板 + Cmd+C 复制选中文字
-      _clipBegin();
+      if (!_clipBegin()) {
+        _log("[Organize] 剪贴板会话开启失败，放弃本次梳理");
+        overlay.recordingMode = "organize";
+        overlay.updateText("剪贴板忙，请重试");
+        await overlay.show();
+        await Future.delayed(const Duration(seconds: 2));
+        await overlay.hide();
+        return;
+      }
       ni.copySelection();
       await Future.delayed(const Duration(milliseconds: 150));
 
@@ -1328,7 +1347,10 @@ class CoreEngine {
             var lastInjectTime = DateTime.now();
             const batchInterval = Duration(milliseconds: AppConstants.kTypewriterBatchIntervalMs);
 
-            _clipBegin();
+            if (!_clipBegin()) {
+              // 会话没开起来，别发 chunk —— 后面会走一次性注入兜底
+              throw StateError('clipboard session unavailable');
+            }
             typewriterBegan = true;
             _log("[PERF] +${sw.elapsedMilliseconds}ms — typewriter mode: clipboard begin");
 

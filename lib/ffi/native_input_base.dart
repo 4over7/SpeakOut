@@ -136,8 +136,8 @@ typedef PressKeyC = Void Function(Int32 keyCode, Int32 modifierFlags);
 typedef PressKeyDart = void Function(int keyCode, int modifierFlags);
 
 // Clipboard streaming injection
-typedef InjectClipboardBeginC = Void Function();
-typedef InjectClipboardBeginDart = void Function();
+typedef InjectClipboardBeginC = Int32 Function();
+typedef InjectClipboardBeginDart = int Function();
 typedef InjectClipboardChunkC = Int32 Function(Pointer<Utf8> text);
 typedef InjectClipboardChunkDart = int Function(Pointer<Utf8> text);
 typedef InjectClipboardEndC = Void Function();
@@ -206,7 +206,10 @@ abstract class NativeInputBase {
   void pressKey(int keyCode, int modifierFlags);
 
   // Clipboard streaming injection (for typewriter effect)
-  void injectClipboardBegin();
+  /// 返回会话是否真的开启了。false 时**不要**继续发 chunk：
+  /// native 那边没有 hold 罩着，每个 chunk 都会变成孤儿各自收尾，
+  /// 文字会在 chunk 之间被还原掉。
+  bool injectClipboardBegin();
   /// 返回这段 chunk 是否真的粘贴出去了。
   /// 和 [inject] 同理：静默失败会让整段流式注入被当成成功。
   bool injectClipboardChunk(String text);
