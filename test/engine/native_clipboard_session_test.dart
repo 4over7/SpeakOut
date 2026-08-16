@@ -20,10 +20,11 @@ void main() {
   });
 
   test('收尾的早退判据不得是「快照为 nil」', () {
-    final finish =
-        RegExp(r'static void tx_finish_locked\(NSPasteboard \*pb, uint64_t gen\) \{([\s\S]*?)\n\}')
-            .firstMatch(src)
-            ?.group(1);
+    // 按函数名匹配，不写死签名（它加过出参，签名变过）
+    final finish = RegExp(
+            r'(?:^|\n)(?!\s*//)[^\n;{}]*\btx_finish_locked\s*\([^;{}]*?\)\s*\{([\s\S]*?)\n\}')
+        .firstMatch(src)
+        ?.group(1);
     expect(finish, isNotNull, reason: '没找到 tx_finish_locked');
     expect(RegExp(r'if\s*\(\s*_txOriginal\s*==\s*nil\s*\)').hasMatch(finish!),
         isFalse,

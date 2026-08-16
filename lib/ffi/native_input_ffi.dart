@@ -12,7 +12,7 @@ import 'package:speakout/config/app_log.dart';
 /// 手动递增靠自觉，而我漏过一次（改了 inject_clipboard_begin 的签名却没升，
 /// 正好是这个握手要防的情形）。现在版本是签名的函数，只改一半不可能。
 /// 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
-const int kExpectedNativeAbiVersion = 0xbb09cb;
+const int kExpectedNativeAbiVersion = 0x7d0948;
 
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
@@ -574,9 +574,13 @@ class NativeInputFFI implements NativeInputBase {
     if (fn == null) return null;
     final ptr = fn();
     if (ptr == nullptr) return null;
-    final text = ptr.toDartString();
-    nativeFree(ptr.cast());
-    return text;
+    // try/finally：toDartString 抛异常（非法 UTF-8 等）时也要释放，
+    // 否则每失败一次漏一块 native 内存。
+    try {
+      return ptr.toDartString();
+    } finally {
+      nativeFree(ptr.cast());
+    }
   }
 
   @override

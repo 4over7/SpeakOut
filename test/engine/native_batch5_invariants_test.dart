@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// 每一条都对应一个已经发生过或已被确认可触发的缺陷。
 /// 导出签名的指纹。**改了任何导出函数的签名就要连同 ABI 版本一起更新。**
 /// 值由「导出签名一变，ABI 版本必须跟着变」这条测试的失败信息给出。
-const String kNativeAbiFingerprint = 'bb09cbf753496d95908c81454c5c99073a424c8d';
+const String kNativeAbiFingerprint = '7d094818ff94a198f613069271bed70857311af5';
 
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
@@ -154,7 +154,7 @@ void main() {
       // chunk / copy_selection 在没有 hold 罩着时会把代次推高，让先前安排的
       // 收尾任务因代次不符早退，自己却不安排新任务 —— 事务从此挂着不放，
       // _txActive 永为 YES，之后每次注入都沿用一份很旧的快照。
-      for (final fn in ['inject_clipboard_chunk', 'copy_selection']) {
+      for (final fn in ['inject_clipboard_chunk', 'copy_selection_impl']) {
         final body = bodyOfFn(fn);
         expect(body.contains('tx_schedule_finish'), isTrue,
             reason: '$fn 推进了代次却不安排收尾');
@@ -166,7 +166,7 @@ void main() {
     test('copy_selection 必须要求「恰好变了一次」', () {
       // changeCount 每次 clearContents 加一，增量 > 1 说明这段时间还有别人
       // 动过剪贴板 —— 此时把当前值记成我们的，收尾就会盖掉用户刚复制的内容。
-      final body = bodyOfFn('copy_selection');
+      final body = bodyOfFn('copy_selection_impl');
       expect(body.contains('delta == 1'), isTrue,
           reason: '只看「变了」不够，必须恰好变一次');
     });
@@ -220,7 +220,7 @@ void main() {
     });
 
     test('copy_selection 的等待必须放在锁外', () {
-      final body = stripComments(bodyOfFn('copy_selection'));
+      final body = stripComments(bodyOfFn('copy_selection_impl'));
       final loopAt = body.indexOf('usleep(5000)');
       // 等待必须夹在「放锁」和「重新取锁」之间
       final unlockAt = body.lastIndexOf('pthread_mutex_unlock', loopAt);
@@ -269,6 +269,19 @@ void main() {
         expect(sigs.length, greaterThan(5), reason: '$f 没扫到足够导出，正则退化了');
         all.addAll(sigs.map((x) => '$f :: $x'));
       }
+
+      // **ABI 的另一半在 Dart 这边。** 只扫 native 的话，把
+      // `InjectTextC = Int32 Function(...)` 改成 `Int64` 时 native 源码没变、
+      // 指纹不变、版本不变，握手照样通过 —— 而 Dart 会按错误宽度读返回值。
+      final dartTypedefs = RegExp(r'^typedef\s+(\w+C)\s*=\s*([^;]+);',
+              multiLine: true)
+          .allMatches(File('lib/ffi/native_input_base.dart').readAsStringSync())
+          .map((m) =>
+              'dart :: ${m.group(1)} = ${m.group(2)!.replaceAll(RegExp(r'\s+'), ' ').trim()}')
+          .toList();
+      expect(dartTypedefs.length, greaterThan(20),
+          reason: 'Dart typedef 没扫到足够条目，正则退化了');
+      all.addAll(dartTypedefs);
       all.sort();
       // 正则扫到的导出面必须与 dylib 里**真实的**导出符号对得上。
       // 写死一个数字太脆（每加一个导出都要改），而且它证明不了「扫全了」；
@@ -317,7 +330,13 @@ void main() {
       sources.forEach((f, re) {
         final m = re.firstMatch(File(f).readAsStringSync());
         expect(m, isNotNull, reason: '$f 找不到 ABI 版本');
-        final got = int.parse(m!.group(1)!.replaceFirst('0x', ''), radix: 16);
+        // 必须写成 0x 开头的十六进制：`replaceFirst('0x','')` 后一律按 16 进制
+        // 解析的话，某处写裸十进制 123456、别处写 0x123456 会被认为相同，
+        // 运行时数值却不同。
+        final raw = m!.group(1)!;
+        expect(RegExp(r'^0x[0-9a-fA-F]{6,7}$').hasMatch(raw), isTrue,
+            reason: '$f 的 ABI 版本必须是 0x 开头的十六进制，实际是 $raw');
+        final got = int.parse(raw.substring(2), radix: 16);
         if (got != expectedAbi) wrong[f] = m.group(1)!;
       });
       expect(wrong, isEmpty,
@@ -327,28 +346,6 @@ void main() {
               '  同时把 kNativeAbiFingerprint 更新为 $digest');
       expect(digest, kNativeAbiFingerprint,
           reason: '指纹变了，请更新 kNativeAbiFingerprint 为 $digest');
-    });
-
-    test('三个平台都必须导出 ABI 版本，且与 Dart 侧一致', () {
-      // symbol 名不带返回类型：按 Int32 去调一个还是 void 的旧 inject_text
-      // 不会崩，只会读到返回寄存器里的垃圾 ——「注入成功了吗」变成掷骰子。
-      final versions = <String, int>{};
-      for (final f in [
-        'native_lib/native_input.m',
-        'native_lib/linux/native_input.c',
-        'native_lib/windows/native_input.cpp',
-      ]) {
-        final m = RegExp(r'#define SPEAKOUT_NATIVE_ABI_VERSION (\d+)')
-            .firstMatch(File(f).readAsStringSync());
-        expect(m, isNotNull, reason: '$f 没有导出 ABI 版本');
-        versions[f] = int.parse(m!.group(1)!);
-      }
-      final dart = RegExp(r'kExpectedNativeAbiVersion = (\d+)')
-          .firstMatch(File('lib/ffi/native_input_ffi.dart').readAsStringSync());
-      expect(dart, isNotNull);
-      versions['dart'] = int.parse(dart!.group(1)!);
-      expect(versions.values.toSet().length, 1,
-          reason: '各处 ABI 版本不一致：$versions');
     });
 
     test('新的用户可见错误必须走错误码，不能硬编码文案', () {
@@ -367,6 +364,74 @@ void main() {
     });
   });
 
+  group('R39/R40 复制读取原子化与还原重试', () {
+    test('复制与读取必须是同一次调用', () {
+      // 拆成两次 FFI 的话有两个窗口会读到别的内容：native 观察到的
+      // changeCount 变化未必来自我们的 Cmd+C；返回后到 Dart 读之间还可能再变。
+      // 任一命中，送进 LLM 的就是无关内容甚至敏感信息。
+      expect(code.contains('copy_selection_text'), isTrue,
+          reason: '缺少「复制并返回文本」的原子入口');
+      final engine = File('lib/engine/core_engine.dart').readAsStringSync();
+      expect(engine.contains('Clipboard.getData'), isFalse,
+          reason: '梳理路径不得再自己读剪贴板');
+      expect(engine.contains('copySelectionText()'), isTrue);
+      // 读的过程本身也要稳定：读前读后 changeCount 一致才认
+      final body = stripComments(bodyOfFn('copy_selection_text'));
+      expect(body.contains('pb.changeCount != before'), isTrue,
+          reason: '读文本要做稳定读，否则读到的可能是读一半被换掉的内容');
+    });
+
+    test('还原重试不得在锁内做', () {
+      // 三次 50ms 的等待占着 clipTxMutex 会把注入路径一起卡住 150ms。
+      final finish = stripComments(bodyOfFn('tx_finish_locked'));
+      expect(finish.contains('usleep'), isFalse,
+          reason: '重试的等待跑到锁里去了');
+      expect(finish.contains('retryItems'), isTrue,
+          reason: '首次失败要把待重试内容交给锁外的调用方');
+      final sched = stripComments(bodyOfFn('tx_schedule_finish'));
+      expect(sched.contains('usleep(50000)'), isTrue, reason: '锁外没有重试');
+      expect(sched.contains('_txActive'), isTrue,
+          reason: '重写之前必须确认没有新事务开起来，否则会盖掉它的内容');
+    });
+
+    test('还原重试前必须核对外部有没有接管剪贴板', () {
+      // clipTxMutex 管不到**别的进程**。50ms 等待里用户完全可能自己复制了东西，
+      // 无条件 clearContents 会把它永久盖掉；而 writeObjects 首次失败本身
+      // 往往就意味着 ownership 已经易主，这时候盲目重试风险更大。
+      final sched = stripComments(bodyOfFn('tx_schedule_finish'));
+      expect(sched.contains('pb.changeCount != retryExpected'), isTrue,
+          reason: '重试前只查了「有没有新的内部事务」，管不到别的进程');
+      final guardAt = sched.indexOf('pb.changeCount != retryExpected');
+      final clearAt = sched.indexOf('[pb clearContents]');
+      expect(guardAt, greaterThanOrEqualTo(0));
+      expect(clearAt, greaterThan(guardAt), reason: '核对必须在 clearContents 之前');
+    });
+
+    test('读取必须锁死在归因到的那一版，不许重试到新版本', () {
+      // 「读前读后一致」只证明读的这一瞬没被换。复制完成之后、我们读之前
+      // 外部写了 Z 的话，循环下一轮会对 Z 做一次稳定读并把 Z 返回，
+      // 而事务的 expected 仍指向 Cmd+C 那一版 —— Z 就这么被发给了 LLM。
+      final body = stripComments(bodyOfFn('copy_selection_text'));
+      expect(body.contains('before != observed'), isTrue,
+          reason: '读到的版本必须正是 copy_selection 归因到的那一版');
+      expect(body.contains('copy_selection_impl(&observed)'), isTrue,
+          reason: '归因到的 changeCount 必须从复制函数传出来');
+    });
+
+    test('还原失败必须能被 Dart 发现，且所有录音路径都对账', () {
+      expect(code.contains('clipboard_restore_failures'), isTrue,
+          reason: '异步还原失败没有任何上报通道');
+      final engine = File('lib/engine/core_engine.dart').readAsStringSync();
+      // 必须在**录音开始**时对账：还原是注入之后 800ms 才发生的，
+      // 放在注入末尾永远晚一拍；放这里 ptt/闪念/梳理都会经过。
+      final reportAt = engine.indexOf('_reportClipboardRestoreFailures();');
+      final permAt = engine.indexOf('// 1. PERMISSION CHECK');
+      expect(reportAt, greaterThanOrEqualTo(0));
+      expect(permAt, greaterThan(reportAt),
+          reason: '对账要放在录音开始处，不能只挂在某一条注入分支上');
+    });
+  });
+
   group('线上事故：注入文字滞留剪贴板', () {
     test('所有权判据必须是我们自己写的 token', () {
       // 所有权判定必须集中在一处，且三条判据齐全。
@@ -379,7 +444,7 @@ void main() {
       // 判据本身的正确性，不是那次故障的修复证明。
       // 三处必须走**同一个**判定函数，而不是各自拼判据 ——
       // 分散写正是上一轮「只改收尾那一处」的复发温床。
-      for (final fn in ['tx_finish_locked', 'tx_paste_locked', 'copy_selection']) {
+      for (final fn in ['tx_finish_locked', 'tx_paste_locked', 'copy_selection_impl']) {
         final body = stripComments(bodyOfFn(fn));
         expect(body.contains('tx_still_ours_locked'), isTrue,
             reason: '$fn 没有走统一的所有权判定');
@@ -413,8 +478,12 @@ void main() {
           reason: 'CGEvent 创建失败时不能照样报成功');
       final finish = stripComments(bodyOfFn('tx_finish_locked'));
       expect(finish.contains('[pb writeObjects:_txOriginal]'), isTrue);
-      expect(finish.contains('RESTORE WRITE FAILED'), isTrue,
-          reason: '还原写入失败时剪贴板已被清空，不能记成 restored');
+      // 首次失败在锁内只交出待重试内容，最终失败的判定挪到了锁外的重试段
+      expect(finish.contains('retryItems'), isTrue,
+          reason: '还原写入失败必须被识别并交给锁外重试');
+      final sched = stripComments(bodyOfFn('tx_schedule_finish'));
+      expect(sched.contains('RESTORE WRITE FAILED'), isTrue,
+          reason: '重试全败时剪贴板已被清空，不能记成 restored');
     });
 
     test('发 Cmd+V 之前必须确认剪贴板已生效', () {
@@ -499,7 +568,7 @@ void main() {
       // 重读的话，重拍返回之后到读 before 之间用户又复制一次，
       // before 就把那次外部变更吸收了，我们的 Cmd+C 让 delta 恰好为 1 ——
       // 误判成纯内部变更，收尾把用户刚复制的内容覆盖掉。
-      final body = bodyOfFn('copy_selection');
+      final body = bodyOfFn('copy_selection_impl');
       expect(body.contains('? _txExpectedChangeCount'), isTrue,
           reason: '事务活跃时 before 必须取自基线，不能重读 changeCount');
       // 放锁等待期间事务可能被别的线程换掉，重新取锁后必须逐项核对
@@ -563,17 +632,14 @@ void main() {
 
     test('快照拍不稳时禁止还原', () {
       // 此时手里没有可信内容：clearContents 之后无内容可写等于清空用户剪贴板
-      final finish =
-          RegExp(r'static void tx_finish_locked\(NSPasteboard \*pb, uint64_t gen\) \{([\s\S]*?)\n\}')
-              .firstMatch(src)!
-              .group(1)!;
+      final finish = bodyOfFn('tx_finish_locked');
       expect(finish.contains('!_txOriginalValid'), isTrue,
           reason: '收尾必须先看快照可不可信');
     });
 
     test('copy_selection 发 Cmd+C 之前也要查易主', () {
       // delta == 1 只说明「观察到一次变化」，证明不了事务开始后没有先发生外部变化
-      final body = bodyOfFn('copy_selection');
+      final body = bodyOfFn('copy_selection_impl');
       final checkAt = body.indexOf('tx_snapshot_stable_locked');
       final postAt = body.indexOf('post_command_key');
       expect(checkAt, greaterThanOrEqualTo(0), reason: '发 Cmd+C 前没查所有权');
@@ -614,7 +680,7 @@ void main() {
     test('copy_selection 不得固定 sleep 后把「当前值」认作自己造成的', () {
       // 固定睡 100ms 的话，用户恰好在这窗口内自己复制了东西，那个值会被
       // 记成我们的变更，之后收尾就拿旧快照把他刚复制的内容覆盖掉。
-      final body = bodyOfFn('copy_selection');
+      final body = bodyOfFn('copy_selection_impl');
       expect(body.contains('usleep(100000)'), isFalse,
           reason: '不能固定睡满再归因，要轮询等自己的 Cmd+C 落地');
       expect(body.contains('observed != before'), isTrue,

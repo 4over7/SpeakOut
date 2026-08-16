@@ -947,6 +947,11 @@ class CoreEngine {
       return;
     }
 
+    // 上一轮的剪贴板还原是注入之后 800ms 的异步任务，注入结束时还没发生 ——
+    // 所以在**下一次录音开始时**对账，而不是在注入末尾（那永远晚一拍）。
+    // 放这里还有个好处：ptt / 闪念 / 梳理所有路径都会经过，不会漏。
+    _reportClipboardRestoreFailures();
+
     // 1. PERMISSION CHECK
     if (_nativeInput == null || !_nativeInput.checkMicrophonePermission()) {
       _log("Permission DENIED by native check.");
@@ -1542,7 +1547,6 @@ class CoreEngine {
           _typewriterInjected = false;
           // 文字仍然进聊天记录 —— 注入失败时那里是用户唯一能找回这段话的地方
           ChatService().addDictation(finalText, asrOriginal: originalAsrText);
-          _reportClipboardRestoreFailures();
           if (injected) {
             _statusController.add(EngineStatus.ready("Ready"));
           } else {

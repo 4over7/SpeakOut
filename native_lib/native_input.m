@@ -45,7 +45,7 @@ static void flush_tap_log_sync(void);
 // 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
 // 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
 // 而不是悄悄读垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 0xbb09cb
+#define SPEAKOUT_NATIVE_ABI_VERSION 0x7d0948
 // 剪贴板还原最终失败的累计次数。还原发生在注入之后 800ms 的异步任务里，
 // 没法用返回值告诉 Dart —— 只记日志的话，用户的剪贴板被清空了却毫不知情。
 // Dart 侧在下一次注入时读一下这个计数，涨了就提示。
@@ -814,7 +814,10 @@ static BOOL tx_still_ours_locked(NSPasteboard *pb) {
   return token != nil && [token isEqualToString:_txToken];
 }
 
-static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
+// `retryItems` 是出参：首次还原写入失败时，把待写回的内容交出去，
+// 由调用方**在锁外**重试 —— 重试要 sleep，占着锁会把注入一起卡住。
+static void tx_finish_locked(NSPasteboard *pb, uint64_t gen,
+                             NSArray **retryItems, NSInteger *retryExpected) {
   if (!_txActive) return;
   if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
   if (_txHoldDepth > 0) return;     // 流式会话还开着，等它 end
@@ -838,23 +841,11 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
     } else if ([pb writeObjects:_txOriginal]) {
       log_to_file("Clipboard tx: restored");
     } else {
-      // 重试几次：writeObjects 的失败常常是瞬时的 ownership 争用。
-      BOOL recovered = NO;
-      for (int i = 0; i < 3 && !recovered; i++) {
-        usleep(50000);
-        [pb clearContents];
-        recovered = [pb writeObjects:_txOriginal];
-      }
-      if (recovered) {
-        log_to_file("Clipboard tx: restored after retry");
-      } else {
-        // 不能记成功：此刻剪贴板已被 clearContents 清空，用户的内容真的没了。
-        // 计数让 Dart 侧能发现 —— 还原是异步的，没法用返回值告诉调用方，
-        // 只记日志的话用户永远不知道自己的剪贴板被清空了。
-        atomic_fetch_add_explicit(&clipboardRestoreFailures, 1,
-                                  memory_order_relaxed);
-        log_to_file("Clipboard tx: RESTORE WRITE FAILED, clipboard left empty");
-      }
+      // 首次写入失败。**重试不能在锁里做** —— 三次 50ms 的等待会把注入路径
+      // 一起卡住 150ms。把待重试的内容交给调用方，在锁外重试。
+      *retryItems = _txOriginal;
+      *retryExpected = pb.changeCount; // 重试前要拿它核对，见下
+      log_to_file("Clipboard tx: restore write failed, will retry outside lock");
     }
   } else {
     log_to_file("Clipboard tx: skipped restore (clipboard content is no longer ours)");
@@ -872,9 +863,48 @@ static void tx_schedule_finish(uint64_t gen) {
       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         @autoreleasepool {
           NSPasteboard *pb = [NSPasteboard generalPasteboard];
+          NSArray *retryItems = nil;
+          NSInteger retryExpected = -1;
           pthread_mutex_lock(&clipTxMutex);
-          tx_finish_locked(pb, gen);
+          tx_finish_locked(pb, gen, &retryItems, &retryExpected);
           pthread_mutex_unlock(&clipTxMutex);
+
+          if (retryItems == nil) return;
+          // 锁外重试。每次重写前重新确认没有新事务开起来 ——
+          // 有的话剪贴板已经归它了，我们再写就是把它的内容盖掉。
+          BOOL recovered = NO;
+          for (int i = 0; i < 3 && !recovered; i++) {
+            usleep(50000);
+            pthread_mutex_lock(&clipTxMutex);
+            const BOOL busy = _txActive;
+            pthread_mutex_unlock(&clipTxMutex);
+            if (busy) {
+              log_to_file("Clipboard tx: restore retry aborted (new tx started)");
+              return;
+            }
+            // **只查「有没有新的内部事务」是不够的** —— clipTxMutex 管不到
+            // 别的进程。这 50ms 里用户完全可能自己复制了东西，
+            // 无条件 clearContents 会把它永久盖掉。
+            // 而且 writeObjects 首次失败本身往往就意味着 ownership 已经易主，
+            // 这时候盲目重试风险更大。
+            if (pb.changeCount != retryExpected) {
+              log_to_file("Clipboard tx: restore retry aborted (clipboard taken over)");
+              return;
+            }
+            [pb clearContents];
+            recovered = [pb writeObjects:retryItems];
+            retryExpected = pb.changeCount; // 我们自己刚改的，下一轮以此为准
+          }
+          if (recovered) {
+            log_to_file("Clipboard tx: restored after retry");
+            return;
+          }
+          // 此刻剪贴板已被 clearContents 清空，用户的内容真的没了。
+          // 计数让 Dart 侧能发现 —— 还原是异步的，没法用返回值告诉调用方，
+          // 只记日志的话用户永远不知道自己的剪贴板被清空了。
+          atomic_fetch_add_explicit(&clipboardRestoreFailures, 1,
+                                    memory_order_relaxed);
+          log_to_file("Clipboard tx: RESTORE WRITE FAILED, clipboard left empty");
         }
       });
 }
@@ -1082,7 +1112,10 @@ void inject_clipboard_end(void) {
 // 目标 App 没响应、或期间还有别人动过）。
 // **不能返回 void**：Cmd+C 没生效时 Dart 会把**旧剪贴板内容**当成用户选中的
 // 文字发给 LLM —— 那可能是完全无关、甚至敏感的内容。
-int copy_selection(void) {
+// `outObserved` 出参：归因成功时写回「我们认定属于本次 Cmd+C 的那个
+// changeCount」。copy_selection_text 用它锁死读取版本 —— 只有读到的正是
+// 那一版才算数，读到更新的版本一律失败，不许「重试到新版本」。
+static int copy_selection_impl(NSInteger *outObserved) {
   @autoreleasepool {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
@@ -1169,11 +1202,14 @@ int copy_selection(void) {
       log_to_file("Clipboard tx: copy_selection timed out waiting for clipboard");
     }
     const BOOL copied = (delta == 1);
+    if (copied && outObserved != NULL) *outObserved = observed;
     pthread_mutex_unlock(&clipTxMutex);
     if (orphan) tx_schedule_finish(gen);
     return copied ? 1 : 0;
   }
 }
+
+int copy_selection(void) { return copy_selection_impl(NULL); }
 
 // 复制选中文字**并把它直接返回**，调用方用 native_free 释放。
 // 失败返回 NULL。
@@ -1185,16 +1221,32 @@ int copy_selection(void) {
 //   2. native 返回后 Dart 还固定等 150ms 才读，这段时间里剪贴板可能又被改了。
 // 两个窗口任一命中，送进 LLM 的就是无关内容 —— 甚至是用户剪贴板里的敏感信息。
 //
-// 这里把「发 Cmd+C → 等变化 → 读文本」收进同一次调用，并用
-// 「读前 changeCount == 读后 changeCount」保证读到的是同一版内容。
+// 这里把「发 Cmd+C → 等变化 → 读文本」收进同一次调用，并把读取**锁死在
+// copy_selection 归因到的那一版**上。
+//
+// ⚠️ **仍然证明不了「那次变化就是我们的 Cmd+C 造成的」。**
+// changeCount 只说明 ownership 变过，说不出是谁变的：Cmd+C 还没被目标 App
+// 处理、而别的进程恰好写了一次时，delta 同样是 1，我们会把它误当成选中文字。
+// 要拿到确定性来源只能走 Accessibility 的选中文本属性（AXSelectedText），
+// 那是另一条路，尚未实现。这里只关闭了「复制之后又被改」的窗口，
+// 没有、也无法用 changeCount 关闭「第一次变化来源不明」的窗口。
 const char *copy_selection_text(void) {
   @autoreleasepool {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
-    if (copy_selection() != 1) return NULL;
+    NSInteger observed = -1;
+    if (copy_selection_impl(&observed) != 1) return NULL;
 
-    // 稳定读：读前读后 changeCount 一致，才能确定这份文本没被中途换掉
+    // **锁死版本：只接受 copy_selection 归因到的那一版。**
+    // 上一版这里是「读前读后一致就行」，那只证明「读的这一瞬没被换」——
+    // 复制完成之后、我们读之前外部写了 Z 的话，循环下一轮会对 Z 做一次
+    // 稳定读并把 Z 返回，而事务的 expected 仍指向 Cmd+C 那一版。
+    // 现在读到的版本对不上就直接失败，**不许重试到新版本**。
     for (int i = 0; i < 8; i++) {
       const NSInteger before = pb.changeCount;
+      if (before != observed) {
+        log_to_file("Clipboard tx: clipboard moved past the copied version, abort");
+        return NULL;
+      }
       NSString *text = [pb stringForType:NSPasteboardTypeString];
       if (pb.changeCount != before) continue; // 读的过程中被换了，重来
       if (text == nil) return NULL;
