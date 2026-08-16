@@ -33,13 +33,30 @@ class EngineStatus {
   /// UI 的分支逻辑不受影响 —— 这正是引入 kind 的目的。
   final String message;
 
-  const EngineStatus(this.kind, this.message);
+  /// 稳定的错误标识码，供 UI 去 i18n 表里取文案；为 null 时回退到 [message]。
+  ///
+  /// 引擎层不能 import `AppLocalizations`（三层架构铁律：Engine 不依赖 UI），
+  /// 所以这里**只给码、不给文案**。新增用户可见错误时给码，
+  /// 别再往 [message] 里塞硬编码中文 —— 那会在英文环境下直接漏出去。
+  final String? code;
 
-  const EngineStatus.idle() : kind = EngineStatusKind.idle, message = '';
-  const EngineStatus.info(this.message) : kind = EngineStatusKind.info;
-  const EngineStatus.ready(this.message) : kind = EngineStatusKind.ready;
-  const EngineStatus.warning(this.message) : kind = EngineStatusKind.warning;
-  const EngineStatus.error(this.message) : kind = EngineStatusKind.error;
+  const EngineStatus(this.kind, this.message, {this.code});
+
+  const EngineStatus.idle()
+      : kind = EngineStatusKind.idle,
+        message = '',
+        code = null;
+  const EngineStatus.info(this.message)
+      : kind = EngineStatusKind.info,
+        code = null;
+  const EngineStatus.ready(this.message)
+      : kind = EngineStatusKind.ready,
+        code = null;
+  const EngineStatus.warning(this.message)
+      : kind = EngineStatusKind.warning,
+        code = null;
+  const EngineStatus.error(this.message, {this.code})
+      : kind = EngineStatusKind.error;
 
   bool get isReady => kind == EngineStatusKind.ready || kind == EngineStatusKind.warning;
   bool get isProblem => kind == EngineStatusKind.error || kind == EngineStatusKind.warning;

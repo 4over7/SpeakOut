@@ -1874,6 +1874,18 @@ abstract class AppLocalizations {
   /// **'Microphone access is restricted by system policy'**
   String get permissionsMicrophoneRestricted;
 
+  /// No description provided for @engineInjectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Injection failed — the text is saved in chat history'**
+  String get engineInjectFailed;
+
+  /// No description provided for @engineInjectPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Injection incomplete — the full text is saved in chat history'**
+  String get engineInjectPartial;
+
   /// No description provided for @permissionsOpen.
   ///
   /// In en, this message translates to:

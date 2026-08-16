@@ -986,6 +986,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Microphone access is restricted by system policy';
 
   @override
+  String get engineInjectFailed =>
+      'Injection failed — the text is saved in chat history';
+
+  @override
+  String get engineInjectPartial =>
+      'Injection incomplete — the full text is saved in chat history';
+
+  @override
   String get permissionsOpen => 'Open';
 
   @override

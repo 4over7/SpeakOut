@@ -7,6 +7,10 @@ import 'package:speakout/config/app_log.dart';
 ///
 /// macOS / Windows / Linux 的 NativeInput 实现都继承此类，
 /// 只需提供各自平台的动态库路径即可复用全部 FFI 绑定代码。
+/// 与 `native_input.m` 里的 `SPEAKOUT_NATIVE_ABI_VERSION` 必须一致。
+/// 改任何导出函数的签名时两边一起 +1。
+const int kExpectedNativeAbiVersion = 2;
+
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
 
@@ -89,6 +93,23 @@ class NativeInputFFI implements NativeInputBase {
       _setLogDirectory = _dylib
           .lookup<NativeFunction<SetLogDirectoryC>>('set_log_directory')
           .asFunction();
+
+      // ABI 握手：旧 dylib 没有这个 symbol，或版本对不上，都要**明确报错**。
+      // 不校验的话，按 Int32 去调一个还是 void 的旧 inject_text 不会崩，
+      // 只会读到返回寄存器里的垃圾 —— 「注入成功了吗」变成掷骰子。
+      try {
+        final abi = _dylib
+            .lookup<NativeFunction<NativeAbiVersionC>>('native_input_abi_version')
+            .asFunction<NativeAbiVersionDart>()();
+        if (abi != kExpectedNativeAbiVersion) {
+          throw StateError(
+              'native dylib ABI $abi != expected $kExpectedNativeAbiVersion');
+        }
+        _log("Native ABI v$abi OK");
+      } on ArgumentError catch (_) {
+        throw StateError('native dylib 太旧：没有 native_input_abi_version '
+            '(期望 ABI v$kExpectedNativeAbiVersion)');
+      }
 
       _log("Core FFI bindings SUCCESS");
     } catch (e) {

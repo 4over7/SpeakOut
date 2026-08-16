@@ -1391,8 +1391,9 @@ class CoreEngine {
               if (streamInjected) {
                 // 已经粘出去一部分，回退重放会造成重复 —— 只提示，不重放
                 _typewriterInjected = true;
-                _statusController
-                    .add(EngineStatus.error("注入不完整，完整文字已存到聊天记录"));
+                _statusController.add(EngineStatus.error(
+                    "Injection incomplete; full text saved to chat history",
+                    code: 'inject_partial'));
               }
             }
             _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish stream done (typewriter), len=${finalText.length}");
@@ -1482,7 +1483,9 @@ class CoreEngine {
             // 注入失败绝不能静默：用户刚口述的整段话没进输入框，
             // 不说的话他只会对着没变化的界面发愣，还以为识别没成功。
             _log("[Inject] FAILED — text kept in chat history");
-            _statusController.add(EngineStatus.error("注入失败，文字已存到聊天记录"));
+            _statusController.add(EngineStatus.error(
+                "Injection failed; text saved to chat history",
+                code: 'inject_failed'));
           }
         }
         _log("[PERF] +${sw.elapsedMilliseconds}ms — inject/save done");

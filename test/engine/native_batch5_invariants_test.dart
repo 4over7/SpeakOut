@@ -202,6 +202,76 @@ void main() {
     });
   });
 
+  group('R37 未做项的收口', () {
+    test('注入路径不得在临界区里长时间等待', () {
+      // 持锁等待会把还原任务和别的注入一起陪绑。
+      // tx_paste_locked 里的读回是同进程的，立刻就有结果，不该轮询；
+      // chunk 的节奏等待与事务状态无关，应放锁外。
+      final paste = stripComments(bodyOfFn('tx_paste_locked'));
+      expect(RegExp(r'for\s*\(int i = 0; i < \d+; i\+\+\)').hasMatch(paste), isFalse,
+          reason: '同进程读回不需要轮询，白等还拉长持锁时间');
+      // 必须用 lastIndexOf：这个函数有多条早退路径、多个 unlock，
+      // 拿第一个比会让断言恒成立（变异探针实测漏报过）。
+      final chunk = stripComments(bodyOfFn('inject_clipboard_chunk'));
+      final lastUnlock = chunk.lastIndexOf('pthread_mutex_unlock');
+      final pacingAt = chunk.indexOf('usleep(30000)');
+      expect(lastUnlock, greaterThanOrEqualTo(0));
+      expect(pacingAt, greaterThanOrEqualTo(0));
+      expect(lastUnlock, lessThan(pacingAt), reason: '节奏等待必须在锁外');
+    });
+
+    test('copy_selection 的等待必须放在锁外', () {
+      final body = stripComments(bodyOfFn('copy_selection'));
+      final loopAt = body.indexOf('usleep(5000)');
+      // 等待必须夹在「放锁」和「重新取锁」之间
+      final unlockAt = body.lastIndexOf('pthread_mutex_unlock', loopAt);
+      final relockAt = body.indexOf('pthread_mutex_lock', loopAt);
+      expect(loopAt, greaterThanOrEqualTo(0));
+      expect(unlockAt, greaterThanOrEqualTo(0));
+      expect(relockAt, greaterThan(loopAt), reason: '等完必须重新取锁');
+      expect(unlockAt, lessThan(loopAt),
+          reason: '最长 250ms 的等待不该占着锁 —— 我们等的是目标 App 响应 Cmd+C，'
+              '跟事务状态无关');
+    });
+
+    test('三个平台都必须导出 ABI 版本，且与 Dart 侧一致', () {
+      // symbol 名不带返回类型：按 Int32 去调一个还是 void 的旧 inject_text
+      // 不会崩，只会读到返回寄存器里的垃圾 ——「注入成功了吗」变成掷骰子。
+      final versions = <String, int>{};
+      for (final f in [
+        'native_lib/native_input.m',
+        'native_lib/linux/native_input.c',
+        'native_lib/windows/native_input.cpp',
+      ]) {
+        final m = RegExp(r'#define SPEAKOUT_NATIVE_ABI_VERSION (\d+)')
+            .firstMatch(File(f).readAsStringSync());
+        expect(m, isNotNull, reason: '$f 没有导出 ABI 版本');
+        versions[f] = int.parse(m!.group(1)!);
+      }
+      final dart = RegExp(r'kExpectedNativeAbiVersion = (\d+)')
+          .firstMatch(File('lib/ffi/native_input_ffi.dart').readAsStringSync());
+      expect(dart, isNotNull);
+      versions['dart'] = int.parse(dart!.group(1)!);
+      expect(versions.values.toSet().length, 1,
+          reason: '各处 ABI 版本不一致：$versions');
+    });
+
+    test('新的用户可见错误必须走错误码，不能硬编码文案', () {
+      final engine = File('lib/engine/core_engine.dart').readAsStringSync();
+      for (final code in ['inject_failed', 'inject_partial']) {
+        expect(engine.contains("code: '$code'"), isTrue,
+            reason: '引擎应发 $code 而不是直接给文案');
+      }
+      // 两种语言都得有，否则英文环境会漏中文出去
+      for (final key in ['engineInjectFailed', 'engineInjectPartial']) {
+        for (final arb in ['lib/l10n/app_zh.arb', 'lib/l10n/app_en.arb']) {
+          expect(File(arb).readAsStringSync().contains('"$key"'), isTrue,
+              reason: '$arb 缺 $key');
+        }
+      }
+    });
+  });
+
   group('线上事故：注入文字滞留剪贴板', () {
     test('所有权判据必须是我们自己写的 token', () {
       // changeCount 反映的是 ownership 变更，任何重新声明剪贴板的进程都会推高它，

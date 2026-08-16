@@ -937,6 +937,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get permissionsMicrophoneRestricted => '麦克风被系统策略限制，无法自行开启';
 
   @override
+  String get engineInjectFailed => '注入失败，文字已存到聊天记录';
+
+  @override
+  String get engineInjectPartial => '注入不完整，完整文字已存到聊天记录';
+
+  @override
   String get permissionsOpen => '打开';
 
   @override

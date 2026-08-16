@@ -149,6 +149,12 @@ static unsigned __stdcall keyboard_thread_proc(void* param) {
     return 0;
 }
 
+// ABI 版本握手，必须与 macOS 侧的 SPEAKOUT_NATIVE_ABI_VERSION 保持一致。
+// Dart 初始化时校验：旧 dylib 没有这个 symbol 就明确报错，
+// 而不是按新签名去调旧函数、读到返回寄存器里的垃圾。
+#define SPEAKOUT_NATIVE_ABI_VERSION 2
+EXPORT int native_input_abi_version(void) { return SPEAKOUT_NATIVE_ABI_VERSION; }
+
 EXPORT int start_keyboard_listener(KeyCallback callback) {
     if (g_keyboardHook) return 1; // Already running
 

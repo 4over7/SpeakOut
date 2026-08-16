@@ -8,6 +8,9 @@ typedef StartKeyboardListenerDart = int Function(Pointer<NativeFunction<KeyCallb
 typedef StopKeyboardListenerC = Void Function();
 typedef StopKeyboardListenerDart = void Function();
 
+typedef NativeAbiVersionC = Int32 Function();
+typedef NativeAbiVersionDart = int Function();
+
 typedef InjectTextC = Int32 Function(Pointer<Utf8> text);
 typedef InjectTextDart = int Function(Pointer<Utf8> text);
 

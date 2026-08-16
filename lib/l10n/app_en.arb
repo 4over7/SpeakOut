@@ -381,6 +381,8 @@
   "permissionsMicrophone": "Microphone",
   "permissionsMicrophoneDesc": "Audio capture",
   "permissionsMicrophoneRestricted": "Microphone access is restricted by system policy",
+  "engineInjectFailed": "Injection failed — the text is saved in chat history",
+  "engineInjectPartial": "Injection incomplete — the full text is saved in chat history",
   "permissionsOpen": "Open",
   "aboutDeveloper": "Developer",
   "aboutVerboseLogging": "Verbose Logging",

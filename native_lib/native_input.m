@@ -31,6 +31,19 @@ static atomic_uint tapLogInFlight = 0;
 static void start_tap_log_drain(void);
 static void flush_tap_log_sync(void);
 
+// ABI 版本握手。
+//
+// C symbol 名里不带返回类型：Dart 按 Int32 去调一个还是 void 的旧
+// `inject_text`，符号照样查得到，调用也不会崩 —— 返回寄存器里是**未定义残值**，
+// 于是「注入成功了吗」变成掷骰子。正常 DMG/install 是整包替换不会混搭，
+// 但手工替换、部分更新、加载路径残留都可能撞上。
+//
+// 改签名时**必须**同时 +1，Dart 侧在初始化时校验。
+// 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
+// 而不是悄悄读垃圾。
+#define SPEAKOUT_NATIVE_ABI_VERSION 2
+int native_input_abi_version(void) { return SPEAKOUT_NATIVE_ABI_VERSION; }
+
 void set_debug_logging(int enabled) {
   if (enabled) {
     atomic_store(&debugLoggingEnabled, 1);
@@ -872,22 +885,17 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   // 换句话说：出货版那句 `usleep(10000)` 想解决的「跨进程传播竞态」，
   // 这里**并没有解决**，只是把「盲等 10ms」换成了「确认自己这边写对了」。
   // 要真正解决，需要目标进程的粘贴回执，而 macOS 没有提供这种机制。
-  BOOL visible = NO;
-  for (int i = 0; i < 40; i++) { // 最多 200ms
-    NSString *now = [pb stringForType:NSPasteboardTypeString];
-    if (now != nil && [now isEqualToString:text]) {
-      visible = YES;
-      if (i > 2) {
-        log_to_file("Clipboard tx: pasteboard took %dms to reflect our text", (i + 1) * 5);
-      }
-      break;
-    }
-    usleep(5000);
-  }
+  // 因为上面这条理由，这里**只读一次**，不轮询：同进程读回来要么立刻就对，
+  // 要么就是真的被别人接管了 —— 再等 200ms 也等不出不一样的结果，
+  // 徒然把持锁时间和 UI 阻塞拉长。
+  // （上一版在这里轮询 40×5ms，那是按「等跨进程传播」设计的，
+  //   而这个读根本不跨进程，等于白等。）
+  NSString *now = [pb stringForType:NSPasteboardTypeString];
+  const BOOL visible = (now != nil && [now isEqualToString:text]);
   if (!visible) {
     // 返回 gen 而不是 0：剪贴板已经被我们污染了，收尾任务必须照常安排，
     // 把用户原来的内容放回去。
-    log_to_file("Clipboard tx: pasteboard never reflected our text, paste skipped");
+    log_to_file("Clipboard tx: readback mismatch (taken over?), paste skipped");
     _txPasteFailed = YES;
     return gen;
   }
@@ -981,9 +989,11 @@ int inject_clipboard_chunk(const char *text) {
       return 0;
     }
     const BOOL pasted = !_txPasteFailed;
-    usleep(30000); // 30ms for paste to complete before next chunk
     const BOOL orphan = (_txHoldDepth == 0);
     pthread_mutex_unlock(&clipTxMutex);
+    // 节奏等待放在**锁外**：它只是给目标 App 留出粘贴时间，
+    // 跟事务状态无关，没必要让还原任务陪着一起等 30ms。
+    usleep(30000); // 30ms for paste to complete before next chunk
 
     // **推进了代次就必须有人收尾。** 没有 hold 罩着的 chunk（比如 end 之后
     // 迟到的那一条）会把代次推到 gen+1，让先前安排的收尾任务因代次不符而
@@ -1049,12 +1059,18 @@ void copy_selection(void) {
     // 100ms 内自己复制了东西的话，那个值会被记成我们的，之后收尾就会拿旧快照
     // 把他刚复制的内容覆盖掉。改成轮询等自己的 Cmd+C 落地，拿到就走 ——
     // 之后用户再复制，changeCount 就对不上，还原会被正确跳过。
+    // **等待放在锁外。** 这一等最长 250ms，占着 clipTxMutex 等的话，
+    // 还原任务和别的注入都被陪绑 —— 而我们等的只是目标 App 响应 Cmd+C，
+    // 跟事务状态无关。锁在这里放掉，拿到结果后再重新取。
+    pthread_mutex_unlock(&clipTxMutex);
     NSInteger observed = before;
     for (int i = 0; i < 50; i++) { // 最多 250ms：目标 App 卡顿时 100ms 常常不够
       usleep(5000);
       observed = pb.changeCount;
       if (observed != before) break;
     }
+    pthread_mutex_lock(&clipTxMutex);
+
     // **必须恰好变了一次才算我们的。** changeCount 每次 clearContents/declareTypes
     // 加一，所以增量 > 1 说明这段时间里还有别人动过剪贴板 —— 此时把当前值
     // 记成「我们造成的」，收尾就会拿旧快照把用户刚复制的内容盖掉。
