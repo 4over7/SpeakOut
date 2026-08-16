@@ -320,6 +320,18 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     }
   }
 
+  /// 沙盒版的授权跟着 bookmark 走，而配置里存的是另一份字符串。
+  /// 两者不一致时（目录被移动、配置被导入或手改），写入注定被沙盒拒绝 ——
+  /// 必须让用户看见，而不是等到写闪念时静默失败。
+  Future<String?> _resolvedDiaryDirectory() async {
+    try {
+      return await const MethodChannel('com.SpeakOut/overlay')
+          .invokeMethod<String>('resolvedDiaryDirectory');
+    } catch (_) {
+      return null; // 非 macOS 或旧壳工程：没有这个能力，跳过对账
+    }
+  }
+
   Future<void> _validateDiaryDirectory() async {
     final dirPath = ConfigService().diaryDirectory;
     if (dirPath.isEmpty) {
@@ -334,6 +346,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       await testFile.delete();
       setState(() => _diaryDirError = '');
     } catch (e) {
+      // 写不进去时把「bookmark 实际授权的是哪个目录」一并记下来。
+      // 用户看到的提示已经够可操作（重新选择目录），缺的是排查线索：
+      // 沙盒版最常见的原因是配置路径与授权目录不是同一个。
+      final authorized = await _resolvedDiaryDirectory();
+      if (authorized != null && authorized != dirPath) {
+        AppLog.e('闪念目录写入失败：配置=$dirPath 但 bookmark 授权的是 $authorized');
+      } else {
+        AppLog.e('闪念目录写入失败: $e');
+      }
+      if (!mounted) return;
       setState(() => _diaryDirError = AppLocalizations.of(context)!.diaryDirCannotWrite);
     }
   }

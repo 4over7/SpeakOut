@@ -51,20 +51,46 @@ class AppDelegate: FlutterAppDelegate {
   // Powerbox 的临时授权覆盖得到。
   private static let diaryBookmarkKey = "SpeakOutDiaryDirBookmark"
   private var scopedDiaryURL: URL?
+  /// 启动时按 bookmark 实际解析出来的目录。Dart 侧配置里存的是另一份字符串，
+  /// 两者可能不一致（目录被移动、配置被导入/手改），由 Dart 启动时对账。
+  private var scopedDiaryPath: String?
 
-  /// 是否运行在 App Sandbox 里。沙盒下 bookmark 失败 = 目录不可用，必须报错；
-  /// 非沙盒下 bookmark 只是锦上添花，失败了普通文件权限照样能写，不该打扰用户。
+  /// 沙盒判定必须是**三态**。沙盒下 bookmark 失败 = 目录不可用，必须报错；
+  /// 非沙盒下 bookmark 只是锦上添花，失败了普通文件权限照样能写。
+  /// 但「查不出来」既不是前者也不是后者 —— 把未知当成非沙盒就又是一次
+  /// fail-open：真在沙盒里、SecTask 查询恰好失败，就会照样把拿不到持久
+  /// 授权的路径返回给 Dart，重启后闪念静默失效。只有**明确读到 false**
+  /// 才允许降级。
   ///
-  /// **不能用 `APP_SANDBOX_CONTAINER_ID` 这个环境变量判断** —— 那是运行环境的
-  /// 实现细节而非公开契约，已知有沙盒进程读不到它。误判的代价是实打实的：
-  /// 漏判成非沙盒时，拿不到持久授权也照样把路径返回给 Dart，重启后闪念静默失效。
-  /// 这里读自己的 entitlement，是 Apple 给的标准做法。
-  private lazy var isSandboxed: Bool = {
-    guard let task = SecTaskCreateFromSelf(nil) else { return false }
-    let value = SecTaskCopyValueForEntitlement(
-      task, "com.apple.security.app-sandbox" as CFString, nil)
-    return (value as? Bool) ?? false
+  /// 不能用 `APP_SANDBOX_CONTAINER_ID` 环境变量：那是运行环境的实现细节
+  /// 而非公开契约，已知有沙盒进程读不到它。
+  private enum SandboxState { case sandboxed, notSandboxed, unknown }
+
+  private lazy var sandboxState: SandboxState = {
+    guard let task = SecTaskCreateFromSelf(nil) else { return .unknown }
+    // **用复数版 API。** 单值的 SecTaskCopyValueForEntitlement 返回 NULL 时，
+    // 「entitlement 不存在」和「查询失败」分不开，而且不保证一定填 error ——
+    // 靠 `value == nil && error == nil` 推断成「非沙盒」又是一次 fail-open。
+    // 复数版的契约是明确的：整体返回 nil = 查询失败；
+    // 返回 dictionary 而 key 不在里面 = 确定没设置。
+    var error: Unmanaged<CFError>?
+    let values = SecTaskCopyValuesForEntitlements(
+      task, ["com.apple.security.app-sandbox"] as CFArray, &error)
+    if let error = error {
+      NSLog("[Sandbox] 读取 entitlement 失败: %@",
+            String(describing: error.takeRetainedValue()))
+      return .unknown
+    }
+    guard let dict = values as? [String: Any] else { return .unknown }
+    guard let raw = dict["com.apple.security.app-sandbox"] else {
+      return .notSandboxed // 字典拿到了但没这个 key —— 确定没设置
+    }
+    guard let flag = raw as? Bool else { return .unknown }
+    return flag ? .sandboxed : .notSandboxed
   }()
+
+  /// 拿不到持久授权时，是否必须向用户报错（而不是静默返回路径）
+  private var requiresPersistentAccess: Bool { sandboxState != .notSandboxed }
 
   private func makeBookmark(for url: URL) -> Data? {
     do {
@@ -77,9 +103,12 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
-  /// 解析 bookmark 并真正取得访问权。成功才返回 URL —— 调用方据此决定
-  /// 要不要提交这次目录切换。
-  private func acquireScope(from data: Data) -> URL? {
+  /// 解析 bookmark 并真正取得访问权。
+  ///
+  /// **无副作用**：不写 UserDefaults。stale 时把刷新后的 data 一并返回，
+  /// 由调用方决定提交哪一份 —— 上一版在这里直接写盘，外层随后又用最初那份
+  /// 覆盖回去，等于 stale 刷新白做，下次启动照样解析不出来。
+  private func acquireScope(from data: Data) -> (url: URL, effective: Data)? {
     var stale = false
     do {
       let url = try URL(resolvingBookmarkData: data,
@@ -90,11 +119,14 @@ class AppDelegate: FlutterAppDelegate {
         NSLog("[Sandbox] startAccessingSecurityScopedResource 失败: %@", url.path)
         return nil
       }
-      // stale 说明目录被移动/改名过，此刻立刻重建，否则下次启动就解析不出来了
-      if stale, let fresh = makeBookmark(for: url) {
-        UserDefaults.standard.set(fresh, forKey: Self.diaryBookmarkKey)
+      guard stale else { return (url, data) }
+      // 目录被移动/改名过。刷新失败不影响本次访问，但要说清楚「这次能用、
+      // 持久化没修好」，不能当成完全成功悄悄咽下去。
+      guard let fresh = makeBookmark(for: url) else {
+        NSLog("[Sandbox] bookmark 已 stale 且刷新失败：本次可访问，下次启动可能失效")
+        return (url, data)
       }
-      return url
+      return (url, fresh)
     } catch {
       NSLog("[Sandbox] 解析 bookmark 失败: %@", String(describing: error))
       return nil
@@ -106,28 +138,32 @@ class AppDelegate: FlutterAppDelegate {
     guard let data = UserDefaults.standard.data(forKey: Self.diaryBookmarkKey) else {
       return false
     }
-    guard let url = acquireScope(from: data) else { return false }
-    scopedDiaryURL = url
-    NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", url.path)
+    guard let got = acquireScope(from: data) else { return false }
+    scopedDiaryURL = got.url
+    scopedDiaryPath = got.url.path
+    if got.effective != data {
+      UserDefaults.standard.set(got.effective, forKey: Self.diaryBookmarkKey)
+    }
+    NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", got.url.path)
     return true
   }
 
   /// 切换闪念目录。**整件事要么全成、要么什么都不动。**
-  /// 上一版是「建 bookmark → 放掉旧 scope → 试着恢复 → 不管成没成都返回路径」：
-  /// 新目录能生成 bookmark 但解析/取权失败时，旧授权已经放掉、旧 bookmark 已被
-  /// 覆盖，用户配置却指向一个写不进去的目录 —— 本次会话靠 Powerbox 临时授权
-  /// 还能写，重启后就静默失效。所以先拿到新权限，再提交。
+  /// 先拿到新权限，再提交 —— 顺序反了的话，新目录取权失败时旧授权已经放掉、
+  /// 旧 bookmark 已被覆盖，用户配置却指向一个写不进去的目录：本次会话靠
+  /// Powerbox 临时授权还能写，重启后就静默失效。
   private func switchDiaryDirectory(to url: URL) -> Bool {
     guard let data = makeBookmark(for: url) else { return false }
     let previous = scopedDiaryURL
     scopedDiaryURL = nil
-    guard let acquired = acquireScope(from: data) else {
+    guard let got = acquireScope(from: data) else {
       scopedDiaryURL = previous // 新的没拿到，旧 scope 原样留着
       return false
     }
     previous?.stopAccessingSecurityScopedResource()
-    scopedDiaryURL = acquired
-    UserDefaults.standard.set(data, forKey: Self.diaryBookmarkKey)
+    scopedDiaryURL = got.url
+    scopedDiaryPath = got.url.path
+    UserDefaults.standard.set(got.effective, forKey: Self.diaryBookmarkKey)
     return true
   }
 
@@ -166,6 +202,10 @@ class AppDelegate: FlutterAppDelegate {
         case "hideSilenceHint":
           self?.hideSilenceHint()
           result(nil)
+        case "resolvedDiaryDirectory":
+          // 给 Dart 对账用：bookmark 实际授权的是哪个目录。
+          // 与配置里的路径不一致时，写入注定失败，要让用户看见而不是静默失败。
+          result(self?.scopedDiaryPath)
         case "pickDirectory":
           self?.pickDirectory(result: result)
         case "pickFile":
@@ -420,7 +460,7 @@ class AppDelegate: FlutterAppDelegate {
         return
       }
       let ok = self.switchDiaryDirectory(to: url)
-      if !ok && self.isSandboxed {
+      if !ok && self.requiresPersistentAccess {
         // 沙盒下拿不到跨启动授权 = 这个目录用不了。不能静默返回路径，
         // 否则用户这次能写、重启后闪念就静默丢失，而且看不到任何原因。
         // message 只进日志：给用户看的文案由 Dart 侧走 i18n

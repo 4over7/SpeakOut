@@ -208,3 +208,149 @@ codex 还逐条推演了 8 个剪贴板交错场景，其中 6 个结果正确�
   （收尾时比一次），而真实语义是「整段事务期间有没有别人插手」，那是每次写都要看的。
 - 三轮下来，同一块代码 codex 每轮都还能找出 P1。趋势是收敛的（P1 的严重度和数量在降），
   但**「我认为已经想全了」这个判断本身，三轮都是错的**。
+
+---
+
+## 第四轮（第 35 轮复审）
+
+### 现象
+
+**2 条 P1、2 条 P2、4 条 P3**。codex 同时给出收敛判断：
+「未探明风险已经从『状态机整体未知』降到『少数明确的并发/持久化边界』，
+判断为中等。建议先修这几条，再补三类可执行测试，完成后可以收敛。」
+
+### 假设 · 判断原因
+
+| # | 问题 | 判断 |
+|---|---|---|
+| P1-1 | 「稳定快照」其实不稳定 | **成立**。`tx_begin_locked` 先拍快照再读 changeCount，两步之间用户可以复制：拍到 X → 用户复制 Z → expected 记成 Z 的 count → 之后写前检查看到「没易主」不重拍 → 收尾还原 X，**Z 被永久覆盖** |
+| P1-2 | `copy_selection` 发 Cmd+C 之前没查易主 | **成立**。`delta == 1` 只说明「观察到一次变化」，证明不了事务开始后没有**先**发生过外部变化 |
+| P2-1 | bookmark 与 Dart 路径是两个独立提交 | **部分成立**（见下） |
+| P2-2 | SecTask 查询失败被当成「确定非沙盒」 | **成立，而且正是这个 commit 要堵的那个形状**：未知 ≠ 非沙盒，把未知映射成 false 又是一次 fail-open |
+| P3-1 | stale 刷新的 bookmark 被外层旧 data 覆盖 | **成立**，stale 刷新等于白做 |
+| P3-2 | 停生产者没等在途写者 | **成立**。回调可能刚读到 enabled、正在 vsnprintf，排空看不到它 |
+| P3-3 | `copy_selection` 同步阻塞最长 250ms | **成立但接受**（见下） |
+| P3-4 | `launchUrl` 返回 false 不抛异常 | **成立**，async 包装只兜住了抛异常那一半 |
+
+### 措施
+
+- 新增 `tx_snapshot_stable_locked`：读 count → 拍 → 再读 count，一致才认；
+  连续 8 次拍不稳就标记 `_txOriginalValid = NO`，收尾时**什么都不做**
+  （clearContents 之后无内容可写等于清空用户剪贴板，比不还原更糟）。
+  `tx_begin_locked` 和写前重拍都改走它。
+- `copy_selection` 发 Cmd+C **之前**先查易主，不符就稳定重拍。
+- 沙盒判定改**三态** `sandboxed / notSandboxed / unknown`；
+  只有明确读到 entitlement 为 false 才允许「不报错」降级。
+- `acquireScope` 改成无副作用，把 stale 刷新后的 data 一并返回，由调用方只提交一次；
+  刷新失败明确记为「本次可访问、持久化未修好」。
+- tap 日志加在途写者计数 `tapLogInFlight`，关闭时等它归零（上限 ~10ms）再排空。
+- `launchUrl` 的返回值现在会检查，false 时弹提示。
+- `_validateDiaryDirectory` 写盘失败时，把「bookmark 实际授权的是哪个目录」记进日志。
+
+### 未采纳 / 部分采纳的两条，理由
+
+- **P2-1（bookmark 与 Dart 配置跨语言事务）**：只做了可诊断性。
+  用户可见的失败**本来就已经暴露**——`_validateDiaryDirectory` 有真实写盘探测，
+  沙盒拒绝会显示「无法写入目录，请重新选择（macOS 需重新授权）」，这条提示已经可操作。
+  真正缺的是排查线索，所以补的是日志而不是新提示。
+  完整的「单一真源 + 启动对账 + 配置导入排除 diary_directory」是**架构级改动**，
+  影响配置导出/导入契约，**留给项目所有者决定**。
+- **P3-3（同步阻塞 250ms）**：接受现状。满 250ms 只发生在
+  「Cmd+C 没产生任何变化」的情况，也就是用户没选中文字就触发 AI 梳理 ——
+  紧接着就会显示「未检测到选中文字」。改成异步要在 native/Dart 之间加一套完成通知，
+  收益不抵复杂度。**这不是「论证它无害」，而是明确记为已知取舍。**
+
+### 验证结果
+
+- clang 零警告；**`flutter build macos --debug` 构建成功**——
+  这轮才发现前几轮用的 `swiftc -parse` **只做语法检查、不做类型检查**，
+  所有 Swift 改动此前都没被真正编译过。现在 `SecTaskCopyValueForEntitlement`
+  的桥接、`as? Bool` 转换、async onTap 都过了真实类型检查。
+- 构建产物的 entitlements 四条齐全（`app-sandbox` / `audio-input` /
+  `user-selected.read-write` / `bookmarks.app-scope`），bundle 内 dylib 哈希与源一致。
+- `flutter analyze` 干净；**全量测试 739 通过 / 10 skip / 0 失败**。
+- 断言 22 → 27 条，**4 个新变异探针**逐一确认能抓到。
+
+### 复盘
+
+- **`swiftc -parse` 不等于编译，这是我这几轮最实质的验证漏洞。**
+  连着三轮我都在汇报里写「swiftc -parse 通过」，听起来像验证过，
+  实际只证明了括号配对。真实构建一跑就把这个洞补上了 ——
+  以后碰 Swift 必须跑 `flutter build macos`。
+- **改实现后只跑了单个测试文件，导致 `native_clipboard_session_test` 里
+  一条同样写死旧字面量的断言漏到了全量才暴露。** 源码级断言的代价就是
+  跟实现形状强耦合，改实现必须全量跑，不能只跑「我改的那个文件」。
+- 顺带发现一个与本批无关的既有问题（**未修**）：`AppDelegate` 用
+  `Bundle.main.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib"`
+  dlopen，而 `flutter build macos` 只把 dylib 作为 asset 放进
+  `flutter_assets/native_lib/`，那个路径**在开发构建里根本不存在** ——
+  只有 `scripts/install.sh` 会额外拷一份到 `Contents/MacOS/`。
+  也就是说 `flutter run` 出来的包，录音浮窗的波形一直是死的（Dart 侧不受影响）。
+  已记录，**未动手**：它不在本批范围内，且修法（改路径 or 加 build phase）
+  影响打包脚本，应单独确认。
+
+---
+
+## 第五轮（第 36 轮复审）
+
+### 现象
+
+**2 条 P1、3 条 P2、2 条 P3**。其中 P2-3 是**我自己造成的提交污染**。
+
+### 假设 · 判断原因
+
+| # | 问题 | 判断 |
+|---|---|---|
+| P1-1 | 快照失败后仍继续 clearContents 并注入 | **成立**。我把「拿不到快照 → 收尾时不还原」当成失败策略，实际等于把用户剪贴板换成注入文字并永久留在那里（口述内容还泄漏在剪贴板里）。而且 `pasteboardItems == nil` 按 Apple 说明也可能是读取出错，被我当成了空剪贴板 |
+| P1-2 | `copy_selection` 的 `before` 重读，会吸收重拍后的外部变更 | **成立**。重拍返回后到读 `before` 之间用户再复制一次，`before` 就把它吸收了，我们的 Cmd+C 让 `delta` 恰好为 1 → 误判成纯内部变更 |
+| P2-1 | 单值 entitlement API 分不出「不存在」和「查询失败」 | **成立**。`value == nil && error == nil → notSandboxed` 的推断不完备，又是一次 fail-open |
+| P2-2 | 写盘探测不等于启动对账 | **不认可我上一轮的理由，正确**。探测只在超能力页跑，而闪念是快捷键直接触发的；且探测写 `.speakout_write_test`，真实写的是 `yyyy-MM-dd.md` |
+| P2-3 | **提交混入 48MB pkg 和本地文件** | **成立，且是同一个错犯第二次** |
+| P3-1 | `tapLogInFlight` 仍没形成屏障 | **成立**。先读开关再登记，中间仍有窗口 |
+| P3-2 | 麦克风 notDetermined 轮询仍会静默结束 | **成立**，是 P3-4 的同形状残留 |
+
+### 措施
+
+- `snapshot_pasteboard` 返回 `BOOL` 并区分「读取失败」与「本来就是空的」；
+  `tx_snapshot_stable_locked` / `tx_begin_locked` 都返回 `BOOL`；
+  **三个注入入口在拿不到快照时一律提前返回，绝不 clearContents**。
+- `copy_selection` 的基线改用 `_txExpectedChangeCount`，不再重读。
+- 沙盒判定改用复数版 `SecTaskCopyValuesForEntitlements`（契约能区分三态）。
+- `log_from_tap` 改成**先登记 in-flight 再复查开关**，形成真屏障。
+- 麦克风轮询每轮读完整 status，denied → 送去系统设置，restricted → 提示，
+  30 秒超时 → 提示，不再静默结束。
+- 配置导出/导入两侧都排除 `diary_directory`（bookmark 不可移植，导过去
+  就是「配置指着一个没授权的目录」）。
+- **闪念写入前在 `DiaryService` 里对账**（不是设置页）：bookmark 授权目录与
+  配置路径不一致就 fail-closed 并给可操作提示。闪念是快捷键直接触发的，
+  放在设置页等于大部分用户永远跑不到。
+- `.gitignore` 补 `real-test/` `.claude/` `*.pkg` `docs/*_preview.html`。
+
+### 一处我没有照做，理由
+
+codex 建议「逐 type `dataForType:` 失败也应视为快照失败并中止注入」。
+**没照做**：剪贴板里有 file promise 之类延迟类型时，某些 type 的
+`dataForType:` 本来就返回 nil。为此中止注入的话，用户口述的文字直接丢失——
+那比「还原时少一个冷门格式」严重得多。改为记 lossy + 写日志，
+只有 `pasteboardItems == nil`（整体读取失败）才中止。**这是权衡，不是遗漏。**
+
+### 验证结果
+
+- clang 零警告；`flutter build macos --debug` 构建成功；`flutter analyze` 干净。
+- **全量测试 744 通过 / 10 skip / 0 失败**。
+- 断言 27 → 32 条，**4 个新变异探针**逐一确认能抓到。
+
+### 复盘
+
+- **`git add -A` 把 48MB 的 pkg 卷进提交，是同一个错在同一次会话里犯第二次。**
+  第一次（`ebae8ef` 混入 1582 行预览页）我拆掉重做了，却只当成「这次手滑」，
+  没做任何防护。真正的修复是 `.gitignore` —— AGENTS.md 里写了
+  「`real-test/` 是本地目录不入库」，但**声明不等于防护**，
+  只要它还是 untracked 而非 ignored，`git add -A` 就一定会再把它捞进来。
+- **源码级断言与实现形状强耦合的代价，这轮付了四次**：把 `void` 改成 `BOOL`
+  让一批断言集体失效。已把 `bodyOf(完整签名)` 改成 `bodyOfFn(函数名)`。
+  更值得记的是其中一条**不是过期而是语义真的变了**：
+  「置位必须早于拍快照」原本是「空剪贴板也要开会话」的代理，
+  而快照现在可能失败、失败时不能开事务，所以置位必然在后。
+  代理失效时**不能顺手把断言改成匹配新代码**，要回去问原始不变量是什么 ——
+  这里改成直接断言「空剪贴板算拍摄成功」。

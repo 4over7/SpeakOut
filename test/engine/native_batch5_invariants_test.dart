@@ -30,6 +30,20 @@ void main() {
     return m!.group(1)!;
   }
 
+  /// 按**函数名**取函数体，不写死返回类型。
+  /// 写死完整签名的代价已经付过三次了：把 void 改成 BOOL 这种与断言意图
+  /// 完全无关的改动，会让一批断言集体失效。断言要盯的是函数体内容。
+  String bodyOfFn(String name) {
+    final m = RegExp(
+            r'^\s*(?:static\s+)?[A-Za-z_][A-Za-z0-9_ *]*\b' +
+                RegExp.escape(name) +
+                r'\s*\([^)]*\)\s*\{([\s\S]*?)\n\}',
+            multiLine: true)
+        .firstMatch(src);
+    expect(m, isNotNull, reason: '没找到函数 $name —— 断言已失效，先修扫描');
+    return m!.group(1)!;
+  }
+
   group('N1 EventTap 两类禁用都要重启', () {
     test('ByUserInput 不能只是 return', () {
       // 只重启 Timeout、对 ByUserInput 直接 return 的话，此后所有快捷键
@@ -89,24 +103,16 @@ void main() {
     });
 
     test('原始快照只在事务开启时拍一次', () {
-      final body =
-          RegExp(r'static void tx_begin_locked\(NSPasteboard \*pb\) \{([\s\S]*?)\n\}')
-              .firstMatch(src)
-              ?.group(1);
-      expect(body, isNotNull);
-      expect(body!.contains('if (_txActive) return'), isTrue,
+      final body = bodyOfFn('tx_begin_locked');
+      expect(body.contains('if (_txActive) return'), isTrue,
           reason: '已有事务在跑就必须沿用它的快照，绝不重拍');
     });
 
     test('收尾必须在同一把锁里完成「校验+还原+清状态」', () {
       // 先清 pending 再去还原的话，中间插进来的注入会把已被污染的剪贴板
       // 当成新事务的原始快照，用户内容照样丢。
-      final body =
-          RegExp(r'static void tx_finish_locked\(NSPasteboard \*pb, uint64_t gen\) \{([\s\S]*?)\n\}')
-              .firstMatch(src)
-              ?.group(1);
-      expect(body, isNotNull);
-      final restoreAt = body!.indexOf('writeObjects');
+      final body = bodyOfFn('tx_finish_locked');
+      final restoreAt = body.indexOf('writeObjects');
       final clearAt = body.indexOf('_txActive = NO');
       expect(restoreAt, greaterThanOrEqualTo(0));
       expect(clearAt, greaterThanOrEqualTo(0));
@@ -118,12 +124,8 @@ void main() {
 
     test('粘贴序列全程持锁 —— 不能在写剪贴板和 Cmd+V 之间放锁', () {
       // 放锁的话另一次注入可以在我们粘贴之前改掉剪贴板，粘出来是别的内容。
-      final body =
-          RegExp(r'static uint64_t tx_paste_locked\(NSPasteboard \*pb, NSString \*text\) \{([\s\S]*?)\n\}')
-              .firstMatch(src)
-              ?.group(1);
-      expect(body, isNotNull, reason: '没找到 tx_paste_locked');
-      expect(body!.contains('pthread_mutex_unlock'), isFalse,
+      final body = bodyOfFn('tx_paste_locked');
+      expect(body.contains('pthread_mutex_unlock'), isFalse,
           reason: '这个函数内部不得放锁');
       expect(body.contains('post_command_key'), isTrue);
     });
@@ -134,17 +136,15 @@ void main() {
       // 只在收尾时查，只挡得住「最后一次内部写之后」的用户复制：
       //   X → chunk(A) → 用户复制 Z → chunk(B) 把 Z 清掉并更新 expected
       //   → 收尾看到匹配，还原 X。Z 永久丢失，用户毫无察觉。
-      final body =
-          RegExp(r'static uint64_t tx_paste_locked\(NSPasteboard \*pb, NSString \*text\) \{([\s\S]*?)\n\}')
-              .firstMatch(src)
-              ?.group(1);
+      final body = bodyOfFn('tx_paste_locked');
       expect(body, isNotNull);
-      final checkAt = body!.indexOf('pb.changeCount != _txExpectedChangeCount');
+      final checkAt = body.indexOf('pb.changeCount != _txExpectedChangeCount');
       final clearAt = body.indexOf('clearContents');
       expect(checkAt, greaterThanOrEqualTo(0), reason: '写之前没有易主检查');
       expect(checkAt, lessThan(clearAt), reason: '检查必须在清空剪贴板之前');
-      expect(body.contains('snapshot_pasteboard'), isTrue,
-          reason: '发现易主后要把用户当前内容作为新的还原目标');
+      expect(body.contains('tx_snapshot_stable_locked'), isTrue,
+          reason: '发现易主后要把用户当前内容作为新的还原目标'
+              '（且必须走与 changeCount 同版本的稳定快照）');
     });
 
     test('推进代次的每条路径都必须有人收尾', () {
@@ -200,6 +200,119 @@ void main() {
     });
   });
 
+  group('R36 快照拿不到就必须中止注入', () {
+    test('snapshot_pasteboard 要区分「读取失败」和「本来就是空的」', () {
+      // pasteboardItems 为 nil 按 Apple 说明也可能是读取出错。当成空的话，
+      // 我们会拿一份「什么都没有」的快照去覆盖用户真实内容。
+      final body = bodyOfFn('snapshot_pasteboard');
+      expect(body.contains('oldContents == nil'), isTrue,
+          reason: '必须把 nil 单独判成读取失败');
+      expect(body.contains('return NO'), isTrue);
+    });
+
+    test('三个注入入口在拿不到快照时都必须提前返回', () {
+      // 「先照写、收尾时不还原」不是可用的失败策略 —— 那等于把用户剪贴板
+      // 换成我们注入的文字并永久留在那里（口述内容还会泄漏在剪贴板里）。
+      for (final fn in [
+        'static void inject_via_clipboard(const char *text)',
+        'void inject_clipboard_begin(void)',
+        'void inject_clipboard_chunk(const char *text)',
+      ]) {
+        final body = bodyOf(fn);
+        expect(body.contains('if (!tx_begin_locked('), isTrue,
+            reason: '$fn 没有检查快照是否拿到');
+        final guardAt = body.indexOf('if (!tx_begin_locked(');
+        final pasteAt = body.indexOf('tx_paste_locked');
+        if (pasteAt >= 0) {
+          expect(guardAt, lessThan(pasteAt),
+              reason: '$fn 的检查必须在写剪贴板之前');
+        }
+      }
+    });
+
+    test('中途重拍失败返回 0，调用方不得安排收尾', () {
+      final chunk = bodyOf('void inject_clipboard_chunk(const char *text)');
+      expect(chunk.contains('gen == 0'), isTrue,
+          reason: 'chunk 没处理「没写成」的返回值');
+      final oneShot = bodyOf('static void inject_via_clipboard(const char *text)');
+      expect(oneShot.contains('gen != 0'), isTrue,
+          reason: '一次性注入没处理「没写成」的返回值');
+    });
+
+    test('copy_selection 的基线必须取自稳定快照，不能重读', () {
+      // 重读的话，重拍返回之后到读 before 之间用户又复制一次，
+      // before 就把那次外部变更吸收了，我们的 Cmd+C 让 delta 恰好为 1 ——
+      // 误判成纯内部变更，收尾把用户刚复制的内容覆盖掉。
+      final body = bodyOf('void copy_selection(void)');
+      expect(body.contains('_txExpectedChangeCount : pb.changeCount'), isTrue,
+          reason: '事务活跃时 before 必须用基线');
+    });
+
+    test('tap 日志必须先登记在途再复查开关', () {
+      final body = bodyOf(
+          '__attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,\n                                                               ...)');
+      final addAt = body.indexOf('atomic_fetch_add_explicit(&tapLogInFlight');
+      final gateAt = body.indexOf('atomic_load(&tapLogProducerEnabled)');
+      expect(addAt, greaterThanOrEqualTo(0));
+      expect(gateAt, greaterThanOrEqualTo(0));
+      expect(addAt, lessThan(gateAt),
+          reason: '顺序反了就还有窗口：读到 enabled 后被抢占，'
+              '关闭方看到 inFlight=0 直接关掉，恢复后写的那条就丢了');
+    });
+  });
+
+  group('R35 快照必须与 changeCount 同版本', () {
+    test('拍快照与读 changeCount 之间不得留窗口', () {
+      // 先拍快照再读 count，两步之间用户完全可能复制东西：
+      //   X → 拍到 X → 用户复制 Z（count 变）→ expected 记成 Z 的 count
+      //   → 之后写前检查看到「没易主」不重拍 → 收尾还原 X，Z 被覆盖。
+      final body = bodyOfFn('tx_snapshot_stable_locked');
+      expect(body.contains('const NSInteger before = pb.changeCount'), isTrue);
+      expect(body.contains('const NSInteger after = pb.changeCount'), isTrue);
+      expect(body.contains('if (before == after)'), isTrue,
+          reason: '必须两次读一致才认这份快照');
+    });
+
+    test('所有拍快照的入口都走稳定版本', () {
+      // tx_begin_locked 和写前重拍都不能直接调 snapshot_pasteboard
+      for (final fn in ['tx_begin_locked', 'tx_paste_locked']) {
+        final body = bodyOfFn(fn);
+        expect(body.contains('_txOriginal = snapshot_pasteboard'), isFalse,
+            reason: '$fn 直接拍了不稳定的快照');
+      }
+    });
+
+    test('快照拍不稳时禁止还原', () {
+      // 此时手里没有可信内容：clearContents 之后无内容可写等于清空用户剪贴板
+      final finish =
+          RegExp(r'static void tx_finish_locked\(NSPasteboard \*pb, uint64_t gen\) \{([\s\S]*?)\n\}')
+              .firstMatch(src)!
+              .group(1)!;
+      expect(finish.contains('!_txOriginalValid'), isTrue,
+          reason: '收尾必须先看快照可不可信');
+    });
+
+    test('copy_selection 发 Cmd+C 之前也要查易主', () {
+      // delta == 1 只说明「观察到一次变化」，证明不了事务开始后没有先发生外部变化
+      final body = bodyOf('void copy_selection(void)');
+      final checkAt = body.indexOf('pb.changeCount != _txExpectedChangeCount');
+      final postAt = body.indexOf('post_command_key');
+      expect(checkAt, greaterThanOrEqualTo(0), reason: '发 Cmd+C 前没查易主');
+      expect(checkAt, lessThan(postAt), reason: '检查必须在发 Cmd+C 之前');
+    });
+
+    test('关闭 verbose 必须等在途写者归零', () {
+      // 停开关只挡新进入者：回调可能刚读到 enabled、正在 vsnprintf，
+      // 排空看不到它，随后落盘也关了 —— 那条日志照样丢。
+      final body = bodyOf('void set_debug_logging(int enabled)');
+      expect(body.contains('tapLogInFlight'), isTrue,
+          reason: '缺少静默屏障，停开关不等于没有在途写者');
+      final waitAt = body.indexOf('tapLogInFlight');
+      final flushAt = body.indexOf('flush_tap_log_sync()');
+      expect(waitAt, lessThan(flushAt), reason: '必须等在途归零之后再排空');
+    });
+  });
+
   group('N6 流式会话不得共用上一次会话的 changeCount', () {
     test('判据必须随事务开启而重置', () {
       // 不复位的话：AI 梳理里 begin 后 Cmd+C 改了剪贴板、LLM 又在首个
@@ -208,12 +321,14 @@ void main() {
       // 跨会话共享的判据必须随事务生命周期走，不能是永不复位的静态量
       expect(code.contains('_lastChunkChangeCount'), isFalse,
           reason: '旧的跨会话静态判据应已随事务协调器一起去掉');
-      final body =
-          RegExp(r'static void tx_begin_locked\(NSPasteboard \*pb\) \{([\s\S]*?)\n\}')
-              .firstMatch(src)!
-              .group(1)!;
-      expect(body.contains('_txExpectedChangeCount = pb.changeCount'), isTrue,
-          reason: '事务开启时要记基线，否则「我们没动过而用户动了」这种情形分不出来');
+      final body = bodyOfFn('tx_begin_locked');
+      expect(body.contains('tx_snapshot_stable_locked'), isTrue,
+          reason: '事务开启时要拍稳定快照并记基线');
+      // 基线本身在 helper 里落，确认它确实落了 —— 否则上一行只是在验「调了个函数」
+      final helper = bodyOfFn('tx_snapshot_stable_locked');
+      expect(helper.contains('_txExpectedChangeCount = after'), isTrue,
+          reason: '基线必须取自与快照同版本的那次读，'
+              '否则「我们没动过而用户动了」这种情形分不出来');
     });
 
     test('copy_selection 不得固定 sleep 后把「当前值」认作自己造成的', () {

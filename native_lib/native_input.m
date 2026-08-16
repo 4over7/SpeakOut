@@ -24,6 +24,10 @@ static atomic_int debugLoggingEnabled = 0;
 // 但那时 log_to_file 已经因为 flag=0 直接返回，日志照样丢。
 // 关闭顺序：先停生产者 → 同步排空（此时落盘仍开着）→ 再关落盘。
 static atomic_int tapLogProducerEnabled = 0;
+// 已经越过开关、还没发布记录的在途写者。只「停开关 + 同步排空」是不够的：
+// 回调可能刚读到 enabled、正在 vsnprintf，此时排空看不到它，随后落盘也关了 ——
+// 那条日志照样丢。关闭时要等这个计数归零，形成真正的静默屏障。
+static atomic_uint tapLogInFlight = 0;
 static void start_tap_log_drain(void);
 static void flush_tap_log_sync(void);
 
@@ -37,6 +41,16 @@ void set_debug_logging(int enabled) {
   // 三步顺序不能乱：停生产者 → 排空 → 关落盘。
   // 少了第一步，排空读完游标后 tap 线程还能再写一条，那条必丢。
   atomic_store(&tapLogProducerEnabled, 0);
+  // 等已登记的写者清空。配合上面「先登记再复查」，这里归零就意味着
+  // 不会再有新记录发布 —— 是真正的静默屏障，不只是把窗口变小。
+  //
+  // 上限 ~10ms 是给调用线程（Dart UI isolate 同步 FFI）的保护：tap 回调里
+  // 那段只是 vsnprintf，正常几微秒就出来。真的等不到，宁可丢一条调试日志，
+  // 也不能把界面卡住。这条取舍写在这里，别当成「已经严格保证」。
+  for (int i = 0; i < 1000; i++) {
+    if (atomic_load_explicit(&tapLogInFlight, memory_order_acquire) == 0) break;
+    usleep(10);
+  }
   flush_tap_log_sync();
   atomic_store(&debugLoggingEnabled, 0);
   // 不撤 drain timer：撤销要跨线程同步 source 的生命周期，代价远大于
@@ -122,11 +136,18 @@ static dispatch_queue_t tapLogQueue = nil;
 
 __attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,
                                                                ...) {
-  if (!atomic_load(&tapLogProducerEnabled)) return;
+  // **先登记再复查开关**，顺序反了就还有窗口：读到 enabled=1 之后被抢占，
+  // 关闭方看到 inFlight=0 直接 flush 并关落盘，我们恢复后写的那条就永远丢了。
+  atomic_fetch_add_explicit(&tapLogInFlight, 1, memory_order_acquire);
+  if (!atomic_load(&tapLogProducerEnabled)) {
+    atomic_fetch_sub_explicit(&tapLogInFlight, 1, memory_order_release);
+    return;
+  }
   const unsigned w = atomic_load_explicit(&tapLogWrite, memory_order_relaxed);
   const unsigned r = atomic_load_explicit(&tapLogRead, memory_order_acquire);
   if (w - r >= TAP_LOG_SLOTS) { // 环已满：丢这一条，别去踩读者手里的槽
     atomic_fetch_add_explicit(&tapLogDropped, 1, memory_order_relaxed);
+    atomic_fetch_sub_explicit(&tapLogInFlight, 1, memory_order_release);
     return;
   }
   va_list ap;
@@ -134,6 +155,7 @@ __attribute__((format(printf, 1, 2))) static void log_from_tap(const char *fmt,
   vsnprintf(tapLogRing[w % TAP_LOG_SLOTS], TAP_LOG_LINE, fmt, ap);
   va_end(ap);
   atomic_store_explicit(&tapLogWrite, w + 1, memory_order_release);
+  atomic_fetch_sub_explicit(&tapLogInFlight, 1, memory_order_release);
 }
 
 static void drain_tap_log(void) {
@@ -602,22 +624,46 @@ static void post_command_key(CGKeyCode key, CGEventTapLocation tap) {
   CFRelease(source);
 }
 
-// 深拷贝当前剪贴板内容，供之后还原。空剪贴板返回 nil。
-static NSArray *snapshot_pasteboard(NSPasteboard *pasteboard) {
+// 深拷贝当前剪贴板内容，供之后还原。
+//
+// 返回值区分**读取失败**和**剪贴板本来就是空的** —— 这两种不能混：
+// `pasteboardItems` 为 nil 按 Apple 头文件说明既可能是空、也可能是读取出错，
+// 当成空的话我们会拿一份「什么都没有」的快照去覆盖用户真实内容。
+// 失败时 *out 不被赋值，调用方必须中止事务。
+//
+// **逐 type 取不到 data 不算失败。** 剪贴板里有 file promise 之类的延迟类型时，
+// 某些 type 的 dataForType: 本来就会返回 nil。为此中止注入的话，
+// 用户口述的文字直接丢失 —— 那比「还原时少一个冷门格式」严重得多。
+// 这类缺失记为 lossy 并写日志，不影响主流程。
+static BOOL snapshot_pasteboard(NSPasteboard *pasteboard, NSArray **out) {
   NSArray *oldContents = [pasteboard pasteboardItems];
-  if (oldContents.count == 0) return nil;
+  if (oldContents == nil) {
+    log_to_file("Clipboard tx: pasteboardItems returned nil (read error)");
+    return NO;
+  }
+  if (oldContents.count == 0) {
+    *out = nil;
+    return YES;
+  }
   NSMutableArray *items = [NSMutableArray array];
+  int lossy = 0;
   for (NSPasteboardItem *item in oldContents) {
     NSPasteboardItem *copy = [[NSPasteboardItem alloc] init];
     for (NSString *type in [item types]) {
       NSData *data = [item dataForType:type];
-      if (data) {
-        [copy setData:data forType:type];
+      if (data == nil) {
+        lossy++;
+        continue;
       }
+      if (![copy setData:data forType:type]) lossy++;
     }
     [items addObject:copy];
   }
-  return items;
+  if (lossy > 0) {
+    log_to_file("Clipboard tx: snapshot lossy (%d types unavailable)", lossy);
+  }
+  *out = items;
+  return YES;
 }
 
 // ============================================================================
@@ -651,17 +697,46 @@ static BOOL _txActive = NO;                  // 事务已开启（持有原始�
 static NSArray *_txOriginal = nil;           // 事务开启前的剪贴板内容
 static uint64_t _txGeneration = 0;           // 我们每改一次剪贴板就 +1
 static NSInteger _txExpectedChangeCount = -1; // 只有我们动过的话，现在该是多少
+static BOOL _txOriginalValid = NO;           // 快照是否可信（拍不稳时为 NO）
 static int _txHoldDepth = 0;                 // 流式会话深度，>0 时挂起还原
 
 // 以下 tx_* 全部要求调用方已持有 clipTxMutex。
 
-static void tx_begin_locked(NSPasteboard *pb) {
-  if (_txActive) return; // 已有事务在跑就沿用它的原始快照，绝不重拍
+// 拍一份**与 changeCount 同版本**的快照。
+//
+// 不能「先拍快照，再读 changeCount」—— 两步之间用户完全可能复制东西：
+//   剪贴板 X → snapshot_pasteboard 拍到 X → 用户复制 Z（count 变）
+//   → expected 记成 Z 的 count → 之后写前检查看到「没易主」，不重拍
+//   → 收尾还原 X，Z 被永久覆盖。
+// 读 count → 拍 → 再读 count，两次一致才算这份快照和这个 count 是同一版本。
+// 返回 NO = 没拿到可信快照。调用方**必须在 clearContents 之前中止**：
+// 「先照写、收尾时不还原」不是可用的失败策略 —— 那等于把用户剪贴板换成
+// 我们注入的文字并永久留在那里（口述内容还会泄漏在剪贴板里）。
+static BOOL tx_snapshot_stable_locked(NSPasteboard *pb) {
+  for (int i = 0; i < 8; i++) {
+    const NSInteger before = pb.changeCount;
+    NSArray *snap = nil;
+    if (!snapshot_pasteboard(pb, &snap)) break; // 读取出错，重试也无意义
+    const NSInteger after = pb.changeCount;
+    if (before == after) {
+      _txOriginal = snap;
+      _txOriginalValid = YES;
+      _txExpectedChangeCount = after;
+      return YES;
+    }
+  }
+  log_to_file("Clipboard tx: snapshot failed, aborting injection");
+  _txOriginal = nil;
+  _txOriginalValid = NO;
+  return NO;
+}
+
+// 返回 NO = 快照没拿到，事务未开启，调用方必须放弃这次注入
+static BOOL tx_begin_locked(NSPasteboard *pb) {
+  if (_txActive) return YES; // 已有事务在跑就沿用它的原始快照，绝不重拍
+  if (!tx_snapshot_stable_locked(pb)) return NO;
   _txActive = YES;
-  _txOriginal = snapshot_pasteboard(pb);
-  // 基线也要记：会话期间我们一次都没动剪贴板、而用户自己复制了东西时，
-  // 靠它才分得清「该还原」和「别碰用户刚复制的内容」。
-  _txExpectedChangeCount = pb.changeCount;
+  return YES;
 }
 
 static uint64_t tx_note_mutation_locked(NSInteger newChangeCount) {
@@ -673,7 +748,10 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   if (!_txActive) return;
   if (gen != _txGeneration) return; // 后面还有更新的改动，交给它收尾
   if (_txHoldDepth > 0) return;     // 流式会话还开着，等它 end
-  if (pb.changeCount == _txExpectedChangeCount) {
+  if (!_txOriginalValid) {
+    // 快照当时就没拍稳，还原等于拿不可信内容覆盖现状 —— 什么都不做
+    log_to_file("Clipboard tx: skipped restore (snapshot was never stable)");
+  } else if (pb.changeCount == _txExpectedChangeCount) {
     [pb clearContents];
     if (_txOriginal.count > 0) {
       [pb writeObjects:_txOriginal];
@@ -684,6 +762,7 @@ static void tx_finish_locked(NSPasteboard *pb, uint64_t gen) {
   }
   _txActive = NO;
   _txOriginal = nil;
+  _txOriginalValid = NO;
   _txExpectedChangeCount = -1;
 }
 
@@ -710,7 +789,7 @@ static uint64_t tx_paste_locked(NSPasteboard *pb, NSString *text) {
   // 一旦发现易主，用户手里那份才是该还原的目标，旧快照已经过期，重新拍。
   if (pb.changeCount != _txExpectedChangeCount) {
     log_to_file("Clipboard tx: user changed clipboard mid-transaction, re-snapshot");
-    _txOriginal = snapshot_pasteboard(pb);
+    if (!tx_snapshot_stable_locked(pb)) return 0; // 0 = 没写，调用方别安排收尾
   }
   NSInteger cc = [pb clearContents];
   [pb setString:text forType:NSPasteboardTypeString];
@@ -728,11 +807,17 @@ static void inject_via_clipboard(const char *text) {
 
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
-    tx_begin_locked(pasteboard);
+    // 拿不到可信快照就**放弃这次注入**：照写下去等于把用户剪贴板换成
+    // 我们的文字且再也换不回来（口述内容还会留在剪贴板里）。
+    if (!tx_begin_locked(pasteboard)) {
+      pthread_mutex_unlock(&clipTxMutex);
+      log_to_file("Clipboard tx: inject aborted (no trustworthy snapshot)");
+      return;
+    }
     const uint64_t gen = tx_paste_locked(pasteboard, newText);
     pthread_mutex_unlock(&clipTxMutex);
 
-    tx_schedule_finish(gen);
+    if (gen != 0) tx_schedule_finish(gen);
   }
 }
 
@@ -746,7 +831,11 @@ void inject_clipboard_begin(void) {
     // 会话状态必须是独立的深度计数，**不能**拿 _txOriginal 是否为 nil 代表：
     // 用户剪贴板本来就为空时快照就是 nil，那样 end 会误判成「无会话」直接返回，
     // 注入的语音文本永久留在剪贴板里（既违反恢复契约，也是口述内容泄漏）。
-    tx_begin_locked(pb);
+    if (!tx_begin_locked(pb)) {
+      pthread_mutex_unlock(&clipTxMutex);
+      log_to_file("Clipboard tx: begin aborted (no trustworthy snapshot)");
+      return;
+    }
     _txHoldDepth++;
     log_to_file("Clipboard tx: hold++ (depth=%d, saved %lu items)", _txHoldDepth,
                 (unsigned long)(_txOriginal ? _txOriginal.count : 0));
@@ -765,8 +854,16 @@ void inject_clipboard_chunk(const char *text) {
 
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
-    tx_begin_locked(pb); // 没走 begin 也能兜住
+    if (!tx_begin_locked(pb)) { // 没走 begin 也能兜住
+      pthread_mutex_unlock(&clipTxMutex);
+      log_to_file("Clipboard tx: chunk aborted (no trustworthy snapshot)");
+      return;
+    }
     const uint64_t gen = tx_paste_locked(pb, newText);
+    if (gen == 0) { // 中途重拍失败，没写成，别安排收尾
+      pthread_mutex_unlock(&clipTxMutex);
+      return;
+    }
     usleep(30000); // 30ms for paste to complete before next chunk
     const BOOL orphan = (_txHoldDepth == 0);
     pthread_mutex_unlock(&clipTxMutex);
@@ -809,7 +906,21 @@ void copy_selection(void) {
   @autoreleasepool {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     pthread_mutex_lock(&clipTxMutex);
-    const NSInteger before = pb.changeCount;
+    // **发 Cmd+C 之前也要查易主。** delta == 1 只能说明「观察到一次变化」，
+    // 证明不了事务开始之后没有先发生过外部变化：
+    //   begin 在 X 上开事务 → 用户复制 Z → copy_selection 读到 Z 的 count
+    //   → Cmd+C 复制出 Y，delta 恰好是 1 → 记成内部变更
+    //   → 收尾还原 X，Z 被覆盖。
+    if (_txActive && pb.changeCount != _txExpectedChangeCount) {
+      log_to_file("Clipboard tx: clipboard changed before copy_selection, re-snapshot");
+      tx_snapshot_stable_locked(pb); // 失败也继续：这里只是复制，不覆盖剪贴板
+    }
+    // **基线必须取自稳定快照那一刻，不能在这里重读。** 重读的话，重拍返回之后
+    // 到这一行之间用户又复制一次（count 变 c+1），before 就把那次外部变更吸收了，
+    // 随后我们的 Cmd+C 让 delta 恰好等于 1 —— 误判成纯内部变更，
+    // 收尾把用户刚复制的内容覆盖掉。
+    const NSInteger before =
+        (_txActive && _txOriginalValid) ? _txExpectedChangeCount : pb.changeCount;
     post_command_key(8, kCGAnnotatedSessionEventTap); // 8 = 'c'
 
     // **不能固定睡 100ms 再把「当前值」认作自己造成的变更。** 用户恰好在这

@@ -46,18 +46,39 @@ void main() {
         reason: '无会话时 end 必须早退，否则 clearContents 会清空用户剪贴板');
   });
 
-  test('空剪贴板仍会开启事务（这条分支正是事故来源）', () {
-    // tx_begin_locked 无条件置 _txActive，快照为不为空是后面的事
-    final begin =
-        RegExp(r'static void tx_begin_locked\(NSPasteboard \*pb\) \{([\s\S]*?)\n\}')
-            .firstMatch(src)!
-            .group(1)!;
-    final activeAt = begin.indexOf('_txActive = YES');
-    final snapAt = begin.indexOf('snapshot_pasteboard');
-    expect(activeAt, greaterThanOrEqualTo(0));
-    expect(snapAt, greaterThanOrEqualTo(0));
-    expect(activeAt, lessThan(snapAt),
-        reason: '置位必须早于拍快照，否则空剪贴板时可能漏置');
+  test('空剪贴板必须走成功路径（这条分支正是事故来源）', () {
+    // 原事故：拿 `_savedClipboardItems == nil` 当会话哨兵，
+    // 用户剪贴板本来就空时快照就是 nil，end 误判成「无会话」直接返回，
+    // 注入的语音文本永久留在剪贴板（口述内容泄漏）。
+    //
+    // 旧断言用「置位语句早于拍快照语句」当代理。那个代理现在失效了 ——
+    // 快照可能失败，失败时**不能**开事务，所以置位必然在拍快照之后。
+    // 代理没了，就直接断言真正的不变量：**空剪贴板算拍摄成功，不算失败。**
+    final snap = RegExp(
+            r'^\s*(?:static\s+)?[A-Za-z_][A-Za-z0-9_ *]*\bsnapshot_pasteboard'
+            r'\s*\([^)]*\)\s*\{([\s\S]*?)\n\}',
+            multiLine: true)
+        .firstMatch(src)
+        ?.group(1);
+    expect(snap, isNotNull, reason: '没找到 snapshot_pasteboard —— 断言已失效');
+    // count == 0 分支必须 return YES，不能和读取失败混为一谈
+    final emptyBranch = RegExp(r'count == 0\)\s*\{([\s\S]*?)\n\s*\}')
+        .firstMatch(snap!)
+        ?.group(1);
+    expect(emptyBranch, isNotNull, reason: '没找到空剪贴板分支');
+    expect(emptyBranch!.contains('return YES'), isTrue,
+        reason: '空剪贴板必须算拍摄成功，否则整条注入会被误判为「拿不到快照」而中止');
+
+    // 而 tx_snapshot_stable_locked 的成功路径不得再用「快照非空」做条件
+    final stable = RegExp(
+            r'^\s*(?:static\s+)?[A-Za-z_][A-Za-z0-9_ *]*\btx_snapshot_stable_locked'
+            r'\s*\([^)]*\)\s*\{([\s\S]*?)\n\}',
+            multiLine: true)
+        .firstMatch(src)
+        ?.group(1);
+    expect(stable, isNotNull);
+    expect(RegExp(r'if\s*\(\s*snap\s*[!=]=\s*nil').hasMatch(stable!), isFalse,
+        reason: '不得拿「快照是否为空」决定事务能不能开');
   });
 
   // 只在 macOS 跑：dylib 是 macOS 专属产物，且判据依赖 `strings`

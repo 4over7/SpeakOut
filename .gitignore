@@ -104,3 +104,11 @@ build/bundled-models/
 
 # llm_bench 运行产物
 tools/llm_bench/llm_bench_result.json
+
+# 本地产物，绝不入库 —— AGENTS.md「目录结构」里已声明是本地目录，
+# 但之前没进 gitignore，结果被 `git add -A` 两次卷进提交
+# （一次 1582 行预览页，一次 48MB 的 .pkg）。声明不等于防护，这里补上。
+real-test/
+.claude/
+*.pkg
+docs/*_preview.html

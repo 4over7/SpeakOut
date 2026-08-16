@@ -616,15 +616,40 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     }
     if (status == 0) {
       AppService().requestMicrophonePermission();
+      // 每轮读**完整状态**，不能只看 granted：用户在系统弹框里点了「不允许」
+      // 之后状态就变成 denied 了，只盯着 granted 会继续空转满 30 秒然后
+      // 一声不响地结束 —— 用户以为点了没反应。
       for (int i = 0; i < 20; i++) {
         await Future.delayed(const Duration(milliseconds: 1500));
         if (!mounted) return;
         _refreshPermissions();
-        if (_microphoneGranted) return;
+        final s = AppService().microphonePermissionStatus();
+        if (s == 3) return; // 已授权
+        if (s == 2) { // 用户点了不允许 —— 直接送去系统设置改
+          await _openSettingsUrl(url, loc);
+          return;
+        }
+        if (s == 1) {
+          NotificationService()
+              .notifyError(loc.permissionsMicrophoneRestricted);
+          return;
+        }
       }
+      // 30 秒还是未决定：弹框没出来或用户没理它，给个提示别静默结束
+      if (!mounted) return;
+      NotificationService().notifyError(loc.permissionsNotGranted);
       return;
     }
-    await launchUrl(Uri.parse(url));
+    await _openSettingsUrl(url, loc);
+  }
+
+  /// launchUrl 打不开时**通常不抛异常，而是返回 false** —— 只 await 不看返回值
+  /// 等于静默失败，用户看到的是「点了没反应」。
+  Future<void> _openSettingsUrl(String url, AppLocalizations loc) async {
+    final ok = await launchUrl(Uri.parse(url));
+    if (ok || !mounted) return;
+    AppLog.e('launchUrl returned false: $url');
+    NotificationService().notifyError(loc.permissionsNotGranted);
   }
 
   Widget _permissionCard(String label, String desc, IconData icon, String url,
@@ -643,9 +668,11 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
       // 用户只会看到「点了没反应」。这里自己 await 并兜住。
       onTap: () async {
         try {
-          await (onTapOverride != null
-              ? onTapOverride(url)
-              : launchUrl(Uri.parse(url)));
+          if (onTapOverride != null) {
+            await onTapOverride(url);
+          } else {
+            await _openSettingsUrl(url, loc);
+          }
         } catch (e) {
           AppLog.e('permission card tap failed: $e');
           if (!mounted) return;

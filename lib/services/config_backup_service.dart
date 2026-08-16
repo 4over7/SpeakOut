@@ -45,6 +45,7 @@ class ConfigBackupService {
       int credentialCount = 0;
       final prefsData = <String, dynamic>{};
       for (final key in allKeys) {
+        if (_isMachineLocalKey(key)) continue; // 换机器无意义，见下方说明
         final isCred = _isCredentialKey(key);
         if (isCred && !includeCredentials) continue; // 默认跳过凭证
         final val = prefs.get(key);
@@ -100,6 +101,7 @@ class ConfigBackupService {
         final type = meta['type'] as String?;
         final value = meta['value'];
 
+        if (_isMachineLocalKey(key)) continue; // 旧备份里可能还带着，导入侧也要挡
         switch (type) {
           case 'String':
             await prefs.setString(key, value as String);
@@ -140,6 +142,16 @@ class ConfigBackupService {
     if (val is bool) return 'bool';
     if (val is List<String>) return 'List<String>';
     return 'String';
+  }
+
+  /// 绑定在本机、不能随配置迁移的 key。
+  ///
+  /// `diary_directory` 在 macOS 沙盒版下**只是一半状态**：真正的授权是
+  /// AppDelegate 存的 security-scoped bookmark，那东西不可移植、也不在这份备份里。
+  /// 把路径导过去，另一台机器上就是「配置指着一个没有授权的目录」——
+  /// 用户看到的是闪念保存失败，却完全不知道原因。宁可让他重新选一次目录。
+  static bool _isMachineLocalKey(String key) {
+    return key == 'diary_directory';
   }
 
   /// 判断 key 是否为敏感凭证（云账户凭证 / API key / 阿里云 AK·SK·appkey / token）。
