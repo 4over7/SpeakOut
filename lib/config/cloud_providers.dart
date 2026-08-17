@@ -64,7 +64,9 @@ class CloudProviders {
       id: 'xfyun',
       name: '讯飞',
       credentialFields: [
-        CredentialField(key: 'app_id', label: 'App ID'),
+        // app_id 只有 ASR 用得到。不写 scope 就是「通用凭证」——
+        // 那样只配星火 LLM（api_password）的账户会因为缺 app_id 被判为不可用。
+        CredentialField(key: 'app_id', label: 'App ID', scope: {CloudCapability.asrStreaming}),
         CredentialField(key: 'api_key', label: 'API Key', isSecret: true, scope: {CloudCapability.asrStreaming}),
         CredentialField(key: 'api_secret', label: 'API Secret', isSecret: true, scope: {CloudCapability.asrStreaming}),
         CredentialField(key: 'api_password', label: 'API Password (星火)', isSecret: true, scope: {CloudCapability.llm}, placeholder: 'Bearer Token for HTTP API'),

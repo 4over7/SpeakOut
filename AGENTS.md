@@ -10,7 +10,7 @@
 |---|---|---|
 | **L1** | 本文 | 每次任务开始。项目概况 + 命令 + 架构铁律 + 导航 |
 | **L2** | `<module>/AGENTS.md` | 动某个模块的代码前，只读那一个（见[模块导航](#模块导航l2)） |
-| **L3** | [`docs/decisions/INDEX.md`](./docs/decisions/INDEX.md)（ADR）<br>[`docs/anti-patterns/INDEX.md`](./docs/anti-patterns/INDEX.md)（踩过的坑） | 做技术选型时查 ADR；动手实施前扫一眼反模式 |
+| **L3** | [`docs/decisions/INDEX.md`](./docs/decisions/INDEX.md)（ADR：为什么这么选）<br>[`docs/anti-patterns/INDEX.md`](./docs/anti-patterns/INDEX.md)（踩过的坑：别再这么干）<br>[`docs/debug-log/INDEX.md`](./docs/debug-log/INDEX.md)（事故追查：这段代码为什么这么绕） | 选型时查 ADR；实施前扫反模式；**改动某个模块前查它有没有事故史** |
 | **L4** | `docs/wiki/README.md` | 需要历史设计依据时。按 🚀 Planning / 🟢 Active / 📜 Historical / 🔴 Archived 分类。**gitignored 的本地文档库 —— 全新 clone 后没有这个目录，属正常** |
 
 > **铁律：一个事实只写在一个层。** L1 可以有指向下层的**指针和一句话索引**，但不复制下层的**可执行细节**（命令、参数、实现机制）——曾经因为两处都抄，原生库编译命令在 L1 漂移成了缺 framework 的过期版本。
@@ -127,10 +127,10 @@ UI 层  ──depends on──▶ Service 层  ──depends on──▶ Engine 
 | **Engine** | `lib/engine/` | 核心编排器 `CoreEngine`、ASR Provider 抽象、模型下载管理 | [AGENTS.md](./lib/engine/AGENTS.md) |
 | **Services** | `lib/services/` | 业务服务（配置/LLM/笔记/聊天/音频/账户/计费/更新） | [AGENTS.md](./lib/services/AGENTS.md) |
 | **UI** | `lib/ui/` | 界面（macos_ui，sidebar shell + 各页面） | [AGENTS.md](./lib/ui/AGENTS.md) |
-| **FFI** | `lib/ffi/` | Dart ↔ 原生 dylib 绑定（`NativeInputBase` 抽象 + 平台分发） | [AGENTS.md](./lib/ffi/AGENTS.md) |
+| **FFI** | `lib/ffi/` | Dart ↔ 原生 dylib 绑定；**ABI 握手**、三档符号、失败回传契约 | [AGENTS.md](./lib/ffi/AGENTS.md) |
 | **Config** | `lib/config/` | 静态常量、云服务商注册表、日志 | [AGENTS.md](./lib/config/AGENTS.md) |
 | **Models** | `lib/models/` | 数据模型（cloud_account / chat / billing） | [AGENTS.md](./lib/models/AGENTS.md) |
-| **Native** | `native_lib/` | Objective-C：CGEventTap + AudioQueue Ring Buffer + 文本注入 | [AGENTS.md](./native_lib/AGENTS.md) |
+| **Native** | `native_lib/` | Objective-C：CGEventTap + AudioQueue Ring Buffer + **剪贴板事务协调器** | [AGENTS.md](./native_lib/AGENTS.md) |
 | **Gateway** | `gateway/` | Cloudflare Workers 后端：许可证 + Token + 计费 + 版本 | [AGENTS.md](./gateway/AGENTS.md) |
 | **macOS 集成** | `macos/Runner/` | AppDelegate + 录音浮窗 + Method Channel | [AGENTS.md](./macos/Runner/AGENTS.md) |
 | i18n | `lib/l10n/` | `app_zh.arb` / `app_en.arb` + `generated/`，改后跑 `flutter gen-l10n` | 无独立文档 |
@@ -171,6 +171,7 @@ sidebar 内部跳转用 `SidebarNavigation.of(context)?.goto('page_id')`，**不
 | [`dont-skip-full-test-on-release`](./docs/anti-patterns/dont-skip-full-test-on-release.md) | 发版必跑完整 `flutter test`，不要问"是否跳过" |
 | [`dont-amend-after-hook-failure`](./docs/anti-patterns/dont-amend-after-hook-failure.md) | pre-commit hook 失败后用新 commit 修，不要 `--amend` |
 | [`dont-trust-green-tests-without-probing`](./docs/anti-patterns/dont-trust-green-tests-without-probing.md) | 测试绿 ≠ 那条路径被验证过，用探针确认 |
+| [`dont-let-source-text-assertions-prove-behavior`](./docs/anti-patterns/dont-let-source-text-assertions-prove-behavior.md) | 「源码里找得到」≠「代码这么执行」，语义要行为测试 |
 | [`dont-let-injection-shape-production-code`](./docs/anti-patterns/dont-let-injection-shape-production-code.md) | 测试注入用外部钩子，别污染生产逻辑 |
 | [`dont-bypass-configservice`](./docs/anti-patterns/dont-bypass-configservice.md) | 不要直接 `SharedPreferences.getInstance()` |
 | [`dont-onnavigatetotab-int`](./docs/anti-patterns/dont-onnavigatetotab-int.md) | 跨页跳转不要用 `onNavigateToTab(int)` |

@@ -14,6 +14,7 @@
 | [`dont-skip-full-test-on-release.md`](./dont-skip-full-test-on-release.md) | 发版必跑完整 `flutter test`，不要问"是否跳过" |
 | [`dont-amend-after-hook-failure.md`](./dont-amend-after-hook-failure.md) | pre-commit hook 失败后用新 commit 修，不要 `--amend` |
 | [`dont-trust-green-tests-without-probing.md`](./dont-trust-green-tests-without-probing.md) | 测试绿 ≠ 那条路径被验证过，用探针确认它真跑到了 |
+| [`dont-let-source-text-assertions-prove-behavior.md`](./dont-let-source-text-assertions-prove-behavior.md) | 「源码里找得到」≠「代码这么执行」；语义正确性要行为测试 |
 | [`dont-let-injection-shape-production-code.md`](./dont-let-injection-shape-production-code.md) | 测试注入用外部钩子，别在实现里加只为造失败的分支 |
 
 ### 🏗️ 架构铁律

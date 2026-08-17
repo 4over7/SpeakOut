@@ -121,10 +121,16 @@ class CloudProvider {
   /// 检查账户是否至少有一项能力的凭证已填写
   /// [credentials] 是用户填写的凭证 Map
   bool hasAnyValidCredentials(Map<String, String> credentials) {
-    // 通用凭证（scope 为空）只要有一个非空就算有效
-    final universalFields = credentialFields.where((f) => f.scope.isEmpty);
-    final hasUniversal = universalFields.any((f) => (credentials[f.key] ?? '').isNotEmpty);
-    if (hasUniversal) return true;
+    // 通用凭证（scope 为空）必须**全部**填齐才算有效。
+    // 原先是「任一非空即可」：腾讯只填了 secret_id、没填 secret_key 和 app_id，
+    // 账户照样被判为可启用 —— 用户以为配好了，一识别就报鉴权失败，
+    // 而且错误来自服务端，很难联想到是自己少填了一格。
+    final universalFields = credentialFields.where((f) => f.scope.isEmpty).toList();
+    if (universalFields.isNotEmpty) {
+      final allFilled =
+          universalFields.every((f) => (credentials[f.key] ?? '').isNotEmpty);
+      if (allFilled) return true;
+    }
 
     // 否则检查各能力组是否有完整凭证
     return hasValidCredentialsFor(CloudCapability.llm, credentials) ||

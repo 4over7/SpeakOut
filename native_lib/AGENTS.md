@@ -35,11 +35,52 @@ AudioQueue 回调里写入 C 静态 ring buffer（16kHz mono PCM），Dart 端 F
 macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑制重复。
 
 ### 4. 文本注入只剩剪贴板一条路
-- FFI 入口是 `inject_text`，内部**直接调 `inject_via_clipboard`**（Cmd+V，200ms 后恢复原剪贴板），没有分流判断。
+- FFI 入口是 `inject_text`，内部走 `inject_via_clipboard`（写剪贴板 → Cmd+V → 延迟还原）。
 - **v1.5.13 起统一走剪贴板**，替代 CGEvent keyboard（HID 队列异步竞争会丢字）。决策见 ADR-002。
-- ⚠️ `inject_via_keyboard`（`native_input.m` 内 `static`）**仍在文件里但零调用点** —— 历史遗留 dead code。
+- ⚠️ `inject_via_keyboard`（`static`）**仍在文件里但零调用点** —— 历史遗留 dead code。
   别照它推断"GUI 应用走 keyboard、其他走剪贴板"，那套分流早就没有了。
-- **打字机效果**（Alpha）：流式 LLM + 剪贴板批量注入（`inject_clipboard_begin/chunk/end`），120ms 批量。
+- **打字机效果**：流式 LLM + 剪贴板批量注入（`inject_clipboard_begin/chunk/end`）。
+
+### 4b. 剪贴板事务协调器 ⭐ 改注入前必读
+
+一次性注入、流式注入、AI 梳理的 Cmd+C **共用同一套事务状态**，绝不能各留一套。
+（曾经是两套，靠 Dart 侧会话计数推断二者不交错 —— 那个计数管不到普通 `inject()`，
+更管不到 native 侧的延迟还原窗口，结果是用户原剪贴板被永久覆盖。）
+
+**状态**（全部由 `clipTxMutex` 保护）：
+
+| 状态 | 含义 |
+|---|---|
+| `_txActive` / `_txOriginal` / `_txOriginalValid` | 事务是否开启、事务开始前的剪贴板快照、快照可不可信 |
+| `_txExpectedChangeCount` / `_txToken` | 所有权判据：只有我们动过的话 changeCount 该是多少；私有 type 里的一次性 token |
+| `_txGeneration` | 每次我们改动剪贴板 +1，只有最后一代负责收尾 |
+| `_txHoldDepth` | 流式会话深度，>0 时挂起还原 |
+| `_txRestorePending` | 还原重试进行中，期间**拒绝开新事务** |
+
+**四条不变量**（违反任何一条都曾造成用户数据丢失）：
+
+1. **快照只在事务开启时拍一次**，且必须与 `changeCount` 同版本（读 → 拍 → 再读，一致才认）。
+2. **所有权判据三条齐全**：`changeCount` 相符 + 恰好一个 item + token 匹配。
+   `changeCount` 是 Apple 文档里的正规机制，token 只是辅助（general pasteboard
+   对所有进程可读，token 能被原样重放）。**不要拿 token 取代 changeCount。**
+3. **动剪贴板之前先判所有权**，不是我们的就重拍快照 —— 只在收尾时判是不够的。
+4. **失败必须能被感知**：同步失败走返回值，异步还原失败走 `clipboard_restore_failures()` 计数。
+
+**返回值语义**：`tx_paste_locked` 返回 `0` **严格表示「剪贴板一个字都没动过」**。
+越过 `clearContents` 之后的任何失败都必须返回非零代次，否则调用方会以为无需收尾，
+直接销毁快照 → 剪贴板永久为空。
+
+> 完整事故史与每条不变量的来由：
+> [`docs/debug-log/2026-08-16-paste-yields-previous-recognition.md`](../docs/debug-log/2026-08-16-paste-yields-previous-recognition.md)
+
+### 4c. AI 梳理的复制必须原子
+
+`copy_selection_text` 把「发 Cmd+C → 等变化 → 读文本」收进**一次调用**，
+并把读取锁死在归因到的那一版。拆成两次 FFI 的话，中间两个窗口会读到别的内容 ——
+送进 LLM 的可能是用户剪贴板里的敏感信息。
+
+⚠️ **已知限制**：`changeCount` 变化**证明不了**那次变化来自我们的 Cmd+C。
+要确定性来源只能走 Accessibility 的 `AXSelectedText`，尚未实现。
 
 ### 5. 偏好设备而非系统默认
 `set_input_device` 设 `kAudioQueueProperty_CurrentDevice` 用偏好设备，**不改系统默认**（ConfigService.audioInputDeviceId 是 SSoT）。
@@ -65,12 +106,19 @@ native_input.m
 ├── 音频采集（AudioQueue callback + start/stop_audio_recording
 │              + get_available_audio_samples / read_audio_buffer / get_audio_level / get_audio_spectrum）
 ├── 设备枚举（AudioObjectGetPropertyData + start/stop_device_change_listener）
-├── 文本注入（keyboard + clipboard 两套）
-├── 应用控制（activate_app / get_frontmost_app_info / press_key / copy_selection）
+├── 剪贴板事务协调器（tx_* 系列 + snapshot_pasteboard，见 §4b）
+├── 文本注入（inject_text / inject_clipboard_begin|chunk|end；keyboard 那套是 dead code）
+├── 应用控制（activate_app / get_frontmost_app_info / press_key / copy_selection_text）
 ├── 权限检查（check_screen_recording_permission 等）
 ├── 自动更新 helper（launch_updater）
-└── 录音 WAV 保存（save_recording_wav）
+├── 录音 WAV 保存（save_recording_wav）
+└── ABI 版本（native_input_abi_version，见 lib/ffi/AGENTS.md §ABI 握手）
 ```
+
+`native_lib/tests/tx_harness.m` —— 剪贴板事务的**可执行**交错测试，
+直接 `#include` 本文件拿到 static 函数。两条安全前提：用 `pasteboardWithUniqueName`
+（不碰用户剪贴板）、宏掉 `CGEventPost`（不发真按键）。由
+`test/engine/native_tx_harness_test.dart` 编译并运行。
 
 ## 不要做什么
 
@@ -79,10 +127,25 @@ native_input.m
 - ❌ **不要 hardcode 路径**（如录音保存路径）— 通过参数从 Dart 传入
 - ❌ **不要忘 -fobjc-arc 编译** — 否则内存管理崩
 - ❌ **不要往 ring buffer 写超过容量** — 会覆盖旧数据，确保 buffer 足够大或正确处理回绕
+- ❌ **不要在 CGEventTap 回调里做同步 I/O** — 回调有系统时限，超时会被系统禁用整个 tap；
+  用 `log_from_tap`（无锁环形缓冲，后台排空），不要用 `log_to_file`
+- ❌ **不要把回调里的 `[str UTF8String]` 直接交给 `NativeCallable.listener`** —
+  它是异步投递，那是悬垂指针；`strdup` 后由 Dart `nativeFree`
+- ❌ **不要改导出签名却不升 ABI 版本** — 四处必须同步，见 [`lib/ffi/AGENTS.md`](../lib/ffi/AGENTS.md)
 
 ## Linux / Windows 子目录
 
-`native_lib/linux/`（`native_input.c`）和 `native_lib/windows/`（`native_input.cpp`）提供同名 `libnative_input` 实现（多数 stub），各带 `CMakeLists.txt`。CI 三平台编译（Windows 测试目前未全绿，见根 AGENTS.md）。
+`native_lib/linux/`（`native_input.c`）和 `native_lib/windows/`（`native_input.cpp`）提供同名
+`libnative_input` 实现（多数 stub），各带 `CMakeLists.txt`。CI 三平台编译
+（Windows 测试目前未全绿，见根 AGENTS.md）。
+
+**两条跨平台纪律**：
+
+- **回调 typedef 必须与 Dart 侧参数完全一致**（`KeyCallback` 三个参数）。
+  少一个不会编译报错，运行时读到的是栈上残值 —— 组合键判定随机命中。
+  指纹锁会检查这一致性。
+- **不导出的符号在 Dart 侧必须是「可选档」**，见 [`lib/ffi/AGENTS.md`](../lib/ffi/AGENTS.md) §三档符号。
+  放错档会让整组能力、甚至整个 FFI 初始化在这两个平台上失败。
 
 ## 调试技巧
 

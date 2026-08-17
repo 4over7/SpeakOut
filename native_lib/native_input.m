@@ -45,7 +45,7 @@ static void flush_tap_log_sync(void);
 // 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
 // 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
 // 而不是悄悄读垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 0xd80931
+#define SPEAKOUT_NATIVE_ABI_VERSION 0xf33ddb
 // 剪贴板还原最终失败的累计次数。还原发生在注入之后 800ms 的异步任务里，
 // 没法用返回值告诉 Dart —— 只记日志的话，用户的剪贴板被清空了却毫不知情。
 // Dart 侧在下一次注入时读一下这个计数，涨了就提示。
@@ -2338,10 +2338,23 @@ deviceChangeListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddresses,
           // 那样只避开了空指针判断的 TOCTOU，避不开「调用时 trampoline 已被释放」。
           // cb 是 NativeCallable.listener 的 trampoline，投递消息后立即返回，
           // 所以 stop 最多阻塞这一瞬间。
+          // **字符串必须 strdup，不能直接传 UTF8String。**
+          // 上面那把锁只解决了 trampoline 的生命周期，没解决**字符串的**：
+          // NativeCallable.listener 是异步投递 —— 它把消息塞进 isolate 队列
+          // 就立刻返回，Dart 回调稍后才跑。而 [uid UTF8String] 指向的是
+          // autoreleased NSString 的内部缓冲，出了这个 autoreleasepool 就没了。
+          // Dart 那边 toDartString() 读到的是已释放内存：轻则乱码设备名，
+          // 重则崩溃。Dart 侧读完负责 nativeFree。
+          char *uidCopy = strdup([uid UTF8String] ?: "");
+          char *nameCopy = strdup([name UTF8String] ?: "");
           pthread_mutex_lock(&deviceChangeCallbackMutex);
           DartDeviceChangeCallback cb = deviceChangeCallback;
           if (cb != NULL) {
-            cb([uid UTF8String], [name UTF8String], isBluetooth ? 1 : 0);
+            cb(uidCopy, nameCopy, isBluetooth ? 1 : 0);
+          } else {
+            // 没人接收就地释放，否则每次设备变化漏两块内存
+            free(uidCopy);
+            free(nameCopy);
           }
           pthread_mutex_unlock(&deviceChangeCallbackMutex);
         }

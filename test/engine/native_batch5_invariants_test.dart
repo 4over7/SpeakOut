@@ -17,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// 每一条都对应一个已经发生过或已被确认可触发的缺陷。
 /// 导出签名的指纹。**改了任何导出函数的签名就要连同 ABI 版本一起更新。**
 /// 值由「导出签名一变，ABI 版本必须跟着变」这条测试的失败信息给出。
-const String kNativeAbiFingerprint = 'd80931139e77ae930faa0b50c417df930d231071';
+const String kNativeAbiFingerprint = 'f33ddb0daf36d8760d425183bcb81d83549e14df';
 
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();
@@ -382,6 +382,22 @@ void main() {
             .toList();
       }
 
+      /// native 侧的**回调函数指针 typedef** 也是 ABI 的一部分 ——
+      /// Dart 用 NativeCallable 把 Dart 函数暴露给它们，参数个数/宽度对不上，
+      /// native 那边读到的就是栈上残值。
+      /// 实测漏过一次：Linux/Windows 的 KeyCallback 从 2 参数补到 3 参数
+      /// （与 Dart 的 KeyCallbackC 对齐），而指纹纹丝不动。
+      List<String> callbackTypedefsOf(String path) {
+        final text = File(path).readAsStringSync();
+        return RegExp(r'typedef\s+([A-Za-z_][\w ]*?)\s*\(\s*\*\s*(\w+)\s*\)'
+                r'\s*\(([^;]*?)\)\s*;')
+            .allMatches(text)
+            .map((m) =>
+                'cbtypedef :: ${m.group(1)!.trim()} (*${m.group(2)})'
+                '(${m.group(3)!.replaceAll(RegExp(r'\s+'), ' ').trim()})')
+            .toList();
+      }
+
       final all = <String>[];
       for (final f in [
         'native_lib/native_input.m',
@@ -391,6 +407,7 @@ void main() {
         final sigs = sigsOf(f);
         expect(sigs.length, greaterThan(5), reason: '$f 没扫到足够导出，正则退化了');
         all.addAll(sigs.map((x) => '$f :: $x'));
+        all.addAll(callbackTypedefsOf(f).map((x) => '$f :: $x'));
       }
 
       // **ABI 的另一半在 Dart 这边。** 只扫 native 的话，把
@@ -497,6 +514,70 @@ void main() {
           expect(File(arb).readAsStringSync().contains('"$key"'), isTrue,
               reason: '$arb 缺 $key');
         }
+      }
+    });
+  });
+
+  group('批次04 FFI：跨平台 ABI 与可选符号', () {
+    test('设备变化回调必须移交字符串所有权', () {
+      // NativeCallable.listener 是**异步投递**：塞进 isolate 队列就返回，
+      // Dart 回调稍后才跑。直接传 [uid UTF8String] 的话，那块内存属于
+      // autoreleased NSString，出了 autoreleasepool 就没了 —— Dart 读到的
+      // 是已释放内存（轻则乱码设备名，重则崩溃）。
+      final src = File('native_lib/native_input.m').readAsStringSync();
+      final call = RegExp(r'cb\(([^)]*)\)').firstMatch(src);
+      expect(call, isNotNull, reason: '没找到设备回调调用点');
+      expect(call!.group(1)!.contains('UTF8String'), isFalse,
+          reason: '直接把 UTF8String 交给异步回调 —— 悬垂指针');
+      expect(call.group(1)!.contains('Copy'), isTrue,
+          reason: '必须传 strdup 出来的副本');
+      // 没人接收时要就地释放，否则每次设备变化漏两块
+      expect(src.contains('free(uidCopy)'), isTrue,
+          reason: '回调为空时不释放副本 —— 内存泄漏');
+      // Dart 侧必须负责释放
+      final dart =
+          File('lib/services/audio_device_service.dart').readAsStringSync();
+      expect(dart.contains('nativeFree(deviceId.cast())'), isTrue,
+          reason: 'Dart 侧读完没有释放 native 分配的字符串');
+    });
+
+    test('三个平台的键盘回调 typedef 必须与 Dart 侧参数一致', () {
+      final dartParams = RegExp(r'typedef KeyCallbackC = Void Function\(([^)]*)\)')
+          .firstMatch(File('lib/ffi/native_input_base.dart').readAsStringSync())
+          ?.group(1);
+      expect(dartParams, isNotNull);
+      final dartCount = dartParams!.split(',').length;
+      for (final f in [
+        'native_lib/linux/native_input.c',
+        'native_lib/windows/native_input.cpp',
+      ]) {
+        final m = RegExp(r'typedef\s+void\s*\(\s*\*\s*KeyCallback\s*\)\s*\(([^)]*)\)')
+            .firstMatch(File(f).readAsStringSync());
+        expect(m, isNotNull, reason: '$f 没有 KeyCallback typedef');
+        expect(m!.group(1)!.split(',').length, dartCount,
+            reason: '$f 的键盘回调参数个数与 Dart 侧不一致 —— '
+                'native 会读到栈上残值，组合键判定随机命中');
+      }
+    });
+
+    test('平台没导出的可选符号不得拖垮整组能力', () {
+      final ffi = File('lib/ffi/native_input_ffi.dart').readAsStringSync();
+      // 这几个 Windows/Linux 都没导出；它们必须是可空 + try 包裹，
+      // 否则一个调试用能力会让整组核心能力判为未绑定，甚至让初始化 rethrow。
+      for (final f in ['_setDebugLogging', '_setLogDirectory',
+                       '_saveRecordingWav', '_isDeviceAvailable']) {
+        // 字段声明必须是**可空**的：写成 `late XxxDart $f` 就意味着
+        // 绑定失败会 rethrow（或后续访问抛 LateInitializationError）。
+        final decl = RegExp('^\\s*(late\\s+)?(\\w+)(\\??)\\s+$f\\s*;',
+                multiLine: true)
+            .firstMatch(ffi);
+        expect(decl, isNotNull, reason: '找不到 $f 的字段声明');
+        expect(decl!.group(1), isNull,
+            reason: '$f 声明成了 late —— 平台没导出时会抛，'
+                '整组能力甚至整个 FFI 初始化都会失败');
+        expect(decl.group(3), '?', reason: '$f 必须可空');
+        expect(ffi.contains('$f = null'), isTrue,
+            reason: '$f 的绑定失败分支没有置 null');
       }
     });
   });

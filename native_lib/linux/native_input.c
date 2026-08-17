@@ -42,7 +42,12 @@
 // ============================================================
 // Callback types (must match Dart FFI signatures)
 // ============================================================
-typedef void (*KeyCallback)(int keyCode, int isDown);
+// 三个参数，必须与 Dart 侧的 KeyCallbackC 完全一致：
+//   (Int32 keyCode, Bool isDown, Uint32 modifierFlags)
+// 少一个参数不会编译报错（函数指针类型不同但被强转过来了），
+// 运行时 Dart 侧读到的 modifierFlags 是寄存器/栈上的残值 ——
+// 组合键判定会随机命中，热键录制界面尤其明显。
+typedef void (*KeyCallback)(int keyCode, int isDown, unsigned int modifierFlags);
 typedef void (*DeviceChangeCallback)(const char* deviceId, const char* deviceName, int isBluetooth);
 
 // ============================================================
@@ -181,7 +186,9 @@ static void* keyboard_thread_proc(void* param) {
         if (ev.type == EV_KEY && g_keyCallback) {
             /* ev.value: 0=up, 1=down, 2=repeat */
             if (ev.value == 0 || ev.value == 1) {
-                g_keyCallback((int)ev.code, ev.value);
+                // Linux 侧暂未采集修饰键状态，显式传 0 而不是不传 ——
+                // 不传的话 Dart 读到的是残值。
+                g_keyCallback((int)ev.code, ev.value, 0u);
             }
         }
     }
@@ -194,7 +201,7 @@ static void* keyboard_thread_proc(void* param) {
 // ABI 版本握手，必须与 macOS 侧的 SPEAKOUT_NATIVE_ABI_VERSION 保持一致。
 // Dart 初始化时校验：旧 dylib 没有这个 symbol 就明确报错，
 // 而不是按新签名去调旧函数、读到返回寄存器里的垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 0xd80931
+#define SPEAKOUT_NATIVE_ABI_VERSION 0xf33ddb
 EXPORT int native_input_abi_version(void) { return SPEAKOUT_NATIVE_ABI_VERSION; }
 
 EXPORT int start_keyboard_listener(KeyCallback callback) {

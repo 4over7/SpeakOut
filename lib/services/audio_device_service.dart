@@ -111,11 +111,20 @@ class AudioDeviceService {
   ) {
     // This is called from native, we need to dispatch to the service instance
     // Using a static approach since callbacks are static
-    _instance?._handleDeviceChange(
-      deviceId.toDartString(),
-      deviceName.toDartString(),
-      isBluetooth == 1,
-    );
+    // native 侧 strdup 过（见 native_input.m 里 deviceChangeCallback 的说明：
+    // NativeCallable.listener 异步投递，直接传 UTF8String 会是悬垂指针），
+    // 这里读完必须释放，否则每次设备变化漏两块内存。
+    // try/finally：toDartString 抛异常时也要释放。
+    try {
+      _instance?._handleDeviceChange(
+        deviceId.toDartString(),
+        deviceName.toDartString(),
+        isBluetooth == 1,
+      );
+    } finally {
+      _instance?._nativeInput.nativeFree(deviceId.cast());
+      _instance?._nativeInput.nativeFree(deviceName.cast());
+    }
   }
   
   // Singleton pattern for static callback access

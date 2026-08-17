@@ -12,7 +12,7 @@ import 'package:speakout/config/app_log.dart';
 /// 手动递增靠自觉，而我漏过一次（改了 inject_clipboard_begin 的签名却没升，
 /// 正好是这个握手要防的情形）。现在版本是签名的函数，只改一半不可能。
 /// 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
-const int kExpectedNativeAbiVersion = 0xd80931;
+const int kExpectedNativeAbiVersion = 0xf33ddb;
 
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
@@ -44,7 +44,7 @@ class NativeInputFFI implements NativeInputBase {
   late NativeFreeDart _nativeFree;
   late GetAvailableAudioSamplesDart _getAvailableAudioSamples;
   late ReadAudioBufferDart _readAudioBuffer;
-  late SaveRecordingWavDart _saveRecordingWav;
+  SaveRecordingWavDart? _saveRecordingWav; // 可选：调试落盘，Win/Linux 未导出
 
   bool _deviceBound = false;
   late GetAudioInputDevicesDart _getAudioInputDevices;
@@ -56,14 +56,15 @@ class NativeInputFFI implements NativeInputBase {
   late StopDeviceChangeListenerDart _stopDeviceChangeListener;
   late GetPreferredDeviceUidDart _getPreferredDeviceUid;
   late SetPreferredDeviceUidDart _setPreferredDeviceUid;
-  late IsDeviceAvailableDart _isDeviceAvailable;
+  IsDeviceAvailableDart? _isDeviceAvailable; // 可选：Win/Linux 未导出
 
   bool _qualityBound = false;
   late AnalyzeAudioQualityDart _analyzeAudioQuality;
   late IsLikelyTelephoneQualityDart _isLikelyTelephoneQuality;
 
-  late SetDebugLoggingDart _setDebugLogging;
-  late SetLogDirectoryDart _setLogDirectory;
+  // 可选：Windows/Linux 未导出这两个符号
+  SetDebugLoggingDart? _setDebugLogging;
+  SetLogDirectoryDart? _setLogDirectory;
 
   void _log(String msg) {
     AppLog.d("[NativeInputFFI] $msg");
@@ -90,12 +91,22 @@ class NativeInputFFI implements NativeInputBase {
           .lookup<NativeFunction<CheckPermissionC>>('check_permission_silent')
           .asFunction();
 
-      _setDebugLogging = _dylib
-          .lookup<NativeFunction<SetDebugLoggingC>>('set_debug_logging')
-          .asFunction();
-      _setLogDirectory = _dylib
-          .lookup<NativeFunction<SetLogDirectoryC>>('set_log_directory')
-          .asFunction();
+      // **日志符号是可选的。** Windows/Linux 的实现里压根没导出它们
+      // （两边 grep 都是 0），而这段在急切绑定的 try 里、失败会 rethrow ——
+      // 等于整个 FFI 初始化在那两个平台上直接抛异常，应用起不来。
+      // 日志开关本来就是「有则用、无则算了」的能力，不该拖垮核心绑定。
+      try {
+        _setDebugLogging = _dylib
+            .lookup<NativeFunction<SetDebugLoggingC>>('set_debug_logging')
+            .asFunction();
+        _setLogDirectory = _dylib
+            .lookup<NativeFunction<SetLogDirectoryC>>('set_log_directory')
+            .asFunction();
+      } catch (_) {
+        _setDebugLogging = null;
+        _setLogDirectory = null;
+        _log('平台库未导出日志控制符号，跳过（不影响核心功能）');
+      }
 
       // ABI 握手：旧 dylib 没有这个 symbol，或版本对不上，都要**明确报错**。
       // 不校验的话，按 Int32 去调一个还是 void 的旧 inject_text 不会崩，
@@ -231,9 +242,16 @@ class NativeInputFFI implements NativeInputBase {
       _readAudioBuffer = _dylib
           .lookup<NativeFunction<ReadAudioBufferC>>('read_audio_buffer')
           .asFunction();
-      _saveRecordingWav = _dylib
-          .lookup<NativeFunction<SaveRecordingWavC>>('save_recording_wav')
-          .asFunction();
+      // save_recording_wav 是**调试用**的录音落盘，Windows/Linux 没导出。
+      // 放在急切段里的话，缺它会让整组音频能力（权限检查、开始录音、
+      // 读 ring buffer）全部判为未绑定 —— 一个调试功能拖垮核心录音。
+      try {
+        _saveRecordingWav = _dylib
+            .lookup<NativeFunction<SaveRecordingWavC>>('save_recording_wav')
+            .asFunction();
+      } catch (_) {
+        _saveRecordingWav = null;
+      }
       _audioBound = true;
       _log("Audio FFI bindings SUCCESS");
 
@@ -345,7 +363,10 @@ class NativeInputFFI implements NativeInputBase {
     if (!_audioBound) return false;
     final pathPtr = path.toNativeUtf8();
     try {
-      return _saveRecordingWav(pathPtr) == 1;
+      // 可选能力：平台没导出就直接说「没存成」，不要谎报成功
+      final fn = _saveRecordingWav;
+      if (fn == null) return false;
+      return fn(pathPtr) == 1;
     } finally {
       calloc.free(pathPtr);
     }
@@ -383,9 +404,16 @@ class NativeInputFFI implements NativeInputBase {
       _setPreferredDeviceUid = _dylib
           .lookup<NativeFunction<SetPreferredDeviceUidC>>('set_preferred_device_uid')
           .asFunction();
-      _isDeviceAvailable = _dylib
-          .lookup<NativeFunction<IsDeviceAvailableC>>('is_device_available')
-          .asFunction();
+      // is_device_available 只用于「首选设备还在不在」这一个判断。
+      // Windows/Linux 没导出；放在急切段里会让整组设备管理（枚举、切换、
+      // 变化监听）全部判为未绑定。
+      try {
+        _isDeviceAvailable = _dylib
+            .lookup<NativeFunction<IsDeviceAvailableC>>('is_device_available')
+            .asFunction();
+      } catch (_) {
+        _isDeviceAvailable = null;
+      }
       _deviceBound = true;
       _log("Device FFI bindings SUCCESS");
     } catch (e) {
@@ -473,20 +501,27 @@ class NativeInputFFI implements NativeInputBase {
     _bindDeviceFunctions();
     if (!_deviceBound) return false;
     final ptr = deviceUID.toNativeUtf8();
-    final result = _isDeviceAvailable(ptr);
+    // 可选能力：查不了就当「还在」—— 返回 false 会让上层误判首选设备已拔掉，
+    // 从而清掉用户的设备偏好。宁可不清。
+    final fn = _isDeviceAvailable;
+    if (fn == null) {
+      calloc.free(ptr);
+      return true;
+    }
+    final result = fn(ptr);
     calloc.free(ptr);
     return result == 1;
   }
 
   @override
   void setDebugLogging(bool enabled) {
-    _setDebugLogging(enabled ? 1 : 0);
+    _setDebugLogging?.call(enabled ? 1 : 0);
   }
 
   @override
   void setLogDirectory(String dir) {
     final ptr = dir.toNativeUtf8();
-    _setLogDirectory(ptr);
+    _setLogDirectory?.call(ptr);
     calloc.free(ptr);
   }
 

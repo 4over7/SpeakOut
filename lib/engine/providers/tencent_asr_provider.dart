@@ -57,7 +57,9 @@ class TencentASRProvider implements ASRProvider {
     _secretId = config['secretId'] as String? ?? '';
     _secretKey = config['secretKey'] as String? ?? '';
     _appId = config['appId'] as String? ?? '';
-    _engineModel = config['model'] as String? ?? '16k_zh';
+    // 注册表 id（asr-streaming）只是 UI 标识，**不是** engine_model_type。
+    // 真正下发的值由 _tencentEngineModelFor(语言) 决定，见 _buildSignedUrl。
+    _engineModel = config['model'] as String? ?? '';
 
     if (_secretId.isEmpty || _secretKey.isEmpty || _appId.isEmpty) {
       throw Exception('Tencent ASR: secretId, secretKey, appId required');
@@ -227,19 +229,37 @@ class TencentASRProvider implements ASRProvider {
   }
 
   /// 构建带签名的 WebSocket URL
+  /// 语言 → 腾讯 engine_model_type。
+  /// 取值来自腾讯实时语音识别文档；auto 归到中文大模型（对中英混说效果最好）。
+  static String _tencentEngineModelFor(String inputLang) {
+    switch (inputLang) {
+      case 'en':
+        return '16k_en';
+      case 'ja':
+        return '16k_ja';
+      case 'ko':
+        return '16k_ko';
+      case 'yue':
+        return '16k_yue';
+      case 'zh':
+      case 'auto':
+      default:
+        return '16k_zh';
+    }
+  }
+
   String _buildSignedUrl() {
     final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final nonce = Random().nextInt(1000000);
     final expired = timestamp + 86400;
 
-    // 语言提示
+    // engine_model_type **只能是腾讯定义的那几个值**，不能透传注册表里的
+    // model id。原先只在「英文」和「既非 auto 也非中文」两种情况下赋值，
+    // 于是默认的 auto 和明确选中文时，engineModel 保持着注册表 id
+    // `asr-streaming` —— 直接发给腾讯是非法值，识别整个不可用。
+    // 现在无论如何都从语言映射出一个合法值，注册表 id 不参与。
     final inputLang = ConfigService().inputLanguage;
-    String engineModel = _engineModel;
-    if (inputLang == 'en') {
-      engineModel = '16k_en';
-    } else if (inputLang != 'auto' && inputLang != 'zh') {
-      engineModel = '16k_zh'; // 默认中文
-    }
+    final engineModel = _tencentEngineModelFor(inputLang);
 
     final params = {
       'secretid': _secretId,
