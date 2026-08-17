@@ -220,6 +220,9 @@
     }
   },
   "vocabImportFailed": "Import failed: {error}",
+  "openLinkFailed": "Unable to open link",
+  "vocabExportFailed": "Export failed: {error}",
+  "@vocabExportFailed": {"placeholders": {"error": {"type": "String"}}},
   "@vocabImportFailed": {
     "placeholders": {
       "error": {}

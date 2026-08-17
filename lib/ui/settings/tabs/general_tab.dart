@@ -188,6 +188,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
               ? null
               : () async {
                   await ConfigService().clearToggleInputKey();
+                  if (!mounted) return;
                   setState(() => _toggleInputKeyName = '');
                 },
         ),
@@ -275,6 +276,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
       return;
     }
 
+    if (!mounted) return;
     switch (target) {
       case 'shared':
         await config.setPttKey(result.keyCode, result.displayName,
@@ -330,6 +332,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
               onChanged: (v) async {
                 if (v != null) {
                   await ConfigService().setToggleMaxDuration(v);
+                  if (!mounted) return;
                   setState(() => _toggleMaxDuration = v);
                 }
               },
@@ -403,6 +406,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
               onChanged: (v) async {
                 if (v != null) {
                   await ConfigService().setAppLanguage(v);
+                  if (!mounted) return;
                   setState(() {});
                 }
               },

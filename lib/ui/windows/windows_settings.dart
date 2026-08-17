@@ -82,6 +82,8 @@ class _HotkeySectionState extends State<_HotkeySection> {
     return ScaffoldPage.scrollable(
       header: const PageHeader(title: Text('快捷键')),
       children: [
+        InfoBar(title: const Text('该平台暂不支持在应用内录制快捷键（Phase 2 仅完成编译验证）。'), severity: InfoBarSeverity.info),
+        const SizedBox(height: 8),
         Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,23 +91,17 @@ class _HotkeySectionState extends State<_HotkeySection> {
               ListTile(
                 title: const Text('按住说话 (PTT)'),
                 subtitle: Text(config.pttKeyName),
-                trailing: Button(
-                  child: const Text('更改'),
-                  onPressed: () {
-                    // TODO: 键盘监听弹窗
-                  },
-                ),
+                // onPressed 为 null = 按钮置灰。**不要给它一个空回调** ——
+                // 那样按钮看着可点，点了什么都不发生，用户只会以为程序坏了。
+                trailing: const Button(onPressed: null, child: Text('更改')),
               ),
               const Divider(),
               ListTile(
                 title: const Text('Toggle 输入'),
                 subtitle: Text(config.toggleInputKeyName),
-                trailing: Button(
-                  child: const Text('更改'),
-                  onPressed: () {
-                    // TODO: 键盘监听弹窗
-                  },
-                ),
+                // onPressed 为 null = 按钮置灰。**不要给它一个空回调** ——
+                // 那样按钮看着可点，点了什么都不发生，用户只会以为程序坏了。
+                trailing: const Button(onPressed: null, child: Text('更改')),
               ),
             ],
           ),
@@ -181,6 +177,7 @@ class _AISectionState extends State<_AISection> {
                 checked: config.aiCorrectionEnabled,
                 onChanged: (v) async {
                   await config.setAiCorrectionEnabled(v);
+                  if (!mounted) return;
                   setState(() {});
                 },
                 content: const Text('启用 AI 纠错'),
@@ -248,6 +245,7 @@ class _LanguageSectionState extends State<_LanguageSection> {
     return GestureDetector(
       onTap: () async {
         await config.setAppLanguage(langCode);
+        if (!mounted) return;
         setState(() {});
       },
       child: Row(

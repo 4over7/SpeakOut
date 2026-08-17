@@ -261,6 +261,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
             onChanged: (v) async {
               await ConfigService().setVerboseLogging(v);
               AppService().applyVerboseLogging();
+              if (!mounted) return;
               setState(() {});
             },
           ),
@@ -275,6 +276,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
             onChanged: (v) async {
               await ConfigService().setLogSensitiveContent(v);
               AppService().applyVerboseLogging();
+              if (!mounted) return;
               setState(() {});
             },
           ),
@@ -294,9 +296,11 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 backgroundColor: MacosColors.transparent,
                 onPressed: () async {
                   final dir = await FilePicker.platform.getDirectoryPath(dialogTitle: loc.aboutLogDir);
+                  if (!mounted) return;
                   if (dir != null) {
                     await ConfigService().setLogDirectory(dir);
                     AppService().applyVerboseLogging();
+                    if (!mounted) return;
                     setState(() {});
                   }
                 },
@@ -308,6 +312,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
                   onPressed: () async {
                     await ConfigService().setLogDirectory('');
                     AppService().applyVerboseLogging();
+                    if (!mounted) return;
                     setState(() {});
                   },
                 ),

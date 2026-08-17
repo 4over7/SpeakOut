@@ -360,8 +360,9 @@ void main() {
   });
 
   test('导入时加载失败必须抛出，不能被吞成「导入 0 条」', () async {
-    // importFromFile 的 catch 会 `return 0`。若 _ensureLoaded() 写在 try 里，
-    // 加载失败就变成「文件里没内容」—— 指向完全错误的方向。
+    // _ensureLoaded() 必须在 try 之外（历史上 try 里的 catch 会 `return 0`，
+    // 加载失败就变成「文件里没内容」—— 指向完全错误的方向）。
+    // 现在 catch 已改成 rethrow，本用例连同下面两条一起守住「失败可见」。
     final svc = CloudAccountService();
     await svc.reload();
     final path = await writeBackup([
@@ -374,6 +375,28 @@ void main() {
     addTearDown(() => CloudAccountService.debugFailInit = false);
     await expectLater(svc.importFromFile(path), throwsA(isA<StateError>()),
         reason: '加载失败被吞成 return 0 了 —— 用户会以为文件是空的');
+  });
+
+  test('文件不是账户导出格式必须抛出，不能报「导入 0 条」', () async {
+    final svc = CloudAccountService();
+    await svc.reload();
+    final dir = await Directory.systemTemp.createTemp('speakout_import');
+    addTearDown(() => dir.delete(recursive: true));
+    final f = File('${dir.path}/wrong.json');
+    await f.writeAsString('{"type":"config_backup","accounts":[]}');
+    await expectLater(svc.importFromFile(f.path), throwsA(isA<FormatException>()),
+        reason: '选错文件被报成「文件里没账户」，用户会去改文件而不是换文件');
+  });
+
+  test('文件不是合法 JSON 必须抛出，不能报「导入 0 条」', () async {
+    final svc = CloudAccountService();
+    await svc.reload();
+    final dir = await Directory.systemTemp.createTemp('speakout_import');
+    addTearDown(() => dir.delete(recursive: true));
+    final f = File('${dir.path}/broken.json');
+    await f.writeAsString('{ this is not json');
+    await expectLater(svc.importFromFile(f.path), throwsA(isA<Object>()),
+        reason: '文件损坏被吞成 0 条，用户完全不知道发生了什么');
   });
 
   test('未初始化时导入，不得给磁盘上已有的 provider 重复建账户', () async {

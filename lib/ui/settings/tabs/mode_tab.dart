@@ -87,6 +87,7 @@ class ModeTabState extends State<ModeTab> {
   Future<void> saveChanges() async {
     await _flushLlmControllers();
     await ConfigService().savePresetConfig(ConfigService().llmPresetId);
+    if (!mounted) return;
     setState(() => _llmConfigDirty = false);
   }
 
@@ -232,6 +233,7 @@ class ModeTabState extends State<ModeTab> {
     if (_isCapturingToggleInputKey) {
       await config.setToggleInputKey(keyCode, displayName,
           modifiers: requiredMods);
+      if (!mounted) return;
       setState(() {
         _toggleInputKeyName = displayName;
         _isCapturingToggleInputKey = false;
@@ -240,6 +242,7 @@ class ModeTabState extends State<ModeTab> {
       // PTT key
       await config.setPttKey(keyCode, displayName, modifiers: requiredMods);
       AppService().pttKeyCode = keyCode;
+      if (!mounted) return;
       setState(() {
         _currentKeyCode = keyCode;
         _currentKeyName = displayName;
@@ -301,6 +304,7 @@ class ModeTabState extends State<ModeTab> {
           onTap: () => _startKeyCapture('toggleInput'),
           onClear: _toggleInputKeyName.isEmpty ? null : () async {
             await ConfigService().clearToggleInputKey();
+            if (!mounted) return;
             setState(() => _toggleInputKeyName = '');
           },
         )),
@@ -315,7 +319,8 @@ class ModeTabState extends State<ModeTab> {
             MacosPopupMenuItem(value: 600, child: Text(loc.toggleMaxMin(10), style: const TextStyle(fontSize: 12))),
           ],
           onChanged: (v) async {
-            if (v != null) { await ConfigService().setToggleMaxDuration(v); setState(() => _toggleMaxDuration = v); }
+            if (v != null) { await ConfigService().setToggleMaxDuration(v); if (!mounted) return;
+                                                                            setState(() => _toggleMaxDuration = v); }
           },
         )),
       ],
@@ -328,6 +333,7 @@ class ModeTabState extends State<ModeTab> {
       _hasLocalCopy[m.id] = await _app.hasLocalCopy(m.id);
     }
     _downloadedStatus[AppService.punctuationModelId] = await _app.isPunctuationModelDownloaded();
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -399,6 +405,7 @@ class ModeTabState extends State<ModeTab> {
     }
 
     final previousModelId = _activeModelId;
+    if (!mounted) return;
     setState(() => _activatingId = model.id);
     await _app.setActiveModel(model.id);
     final path = await _app.getActiveModelPath();
@@ -411,6 +418,7 @@ class ModeTabState extends State<ModeTab> {
           await _app.setActiveModel(previousModelId);
           await ConfigService().setActiveModelId(previousModelId);
         }
+        if (!mounted) return;
         setState(() { _activatingId = null; });
         if (mounted) {
           final loc = AppLocalizations.of(context)!;
@@ -453,6 +461,7 @@ class ModeTabState extends State<ModeTab> {
       }
     }
     await ConfigService().setActiveModelId(model.id);
+    if (!mounted) return;
     setState(() { _activatingId = null; _activeModelId = model.id; });
   }
 
@@ -471,6 +480,7 @@ class ModeTabState extends State<ModeTab> {
           .invokeMethod<String>('pickFile');
       if (result == null || result.isEmpty) return;
 
+      if (!mounted) return;
       setState(() {
         _downloadingIds.add(model.id);
         _downloadProgressMap[model.id] = null;
@@ -545,6 +555,21 @@ class ModeTabState extends State<ModeTab> {
 
   // --- Work Mode switching ---
 
+  /// 云端账户 / 模型下拉切换后重建 ASR。
+  /// 选择已经落盘了，initASR 抛出来就必须让用户看见 ——
+  /// 否则下拉框显示新账户、引擎还连着旧的，跟 v1.10.0 那批「显示 A 跑 B」同源。
+  Future<void> _reinitCloudAsr() async {
+    try {
+      await _app.initASR(modelPath: '', type: 'aliyun');
+    } catch (e) {
+      if (!mounted) return;
+      if (context.mounted) {
+        showSettingsError(context, AppLocalizations.of(context)!.modelActivateFailed('$e'));
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
   Future<void> _switchWorkMode(String? mode) async {
     if (mode == null) return;
     final oldMode = ConfigService().workMode;
@@ -560,22 +585,37 @@ class ModeTabState extends State<ModeTab> {
     }
 
     // Re-init ASR when switching between sherpa <-> aliyun
-    if (mode == 'cloud' && oldMode != 'cloud') {
-      await _app.initASR(modelPath: '', type: 'aliyun');
-    } else if (mode != 'cloud' && oldMode == 'cloud') {
-      final path = await _app.getActiveModelPath();
-      final model = _app.getModelById(_activeModelId ?? '');
-      if (path != null && model != null) {
-        await _app.initASR(modelPath: path, type: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
-        // Model has no built-in punctuation -> auto-load punctuation model
-        if (!model.hasPunctuation && !_app.isPunctuationEnabled) {
-          final punctPath = await _app.getPunctuationModelPath();
-          if (punctPath != null) {
-            await _app.initPunctuation(punctPath, activeModelName: model.name);
+    // 必须 try/catch：workMode 已经落盘了，initASR 再抛出来的话异常直接跑进
+    // 全局 zone —— 下面的 setState 不执行，UI 停在旧模式，而配置里已经是新模式。
+    // 「显示 A 跑 B」正是 v1.10.0 修过一轮的那类问题，不要再放回来。
+    try {
+      if (mode == 'cloud' && oldMode != 'cloud') {
+        await _app.initASR(modelPath: '', type: 'aliyun');
+      } else if (mode != 'cloud' && oldMode == 'cloud') {
+        final path = await _app.getActiveModelPath();
+        final model = _app.getModelById(_activeModelId ?? '');
+        if (path != null && model != null) {
+          await _app.initASR(modelPath: path, type: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
+          // Model has no built-in punctuation -> auto-load punctuation model
+          if (!model.hasPunctuation && !_app.isPunctuationEnabled) {
+            final punctPath = await _app.getPunctuationModelPath();
+            if (punctPath != null) {
+              await _app.initPunctuation(punctPath, activeModelName: model.name);
+            }
           }
         }
       }
+    } catch (e) {
+      // 回滚到旧模式，别让配置停在一个引擎起不来的状态
+      await ConfigService().setWorkMode(oldMode);
+      if (!mounted) return;
+      setState(() {});
+      if (context.mounted) {
+        showSettingsError(context, AppLocalizations.of(context)!.modelActivateFailed('$e'));
+      }
+      return;
     }
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -1131,6 +1171,7 @@ class ModeTabState extends State<ModeTab> {
               value: enabled,
               onChanged: (v) async {
                 await ConfigService().setAiCorrectionEnabled(v);
+                if (!mounted) return;
                 setState(() {});
               },
             ),
@@ -1221,7 +1262,8 @@ class ModeTabState extends State<ModeTab> {
       title: loc.inputLanguage,
       value: value,
       items: items,
-      onChanged: (v) async { await ConfigService().setInputLanguage(v!); setState(() {}); },
+      onChanged: (v) async { await ConfigService().setInputLanguage(v!); if (!mounted) return;
+                                                                         setState(() {}); },
     );
   }
 
@@ -1244,7 +1286,8 @@ class ModeTabState extends State<ModeTab> {
       title: loc.outputLanguage,
       value: value,
       items: items,
-      onChanged: (v) async { await ConfigService().setOutputLanguage(v!); setState(() {}); },
+      onChanged: (v) async { await ConfigService().setOutputLanguage(v!); if (!mounted) return;
+                                                                          setState(() {}); },
     );
   }
 
@@ -1389,8 +1432,7 @@ class ModeTabState extends State<ModeTab> {
             final prov = CloudProviders.getById(acc.providerId);
             final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
             await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
-            await _app.initASR(modelPath: '', type: 'aliyun');
-            setState(() {});
+            await _reinitCloudAsr();
           },
         )),
         if (asrModels.length > 1) ...[
@@ -1410,8 +1452,7 @@ class ModeTabState extends State<ModeTab> {
             onChanged: (v) async {
               if (v == null) return;
               await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
-              await _app.initASR(modelPath: '', type: 'aliyun');
-              setState(() {});
+              await _reinitCloudAsr();
             },
           )),
         ],
@@ -1446,6 +1487,7 @@ class ModeTabState extends State<ModeTab> {
               value: ConfigService().aiCorrectionEnabled,
               onChanged: (v) async {
                 await ConfigService().setAiCorrectionEnabled(v);
+                if (!mounted) return;
                 setState(() {});
               },
             ),
@@ -1463,6 +1505,7 @@ class ModeTabState extends State<ModeTab> {
             onChanged: (v) async {
               if (v != null) {
                 await ConfigService().setLlmProviderType(v);
+                if (!mounted) return;
                 setState(() {});
               }
             },
@@ -1483,7 +1526,8 @@ class ModeTabState extends State<ModeTab> {
               const SizedBox(width: 8),
               MacosSwitch(
                 value: ConfigService().typewriterEnabled,
-                onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); setState(() {}); },
+                onChanged: (v) async { await ConfigService().setTypewriterEnabled(v); if (!mounted) return;
+                                                                                      setState(() {}); },
               ),
             ],
           )),
@@ -1497,6 +1541,7 @@ class ModeTabState extends State<ModeTab> {
                 onTap: () async {
                   await ConfigService().setAiCorrectionPrompt(AppConstants.kDefaultAiCorrectionPrompt);
                   _aiPromptController.text = AppConstants.kDefaultAiCorrectionPrompt;
+                  if (!mounted) return;
                   setState(() {});
                 },
                 child: Text(loc.resetDefault, style: TextStyle(fontSize: 11, color: AppTheme.getAccent(context))),
@@ -1730,11 +1775,13 @@ class ModeTabState extends State<ModeTab> {
                 if (account != null) {
                   await ConfigService().setLlmPresetId(account.providerId);
                 }
+                if (!mounted) return;
                 if (newModelId == _kCustomModelSentinel) {
                   // 进入 custom 模式；先保留当前 model，让用户编辑
                   setState(() => _llmModelCustom = true);
                 } else if (newModelId.isNotEmpty) {
                   await ConfigService().setLlmModel(newModelId);
+                  if (!mounted) return;
                   setState(() => _llmModelCustom = false);
                 }
               },
@@ -1819,6 +1866,7 @@ class ModeTabState extends State<ModeTab> {
                   final p = CloudProviders.getById(account.providerId);
                   if (p?.llmDefaultModel != null) await ConfigService().setLlmModel(p!.llmDefaultModel!);
                 }
+                if (!mounted) return;
                 setState(() => _llmModelCustom = false);
               },
             ),
@@ -1971,6 +2019,7 @@ class ModeTabState extends State<ModeTab> {
                       _llmCustomModelController.clear();
                       await ConfigService().setLlmModel(v);
                       _llmModelController.text = v;
+                      if (!mounted) return;
                       setState(() => _llmModelCustom = false);
                     }
                   },

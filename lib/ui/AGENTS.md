@@ -102,6 +102,39 @@ class AiPlusPage extends StatelessWidget {
 ### 8. 跨平台 fallback
 `linux/` 和 `windows/` 目录提供 macos_ui 不可用平台的实现。**新增 macOS 功能时考虑**对应平台是否需要 fallback（依据：核心录音/输入路径必须三平台都跑通；UI 装饰可只 macOS）。
 
+## 异步纪律（这层最容易踩的一类）
+
+UI 层几乎每个 handler 都是 `async`，而**页面随时可能在 await 期间消失** ——
+sidebar 一换页当前 page 就 dispose，引导页的模型下载更是要跑好几分钟。
+三条硬规矩：
+
+### 1. `await` 之后的 `setState` 必须先判 `mounted`
+
+```dart
+await ConfigService().setXxx(v);
+if (!mounted) return;      // ← 少了这句 → setState() called after dispose()
+setState(() {});
+```
+
+一次清过 **76 处**。`test/ui/setstate_mounted_guard_test.dart` 会挡住回潮；
+它是 AST 判定，`AppLog.d('mounted')` 这种字符串骗不过去。
+用 `context` 的地方另外判 `context.mounted`（两者不是一回事）。
+
+### 2. 已经落盘的操作，后续步骤失败必须让用户看见并回滚
+
+典型形态：`await config.setXxx()` 成功 → `await engine.reinit()` 抛异常。
+若不接住，异常跑进全局 zone，UI 停在旧值而配置已是新值 ——
+**「显示 A 跑 B」**，v1.10.0 为这类问题修过一整批。
+接住之后要么回滚配置，要么把错误显示出来，两者都不做等于没修。
+
+### 3. 按钮不许有空回调
+
+`onPressed: () {}` / 空函数体的 helper 看着可点、点了没反应，用户只会以为程序坏了。
+暂不支持就传 `onPressed: null`（置灰）并说明原因。
+真实事件：模型下载链接按钮的 `_launchUrl` 是个空函数；
+Windows/Linux 的快捷键「更改」按钮挂着 `// TODO`。
+另外 `launchUrl` **失败时返回 false 而不抛异常**，只 await 不看返回值同样是静默失败。
+
 ## 不要做什么
 
 - ❌ **不要 `import 'lib/engine/...'`** — 走 Service 层：engine 能力（ASR/模型/权限/热键流等）经 `AppService()` 的 facade 调用；需要 `ModelInfo`/`ModelArch` 等数据类型时 `import '../services/engine_types.dart'`（已落实，UI 层零 engine import）
@@ -111,6 +144,8 @@ class AiPlusPage extends StatelessWidget {
 - ❌ **不要在 sidebar page 里写完整内容** — 用 viewFilter wrap mode_tab/superpower_tab
 - ❌ **不要硬编码字符串给用户看** — 走 `loc.xxx`
 - ❌ **不要 hardcode 圆角/间距** — 用 4px 网格基准（8/12/16/24/32/48）
+- ❌ **不要给按钮空回调** — 见上「异步纪律 3」
+- ❌ **不要在 await 后裸调 setState** — 见上「异步纪律 1」
 
 ## 全局规则（来自全局 CLAUDE.md Flutter UI 设计原则）
 
@@ -123,4 +158,18 @@ class AiPlusPage extends StatelessWidget {
 
 ## 测试
 
-UI 层测试少（macos_ui 风格难自动化）。手工冒烟：[`docs/release_checklist.md`](../../docs/release_checklist.md)。
+渲染层难自动化，`test/ui/` 里两类混着放 —— **看清楚哪条是哪类**：
+
+| 测试 | 类型 | 守什么 |
+|---|---|---|
+| `setstate_mounted_guard_test.dart` | 纪律（AST 扫全 `lib/`） | await 后的 setState 必须判 mounted |
+| `service_error_handling_test.dart` | 纪律（AST 扫全 `lib/`） | Service 抛出的错误 UI 必须接住 |
+| `notification_queue_test.dart` | 行为 | 通知队列：error 不被后来的 info 顶掉 |
+| `notification_mounted_test.dart` | 行为 | 横幅真的挂在 widget 树上 |
+| `scaffold_messenger_unavailable_test.dart` | 行为 | MacosApp 下没有 ScaffoldMessenger 祖先，别去 `of(context)` |
+| `diagnostics_bundle_test.dart` | 行为 | 报障包含 `speakout_errors.log` |
+
+纪律类断言只能证明「代码还长这样」，证明不了「跑起来是对的」——
+边界与教训见 [`docs/anti-patterns/dont-let-source-text-assertions-prove-behavior.md`](../../docs/anti-patterns/dont-let-source-text-assertions-prove-behavior.md)。
+
+其余靠手工冒烟：[`docs/release_checklist.md`](../../docs/release_checklist.md)。

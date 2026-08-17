@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../config/app_log.dart';
+import '../../services/notification_service.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import '../../services/config_service.dart';
@@ -458,7 +461,7 @@ Widget buildActionBtn(BuildContext context, {
           const SizedBox(width: 4),
           MacosIconButton(
             icon: const MacosIcon(CupertinoIcons.link, size: 16),
-            onPressed: () => _launchUrl(modelUrl),
+            onPressed: () => _launchUrl(modelUrl, loc.openLinkFailed),
           ),
         ],
       ],
@@ -507,9 +510,22 @@ Widget buildActionBtn(BuildContext context, {
   );
 }
 
-void _launchUrl(String url) {
-  // Import url_launcher at call site to avoid circular deps
-  // This is a workaround — callers can import url_launcher directly
+/// 打开外部链接。**原先是个空函数**（注释写着「workaround，调用方自己 import」）
+/// —— 于是模型下载链接按钮点了什么都不发生，而按钮看起来完全正常。
+/// url_launcher 本来就是本项目依赖，没有循环依赖问题。
+Future<void> _launchUrl(String url, String failedMessage) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) {
+    AppLog.e('模型链接无法解析: $url');
+    return;
+  }
+  // launchUrl 失败**通常不抛异常而是返回 false** —— 只 await 不看返回值
+  // 等于静默失败，用户看到的还是「点了没反应」。
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok) {
+    AppLog.e('打开模型链接失败: $url');
+    NotificationService().notifyError(failedMessage);
+  }
 }
 
 /// Shared API item builder

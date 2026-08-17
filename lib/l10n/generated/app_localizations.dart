@@ -1184,6 +1184,18 @@ abstract class AppLocalizations {
   /// **'Import failed: {error}'**
   String vocabImportFailed(Object error);
 
+  /// No description provided for @openLinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open link'**
+  String get openLinkFailed;
+
+  /// No description provided for @vocabExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String vocabExportFailed(String error);
+
   /// No description provided for @vocabExportTsv.
   ///
   /// In en, this message translates to:

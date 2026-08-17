@@ -158,6 +158,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       }
       return;
     }
+    if (!mounted) return;
     await _openAndPollPermission('Privacy_Microphone',
       () => _microphoneGranted ? 'granted' : '',
       () => setState(() => _microphoneAttempted = true));
@@ -242,6 +243,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       // Step 2: Download ASR model
       final asrStart = needsPunctuation ? 0.25 : 0.0;
       final asrRange = needsPunctuation ? 0.75 : 1.0;
+      if (!mounted) return;
       setState(() {
         _downloadStatus = _l10n.onboardingDownloadASR;
         _downloadProgress = asrStart;
@@ -264,6 +266,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       );
 
       // Step 3: Activate model
+      if (!mounted) return;
       setState(() => _downloadStatus = _l10n.onboardingActivating);
       await _app.setActiveModel(selectedModel.id);
       final path = await _app.getActiveModelPath();
@@ -280,6 +283,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
         }
       }
 
+      if (!mounted) return;
       setState(() {
         _isDownloading = false;
         _downloadComplete = true;
@@ -304,6 +308,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
+      if (!mounted) return;
       setState(() {
         _isDownloading = true;
         _downloadProgress = 0;
@@ -331,6 +336,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       );
 
       // Activate model
+      if (!mounted) return;
       setState(() => _downloadStatus = _l10n.onboardingActivating);
       await _app.setActiveModel(selectedModel.id);
       final path = await _app.getActiveModelPath();
@@ -339,6 +345,7 @@ class _OnboardingPageState extends State<OnboardingPage> with WidgetsBindingObse
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
+      if (!mounted) return;
       setState(() {
         _isDownloading = false;
         _downloadComplete = true;

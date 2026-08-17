@@ -54,29 +54,27 @@ class _HotkeyTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Text('该平台暂不支持在应用内录制快捷键（Phase 2 仅完成编译验证）。', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        ),
         Card(
           child: Column(
             children: [
               ListTile(
                 title: const Text('按住说话 (PTT)'),
                 subtitle: Text(config.pttKeyName),
-                trailing: FilledButton.tonal(
-                  child: const Text('更改'),
-                  onPressed: () {
-                    // TODO: 键盘监听弹窗
-                  },
-                ),
+                // onPressed 为 null = 按钮置灰。**不要给它一个空回调** ——
+                // 那样按钮看着可点，点了什么都不发生，用户只会以为程序坏了。
+                trailing: const FilledButton.tonal(onPressed: null, child: Text('更改')),
               ),
               const Divider(height: 1),
               ListTile(
                 title: const Text('Toggle 输入'),
                 subtitle: Text(config.toggleInputKeyName),
-                trailing: FilledButton.tonal(
-                  child: const Text('更改'),
-                  onPressed: () {
-                    // TODO: 键盘监听弹窗
-                  },
-                ),
+                // onPressed 为 null = 按钮置灰。**不要给它一个空回调** ——
+                // 那样按钮看着可点，点了什么都不发生，用户只会以为程序坏了。
+                trailing: const FilledButton.tonal(onPressed: null, child: Text('更改')),
               ),
             ],
           ),
@@ -141,6 +139,7 @@ class _AITabState extends State<_AITab> {
                   value: widget.config.aiCorrectionEnabled,
                   onChanged: (v) async {
                     await widget.config.setAiCorrectionEnabled(v);
+                    if (!mounted) return;
                     setState(() {});
                   },
                 ),
@@ -192,6 +191,7 @@ class _LanguageTabState extends State<_LanguageTab> {
             onChanged: (String? v) async {
               if (v == null) return;
               await widget.config.setAppLanguage(v);
+              if (!mounted) return;
               setState(() {});
             },
             child: Column(

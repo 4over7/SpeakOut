@@ -303,9 +303,11 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
     try {
       final String? outputDir = await const MethodChannel('com.SpeakOut/overlay')
           .invokeMethod('pickDirectory');
+      if (!mounted) return;
       if (outputDir != null) {
         await ConfigService().setDiaryDirectory(outputDir);
         await _validateDiaryDirectory();
+        if (!mounted) return;
         setState(() {});
       }
     } on PlatformException catch (e) {
@@ -344,6 +346,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       final testFile = File('${dir.path}/.speakout_write_test');
       await testFile.writeAsString('test');
       await testFile.delete();
+      if (!mounted) return;
       setState(() => _diaryDirError = '');
     } catch (e) {
       // 写不进去时把「bookmark 实际授权的是哪个目录」一并记下来。
@@ -464,6 +467,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 modifiers: config.diaryModifiers);
             await _validateDiaryDirectory();
           }
+          if (!mounted) return;
           setState(() {});
         },
       ),
@@ -535,6 +539,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               onTap: () => _startKeyCapture('diary'),
               onClear: _diaryKeyName.isEmpty ? null : () async {
                 await ConfigService().clearDiaryKey();
+                if (!mounted) return;
                 setState(() => _diaryKeyName = '');
               },
             ),
@@ -548,6 +553,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               onTap: () => _startKeyCapture('toggleDiary'),
               onClear: _toggleDiaryKeyName.isEmpty ? null : () async {
                 await ConfigService().clearToggleDiaryKey();
+                if (!mounted) return;
                 setState(() => _toggleDiaryKeyName = '');
               },
             ),
@@ -608,6 +614,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 config.organizeKeyName, config.clearOrganizeKey,
                 modifiers: config.organizeModifiers);
           }
+          if (!mounted) return;
           setState(() {});
         },
       ),
@@ -631,6 +638,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               onTap: () => _startKeyCapture('organize'),
               onClear: config.organizeKeyName.isEmpty ? null : () async {
                 await config.clearOrganizeKey();
+                if (!mounted) return;
                 setState(() {});
               },
             ),
@@ -672,6 +680,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                         AppConstants.kDefaultOrganizePrompt);
                     _organizePromptController.text =
                         AppConstants.kDefaultOrganizePrompt;
+                    if (!mounted) return;
                     setState(() {});
                   },
                   child: Text(
@@ -749,6 +758,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
                 config.translateKeyName, config.clearTranslateKey,
                 modifiers: config.translateModifiers);
           }
+          if (!mounted) return;
           setState(() {});
         },
       ),
@@ -772,6 +782,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               onTap: () => _startKeyCapture('translate'),
               onClear: config.translateKeyName.isEmpty ? null : () async {
                 await config.clearTranslateKey();
+                if (!mounted) return;
                 setState(() {});
               },
             ),
@@ -798,6 +809,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
               onChanged: (v) async {
                 if (v != null) {
                   await config.setTranslateTargetLanguage(v);
+                  if (!mounted) return;
                   setState(() {});
                 }
               },

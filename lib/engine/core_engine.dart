@@ -418,7 +418,30 @@ class CoreEngine {
   }
 
   // Switch Provider Logic
-  Future<void> initASR(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model', bool hasPunctuation = false}) async {
+  /// 串行化 initASR。**不要绕过它直接调 `_initASRUnsafe`。**
+  ///
+  /// 两次切换重叠时（用户连点模式/账户下拉，或启动流程与引导页撞上）原先会：
+  /// 第一次已经把 `_asrProvider` 置 null 才去 await `initialize()`，
+  /// 于是第二次看不到「有旧 provider」，跳过 dispose 直接并发初始化 ——
+  /// 后完成的那个覆盖 `_asrProvider` 与 `_asrSubscription`，
+  /// 先完成的那个**永远不会被 dispose**（云端漏一条 WebSocket，
+  /// 离线漏一个 native recognizer），而它的 textStream 还在往
+  /// `_partialTextController` 里推 —— 两路识别结果交替出现在同一个浮窗上。
+  Future<void>? _asrInitChain;
+
+  Future<void> initASR(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model', bool hasPunctuation = false}) {
+    final prev = _asrInitChain;
+    final task = () async {
+      // 前一次失败不影响这一次：它的错误由它自己的调用方接。
+      if (prev != null) { try { await prev; } catch (_) {} }
+      return _initASRUnsafe(modelPath,
+          modelType: modelType, modelName: modelName, hasPunctuation: hasPunctuation);
+    }();
+    _asrInitChain = task;
+    return task;
+  }
+
+  Future<void> _initASRUnsafe(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model', bool hasPunctuation = false}) async {
     // Determine provider type
     final type = ConfigService().asrEngineType;
     ASRProvider provider;
@@ -475,6 +498,10 @@ class CoreEngine {
           _log("Cloud ASR Init Failed: $e");
           _statusController.add(EngineStatus.error("❌ ${cloudProvider.name} 连接失败: $e"));
           _asrProvider = null;
+          // 必须 rethrow：只发 status 的话调用方看到的是「成功返回」，
+          // 设置页那段「Init failed -> rollback」永远不执行 ——
+          // 配置停在一个加载不起来的模型上，按快捷键毫无反应。
+          rethrow;
         }
         return;
       }
@@ -548,6 +575,7 @@ class CoreEngine {
       }
       _log("ASR Init Failed: $e");
       _asrProvider = null;
+      rethrow; // 同上：吞掉会让调用方的回滚/报错分支变成死代码
     }
   }
 

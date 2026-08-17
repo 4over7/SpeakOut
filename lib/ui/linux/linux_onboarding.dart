@@ -69,6 +69,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
 
       final asrStart = needsPunctuation ? 0.25 : 0.0;
       final asrRange = needsPunctuation ? 0.75 : 1.0;
+      if (!mounted) return;
       setState(() {
         _downloadStatus = _l10n.onboardingDownloadASR;
         _downloadProgress = asrStart;
@@ -90,6 +91,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
         },
       );
 
+      if (!mounted) return;
       setState(() => _downloadStatus = _l10n.onboardingActivating);
       await _app.setActiveModel(selectedModel.id);
       final path = await _app.getActiveModelPath();
@@ -105,6 +107,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
         }
       }
 
+      if (!mounted) return;
       setState(() {
         _isDownloading = false;
         _downloadComplete = true;
@@ -133,6 +136,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
       final selectedModel = _app.getModelById(_selectedModelId);
       if (selectedModel == null) throw Exception("Model not found: $_selectedModelId");
 
+      if (!mounted) return;
       setState(() {
         _isDownloading = true;
         _downloadProgress = 0;
@@ -159,6 +163,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
         },
       );
 
+      if (!mounted) return;
       setState(() => _downloadStatus = _l10n.onboardingActivating);
       await _app.setActiveModel(selectedModel.id);
       final path = await _app.getActiveModelPath();
@@ -167,6 +172,7 @@ class _LinuxOnboardingPageState extends State<LinuxOnboardingPage> {
       }
       await ConfigService().setActiveModelId(selectedModel.id);
 
+      if (!mounted) return;
       setState(() {
         _isDownloading = false;
         _downloadComplete = true;

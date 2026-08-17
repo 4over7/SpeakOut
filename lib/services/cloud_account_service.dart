@@ -680,8 +680,9 @@ class CloudAccountService {
       final content = await File(filePath).readAsString();
       final map = jsonDecode(content) as Map<String, dynamic>;
       if (map['type'] != 'cloud_accounts') {
-        AppLog.d('CloudAccountService: invalid file type');
-        return 0;
+        // 不能 return 0：UI 会显示「导入完成，0 条」，
+        // 用户以为是文件空的，其实是选错了文件。
+        throw const FormatException('不是有效的云账户导出文件');
       }
       final list = (map['accounts'] as List?) ?? [];
       int imported = 0;
@@ -758,8 +759,11 @@ class CloudAccountService {
       AppLog.d('CloudAccountService: imported $imported accounts from $filePath');
       return imported;
     } catch (e) {
+      // 同上：读文件失败 / JSON 坏掉 / 结构不对，都必须让调用方看见。
+      // 吞成 return 0 会把「文件读不了」谎报成「文件里没账户」。
+      // 单项坏数据不会走到这里 —— 上面的 per-item catch 已经跳过并计数。
       AppLog.d('CloudAccountService: import failed: $e');
-      return 0;
+      rethrow;
     }
   }
 

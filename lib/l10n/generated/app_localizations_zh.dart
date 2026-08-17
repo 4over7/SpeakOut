@@ -575,6 +575,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get openLinkFailed => '无法打开链接';
+
+  @override
+  String vocabExportFailed(String error) {
+    return '导出失败：$error';
+  }
+
+  @override
   String get vocabExportTsv => '导出文件';
 
   @override

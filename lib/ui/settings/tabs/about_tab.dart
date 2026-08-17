@@ -220,6 +220,7 @@ class _AboutTabState extends State<AboutTab> {
                       UpdateService().resetCheck();
                       await UpdateService().checkForUpdate();
                       final latest = UpdateService().latestVersion;
+                      if (!mounted) return;
                       if (latest != null && UpdateService.isNewer(latest, info.version)) {
                         setState(() => _updateResult = loc.updateAvailable(latest));
                       } else {
@@ -228,6 +229,7 @@ class _AboutTabState extends State<AboutTab> {
                     } catch (_) {
                       setState(() => _updateResult = loc.updateUpToDate);
                     }
+                    if (!mounted) return;
                     setState(() => _isCheckingUpdate = false);
                   },
                   child: Tooltip(
@@ -371,6 +373,7 @@ class _AboutTabState extends State<AboutTab> {
                     onChanged: (v) async {
                       await ConfigService().setVerboseLogging(v);
                       AppService().applyVerboseLogging();
+                      if (!mounted) return;
                       setState(() {});
                     },
                   ),
@@ -390,9 +393,11 @@ class _AboutTabState extends State<AboutTab> {
                         backgroundColor: MacosColors.transparent,
                         onPressed: () async {
                           final dir = await FilePicker.platform.getDirectoryPath(dialogTitle: loc.aboutLogDir);
+                          if (!mounted) return;
                           if (dir != null) {
                             await ConfigService().setLogDirectory(dir);
                             AppService().applyVerboseLogging();
+                            if (!mounted) return;
                             setState(() {});
                           }
                         },
@@ -404,6 +409,7 @@ class _AboutTabState extends State<AboutTab> {
                           onPressed: () async {
                             await ConfigService().setLogDirectory('');
                             AppService().applyVerboseLogging();
+                            if (!mounted) return;
                             setState(() {});
                           },
                         ),

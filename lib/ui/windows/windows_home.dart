@@ -120,20 +120,28 @@ class _WindowsHomePageState extends State<WindowsHomePage> with WidgetsBindingOb
 
   void _startWaveAnimation() {
     _waveTimer?.cancel();
-    _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
-      if (mounted && _isRecording) {
-        setState(() {
-          for (int i = 0; i < _waveHeights.length; i++) {
-            _waveHeights[i] = 0.17 + _random.nextDouble() * 0.83;
-          }
-        });
+    _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (t) {
+      // 录音一停就自杀。原先只在 dispose() 里 cancel —— 松开快捷键后这个
+      // 80ms 定时器还在空转到页面销毁（macOS 上每次还白做一趟 FFI getAudioLevel）。
+      // 波形只在 _isRecording 时构建，下次录音会由 build 重新拉起。
+      if (!mounted || !_isRecording) {
+        t.cancel();
+        _waveTimer = null;
+        return;
       }
+      setState(() {
+        for (int i = 0; i < _waveHeights.length; i++) {
+          _waveHeights[i] = 0.17 + _random.nextDouble() * 0.83;
+        }
+      });
     });
   }
 
   Widget _buildWaveform() {
     if (_waveTimer == null || !_waveTimer!.isActive) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _startWaveAnimation());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startWaveAnimation();
+      });
     }
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,

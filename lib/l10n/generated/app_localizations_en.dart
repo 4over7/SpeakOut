@@ -598,6 +598,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get openLinkFailed => 'Unable to open link';
+
+  @override
+  String vocabExportFailed(String error) {
+    return 'Export failed: $error';
+  }
+
+  @override
   String get vocabExportTsv => 'Export File';
 
   @override

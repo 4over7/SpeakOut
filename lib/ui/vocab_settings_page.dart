@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 import '../services/config_service.dart';
 import '../services/vocab_service.dart';
+import 'package:speakout/config/app_log.dart';
+import '../services/notification_service.dart';
 import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'theme.dart';
 import 'widgets/settings_widgets.dart';
@@ -48,6 +50,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
       case 'finance': await config.setVocabFinanceEnabled(value);
       case 'education': await config.setVocabEducationEnabled(value);
     }
+    if (!mounted) return;
     setState(() => _packEnabled[id] = value);
   }
 
@@ -92,9 +95,12 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
     if (confirmed != true) return;
     final wrong = wrongCtrl.text.trim();
     final correct = correctCtrl.text.trim();
-    if (correct.isEmpty) return;
+    // 两边都得非空：**错误形式为空的词条永远匹配不上任何输入**，
+    // 加进去只是让用户以为配好了，实际一次都不会生效。
+    if (wrong.isEmpty || correct.isEmpty) return;
 
     await VocabService().addUserEntry(VocabEntry(wrong: wrong, correct: correct));
+    if (!mounted) return;
     setState(() {
       _userEntries = List.from(VocabService().userEntries);
     });
@@ -102,9 +108,42 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
 
   Future<void> _deleteEntry(int index) async {
     await VocabService().deleteUserEntry(index);
+    if (!mounted) return;
     setState(() {
       _userEntries = List.from(VocabService().userEntries);
     });
+  }
+
+  /// 按 RFC4180 切一行 CSV：引号内的逗号属于字段本身。
+  /// 不处理跨行的引号字段 —— 词条里放换行没有意义，且上面已按行切过。
+  static List<String> _splitCsvLine(String line) {
+    final fields = <String>[];
+    final buf = StringBuffer();
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (inQuotes) {
+        if (c == '"') {
+          if (i + 1 < line.length && line[i + 1] == '"') {
+            buf.write('"');
+            i++; // "" 是转义后的一个引号
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          buf.write(c);
+        }
+      } else if (c == '"') {
+        inQuotes = true;
+      } else if (c == ',') {
+        fields.add(buf.toString());
+        buf.clear();
+      } else {
+        buf.write(c);
+      }
+    }
+    fields.add(buf.toString());
+    return fields;
   }
 
   Future<void> _importTsv() async {
@@ -123,15 +162,16 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
       int count = 0;
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
-        final parts = line.contains('\t') ? line.split('\t') : line.split(',');
+        final parts = line.contains('\t') ? line.split('\t') : _splitCsvLine(line);
         if (parts.length < 2) continue;
         final wrong = parts[0].trim();
         final correct = parts[1].trim();
-        if (correct.isEmpty) continue;
+        if (wrong.isEmpty || correct.isEmpty) continue; // 同上：空错误形式是死条目
         await VocabService().addUserEntry(VocabEntry(wrong: wrong, correct: correct));
         count++;
       }
 
+      if (!mounted) return;
       setState(() {
         _userEntries = List.from(VocabService().userEntries);
       });
@@ -173,6 +213,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
   }
 
   Future<void> _exportTsv() async {
+    final loc = AppLocalizations.of(context)!;
     try {
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'Export Vocab Entries',
@@ -187,7 +228,10 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
         buffer.writeln('${entry.wrong}\t${entry.correct}');
       }
       await File(result).writeAsString(buffer.toString());
-    } catch (_) {}
+    } catch (e) {
+      AppLog.e('词库导出失败: $e');
+      NotificationService().notifyError(loc.vocabExportFailed('$e'));
+    }
   }
 
 
@@ -230,6 +274,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                   value: _vocabEnabled,
                   onChanged: (v) async {
                     await ConfigService().setVocabEnabled(v);
+                    if (!mounted) return;
                     setState(() => _vocabEnabled = v);
                   },
                 ),
@@ -280,6 +325,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
                         value: _userEnabled,
                         onChanged: (v) async {
                           await ConfigService().setVocabUserEnabled(v);
+                          if (!mounted) return;
                           setState(() => _userEnabled = v);
                         },
                       ),

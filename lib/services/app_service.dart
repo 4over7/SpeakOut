@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import '../engine/core_engine.dart';
 import '../engine/engine_status.dart';
@@ -5,6 +6,7 @@ import '../ffi/native_input_base.dart';
 // import 'billing_service.dart'; // 暂时隐藏
 import 'config_service.dart';
 import 'chat_service.dart';
+import 'vocab_service.dart';
 import 'llm_service.dart';
 import 'cloud_account_service.dart';
 import 'notification_service.dart';
@@ -152,6 +154,11 @@ class AppService {
     await applyVerboseLogging(); // Apply debug logging as early as possible
 
     // 1.5 Other Services
+    // 行业词库必须在这里加载。**不能只在词库设置页里 ensurePacksLoaded()** ——
+    // 听写时 core_engine 调 getVocabHints()，没打开过那个页面的话拿到的是空，
+    // 整个行业词库功能静默失效，而 UI 上看不出任何异常。
+    // 不 await：读几个 asset 而已，失败也只是少了词库提示，不该拖慢启动。
+    unawaited(VocabService().ensurePacksLoaded());
     await ChatService().init();
     await CloudAccountService().init();
     await CloudAccountService().migrateFromLegacy();
