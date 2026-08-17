@@ -141,8 +141,11 @@ class TencentASRProvider implements ASRProvider {
     }
 
     // Wait for server to finish or timeout
+    // 内层等待走 kAsrFinalFrameWait，**不要**用 stopTimeout —— 后者是引擎给
+    // 整个 stop() 的预算（kAsrStopTimeout），两者相等就成了竞速：
+    // 引擎的超时回调返回空文本，会把这里攒下的部分文本一起丢掉。
     return (_stopCompleter?.future ?? Future.value(_buildResult())).timeout(
-      const Duration(seconds: 5),
+      AppConstants.kAsrFinalFrameWait,
       onTimeout: () {
         _log('Stop timeout, returning current text');
         return _buildResult();

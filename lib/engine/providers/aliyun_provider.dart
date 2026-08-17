@@ -33,6 +33,10 @@ class AliyunProvider implements ASRProvider {
   /// 是否已经因 task_id 不匹配丢弃过帧。仅用于「首次丢弃打一条醒目日志」的安全阀，
   /// 让"服务端行为与文档不符导致消息全丢"这种情况一眼可诊断。
   bool _droppedStaleFrame = false;
+
+  /// 服务端最后一帧（TranscriptionCompleted / TaskFailed）到达的信号。
+  /// stop() 原先盲等 500ms —— 阿里云的收尾帧经常比这慢，**最后一句就这么丢了**。
+  Completer<void>? _completed;
   
   bool _isReady = false;
   
@@ -174,6 +178,7 @@ class AliyunProvider implements ASRProvider {
     // Generate new Task ID for this recording session
     _taskId = const Uuid().v4().replaceAll('-', '');
     _droppedStaleFrame = false;
+    _completed = Completer<void>();
 
     // Send Start Directive (reusing existing connection)
     final startCmd = {
@@ -275,14 +280,20 @@ class AliyunProvider implements ASRProvider {
          // Assuming SentenceEnd already handled the text.
          // Just ensure final state.
          _textController.add(_committedText + _currentSentence);
-         
+         _signalCompleted();
+
       } else if (name == 'TaskFailed') {
          // 任务失败（鉴权/参数/余额等）：记录到 _lastError，由 stop() 上报，不注入文本流
          _lastError = "识别失败: ${header['status_text']}";
+         _signalCompleted(); // 失败也是收尾，别让 stop() 白等满超时
       }
     } catch (e) {
       AppLog.d("[AliyunProvider] Message parse error: $e");
     }
+  }
+
+  void _signalCompleted() {
+    if (_completed != null && !_completed!.isCompleted) _completed!.complete();
   }
 
   @override
@@ -322,14 +333,19 @@ class AliyunProvider implements ASRProvider {
   Future<ASRResult> stop() async {
     if (_channel == null) return ASRResult.textOnly("");
 
-    // Wait for handshake to complete (up to 2s) before sending stop
+    // 「等握手」和「等收尾帧」共用一个总预算，**由构造保证内层 < 外层**。
+    // 两段各自独立计时的话最坏情况会加起来超过引擎给 stop() 的预算，
+    // 引擎先放弃、返回空文本，这里攒的文本全丢。
+    final budget = Stopwatch()..start();
+    Duration remaining() => AppConstants.kAsrFinalFrameWait - budget.elapsed;
+
     if (!_isHandshakeComplete) {
       await Future.any([
         Future.doWhile(() async {
           await Future.delayed(const Duration(milliseconds: 100));
           return !_isHandshakeComplete;
         }),
-        Future.delayed(const Duration(seconds: 2)),
+        Future.delayed(remaining()),
       ]);
     }
 
@@ -346,8 +362,15 @@ class AliyunProvider implements ASRProvider {
 
     _channel!.sink.add(jsonEncode(stopCmd));
 
-    // Wait briefly for any final messages
-    await Future.delayed(const Duration(milliseconds: 500));
+    // 等服务端收尾帧，到了就立刻返回。原先是盲等 500ms ——
+    // 既在收尾帧早到时白等，又在它晚到时把最后一句连同 TranscriptionCompleted
+    // 一起丢掉（_handleMessage 里那段 task_id 过滤的注释就提过这个窗口）。
+    if (remaining() > Duration.zero) {
+      await (_completed?.future ?? Future<void>.value())
+          .timeout(remaining(), onTimeout: () {
+        AppLog.d('[AliyunProvider] 等收尾帧超时，返回已有文本');
+      });
+    }
 
     // Reset idle timer (connection stays open)
     _resetIdleTimer();

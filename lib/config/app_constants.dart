@@ -214,6 +214,12 @@ class AppConstants {
   static const int kOfflineModelDurationWarningSeconds = 30;
   /// ASR provider stop() 超时，云端识别可能需要较长时间
   static const Duration kAsrStopTimeout = Duration(seconds: 6);
+  /// provider 的 `stop()` **内部**总等待上限（等握手 + 等服务端收尾帧）。
+  ///
+  /// **必须明显小于 kAsrStopTimeout**：引擎按 kAsrStopTimeout 给 stop() 记时，
+  /// 超时回调返回的是**空文本**。内层不留余量的话，引擎先放弃，
+  /// provider 好不容易攒下的部分文本一起被丢掉 —— 用户看到的是「一个字都没有」。
+  static const Duration kAsrFinalFrameWait = Duration(seconds: 4);
   /// 错误信息在悬浮窗显示的持续时间
   static const Duration kErrorDisplayDuration = Duration(seconds: 4);
   /// 成功提示显示时间

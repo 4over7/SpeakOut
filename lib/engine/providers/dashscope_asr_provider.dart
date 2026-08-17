@@ -238,14 +238,19 @@ class DashScopeASRProvider implements ASRProvider {
   Future<ASRResult> stop() async {
     if (_channel == null) return ASRResult.textOnly('');
 
-    // Wait for handshake
+    // 「等握手」和「等 task-finished」共用一个总预算：两段各自独立计时的话
+    // 最坏 2+4=6s，正好等于引擎给 stop() 的预算，引擎的超时回调会返回空文本，
+    // 把这里攒的文本一起丢掉。
+    final budget = Stopwatch()..start();
+    Duration remaining() => AppConstants.kAsrFinalFrameWait - budget.elapsed;
+
     if (!_isHandshakeComplete) {
       await Future.any([
         Future.doWhile(() async {
           await Future.delayed(const Duration(milliseconds: 100));
           return !_isHandshakeComplete;
         }),
-        Future.delayed(const Duration(seconds: 2)),
+        Future.delayed(remaining()),
       ]);
     }
 
@@ -263,14 +268,16 @@ class DashScopeASRProvider implements ASRProvider {
     _channel!.sink.add(jsonEncode(finishTask));
     _log('finish-task sent');
 
-    // Wait for task-finished / task-failed event (max 4s)
-    await Future.any([
-      Future.doWhile(() async {
-        await Future.delayed(const Duration(milliseconds: 100));
-        return !_isTaskFinished;
-      }),
-      Future.delayed(const Duration(seconds: 4)),
-    ]);
+    // Wait for task-finished / task-failed event（剩余预算内）
+    if (remaining() > Duration.zero) {
+      await Future.any([
+        Future.doWhile(() async {
+          await Future.delayed(const Duration(milliseconds: 100));
+          return !_isTaskFinished;
+        }),
+        Future.delayed(remaining()),
+      ]);
+    }
 
     // Close connection (DashScope doesn't support connection reuse across tasks)
     await _channel?.sink.close();

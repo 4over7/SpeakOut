@@ -52,8 +52,42 @@
 ### 2. 错误用 ASRResult.error 字段，不抛异常
 云端 ASR 失败时走 `result.error` 字段返回，CoreEngine 收到后在录音浮窗显示 4 秒。**不要 throw**——会让 stop() 卡死。
 
-### 3. Provider 抽象 stop() 必须可超时
-CoreEngine 调 ASR `stop()` 时设 6 秒超时（云端识别需要 wait task-finished）。Provider 实现里发 `finish-task` 后等 flag，最多 4s。
+### 3. stop() 的两层预算：内层必须给外层让路
+
+```
+引擎（core_engine）      provider.stop().timeout(stopTimeout)     ← 外层，超时回调返回 **空文本**
+  └ provider 内部        等握手 + 等收尾帧 ≤ kAsrFinalFrameWait   ← 内层，超时返回 **已攒到的文本**
+```
+
+| 常量 | 值 | 谁用 |
+|---|---|---|
+| `kAsrStopTimeout` | 6s | 引擎给 `stop()` 的总预算；也是取消路径的短超时 |
+| `kAsrFinalFrameWait` | 4s | provider 内部所有等待**加起来**的上限 |
+
+**内层跟外层齐平就是竞速**：外层先触发的话返回空文本，provider 攒下的部分文本一起丢，
+用户看到「一个字都没有」。踩过三种形态：写死 5s 而声明 6s（三个 provider）、
+阿里云 `stop()` **盲等 500ms** 直接丢掉慢到的最后一句、
+握手 2s 与收尾 4s 各自独立计时正好加到 6s。
+
+现在的写法：`Stopwatch` + `remaining()`，两段共用一个预算；等的是**事件**
+（Completer / 标志位轮询）而不是固定时长，早到就早返回。
+`test/engine/asr_stop_budget_test.dart` 守这条。
+
+> 例外：OpenAI/Groq 是批量上传，`stopTimeout` 单独声明 35s（HTTP 自身 30s），
+> 这在类里写明了理由。取消路径不用它 —— 见 `core_engine.dart` 里的注释。
+
+### 3b. initASR 必须串行，失败必须上抛
+
+`initASR` 在 await `provider.initialize()` **之前**就把 `_asrProvider` 置 null，
+所以两次调用重叠时第二次看不到旧 provider，跳过 dispose 直接并发初始化：
+后完成的覆盖字段，先完成的**永远不被 dispose**（云端漏 WebSocket / 离线漏 recognizer），
+而它的 textStream 还在往浮窗推 —— 两路结果交替出现。
+
+公开的 `initASR` 因此只是一层串行链，实现在 `_initASRUnsafe`。**不要绕过它。**
+
+初始化失败也必须 `rethrow`：只发一条 `EngineStatus.error` 就正常返回的话，
+调用方看到的是「成功」，设置页那段 `Init failed -> rollback` 变成死代码，
+配置停在一个加载不起来的模型上。`test/engine/asr_init_serialization_test.dart` 守这两条。
 
 ### 4. 默认模型随包内置（v1.10）
 
@@ -116,6 +150,8 @@ CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——�
 - ❌ **不要在主循环里做长任务（>16ms）** — 阻塞键事件处理
 - ❌ **不要直接读 SharedPreferences** — 走 `ConfigService()`
 - ❌ **不要复用过期 ASRProvider 实例** — 切换工作模式必须 `dispose()` 旧的、new 新的
+- ❌ **不要在 `stop()` 里 `Future.delayed(秒级)` 盲等** — 见 §3，等事件不等时长
+- ❌ **不要直接调 `_initASRUnsafe`** — 见 §3b，绕过串行链会漏 provider
 
 ## 测试
 
@@ -147,6 +183,9 @@ CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——�
   > 体积从 `ModelInfo.description` 里的 `~538MB` / `~1.0GB` 解析，不维护硬编码 id 清单
   > （那种清单会随模型增删漂移）。超时也按体积给：≥300MB 用 30 分钟，其余 10 分钟。
 - `test/engine/hotkey_matching_test.dart` — 修饰键精确匹配规则
+- `test/engine/asr_stop_budget_test.dart` — 上面 §3 的两层预算（含「不得秒级盲等」扫描）
+- `test/engine/asr_init_serialization_test.dart` — 上面 §3b 的串行链与 rethrow
+- `test/engine/xfyun_wpgs_test.dart` — 讯飞动态修正的 segment 合并（rg 越界不得重复/丢字）
 - 新增 Provider 时：mock WebSocket，验证 protocol 序列（run-task → task-started → result-generated → task-finished/task-failed）
 
 ## 与外部依赖

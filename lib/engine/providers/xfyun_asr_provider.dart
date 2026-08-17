@@ -133,8 +133,11 @@ class XfyunASRProvider implements ASRProvider {
       } catch (_) {}
     }
 
+    // 内层等待走 kAsrFinalFrameWait，**不要**用 stopTimeout —— 后者是引擎给
+    // 整个 stop() 的预算（kAsrStopTimeout），两者相等就成了竞速：
+    // 引擎的超时回调返回空文本，会把这里攒下的部分文本一起丢掉。
     return (_stopCompleter?.future ?? Future.value(_buildResult())).timeout(
-      const Duration(seconds: 5),
+      AppConstants.kAsrFinalFrameWait,
       onTimeout: () {
         _log('Stop timeout');
         return _buildResult();
@@ -260,31 +263,32 @@ class XfyunASRProvider implements ASRProvider {
     final segText = text.toString();
     final pgs = result['pgs'] as String?;
 
-    if (pgs == 'rpl') {
-      // 替换模式：用 rg 指定替换范围
-      final rg = result['rg'] as List?;
-      if (rg != null && rg.length >= 2) {
-        final start = (rg[0] as int) - 1; // 讯飞 1-based
-        final end = (rg[1] as int) - 1;
-        if (start >= 0 && start < _segments.length) {
-          // 替换 [start, end] 范围的 segments
-          for (int i = end; i >= start && i < _segments.length; i--) {
-            _segments.removeAt(i);
-          }
-          if (start < _segments.length) {
-            _segments.insert(start, segText);
-          } else {
-            _segments.add(segText);
-          }
-        }
-      }
-    } else {
-      // 追加模式 (pgs == 'apd' 或 null)
-      _segments.add(segText);
-    }
+    applyWpgs(_segments, segText, pgs, result['rg'] as List?);
 
     final fullText = _segments.join('');
     _textController.add(fullText);
+  }
+
+  /// 讯飞动态修正（wpgs）：把一段新识别结果并进 segment 列表。
+  ///
+  /// `pgs == 'rpl'` 表示「替换 rg 指定的那段」，`rg` 是 **1-based 闭区间**。
+  /// 其余（'apd' / null）是追加。
+  ///
+  /// rg 越界必须夹住而不是放弃：旧写法在 `end >= length` 时删除循环一次都不跑，
+  /// 却照样 insert —— 被替换的旧文本还在，新文本又插进去，**结果重复**。
+  /// 而 `start >= length` 时旧写法把整段文本**直接丢掉**。
+  /// 服务端的计数和本地列表本来就可能对不齐，两种都不能接受。
+  static void applyWpgs(
+      List<String> segments, String segText, String? pgs, List? rg) {
+    if (pgs != 'rpl' || rg == null || rg.length < 2) {
+      segments.add(segText);
+      return;
+    }
+    final start = ((rg[0] as int) - 1).clamp(0, segments.length);
+    final end = (rg[1] as int) - 1;
+    final to = (end + 1).clamp(start, segments.length);
+    segments.removeRange(start, to);
+    segments.insert(start, segText);
   }
 
   void _finishStop() {
