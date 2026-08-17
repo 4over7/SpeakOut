@@ -7,6 +7,9 @@ import 'package:speakout/engine/providers/asr_provider_factory.dart';
 /// 事故形态：Core 固定等 6 秒，而 OpenAI/Groq 批量识别自身 HTTP 超时 30 秒 ——
 /// Whisper 转写稍长的录音必然超 6 秒，Core 先超时丢弃，provider 还在干活，
 /// 用户看到「说了一段话什么都没出来」，日志里也没有报错。
+///
+/// 本文件只管**对外契约**（声明的 stopTimeout 够不够）。provider 内部实际等多久、
+/// 有没有给外层留余量，由 `asr_stop_budget_test.dart` 管。两者不重复。
 void main() {
   group('ASR stopTimeout 契约', () {
     test('批量识别 provider 的等待上限必须大于其自身 HTTP 超时（30s）', () {

@@ -20,12 +20,12 @@
 | **`ConfigService`** | `config_service.dart` | ~600 | **唯一**配置读写入口（包装 SharedPreferences），所有偏好/凭证/状态都过它 |
 | **`LLMService`** | `llm_service.dart` | ~730 | **唯一** LLM 调用入口，支持 OpenAI/Anthropic/Ollama 三种 API 格式 + 流式 + 翻译 + 梳理 |
 | `AppService` | `app_service.dart` | ~240 | 应用生命周期总控：启动时调 init()，关闭时 dispose() 全部子服务 |
-| `CloudAccountService` | `cloud_account_service.dart` | ~290 | 云账户 CRUD（多账户管理 + 凭证安全存储） |
+| `CloudAccountService` | `cloud_account_service.dart` | ~830 | 云账户 CRUD（多账户管理 + 凭证安全存储） |
 | `AudioDeviceService` | `audio_device_service.dart` | ~300 | 麦克风设备枚举、用户偏好、蓝牙检测、设备变化 Stream |
 | `UpdateService` | `update_service.dart` | ~590 | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
 | `ChatService` | `chat_service.dart` | ~150 | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
 | `BillingService` | `billing_service.dart` | ~230 | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
-| `VocabService` | `vocab_service.dart` | ~180 | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
+| `VocabService` | `vocab_service.dart` | ~220 | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
 | `DiaryService` | `diary_service.dart` | ~50 | 闪念笔记 Markdown 文件按天追加 |
 | `OverlayController` | `overlay_controller.dart` | ~80 | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
 | `NotificationService` | `notification_service.dart` | ~66 | macOS 系统通知（应用内 + 横幅消息）|
@@ -90,17 +90,30 @@ CoreEngine 录音结束
 
 ## 测试
 
-- `test/services/llm_service_test.dart` — Golden + 流式协议 + 三种 API 格式
-- `test/services/config_service_test.dart` — 默认值 + setter 行为
-- `test/services/diary_service_test.dart` — Markdown 追加
-- 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）
+`test/services/` 下 20+ 个文件，**以目录实际内容为准**，这里只标几处需要知道的：
+
+| 测试 | 覆盖 |
+|---|---|
+| `llm_service_test.dart` + `llm_blackbox_test.dart` | Golden prompt + 流式协议 + 三种 API 格式 |
+| `cloud_account_import_test.dart` | 账户导入/合并/回滚/凭证清理（27 例，写路径的主要安全网）|
+| `write_chain_discipline_test.dart` | **纪律测试**：链内代码不得再调公开写方法（会死锁，不是报错）|
+| `config_backup_service_test.dart` | 导出默认不含凭证 |
+| `vocab_csv_test.dart` | CSV 引号/转义/空字段 |
+
+测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）。
 
 > **无单测的 service**（改动时没有安全网，靠手动验证）：`BillingService`、
-> `CloudAccountService`、`AudioDeviceService`、`AppService`、`OverlayController`。
-> 完整覆盖情况以 `test/services/` 目录实际文件为准。
+> `AudioDeviceService`、`AppService`、`OverlayController`、`UpdateService` 的安装脚本部分
+> （`update_service_test.dart` 只覆盖版本比较与校验，不覆盖 helper 脚本执行）。
 
 ## 隐藏的雷区
 
 - **AppLog dispose 必须取消 _flushTimer** — 否则测试 hang（已修，2026-03-29）
 - **UpdateService 下载用 `request.followRedirects = true`** — http.Client 默认不跟随 302（这个 bug 卡过一次）
 - **测试连接（testConnectionWith）和真实调用走不同 base URL** — Anthropic 是 `/v1/messages`，OpenAI 兼容是 `/chat/completions`
+- **`CloudAccountService` 的公开写方法只能从链外调** — 链内再调会把自己排到自己后面，
+  表现是**卡死而不是报错**。规则由 `write_chain_discipline_test.dart` 守，加新写方法时同步加进它的名单
+- **`importFromFile` 现在会抛** — 文件读不了 / JSON 坏 / 不是账户导出格式都 rethrow。
+  UI 必须接住；早期它吞成 `return 0`，界面报「导入完成，0 条」，把用户指向完全错误的方向
+- **懒加载不要用「布尔完成位」** — `VocabService` 曾在 await **之前**就把 `_packsLoaded` 置 true，
+  并发第二次调用立刻返回而数据还没读完。要记就记 Future 本身（`_x ??= _load()`）

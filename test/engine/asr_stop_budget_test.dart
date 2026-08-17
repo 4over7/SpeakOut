@@ -17,6 +17,10 @@ import 'package:speakout/config/app_constants.dart';
 /// - 写死 `const Duration(seconds: 5)`，而声明的 `stopTimeout` 是 6s（三个 provider）
 /// - 阿里云 `stop()` **盲等 500ms** 就返回，服务端收尾帧一慢，最后一句直接没了
 /// - 握手等待和收尾等待各自独立计时，最坏 2+4=6s，正好撞上外层预算
+///
+/// 与 `asr_stop_timeout_test.dart` **不重复**：那个守「provider 声明的
+/// `stopTimeout` 够不够它自己用」（对外契约），本文件守「provider 内部实际
+/// 等多久，有没有给外层留余量」（对内实现）。两头都要有人管。
 void main() {
   test('内层等待预算必须明显小于引擎给 stop() 的预算', () {
     expect(AppConstants.kAsrFinalFrameWait,
