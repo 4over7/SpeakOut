@@ -50,7 +50,10 @@ class VocabService {
   ];
 
   final Map<String, VocabPack> _loadedPacks = {};
-  bool _packsLoaded = false;
+  /// 记的是「加载这件事」本身，不是布尔完成位。
+  /// 布尔位在 await 之前就置 true —— 并发第二次调用会立刻返回，
+  /// 而词库其实还没读完，调用方拿到空列表。
+  Future<void>? _packsLoading;
 
   static List<({String id, String nameZh, String nameEn})> get availablePacks =>
       _packDefs.map((d) => (id: d.id, nameZh: d.nameZh, nameEn: d.nameEn)).toList();
@@ -144,12 +147,44 @@ class VocabService {
   }
 
   /// Load all industry packs (lazy, called once)
-  Future<void> ensurePacksLoaded() async {
-    if (_packsLoaded) return;
-    _packsLoaded = true;
+  Future<void> ensurePacksLoaded() => _packsLoading ??= _loadAllPacks();
+
+  Future<void> _loadAllPacks() async {
     for (final def in _packDefs) {
       await _loadPack(def.id, def.asset, def.nameZh, def.nameEn);
     }
+  }
+
+  /// 按 RFC4180 切一行 CSV：引号内的逗号属于字段本身。
+  /// 不处理跨行的引号字段 —— 词条里放换行没有意义，调用方已按行切过。
+  static List<String> splitCsvLine(String line) {
+    final fields = <String>[];
+    final buf = StringBuffer();
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (inQuotes) {
+        if (c == '"') {
+          if (i + 1 < line.length && line[i + 1] == '"') {
+            buf.write('"');
+            i++; // "" 是转义后的一个引号
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          buf.write(c);
+        }
+      } else if (c == '"') {
+        inQuotes = true;
+      } else if (c == ',') {
+        fields.add(buf.toString());
+        buf.clear();
+      } else {
+        buf.write(c);
+      }
+    }
+    fields.add(buf.toString());
+    return fields;
   }
 
   Future<void> _loadPack(String id, String assetPath, String nameZh, String nameEn) async {

@@ -114,38 +114,6 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
     });
   }
 
-  /// 按 RFC4180 切一行 CSV：引号内的逗号属于字段本身。
-  /// 不处理跨行的引号字段 —— 词条里放换行没有意义，且上面已按行切过。
-  static List<String> _splitCsvLine(String line) {
-    final fields = <String>[];
-    final buf = StringBuffer();
-    var inQuotes = false;
-    for (var i = 0; i < line.length; i++) {
-      final c = line[i];
-      if (inQuotes) {
-        if (c == '"') {
-          if (i + 1 < line.length && line[i + 1] == '"') {
-            buf.write('"');
-            i++; // "" 是转义后的一个引号
-          } else {
-            inQuotes = false;
-          }
-        } else {
-          buf.write(c);
-        }
-      } else if (c == '"') {
-        inQuotes = true;
-      } else if (c == ',') {
-        fields.add(buf.toString());
-        buf.clear();
-      } else {
-        buf.write(c);
-      }
-    }
-    fields.add(buf.toString());
-    return fields;
-  }
-
   Future<void> _importTsv() async {
     final loc = AppLocalizations.of(context)!;
     try {
@@ -162,7 +130,7 @@ class _VocabSettingsViewState extends State<VocabSettingsView> {
       int count = 0;
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
-        final parts = line.contains('\t') ? line.split('\t') : _splitCsvLine(line);
+        final parts = line.contains('\t') ? line.split('\t') : VocabService.splitCsvLine(line);
         if (parts.length < 2) continue;
         final wrong = parts[0].trim();
         final correct = parts[1].trim();
