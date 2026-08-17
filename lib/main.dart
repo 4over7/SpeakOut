@@ -382,7 +382,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
         return;
       }
       // Get real-time audio level (0.0 ~ 1.0)
-      final level = _appService.engine.nativeInput?.getAudioLevel() ?? 0.0;
+      final level = _appService.nativeInput?.getAudioLevel() ?? 0.0;
       setState(() {
         for (int i = 0; i < _waveHeights.length; i++) {
           // Random base shape (0.0 ~ 1.0), scaled by audio level

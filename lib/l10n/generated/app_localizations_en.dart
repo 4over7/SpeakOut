@@ -1115,6 +1115,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String modelActivateFailedNoEngine(String error) {
+    return 'Model activation failed: $error. The engine is still not ready after rollback — restart the app or pick another model';
+  }
+
+  @override
   String get punctAutoLoaded => 'Punctuation model auto-loaded';
 
   @override

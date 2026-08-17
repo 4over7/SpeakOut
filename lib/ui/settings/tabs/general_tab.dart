@@ -276,7 +276,8 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
       return;
     }
 
-    if (!mounted) return;
+    // mounted 判断只能挡 setState，**不能挡在落盘前面** ——
+    // 用户刚录完快捷键就关掉设置页的话，那次录制会被静默丢掉。
     switch (target) {
       case 'shared':
         await config.setPttKey(result.keyCode, result.displayName,
@@ -284,6 +285,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
         await config.setToggleInputKey(result.keyCode, result.displayName,
             modifiers: result.modifiers);
         AppService().pttKeyCode = result.keyCode;
+        if (!mounted) return;
         setState(() {
           _currentKeyCode = result.keyCode;
           _currentKeyName = result.displayName;
@@ -292,11 +294,13 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
       case 'toggleInput':
         await config.setToggleInputKey(result.keyCode, result.displayName,
             modifiers: result.modifiers);
+        if (!mounted) return;
         setState(() => _toggleInputKeyName = result.displayName);
       default:
         await config.setPttKey(result.keyCode, result.displayName,
             modifiers: result.modifiers);
         AppService().pttKeyCode = result.keyCode;
+        if (!mounted) return;
         setState(() {
           _currentKeyCode = result.keyCode;
           _currentKeyName = result.displayName;
@@ -639,8 +643,8 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
           return;
         }
       }
-      // 30 秒还是未决定：弹框没出来或用户没理它，给个提示别静默结束
-      if (!mounted) return;
+      // 30 秒还是未决定：弹框没出来或用户没理它，给个提示别静默结束。
+      // 不判 mounted：全局横幅不依赖本页 context，页面关了也该看到结论。
       NotificationService().notifyError(loc.permissionsNotGranted);
       return;
     }
@@ -679,8 +683,7 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
           }
         } catch (e) {
           AppLog.e('permission card tap failed: $e');
-          if (!mounted) return;
-          NotificationService().notifyError(loc.permissionsNotGranted);
+          NotificationService().notifyError(loc.permissionsNotGranted); // 同上，全局横幅不判 mounted
         }
       },
       children: [

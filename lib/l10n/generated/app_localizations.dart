@@ -2084,6 +2084,12 @@ abstract class AppLocalizations {
   /// **'Model activation failed: {err}'**
   String modelActivateFailed(String err);
 
+  /// No description provided for @modelActivateFailedNoEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Model activation failed: {error}. The engine is still not ready after rollback — restart the app or pick another model'**
+  String modelActivateFailedNoEngine(String error);
+
   /// No description provided for @punctAutoLoaded.
   ///
   /// In en, this message translates to:

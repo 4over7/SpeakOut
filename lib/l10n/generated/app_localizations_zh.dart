@@ -1059,6 +1059,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String modelActivateFailedNoEngine(String error) {
+    return '模型激活失败：$error。回退到原模型后语音引擎仍未就绪，请重启应用或重新选择模型';
+  }
+
+  @override
   String get punctAutoLoaded => '已自动加载标点模型';
 
   @override

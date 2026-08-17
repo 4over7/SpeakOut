@@ -101,9 +101,12 @@ class AliyunProvider implements ASRProvider {
       // 错误经 _lastError 上报（stop() 转 ASRResult.error），不塞进文本流污染识别结果
       _lastError = "连接错误: $e";
       _isConnected = false;
+      // 连接已经废了，收尾帧永远不会来 —— 不放行的话 stop() 会白等满预算
+      _signalCompleted();
     }, onDone: () {
       _isConnected = false;
       _stopHeartbeat();
+      _signalCompleted(); // 同上
     });
     
     _isConnected = true;
@@ -332,6 +335,13 @@ class AliyunProvider implements ASRProvider {
   @override
   Future<ASRResult> stop() async {
     if (_channel == null) return ASRResult.textOnly("");
+    // 连接已断（onError/onDone 走过）：发 stop 指令没有意义，等收尾帧更没有意义。
+    // 直接返回已有文本 —— 否则每次停止录音都要白等满预算。
+    if (!_isConnected) {
+      final text = _committedText + _currentSentence;
+      if (_lastError != null && text.isEmpty) return ASRResult.withError(_lastError!);
+      return ASRResult.textOnly(text);
+    }
 
     // 「等握手」和「等收尾帧」共用一个总预算，**由构造保证内层 < 外层**。
     // 两段各自独立计时的话最坏情况会加起来超过引擎给 stop() 的预算，

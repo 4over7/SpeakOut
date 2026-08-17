@@ -116,9 +116,28 @@ if (!mounted) return;      // ← 少了这句 → setState() called after dispo
 setState(() {});
 ```
 
-一次清过 **76 处**。`test/ui/setstate_mounted_guard_test.dart` 会挡住回潮；
+一次清过 **77 处**。`test/ui/setstate_mounted_guard_test.dart` 会挡住回潮；
 它是 AST 判定，`AppLog.d('mounted')` 这种字符串骗不过去。
 用 `context` 的地方另外判 `context.mounted`（两者不是一回事）。
+
+**反过来的错更严重：`mounted` 只挡 `setState`，不挡落盘，也不挡全局通知。**
+
+```dart
+final dir = await picker();
+// ❌ 守卫放这儿 → 页面在选目录期间被关掉，用户选的目录被静默丢弃
+if (dir != null) {
+  await ConfigService().setLogDirectory(dir);   // 这一步必须发生
+  if (!mounted) return;                          // ✅ 守卫放这儿
+  setState(() {});
+}
+```
+
+那次批量补守卫里这个错犯了 **5 次**：日志目录、闪念目录（Swift 侧已经提交了
+security-scoped bookmark，Dart 侧不落盘两边就对不上，`DiaryService` 的对账
+fail-closed → 闪念根本写不了）、刚录好的快捷键、LLM 模型（preset 存了 model 没存）。
+`NotificationService()` 是全局横幅、不依赖本页 context，同样不判 `mounted` ——
+判了就变成「操作失败了但用户什么都没看到」。
+同一个测试文件的第二条断言守这条反向规则。
 
 ### 2. 已经落盘的操作，后续步骤失败必须让用户看见并回滚
 

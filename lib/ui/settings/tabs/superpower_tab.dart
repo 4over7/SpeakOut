@@ -300,10 +300,16 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
   // ---------------------------------------------------------------------------
 
   Future<void> _pickDiaryFolder() async {
+    // 先取好文案：失败提示是全局横幅，不该因为用户关了设置页就消失，
+    // 而 AppLocalizations.of(context) 在页面销毁后取不到。
+    final loc = AppLocalizations.of(context)!;
     try {
       final String? outputDir = await const MethodChannel('com.SpeakOut/overlay')
           .invokeMethod('pickDirectory');
-      if (!mounted) return;
+      // 这里**不能**判 mounted 就 return：Swift 侧此刻已经为这个目录提交了
+      // security-scoped bookmark，Dart 侧不落盘就和授权对不上 ——
+      // DiaryService 的目录对账会 fail-closed，闪念笔记直接不能写。
+      // mounted 只挡 setState。
       if (outputDir != null) {
         await ConfigService().setDiaryDirectory(outputDir);
         await _validateDiaryDirectory();
@@ -314,9 +320,7 @@ class _SuperpowerTabState extends State<SuperpowerTab> {
       // 沙盒版拿不到该目录的持久授权。只记日志的话用户这次能写、重启后
       // 闪念静默丢失且看不到任何原因 —— 必须把它摆到台面上。
       AppLog.e('Pick Directory Failed: ${e.code} ${e.message}');
-      if (!mounted) return;
-      NotificationService()
-          .notifyError(AppLocalizations.of(context)!.diaryDirBookmarkFailed);
+      NotificationService().notifyError(loc.diaryDirBookmarkFailed);
     } catch (e) {
       AppLog.d('Pick Directory Failed: $e');
     }

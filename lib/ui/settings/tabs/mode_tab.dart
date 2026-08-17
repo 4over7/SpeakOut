@@ -18,6 +18,7 @@ import '../../vocab_settings_page.dart';
 import '../settings_shared.dart';
 import '../sidebar/sidebar_shell.dart';
 import '../../../services/notification_service.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Which subset of mode_tab to render.
 /// `all` — legacy 5-tab settings page (default).
@@ -414,16 +415,25 @@ class ModeTabState extends State<ModeTab> {
         await _app.initASR(modelPath: path, type: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
       } catch (e) {
         // Init failed -> rollback
+        //
+        // 光把 activeModelId 改回去不够：initASR 失败前已经 dispose 了旧 provider，
+        // 此刻 _asrProvider 是 null —— 用户回到「原来那个模型」，按快捷键却毫无反应，
+        // 而界面上看不出任何异常。必须把引擎也一并恢复。
         if (previousModelId != null) {
           await _app.setActiveModel(previousModelId);
           await ConfigService().setActiveModelId(previousModelId);
+          // _activeModelId 只在成功分支才更新，此刻还是 previousModelId，
+          // 所以 _initAsrForCurrentConfig() 读到的就是要恢复的那个模型。
+          await _restoreEngineAfterRollback();
         }
         if (!mounted) return;
+        final loc = AppLocalizations.of(context)!;
         setState(() { _activatingId = null; });
-        if (mounted) {
-          final loc = AppLocalizations.of(context)!;
-          showSettingsError(context, loc.modelActivateFailed('$e'));
-        }
+        showSettingsError(
+            context,
+            _app.isASRReady
+                ? loc.modelActivateFailed('$e')
+                : loc.modelActivateFailedNoEngine('$e'));
         return;
       }
       // Model has no built-in punctuation -> prompt user + auto-load punctuation model
@@ -555,17 +565,66 @@ class ModeTabState extends State<ModeTab> {
 
   // --- Work Mode switching ---
 
+  /// 按**当前配置**重建 ASR。
+  ///
+  /// 正向切换和失败回滚必须走同一段逻辑 —— 分开写的话回滚那份迟早漏一步，
+  /// 而漏的后果是「配置看着回去了，引擎其实是空的」，界面上完全看不出来。
+  /// 走哪个 provider 由 `ConfigService().asrEngineType` 决定（initASR 内部读），
+  /// 这里只负责把离线模型的路径/类型喂对。
+  Future<void> _initAsrForCurrentConfig() async {
+    if (ConfigService().workMode == 'cloud') {
+      await _app.initASR(modelPath: '', type: 'aliyun');
+      return;
+    }
+    final path = await _app.getActiveModelPath();
+    final model = _app.getModelById(_activeModelId ?? '');
+    if (path == null || model == null) return;
+    await _app.initASR(
+        modelPath: path,
+        type: model.type,
+        modelName: model.name,
+        hasPunctuation: model.hasPunctuation);
+    // Model has no built-in punctuation -> auto-load punctuation model
+    if (!model.hasPunctuation && !_app.isPunctuationEnabled) {
+      final punctPath = await _app.getPunctuationModelPath();
+      if (punctPath != null) {
+        await _app.initPunctuation(punctPath, activeModelName: model.name);
+      }
+    }
+  }
+
+  /// 回滚配置之后把引擎也拉回来。起不来只记日志 ——
+  /// 调用方随后会按 `_app.isASRReady` 决定给用户哪句话。
+  Future<void> _restoreEngineAfterRollback() async {
+    try {
+      await _initAsrForCurrentConfig();
+    } catch (e) {
+      AppLog.e('回滚后 ASR 仍未起来: $e');
+    }
+  }
+
   /// 云端账户 / 模型下拉切换后重建 ASR。
   /// 选择已经落盘了，initASR 抛出来就必须让用户看见 ——
   /// 否则下拉框显示新账户、引擎还连着旧的，跟 v1.10.0 那批「显示 A 跑 B」同源。
-  Future<void> _reinitCloudAsr() async {
+  Future<void> _reinitCloudAsr(String? prevAccountId, String? prevModelId) async {
     try {
       await _app.initASR(modelPath: '', type: 'aliyun');
     } catch (e) {
+      // 选择已经落盘了，新账户又起不来 —— 不回滚的话下拉框显示新账户、
+      // 引擎却是空的，跟 v1.10.0 那批「显示 A 跑 B」同源。
+      await ConfigService().setSelectedAsrAccount(prevAccountId, modelId: prevModelId);
+      await _restoreEngineAfterRollback();
       if (!mounted) return;
+      final loc = AppLocalizations.of(context)!;
+      setState(() {});
       if (context.mounted) {
-        showSettingsError(context, AppLocalizations.of(context)!.modelActivateFailed('$e'));
+        showSettingsError(
+            context,
+            _app.isASRReady
+                ? loc.modelActivateFailed('$e')
+                : loc.modelActivateFailedNoEngine('$e'));
       }
+      return;
     }
     if (mounted) setState(() {});
   }
@@ -576,44 +635,40 @@ class ModeTabState extends State<ModeTab> {
     await ConfigService().setWorkMode(mode);
 
     // Reset input language if current selection is not supported by cloud ASR model
+    final oldInputLang = ConfigService().inputLanguage;
     if (mode == 'cloud') {
       final cloudModel = _getCurrentCloudAsrModel();
-      final inputLang = ConfigService().inputLanguage;
-      if (cloudModel != null && inputLang != 'auto' && !cloudModel.supportsLanguage(inputLang)) {
+      if (cloudModel != null && oldInputLang != 'auto' && !cloudModel.supportsLanguage(oldInputLang)) {
         await ConfigService().setInputLanguage('auto');
       }
     }
 
-    // Re-init ASR when switching between sherpa <-> aliyun
     // 必须 try/catch：workMode 已经落盘了，initASR 再抛出来的话异常直接跑进
     // 全局 zone —— 下面的 setState 不执行，UI 停在旧模式，而配置里已经是新模式。
     // 「显示 A 跑 B」正是 v1.10.0 修过一轮的那类问题，不要再放回来。
-    try {
-      if (mode == 'cloud' && oldMode != 'cloud') {
-        await _app.initASR(modelPath: '', type: 'aliyun');
-      } else if (mode != 'cloud' && oldMode == 'cloud') {
-        final path = await _app.getActiveModelPath();
-        final model = _app.getModelById(_activeModelId ?? '');
-        if (path != null && model != null) {
-          await _app.initASR(modelPath: path, type: model.type, modelName: model.name, hasPunctuation: model.hasPunctuation);
-          // Model has no built-in punctuation -> auto-load punctuation model
-          if (!model.hasPunctuation && !_app.isPunctuationEnabled) {
-            final punctPath = await _app.getPunctuationModelPath();
-            if (punctPath != null) {
-              await _app.initPunctuation(punctPath, activeModelName: model.name);
-            }
-          }
+    if ((mode == 'cloud') != (oldMode == 'cloud')) {
+      try {
+        await _initAsrForCurrentConfig();
+      } catch (e) {
+        // 回滚**全部**改动：workMode、被顺手改掉的输入语言，以及引擎本身。
+        // 只回滚配置不回滚引擎的话，用户看着还在旧模式，按快捷键却毫无反应。
+        await ConfigService().setWorkMode(oldMode);
+        if (ConfigService().inputLanguage != oldInputLang) {
+          await ConfigService().setInputLanguage(oldInputLang);
         }
+        await _restoreEngineAfterRollback();
+        if (!mounted) return;
+        final loc = AppLocalizations.of(context)!;
+        setState(() {});
+        if (context.mounted) {
+          showSettingsError(
+              context,
+              _app.isASRReady
+                  ? loc.modelActivateFailed('$e')
+                  : loc.modelActivateFailedNoEngine('$e'));
+        }
+        return;
       }
-    } catch (e) {
-      // 回滚到旧模式，别让配置停在一个引擎起不来的状态
-      await ConfigService().setWorkMode(oldMode);
-      if (!mounted) return;
-      setState(() {});
-      if (context.mounted) {
-        showSettingsError(context, AppLocalizations.of(context)!.modelActivateFailed('$e'));
-      }
-      return;
     }
     if (!mounted) return;
     setState(() {});
@@ -1431,8 +1486,14 @@ class ModeTabState extends State<ModeTab> {
             final acc = uniqueAsrAccounts.firstWhere((a) => a.id == v);
             final prov = CloudProviders.getById(acc.providerId);
             final defaultModelId = prov?.asrModels.isNotEmpty == true ? prov!.asrModels.first.id : null;
+            // 取 effectiveAsrAccount() 而不是直读 selectedAsrAccountId ——
+            // 后者被 architecture_single_source_test 钉死只能由真源碰
+            // （UI 自己做回退曾导致「界面显示 A、实际连 B」）。
+            // 用「当前真正在跑的那个账户」做回滚目标，语义上也更准。
+            final prevId = CloudAccountService().effectiveAsrAccount()?.id;
+            final prevModel = ConfigService().selectedAsrModelId;
             await ConfigService().setSelectedAsrAccount(v, modelId: defaultModelId);
-            await _reinitCloudAsr();
+            await _reinitCloudAsr(prevId, prevModel);
           },
         )),
         if (asrModels.length > 1) ...[
@@ -1451,8 +1512,9 @@ class ModeTabState extends State<ModeTab> {
             )).toList(),
             onChanged: (v) async {
               if (v == null) return;
+              final prevModel = ConfigService().selectedAsrModelId;
               await ConfigService().setSelectedAsrAccount(effectiveAsrId, modelId: v);
-              await _reinitCloudAsr();
+              await _reinitCloudAsr(effectiveAsrId, prevModel);
             },
           )),
         ],
@@ -1775,9 +1837,11 @@ class ModeTabState extends State<ModeTab> {
                 if (account != null) {
                   await ConfigService().setLlmPresetId(account.providerId);
                 }
-                if (!mounted) return;
+                // 守卫只能挡 setState：挡在这里的话上面的 setLlmPresetId
+                // 已经落盘、下面的 setLlmModel 却被跳过，配置自相矛盾。
                 if (newModelId == _kCustomModelSentinel) {
                   // 进入 custom 模式；先保留当前 model，让用户编辑
+                  if (!mounted) return;
                   setState(() => _llmModelCustom = true);
                 } else if (newModelId.isNotEmpty) {
                   await ConfigService().setLlmModel(newModelId);

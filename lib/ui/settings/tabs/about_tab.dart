@@ -393,7 +393,6 @@ class _AboutTabState extends State<AboutTab> {
                         backgroundColor: MacosColors.transparent,
                         onPressed: () async {
                           final dir = await FilePicker.platform.getDirectoryPath(dialogTitle: loc.aboutLogDir);
-                          if (!mounted) return;
                           if (dir != null) {
                             await ConfigService().setLogDirectory(dir);
                             AppService().applyVerboseLogging();

@@ -519,9 +519,16 @@ Future<void> _launchUrl(String url, String failedMessage) async {
     AppLog.e('模型链接无法解析: $url');
     return;
   }
-  // launchUrl 失败**通常不抛异常而是返回 false** —— 只 await 不看返回值
-  // 等于静默失败，用户看到的还是「点了没反应」。
-  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  // 两条失败路径都要接：launchUrl **通常返回 false**，但没有可用 handler 时
+  // 会抛 PlatformException。只看返回值不接异常的话，异常直接进全局 zone，
+  // 用户看到的还是「点了没反应」—— 跟修之前一模一样。
+  bool ok;
+  try {
+    ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (e) {
+    AppLog.e('打开模型链接抛异常: $url ($e)');
+    ok = false;
+  }
   if (!ok) {
     AppLog.e('打开模型链接失败: $url');
     NotificationService().notifyError(failedMessage);

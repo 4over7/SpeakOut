@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'config_service.dart';
+import 'package:speakout/config/app_log.dart';
 
 /// Vocab entry: wrong form -> correct form
 class VocabEntry {
@@ -147,7 +148,15 @@ class VocabService {
   }
 
   /// Load all industry packs (lazy, called once)
-  Future<void> ensurePacksLoaded() => _packsLoading ??= _loadAllPacks();
+  ///
+  /// 失败要把槽位清掉：记住一个 failed future 会让后续每次调用都拿到同一个错误，
+  /// **永久卡在失败状态**，重试也没用（`cloud_account_import_test.dart` 里
+  /// 「初始化失败后必须允许重试」立过同样的规矩）。
+  Future<void> ensurePacksLoaded() => _packsLoading ??= _loadAllPacks()
+      .catchError((Object e) {
+        _packsLoading = null;
+        AppLog.d('VocabService: 行业词库加载失败，下次调用会重试: $e');
+      });
 
   Future<void> _loadAllPacks() async {
     for (final def in _packDefs) {

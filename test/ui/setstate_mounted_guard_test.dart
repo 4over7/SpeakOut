@@ -45,6 +45,68 @@ void main() {
             '页面已销毁时会抛 setState() called after dispose():\n'
             '${offenders.join('\n')}');
   });
+
+  /// 上一条的反面 —— 补守卫时最容易犯的错。
+  ///
+  /// `if (!mounted) return;` 后面**紧跟一个既有 await 又有 setState 的复合语句**，
+  /// 意味着守卫连同里面的**落盘一起挡掉了**。页面在 await 期间关掉时，
+  /// 用户刚做的选择被静默丢弃，而这比一个 setState 异常严重得多。
+  ///
+  /// 真实事件（同一次批量补守卫里犯了 5 次）：
+  /// - 选完日志目录 → `setLogDirectory` 被跳过
+  /// - 选完闪念目录 → Swift 侧已提交 security-scoped bookmark、Dart 侧没落盘，
+  ///   两边对不上，DiaryService 的对账 fail-closed，闪念直接不能写
+  /// - 录完快捷键 → 整个 `switch` 被跳过，那次录制白做
+  /// - 选完 LLM 模型 → preset 已存、model 没存，配置自相矛盾
+  ///
+  /// **规矩：mounted 只挡 setState，不挡落盘，也不挡全局通知。**
+  test('mounted 守卫不得挡在落盘前面', () {
+    final offenders = <String>[];
+    for (final f in Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'))) {
+      final result = parseFile(
+        path: f.absolute.path,
+        featureSet: FeatureSet.latestLanguageVersion(),
+      );
+      result.unit
+          .accept(_GuardBlocksWriteVisitor(f.path, result.lineInfo, offenders));
+    }
+    expect(offenders, isEmpty,
+        reason: '守卫后面紧跟的语句里 await 先于 setState —— '
+            '页面已销毁时那次 await 的副作用会被一起跳过：\n'
+            '${offenders.join('\n')}');
+  });
+}
+
+class _GuardBlocksWriteVisitor extends RecursiveAstVisitor<void> {
+  _GuardBlocksWriteVisitor(this.path, this.lineInfo, this.offenders);
+
+  final String path;
+  final LineInfo lineInfo;
+  final List<String> offenders;
+
+  @override
+  void visitBlock(Block node) {
+    for (var i = 0; i < node.statements.length - 1; i++) {
+      if (node.statements[i].toSource() != 'if (!mounted) return;') continue;
+      final next = node.statements[i + 1];
+      final src = next.toSource();
+      // 裸 setState 是正常写法，不算
+      if (src.startsWith('setState(')) continue;
+      // 只看**本层**：闭包里的 setState 是回调，不在这条语句里同步执行
+      // （引导页把 `() => setState(...)` 当参数传出去就属于这种）。
+      final scan = _SameLevelScanner()..visit(next);
+      if (scan.firstSetState == null || scan.firstAwait == null) continue;
+      // 真正要抓的是「副作用先于 setState」：await 在前，说明守卫把它一起挡了
+      if (scan.firstAwait! > scan.firstSetState!) continue;
+      final loc = lineInfo.getLocation(next.offset);
+      offenders.add('  $path:${loc.lineNumber}  '
+          '${src.length > 80 ? '${src.substring(0, 80)}…' : src}');
+    }
+    super.visitBlock(node);
+  }
 }
 
 class _UnguardedSetStateVisitor extends RecursiveAstVisitor<void> {
@@ -65,6 +127,15 @@ class _UnguardedSetStateVisitor extends RecursiveAstVisitor<void> {
     return v.found;
   }
 
+  /// 同理，`await` 也走 AST：`AppLog.d('await ')` 不该被当成真的有 await。
+  /// 嵌套闭包里的 await 也会算进来 —— 那是 fail-closed 方向，
+  /// 顶多多要一句 `if (!mounted)`，不会漏掉真问题。
+  static bool _has<T extends AstNode>(AstNode node) {
+    final v = _NodeFinder<T>();
+    node.accept(v);
+    return v.found;
+  }
+
   @override
   void visitBlock(Block node) {
     var sawAwait = false;
@@ -79,7 +150,7 @@ class _UnguardedSetStateVisitor extends RecursiveAstVisitor<void> {
         sawAwait = false; // 同一段只报一次，避免刷屏
       }
       if (mentionsMounted) guarded = true;
-      if (src.contains('await ')) {
+      if (_has<AwaitExpression>(st)) {
         sawAwait = true;
         guarded = false;
       }
@@ -95,5 +166,41 @@ class _MountedFinder extends RecursiveAstVisitor<void> {
   void visitSimpleIdentifier(SimpleIdentifier node) {
     if (node.name == 'mounted') found = true;
     super.visitSimpleIdentifier(node);
+  }
+}
+
+class _NodeFinder<T extends AstNode> extends GeneralizingAstVisitor<void> {
+  bool found = false;
+
+  @override
+  void visitNode(AstNode node) {
+    if (node is T) found = true;
+    super.visitNode(node);
+  }
+}
+
+/// 只扫**同一个异步层**：遇到函数字面量就不往里走。
+/// 闭包里的 await / setState 属于另一次执行，跟当前这条语句的顺序无关。
+class _SameLevelScanner extends RecursiveAstVisitor<void> {
+  int? firstAwait;
+  int? firstSetState;
+
+  void visit(AstNode node) => node.accept(this);
+
+  @override
+  void visitFunctionExpression(FunctionExpression node) {
+    // 故意不 super：不进闭包
+  }
+
+  @override
+  void visitAwaitExpression(AwaitExpression node) {
+    firstAwait ??= node.offset;
+    super.visitAwaitExpression(node);
+  }
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    if (node.methodName.name == 'setState') firstSetState ??= node.offset;
+    super.visitMethodInvocation(node);
   }
 }

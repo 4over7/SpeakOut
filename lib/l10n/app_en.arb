@@ -462,6 +462,8 @@
   },
   "hotkeyConflictAutoClearMsg": "The hotkey has been cleared. Please set a new one.",
   "modelActivateFailed": "Model activation failed: {err}",
+  "modelActivateFailedNoEngine": "Model activation failed: {error}. The engine is still not ready after rollback — restart the app or pick another model",
+  "@modelActivateFailedNoEngine": {"placeholders": {"error": {"type": "String"}}},
   "@modelActivateFailed": {
     "placeholders": {
       "err": {

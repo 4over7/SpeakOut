@@ -284,8 +284,10 @@ class XfyunASRProvider implements ASRProvider {
       segments.add(segText);
       return;
     }
-    final start = ((rg[0] as int) - 1).clamp(0, segments.length);
-    final end = (rg[1] as int) - 1;
+    // 用 num 而不是 int：JSON 里 `1` 和 `1.0` 都可能出现，`as int` 一抛
+    // 会被 _onMessage 的 catch 吞掉**整条消息**，连同识别文本一起丢。
+    final start = ((rg[0] as num).toInt() - 1).clamp(0, segments.length);
+    final end = (rg[1] as num).toInt() - 1;
     final to = (end + 1).clamp(start, segments.length);
     segments.removeRange(start, to);
     segments.insert(start, segText);

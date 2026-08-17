@@ -185,10 +185,10 @@ class _DeveloperPageState extends State<DeveloperPage> {
         throw Exception('ditto failed: ${dittoResult.stderr}');
       }
 
-      if (!mounted) return;
+      // 不判 mounted：NotificationService 是全局横幅，不依赖本页 context。
+      // 加了守卫的话，用户导出完日志顺手关掉设置页 → 一条提示都看不到。
       NotificationService().notifySuccess(loc.aboutSystemLogSuccess(zipPath));
     } catch (e) {
-      if (!mounted) return;
       NotificationService().notifyError(loc.aboutSystemLogFailed('$e'));
     } finally {
       try {
@@ -296,7 +296,6 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 backgroundColor: MacosColors.transparent,
                 onPressed: () async {
                   final dir = await FilePicker.platform.getDirectoryPath(dialogTitle: loc.aboutLogDir);
-                  if (!mounted) return;
                   if (dir != null) {
                     await ConfigService().setLogDirectory(dir);
                     AppService().applyVerboseLogging();
