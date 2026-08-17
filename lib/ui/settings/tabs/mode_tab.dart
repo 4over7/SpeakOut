@@ -578,7 +578,11 @@ class ModeTabState extends State<ModeTab> {
     }
     final path = await _app.getActiveModelPath();
     final model = _app.getModelById(_activeModelId ?? '');
-    if (path == null || model == null) return;
+    // 解析不出模型时**必须抛**，不能静默返回：调用方会当成「切换成功」，
+    // 于是模式已经改成离线、引擎却是空的，按快捷键毫无反应。
+    if (path == null || model == null) {
+      throw StateError('离线模型不可用（id=${_activeModelId ?? ''}, path=$path）');
+    }
     await _app.initASR(
         modelPath: path,
         type: model.type,
@@ -618,11 +622,13 @@ class ModeTabState extends State<ModeTab> {
       final loc = AppLocalizations.of(context)!;
       setState(() {});
       if (context.mounted) {
+        // 这里是「换云端账户/模型」，不是「激活离线模型」——
+        // 套 modelActivateFailed 的话术会把用户引向模型页面。
         showSettingsError(
             context,
             _app.isASRReady
-                ? loc.modelActivateFailed('$e')
-                : loc.modelActivateFailedNoEngine('$e'));
+                ? loc.asrSwitchFailed('$e')
+                : loc.asrSwitchFailedNoEngine('$e'));
       }
       return;
     }
@@ -632,10 +638,11 @@ class ModeTabState extends State<ModeTab> {
   Future<void> _switchWorkMode(String? mode) async {
     if (mode == null) return;
     final oldMode = ConfigService().workMode;
+    // 两个「旧值」都要在任何写入**之前**取，否则回滚目标会随实现漂移
+    final oldInputLang = ConfigService().inputLanguage;
     await ConfigService().setWorkMode(mode);
 
     // Reset input language if current selection is not supported by cloud ASR model
-    final oldInputLang = ConfigService().inputLanguage;
     if (mode == 'cloud') {
       final cloudModel = _getCurrentCloudAsrModel();
       if (cloudModel != null && oldInputLang != 'auto' && !cloudModel.supportsLanguage(oldInputLang)) {
@@ -664,8 +671,8 @@ class ModeTabState extends State<ModeTab> {
           showSettingsError(
               context,
               _app.isASRReady
-                  ? loc.modelActivateFailed('$e')
-                  : loc.modelActivateFailedNoEngine('$e'));
+                  ? loc.asrSwitchFailed('$e')
+                  : loc.asrSwitchFailedNoEngine('$e'));
         }
         return;
       }

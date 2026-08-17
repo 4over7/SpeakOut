@@ -422,9 +422,31 @@
   },
   "hotkeyConflictAutoClearMsg": "快捷键已自动清除，请重新设置。",
   "modelActivateFailed": "模型激活失败：{err}",
-  "modelActivateFailedNoEngine": "模型激活失败：{error}。回退到原模型后语音引擎仍未就绪，请重启应用或重新选择模型",
-  "@modelActivateFailedNoEngine": {"placeholders": {"error": {"type": "String"}}},
   "@modelActivateFailed": {
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
+  },
+  "modelActivateFailedNoEngine": "模型激活失败：{err}。回退到原模型后语音引擎仍未就绪，请重启应用或重新选择模型",
+  "@modelActivateFailedNoEngine": {
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
+  },
+  "asrSwitchFailed": "切换识别服务失败：{err}，已恢复原来的选择",
+  "@asrSwitchFailed": {
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
+  },
+  "asrSwitchFailedNoEngine": "切换识别服务失败：{err}。恢复原选择后语音引擎仍未就绪，请重启应用",
+  "@asrSwitchFailedNoEngine": {
     "placeholders": {
       "err": {
         "type": "String"

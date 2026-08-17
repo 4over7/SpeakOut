@@ -1059,8 +1059,18 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String modelActivateFailedNoEngine(String error) {
-    return '模型激活失败：$error。回退到原模型后语音引擎仍未就绪，请重启应用或重新选择模型';
+  String modelActivateFailedNoEngine(String err) {
+    return '模型激活失败：$err。回退到原模型后语音引擎仍未就绪，请重启应用或重新选择模型';
+  }
+
+  @override
+  String asrSwitchFailed(String err) {
+    return '切换识别服务失败：$err，已恢复原来的选择';
+  }
+
+  @override
+  String asrSwitchFailedNoEngine(String err) {
+    return '切换识别服务失败：$err。恢复原选择后语音引擎仍未就绪，请重启应用';
   }
 
   @override

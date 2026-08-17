@@ -1115,8 +1115,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String modelActivateFailedNoEngine(String error) {
-    return 'Model activation failed: $error. The engine is still not ready after rollback — restart the app or pick another model';
+  String modelActivateFailedNoEngine(String err) {
+    return 'Model activation failed: $err. The engine is still not ready after rollback — restart the app or pick another model';
+  }
+
+  @override
+  String asrSwitchFailed(String err) {
+    return 'Failed to switch ASR service: $err. Previous selection restored';
+  }
+
+  @override
+  String asrSwitchFailedNoEngine(String err) {
+    return 'Failed to switch ASR service: $err. The engine is still not ready after restoring — please restart the app';
   }
 
   @override

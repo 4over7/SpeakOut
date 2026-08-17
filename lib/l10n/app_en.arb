@@ -462,9 +462,31 @@
   },
   "hotkeyConflictAutoClearMsg": "The hotkey has been cleared. Please set a new one.",
   "modelActivateFailed": "Model activation failed: {err}",
-  "modelActivateFailedNoEngine": "Model activation failed: {error}. The engine is still not ready after rollback — restart the app or pick another model",
-  "@modelActivateFailedNoEngine": {"placeholders": {"error": {"type": "String"}}},
   "@modelActivateFailed": {
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
+  },
+  "modelActivateFailedNoEngine": "Model activation failed: {err}. The engine is still not ready after rollback — restart the app or pick another model",
+  "@modelActivateFailedNoEngine": {
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
+  },
+  "asrSwitchFailed": "Failed to switch ASR service: {err}. Previous selection restored",
+  "@asrSwitchFailed": {
+    "placeholders": {
+      "err": {
+        "type": "String"
+      }
+    }
+  },
+  "asrSwitchFailedNoEngine": "Failed to switch ASR service: {err}. The engine is still not ready after restoring — please restart the app",
+  "@asrSwitchFailedNoEngine": {
     "placeholders": {
       "err": {
         "type": "String"

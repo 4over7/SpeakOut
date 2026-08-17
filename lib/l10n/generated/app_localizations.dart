@@ -2087,8 +2087,20 @@ abstract class AppLocalizations {
   /// No description provided for @modelActivateFailedNoEngine.
   ///
   /// In en, this message translates to:
-  /// **'Model activation failed: {error}. The engine is still not ready after rollback — restart the app or pick another model'**
-  String modelActivateFailedNoEngine(String error);
+  /// **'Model activation failed: {err}. The engine is still not ready after rollback — restart the app or pick another model'**
+  String modelActivateFailedNoEngine(String err);
+
+  /// No description provided for @asrSwitchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to switch ASR service: {err}. Previous selection restored'**
+  String asrSwitchFailed(String err);
+
+  /// No description provided for @asrSwitchFailedNoEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to switch ASR service: {err}. The engine is still not ready after restoring — please restart the app'**
+  String asrSwitchFailedNoEngine(String err);
 
   /// No description provided for @punctAutoLoaded.
   ///
