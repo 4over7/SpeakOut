@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,7 +19,7 @@ class ConfigService {
   // Safe field: Nullable prefs
   SharedPreferences? _prefs;
   bool _initialized = false;
-  Completer<void>? _initCompleter;
+  Future<void>? _initInFlight;
   // Default doc path (fallback if not init)
   String _defaultDocPath = "";
 
@@ -33,28 +32,38 @@ class ConfigService {
   // Local Notifier for Language Change
   final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
 
-  Future<void> init() async {
-    if (_initialized) return;
-    if (_initCompleter != null) return _initCompleter!.future;
-    _initCompleter = Completer<void>();
-    _prefs = await SharedPreferences.getInstance();
-    
-    // Get Safe Directory
+  Future<void> init() {
+    if (_initialized) return Future.value();
+    final inFlight = _initInFlight;
+    if (inFlight != null) return inFlight;
+    final future = _initialize();
+    _initInFlight = future;
+    return future;
+  }
+
+  Future<void> _initialize() async {
     try {
-      final docDir = await getApplicationDocumentsDirectory();
-      _defaultDocPath = "${docDir.path}/SpeakOut_Notes";
-    } catch (e) {
-      AppLog.d("ConfigService: Failed to get doc dir: $e");
+      _prefs = await SharedPreferences.getInstance();
+
+      // Get Safe Directory
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        _defaultDocPath = "${docDir.path}/SpeakOut_Notes";
+      } catch (e) {
+        AppLog.d("ConfigService: Failed to get doc dir: $e");
+      }
+
+      // Load Locale
+      _updateLocaleNotifier();
+
+      // Preload credential values into memory cache
+      _preloadSecureKeys();
+
+      _initialized = true;
+    } catch (_) {
+      _initInFlight = null;
+      rethrow;
     }
-    
-    // Load Locale
-    _updateLocaleNotifier();
-
-    // Preload Keychain values into memory cache
-    _preloadSecureKeys();
-
-    _initialized = true;
-    _initCompleter!.complete();
   }
 
   /// 重新加载配置（导入配置后调用，刷新内存缓存）
@@ -131,6 +140,7 @@ class ConfigService {
   Future<void> clearToggleDiaryKey() async {
     await _prefs?.remove('toggle_diary_key_code');
     await _prefs?.remove('toggle_diary_key_name');
+    await _prefs?.remove('toggle_diary_modifiers');
   }
 
   // --- Toggle Shared Config ---
@@ -198,7 +208,11 @@ class ConfigService {
       await _prefs?.remove('audio_device_name');
     } else {
       await _prefs?.setString('audio_device_id', id);
-      if (name != null) await _prefs?.setString('audio_device_name', name);
+      if (name != null) {
+        await _prefs?.setString('audio_device_name', name);
+      } else {
+        await _prefs?.remove('audio_device_name');
+      }
     }
   }
 
@@ -346,6 +360,8 @@ class ConfigService {
     final owner = selectedLlmAccountId;
     if (owner != null && owner.isNotEmpty) {
       await _prefs?.setString('llm_model_owner', owner);
+    } else {
+      await _prefs?.remove('llm_model_owner');
     }
   }
 
@@ -435,7 +451,11 @@ class ConfigService {
       await _prefs?.remove('selected_asr_model_id');
     } else {
       await _prefs?.setString('selected_asr_account_id', accountId);
-      if (modelId != null) await _prefs?.setString('selected_asr_model_id', modelId);
+      if (modelId != null) {
+        await _prefs?.setString('selected_asr_model_id', modelId);
+      } else {
+        await _prefs?.remove('selected_asr_model_id');
+      }
     }
   }
 
@@ -465,7 +485,6 @@ class ConfigService {
     _updateLocaleNotifier();
   }
 
-  /// Load credential values from Keychain into memory cache.
   /// Load credential values from SharedPreferences into memory cache.
   /// TODO: 拿到苹果开发者账号后迁移到 Keychain。
   void _preloadSecureKeys() {

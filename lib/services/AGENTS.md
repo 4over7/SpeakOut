@@ -44,6 +44,10 @@
 - 写入有时需要触发副作用（如切换语言 → 更新 `localeNotifier`）
 - 测试时 mock 一个 service 比 mock 整个 SharedPreferences 容易
 
+`init()` 会让并发调用共享同一个 Future；初始化失败后必须清掉在途状态，让下次调用能够重试。
+账户与模型、设备 UID 与名称、快捷键与修饰键这类成组字段，切换或清除主字段时也要同步处理从属字段，
+避免旧值跨配置串用。
+
 ### 3. LLMService 三条调用路径（但枚举只有两个值）
 - OpenAI 兼容（绝大多数：DeepSeek/阿里云/Groq/智谱/Kimi/MiniMax/Doubao 等）
 - Anthropic（Claude）
@@ -109,6 +113,7 @@ CoreEngine 录音结束
 | `cloud_account_import_test.dart` | 账户导入/合并/回滚/凭证清理（27 例，写路径的主要安全网）|
 | `write_chain_discipline_test.dart` | **纪律测试**：链内代码不得再调公开写方法（会死锁，不是报错）|
 | `config_backup_service_test.dart` | 导出默认不含凭证 |
+| `config_service_init_retry_test.dart` + `config_service_consistency_test.dart` | 初始化失败重试 + 成组字段一致性 |
 | `vocab_csv_test.dart` | CSV 引号/转义/空字段 |
 | `audio_device_service_test.dart` | 设备缓存、监听生命周期、回调非阻塞、提醒开关恢复 |
 | `think_tag_filter_test.dart` | 流式剥 `<think>`（标签被 delta 切成两半的各种形态）|
