@@ -54,7 +54,6 @@ class CoreEngine {
       _nativeInput = createNativeInput();
       // Initialize AudioDeviceService
       _audioDeviceService = AudioDeviceService(_nativeInput!);
-      AudioDeviceService.setInstance(_audioDeviceService!);
     } catch (e) {
       AppLog.d("[CoreEngine] Warning: Failed to init NativeInput: $e");
       _nativeInput = null;

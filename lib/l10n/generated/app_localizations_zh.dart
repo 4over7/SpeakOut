@@ -1037,6 +1037,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchToBuiltin => '切换到内置';
 
   @override
+  String get audioDeviceSwitchFailed => '切换音频输入设备失败';
+
+  @override
+  String get audioDeviceDisconnected => '音频设备已断开，已切换到系统默认';
+
+  @override
+  String get bluetoothMicDetected => '检测到蓝牙麦克风，建议使用内置麦克风以获得更好的转写效果';
+
+  @override
+  String get switchToBuiltinMicAction => '切换到内置麦克风';
+
+  @override
+  String get switchedToBuiltinMic => '已切换到内置麦克风';
+
+  @override
   String get autoOptimizeAudio => '蓝牙麦克风提醒';
 
   @override

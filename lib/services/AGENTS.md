@@ -1,6 +1,6 @@
 # lib/services/ — Service 层
 
-> 业务服务层。配置 / LLM 调用 / 笔记 / 聊天历史 / 音频设备 / 云账户 / 计费 / 自动更新。**全部 singleton**，UI 层 + Engine 层都依赖这层。
+> 业务服务层。配置 / LLM 调用 / 笔记 / 聊天历史 / 音频设备 / 云账户 / 计费 / 自动更新。UI 层 + Engine 层都依赖这层。
 
 ## 必读
 
@@ -9,37 +9,39 @@
 
 ## 这层是干什么的
 
-把"业务规则 + 持久化 + 副作用"从 Engine 和 UI 隔离出来。每个服务有清晰职责，singleton 模式，全局可用。
+把"业务规则 + 持久化 + 副作用"从 Engine 和 UI 隔离出来。每个服务有清晰职责；长期有状态服务通常是 singleton，
+`AudioDeviceService` 由 `CoreEngine` 持有，`ConfigBackupService` 是静态工具。
 
-## 服务全清单（13 个）
+## 服务导航
 
-> 规模列是**量级**不是精确行数（精确值必然漂移）。`engine_types.dart` 是共享类型定义，不是 service。
+`engine_types.dart` 是共享类型定义，不是 service。
 
-| Service | 文件 | 规模 | 职责 |
-|---|---|---|---|
-| **`ConfigService`** | `config_service.dart` | ~600 | **唯一**配置读写入口（包装 SharedPreferences），所有偏好/凭证/状态都过它 |
-| **`LLMService`** | `llm_service.dart` | ~730 | **唯一** LLM 调用入口，支持 OpenAI/Anthropic/Ollama 三种 API 格式 + 流式 + 翻译 + 梳理 |
-| `AppService` | `app_service.dart` | ~240 | 应用生命周期总控：启动时调 init()，关闭时 dispose() 全部子服务 |
-| `CloudAccountService` | `cloud_account_service.dart` | ~830 | 云账户 CRUD（多账户管理 + 凭证安全存储） |
-| `AudioDeviceService` | `audio_device_service.dart` | ~300 | 麦克风设备枚举、用户偏好、蓝牙检测、设备变化 Stream |
-| `UpdateService` | `update_service.dart` | ~590 | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
-| `ChatService` | `chat_service.dart` | ~150 | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
-| `BillingService` | `billing_service.dart` | ~230 | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
-| `VocabService` | `vocab_service.dart` | ~220 | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
-| `DiaryService` | `diary_service.dart` | ~50 | 闪念笔记 Markdown 文件按天追加 |
-| `OverlayController` | `overlay_controller.dart` | ~80 | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
-| `NotificationService` | `notification_service.dart` | ~66 | macOS 系统通知（应用内 + 横幅消息）|
-| `ConfigBackupService` | `config_backup_service.dart` | ~160 | 配置导入/导出（JSON）。**默认不导出凭证** — 须显式 `includeCredentials=true` 才含密钥（v1.9.0 加固）|
+| Service | 文件 | 职责 |
+|---|---|---|
+| **`ConfigService`** | `config_service.dart` | **唯一**配置读写入口（包装 SharedPreferences），所有偏好/凭证/状态都过它 |
+| **`LLMService`** | `llm_service.dart` | **唯一** LLM 调用入口，支持 OpenAI/Anthropic/Ollama 三种 API 格式 + 流式 + 翻译 + 梳理 |
+| `AppService` | `app_service.dart` | 应用生命周期总控：启动时调 init()，关闭时 dispose() 全部子服务 |
+| `CloudAccountService` | `cloud_account_service.dart` | 云账户 CRUD（多账户管理 + 凭证安全存储） |
+| `AudioDeviceService` | `audio_device_service.dart` | 麦克风设备枚举、用户偏好、蓝牙检测、设备变化 Stream |
+| `UpdateService` | `update_service.dart` | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
+| `ChatService` | `chat_service.dart` | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
+| `BillingService` | `billing_service.dart` | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
+| `VocabService` | `vocab_service.dart` | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
+| `DiaryService` | `diary_service.dart` | 闪念笔记 Markdown 文件按天追加 |
+| `OverlayController` | `overlay_controller.dart` | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
+| `NotificationService` | `notification_service.dart` | macOS 系统通知（应用内 + 横幅消息）|
+| `ConfigBackupService` | `config_backup_service.dart` | 配置导入/导出（JSON）。**默认不导出凭证** — 须显式 `includeCredentials=true` 才含密钥（v1.9.0 加固）|
 
 ## 关键设计决策
 
-### 1. 全局 singleton + 显式 init/dispose
-所有 service 都是 `factory ServiceName() => _instance` 模式。`AppService` 在启动时统一 `init()`，关闭时 `dispose()` 关闭 stream / 取消 timer / 关闭文件句柄（防内存泄漏，2026-03-29 集中修过一轮）。
+### 1. 有状态服务 + 显式 init/dispose
+全局有状态 service 使用 `factory ServiceName() => _instance`；引擎私有服务由引擎持有。`AppService` 在启动时统一
+`init()`，关闭时 `dispose()` 关闭 stream / 取消 timer / 关闭文件句柄。
 
 ### 2. ConfigService 是配置唯一入口
 **禁止**任何模块直接 `SharedPreferences.getInstance()`。所有 getter 都走 `ConfigService()`，所有 setter 都走 `ConfigService().setXxx()`。原因：
 - 默认值集中管理（`AppConstants.kDefaultXxx`）
-- 写入有时需要触发副作用（如改音频设备 → 通知 AudioDeviceService 重启）
+- 写入有时需要触发副作用（如切换语言 → 更新 `localeNotifier`）
 - 测试时 mock 一个 service 比 mock 整个 SharedPreferences 容易
 
 ### 3. LLMService 三条调用路径（但枚举只有两个值）
@@ -63,13 +65,22 @@
 ### 6. ChatService metadata 字段扩展
 聊天气泡可携带 `metadata` map，用于 dictation 气泡折叠展开 ASR 原文（v1.6.x 起）。新增类似功能时复用此字段，**不要扩 message 主表 schema**。
 
+### 7. 音频设备变化回调不能全量枚举
+
+蓝牙协商期间枚举全部 CoreAudio 设备可能长时间阻塞主 isolate。设备变化回调只做缓存失效、
+偏好对账和快照事件分发；启动只查询当前设备，设置页收到事件也只消费快照，完整列表留到用户主动进入页面时刷新。
+监听初始化必须幂等；注册失败要先清 native callback，再关闭 Dart `NativeCallable`。
+
 ## 数据流
 
 ```
 UI 触发动作（如「保存设置」）
   → ConfigService.setXxx()
   → SharedPreferences 持久化
-  → 必要时 broadcast 到订阅者（如 AudioDeviceService.deviceChanges）
+
+CoreAudio 默认输入变化
+  → AudioDeviceService 对账偏好并失效缓存
+  → deviceChanges 广播轻量快照（不在回调链全量枚举）
 
 CoreEngine 录音结束
   → 调 LLMService.correctText(rawAsr, vocabHints: VocabService().getVocabHints())
@@ -99,13 +110,14 @@ CoreEngine 录音结束
 | `write_chain_discipline_test.dart` | **纪律测试**：链内代码不得再调公开写方法（会死锁，不是报错）|
 | `config_backup_service_test.dart` | 导出默认不含凭证 |
 | `vocab_csv_test.dart` | CSV 引号/转义/空字段 |
+| `audio_device_service_test.dart` | 设备缓存、监听生命周期、回调非阻塞、提醒开关恢复 |
 | `think_tag_filter_test.dart` | 流式剥 `<think>`（标签被 delta 切成两半的各种形态）|
 | `llm_stream_failure_test.dart` | 流式中断不得重复吐原文 / 残留行不丢 / 伪流式也要清 think |
 
 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）。
 
 > **无单测的 service**（改动时没有安全网，靠手动验证）：`BillingService`、
-> `AudioDeviceService`、`AppService`、`OverlayController`、`UpdateService` 的安装脚本部分
+> `AppService`、`OverlayController`、`UpdateService` 的安装脚本部分
 > （`update_service_test.dart` 只覆盖版本比较与校验，不覆盖 helper 脚本执行）。
 
 ## 隐藏的雷区

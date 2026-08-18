@@ -1091,6 +1091,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchToBuiltin => 'Switch to built-in';
 
   @override
+  String get audioDeviceSwitchFailed => 'Failed to switch audio input device';
+
+  @override
+  String get audioDeviceDisconnected =>
+      'Audio device disconnected. Switched to system default';
+
+  @override
+  String get bluetoothMicDetected =>
+      'Bluetooth microphone detected. Use the built-in microphone for better transcription quality';
+
+  @override
+  String get switchToBuiltinMicAction => 'Switch to built-in microphone';
+
+  @override
+  String get switchedToBuiltinMic => 'Switched to built-in microphone';
+
+  @override
   String get autoOptimizeAudio => 'Bluetooth mic reminder';
 
   @override

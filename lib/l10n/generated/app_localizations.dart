@@ -2048,6 +2048,36 @@ abstract class AppLocalizations {
   /// **'Switch to built-in'**
   String get switchToBuiltin;
 
+  /// No description provided for @audioDeviceSwitchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to switch audio input device'**
+  String get audioDeviceSwitchFailed;
+
+  /// No description provided for @audioDeviceDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio device disconnected. Switched to system default'**
+  String get audioDeviceDisconnected;
+
+  /// No description provided for @bluetoothMicDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth microphone detected. Use the built-in microphone for better transcription quality'**
+  String get bluetoothMicDetected;
+
+  /// No description provided for @switchToBuiltinMicAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to built-in microphone'**
+  String get switchToBuiltinMicAction;
+
+  /// No description provided for @switchedToBuiltinMic.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched to built-in microphone'**
+  String get switchedToBuiltinMic;
+
   /// No description provided for @autoOptimizeAudio.
   ///
   /// In en, this message translates to:

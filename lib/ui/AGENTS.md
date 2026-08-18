@@ -16,7 +16,7 @@
 | 文件 | 职责 |
 |---|---|
 | `theme.dart` | 全局颜色/字体/间距（墨竹翡翠绿 #00B074 / #009660），用 `Theme.of(context)` 取值 |
-| `settings_page.dart` | 11 行 shell，直接渲染 `SettingsSidebarShell`（v1.8 后旧 5-tab 已不可达）|
+| `settings_page.dart` | shell，直接渲染 `SettingsSidebarShell`（v1.8 后旧 5-tab 已不可达）|
 | `chat/` | 聊天页：时间线布局 + dictation 气泡（含 ASR 原文折叠展开） |
 | `settings/` | 设置页（**重要，看下文**）|
 | `cloud_accounts_page.dart` | 云账户管理（多账户 + 凭证分组卡）。**v1.10 起分层展示**：已启用/已填凭证/`_kRecommendedProviderIds` 内的进主区，其余折叠进「更多服务商」——15 家 provider 一个没删，只是默认不铺开 |
@@ -31,10 +31,10 @@
 
 ```
 lib/ui/settings/
-├── settings_page.dart      ← 11 行 shell
+├── settings_page.dart      ← shell
 ├── settings_shared.dart    ← 共享：HotkeyCapturer / findHotkeyConflict / settingsRow helper
 ├── tabs/
-│   ├── mode_tab.dart       ← 大文件（1700+ 行），承载多个 sidebar 页面（用 viewFilter 过滤）
+│   ├── mode_tab.dart       ← 大文件，承载多个 sidebar 页面（用 viewFilter 过滤）
 │   ├── superpower_tab.dart ← 同上，承载超能力相关页面
 │   ├── general_tab.dart    ← 通用 + 快捷键 + 权限三合一
 │   └── service_tab.dart    ← 旧 5-tab 时代的云账户 wrap（sidebar 改用 sidebar/pages/cloud_accounts_page）

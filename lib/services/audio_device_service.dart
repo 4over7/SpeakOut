@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:ui';
 
 import 'package:ffi/ffi.dart';
 import '../ffi/native_input_base.dart';
 import 'config_service.dart';
 import 'notification_service.dart';
 import 'package:speakout/config/app_log.dart';
+import 'package:speakout/l10n/generated/app_localizations.dart';
 
 /// Represents an audio input device
 class AudioDevice {
@@ -76,13 +78,29 @@ class AudioDeviceService {
   bool _disposed = false;
   
   AudioDeviceService(this._nativeInput);
+
+  AppLocalizations get _loc {
+    final configured = ConfigService().appLanguage;
+    final locale = configured == 'system'
+        ? PlatformDispatcher.instance.locale
+        : Locale(configured);
+    return lookupAppLocalizations(
+        Locale(locale.languageCode == 'zh' ? 'zh' : 'en'));
+  }
   
   /// Initialize the service and start listening for device changes
   void initialize() {
+    if (_disposed || _deviceChangeCallable != null) {
+      AppLog.d('[AudioDeviceService] Already initialized or disposed, skipping');
+      return;
+    }
     AppLog.d('[AudioDeviceService] Initializing...');
+
+    autoManageEnabled = ConfigService().bluetoothMicReminderEnabled;
     
-    // Enumerate devices first
-    refreshDevices();
+    // 启动只取当前默认设备。全量枚举留到设置页按需读取，避免应用恰好在
+    // 蓝牙协商期间启动时阻塞主 isolate。
+    _refreshCurrentDevice();
     
     // Start listening for device changes
     _startListening();
@@ -99,41 +117,42 @@ class AudioDeviceService {
     final success = _nativeInput.startDeviceChangeListener(
       _deviceChangeCallable!.nativeFunction,
     );
+
+    if (!success) {
+      // native 会先保存 callback 再注册系统 listener；注册失败时也要先 stop
+      // 清掉 native 指针，之后才能安全释放 trampoline，并允许下次重试。
+      _nativeInput.stopDeviceChangeListener();
+      _deviceChangeCallable?.close();
+      _deviceChangeCallable = null;
+    }
     
     AppLog.d('[AudioDeviceService] Device change listener started: $success');
   }
   
   /// Native callback when device changes
-  static void _onDeviceChanged(
+  void _onDeviceChanged(
     Pointer<Utf8> deviceId,
     Pointer<Utf8> deviceName,
     int isBluetooth,
   ) {
-    // This is called from native, we need to dispatch to the service instance
-    // Using a static approach since callbacks are static
     // native 侧 strdup 过（见 native_input.m 里 deviceChangeCallback 的说明：
     // NativeCallable.listener 异步投递，直接传 UTF8String 会是悬垂指针），
     // 这里读完必须释放，否则每次设备变化漏两块内存。
     // try/finally：toDartString 抛异常时也要释放。
     try {
-      _instance?._handleDeviceChange(
+      unawaited(_handleDeviceChange(
         deviceId.toDartString(),
         deviceName.toDartString(),
         isBluetooth == 1,
-      );
+      ));
     } finally {
-      _instance?._nativeInput.nativeFree(deviceId.cast());
-      _instance?._nativeInput.nativeFree(deviceName.cast());
+      _nativeInput.nativeFree(deviceId.cast());
+      _nativeInput.nativeFree(deviceName.cast());
     }
   }
   
-  // Singleton pattern for static callback access
-  static AudioDeviceService? _instance;
-  static void setInstance(AudioDeviceService service) {
-    _instance = service;
-  }
-  
-  void _handleDeviceChange(String deviceId, String deviceName, bool isBluetooth) {
+  Future<void> _handleDeviceChange(
+      String deviceId, String deviceName, bool isBluetooth) async {
     // 与 native 那把锁互补，两者都不能少：
     // 锁保证 stop 返回后没有 native 回调在途；但 NativeCallable.listener 是
     // **异步投递**的 —— stop 之前 native 已经调过一次的话，那条消息还排在
@@ -150,51 +169,74 @@ class AudioDeviceService {
     _devices = [];
     _currentDevice = null;
 
-    // Emit event immediately
-    _deviceChangeController.add(AudioDeviceEvent(
-      deviceId: deviceId,
-      deviceName: deviceName,
-      isBluetooth: isBluetooth,
-    ));
-
     // Check if our preferred device is still available
     final savedId = ConfigService().audioInputDeviceId;
     if (savedId != null && savedId.isNotEmpty) {
       if (_nativeInput.isDeviceAvailable(savedId)) {
         AppLog.d('[AudioDeviceService] Preferred device still available, no action needed');
-        return;
-      }
-      // Preferred device gone — clear config and C layer
-      AppLog.d('[AudioDeviceService] Preferred device gone, clearing preference → system default');
-      ConfigService().setAudioInputDeviceId(null);
-      clearPreferredDevice();
+      } else {
+        // Preferred device gone — clear config and C layer
+        AppLog.d('[AudioDeviceService] Preferred device gone, clearing preference → system default');
+        await ConfigService().setAudioInputDeviceId(null);
+        if (_disposed) return;
+        clearPreferredDevice();
 
-      if (showSwitchNotifications) {
-        NotificationService().notify('音频设备已断开，已切换到系统默认');
+        if (showSwitchNotifications) {
+          NotificationService().notify(_loc.audioDeviceDisconnected);
+        }
       }
-      return;
-    }
-
-    // No preferred device — auto-manage Bluetooth if enabled
-    if (autoManageEnabled && isBluetooth) {
+    } else if (autoManageEnabled && isBluetooth) {
+      // No preferred device — auto-manage Bluetooth if enabled
       _handleBluetoothDetected(deviceName);
     }
+
+    // 订阅者收到事件后会立刻重读配置并更新 UI；必须放在状态处理之后，
+    // 否则设备断开时 UI 可能先读到尚未清掉的旧偏好。
+    if (_disposed || _deviceChangeController.isClosed) return;
+    _deviceChangeController.add(AudioDeviceEvent(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      isBluetooth: isBluetooth,
+    ));
   }
 
   void _handleBluetoothDetected(String bluetoothDeviceName) {
-    AppLog.d('[AudioDeviceService] Bluetooth mic detected as system default, suggesting built-in...');
+    AppLog.d('[AudioDeviceService] Bluetooth mic detected as system default: $bluetoothDeviceName');
 
     if (showSwitchNotifications) {
       NotificationService().notifyWithAction(
-        message: '检测到蓝牙麦克风，建议使用内置麦克风以获得更好的转写效果',
-        actionLabel: '切换到内置麦克风',
+        message: _loc.bluetoothMicDetected,
+        actionLabel: _loc.switchToBuiltinMicAction,
         onAction: () {
-          switchToBuiltinMic();
-          NotificationService().notify('已切换到内置麦克风');
+          unawaited(_switchToBuiltinFromNotification());
         },
         type: NotificationType.audioDeviceSwitch,
         duration: const Duration(seconds: 6),
       );
+    }
+  }
+
+  Future<void> _switchToBuiltinFromNotification() async {
+    if (!switchToBuiltinMic()) {
+      NotificationService().notifyError(_loc.audioDeviceSwitchFailed);
+      return;
+    }
+
+    final uid = getPreferredDeviceUid();
+    if (uid.isEmpty) {
+      NotificationService().notifyError(_loc.audioDeviceSwitchFailed);
+      return;
+    }
+
+    try {
+      await ConfigService().setAudioInputDeviceId(uid);
+      if (_disposed) return;
+      NotificationService().notify(_loc.switchedToBuiltinMic);
+    } catch (e) {
+      AppLog.d('[AudioDeviceService] Failed to persist built-in mic: $e');
+      if (_disposed) return;
+      clearPreferredDevice();
+      NotificationService().notifyError(_loc.audioDeviceSwitchFailed);
     }
   }
   
@@ -209,7 +251,11 @@ class AudioDeviceService {
       _devices = [];
     }
     
-    // Also refresh current device
+    _refreshCurrentDevice();
+  }
+
+  void _refreshCurrentDevice() {
+    _currentDevice = null;
     final currentJsonStr = _nativeInput.getCurrentInputDevice();
     try {
       final Map<String, dynamic> json = jsonDecode(currentJsonStr);
@@ -232,16 +278,17 @@ class AudioDeviceService {
   /// Get the current input device
   AudioDevice? get currentDevice {
     if (_currentDevice == null) {
-      refreshDevices();
+      _refreshCurrentDevice();
     }
     return _currentDevice;
   }
   
   /// Get the built-in microphone
   AudioDevice? get builtInMicrophone {
-    return devices.firstWhere(
+    final availableDevices = devices;
+    return availableDevices.firstWhere(
       (d) => d.isBuiltIn,
-      orElse: () => devices.isNotEmpty ? devices.first : AudioDevice(
+      orElse: () => availableDevices.isNotEmpty ? availableDevices.first : AudioDevice(
         id: '', name: 'Unknown', isBluetooth: false, isBuiltIn: false, sampleRate: 0,
       ),
     );
@@ -263,7 +310,6 @@ class AudioDeviceService {
   /// Clear preferred device — follow system default
   void clearPreferredDevice() {
     _nativeInput.setPreferredDeviceUid('');
-    refreshDevices();
     AppLog.d('[AudioDeviceService] Cleared preferred device, following system default');
   }
 
@@ -311,6 +357,7 @@ class AudioDeviceService {
   
   /// Dispose the service
   void dispose() {
+    if (_disposed) return;
     _disposed = true; // 先立旗，再拆 —— 拆的过程中来的回调也要挡住
     _nativeInput.stopDeviceChangeListener();
 

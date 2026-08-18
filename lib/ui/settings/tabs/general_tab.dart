@@ -51,8 +51,21 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _loadAudioDevices();
     _deviceChangeSubscription =
-        AppService().audioDeviceService?.deviceChanges.listen((_) {
-      if (mounted) _loadAudioDevices();
+        AppService().audioDeviceService?.deviceChanges.listen((event) {
+      if (!mounted) return;
+      // 蓝牙切换期间全量 CoreAudio 枚举可能阻塞数分钟；这里只用回调快照更新，
+      // 完整列表留到用户下次进入设置页或主动操作时刷新。
+      setState(() {
+        _currentAudioDevice = AudioDevice(
+          id: event.deviceId,
+          name: event.deviceName,
+          isBluetooth: event.isBluetooth,
+          isBuiltIn: false,
+          sampleRate: 0,
+        );
+        _useSystemDefaultAudio =
+            AppService().audioDeviceService?.isUsingSystemDefault ?? true;
+      });
     });
 
     final config = ConfigService();
@@ -91,10 +104,11 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
     final service = AppService().audioDeviceService;
     if (service == null) return;
     service.refreshDevices();
+    service.autoManageEnabled = ConfigService().bluetoothMicReminderEnabled;
     setState(() {
       _audioDevices = service.devices;
       _currentAudioDevice = service.currentDevice;
-      _autoManageAudio = service.autoManageEnabled;
+      _autoManageAudio = ConfigService().bluetoothMicReminderEnabled;
       _useSystemDefaultAudio = service.isUsingSystemDefault;
     });
   }
@@ -456,7 +470,12 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
             service.clearPreferredDevice();
             await ConfigService().setAudioInputDeviceId(null);
           } else {
-            service.setInputDevice(value);
+            final switched = service.setInputDevice(value);
+            if (!switched) {
+              NotificationService().notifyError(loc.audioDeviceSwitchFailed);
+              _loadAudioDevices();
+              return;
+            }
             final device = _audioDevices.firstWhere((d) => d.id == value,
                 orElse: () => _audioDevices.first);
             await ConfigService()
@@ -495,7 +514,11 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
               onTap: () async {
                 final service = engine.audioDeviceService;
                 if (service == null) return;
-                service.switchToBuiltinMic();
+                if (!service.switchToBuiltinMic()) {
+                  NotificationService().notifyError(loc.audioDeviceSwitchFailed);
+                  _loadAudioDevices();
+                  return;
+                }
                 final builtIn = service.builtInMicrophone;
                 if (builtIn != null && builtIn.id.isNotEmpty) {
                   await ConfigService()
@@ -524,9 +547,10 @@ class _GeneralTabState extends State<GeneralTab> with WidgetsBindingObserver {
           subtitle: loc.autoOptimizeAudioDesc,
           trailing: MacosSwitch(
             value: _autoManageAudio,
-            onChanged: (v) {
+            onChanged: (v) async {
               setState(() => _autoManageAudio = v);
               engine.audioDeviceService?.autoManageEnabled = v;
+              await ConfigService().setBluetoothMicReminderEnabled(v);
             },
           ),
         ),

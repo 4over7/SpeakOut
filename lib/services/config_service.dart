@@ -189,6 +189,8 @@ class ConfigService {
   
   String? get audioInputDeviceId => _prefs?.getString('audio_device_id');
   String? get audioInputDeviceName => _prefs?.getString('audio_device_name');
+  bool get bluetoothMicReminderEnabled =>
+      _prefs?.getBool('bluetooth_mic_reminder_enabled') ?? true;
   
   Future<void> setAudioInputDeviceId(String? id, {String? name}) async {
     if (id == null) {
@@ -199,6 +201,9 @@ class ConfigService {
       if (name != null) await _prefs?.setString('audio_device_name', name);
     }
   }
+
+  Future<void> setBluetoothMicReminderEnabled(bool enabled) async =>
+      await _prefs?.setBool('bluetooth_mic_reminder_enabled', enabled);
   
   // --- Aliyun Config ---
   String get aliyunAccessKeyId => _cachedAliyunAkId ?? AppConstants.kDefaultAliyunAkId;
