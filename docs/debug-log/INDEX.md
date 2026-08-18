@@ -14,6 +14,7 @@
 
 | 模块 | 文档 | 一句话 |
 |---|---|---|
+| 启动 / UI | [2026-08-19-startup-black-screen](./2026-08-19-startup-black-screen.md) | ⭐ 启动永久黑屏。**改 `main.dart` 首屏前必读** —— `home:` 条件切换换不掉已压栈的初始路由，是条潜伏竞态 |
 | 剪贴板注入 | [2026-08-16-paste-yields-previous-recognition](./2026-08-16-paste-yields-previous-recognition.md) | ⭐ 注入文字滞留剪贴板。**改注入前必读** —— 事务协调器四条不变量的全部来由；根因至今未定案 |
 | 剪贴板注入 | [2026-08-10-synthetic-cmdv-not-recognized](./2026-08-10-synthetic-cmdv-not-recognized.md) | 合成 Cmd+V 序列不完整，Flutter 应用完全收不到 |
 | native 层 | [2026-08-16-batch5-native-findings](./2026-08-16-batch5-native-findings.md) | EventTap 禁用不恢复、回调内同步 I/O、麦克风授权同步阻塞、音量平滑随调用频率失真 |
