@@ -36,11 +36,24 @@ class ChatMessage {
     return ChatMessage(
       id: json['id'] as String,
       text: json['text'] as String,
-      role: json['role'] is int
-          ? ChatRole.values[json['role'] as int]
-          : ChatRole.values.firstWhere((r) => r.name == json['role'] as String),
+      role: _roleFromJson(json['role']),
       timestamp: DateTime.parse(json['timestamp'] as String),
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
+  }
+
+  static ChatRole _roleFromJson(Object? value) {
+    if (value is int) {
+      return value >= 0 && value < ChatRole.values.length
+          ? ChatRole.values[value]
+          : ChatRole.system;
+    }
+    if (value is String) {
+      for (final role in ChatRole.values) {
+        if (role.name == value) return role;
+      }
+      return ChatRole.system;
+    }
+    throw const FormatException('ChatMessage.role 格式无效');
   }
 }

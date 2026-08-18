@@ -21,6 +21,7 @@
 | 配置服务 | [2026-08-18-config-service-consistency](./2026-08-18-config-service-consistency.md) | 初始化失败后可重试，切换主配置时不得遗留旧从属字段 |
 | 配置备份 | [2026-08-18-config-backup-transaction](./2026-08-18-config-backup-transaction.md) | 导出永久排除秘密与本机标识，导入先验证、写失败回滚 |
 | Config / 日志 | [2026-08-18-config-registry-and-log-lifecycle](./2026-08-18-config-registry-and-log-lifecycle.md) | provider 协议真源、日志操作串行化与清空目录跨语言一致性 |
+| Models | [2026-08-18-model-compatibility-boundaries](./2026-08-18-model-compatibility-boundaries.md) | 凭证按完整能力组判断，未知聊天角色保留历史正文 |
 | 云端 ASR | [2026-08-11-volcengine-asr-never-worked](./2026-08-11-volcengine-asr-never-worked.md) | 火山 ASR 自接入起从未跑通（帧解析漏 sequence） |
 | ASR 启动 | [2026-06-02-asr-startup-audio-gap](./2026-06-02-asr-startup-audio-gap.md) | 录音起始丢音 |
 | 全局 | [2026-06-13-review-fixes](./2026-06-13-review-fixes.md) | 三份 review 的修复批次；多处旧逻辑已变，改代码前值得扫 |

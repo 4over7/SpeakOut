@@ -192,7 +192,10 @@ void main() {
     test('缺少必要字段抛出异常', () {
       final badJson = {'id': '1', 'text': 'hello'};
       // Missing role and timestamp
-      expect(() => ChatMessage.fromJson(badJson), throwsA(isA<TypeError>()));
+      expect(
+        () => ChatMessage.fromJson(badJson),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('写入/读取文件往返', () {
