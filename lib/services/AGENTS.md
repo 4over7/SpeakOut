@@ -83,6 +83,16 @@
 Engine 不持有 `BuildContext`，只发稳定 code + params。三端 UI、macOS 浮窗和引擎通知
 都经 `engine_status_localizer.dart`；新增用户可见状态时同步 ARB 和该映射，不在调用点自己判断语言。
 
+### 9. 持久化文件与下载完成态必须可区分
+
+`ChatService` 的新增、清空都走同一写队列，向订阅者发送不可变快照，并通过同目录 staging 文件原子替换历史 JSON。
+`UpdateService` 只把带匹配完成标记的最终 DMG 当作缓存；下载中数据固定留在 `.part`，206 续传必须验证 Range 起点与总长。
+
+### 10. 启动与浮窗状态不能被旧异步任务覆盖
+
+应用只有在键盘监听和 ASR 都可用时才报告 Ready；ASR 初始化失败必须上抛给启动总控保留错误状态。
+浮窗 MethodChannel 的异步错误要在 controller 内消化，延迟清空只能清除自己那一代状态。
+
 ## 数据流
 
 ```
@@ -127,6 +137,8 @@ CoreEngine 录音结束
 | `think_tag_filter_test.dart` | 流式剥 `<think>`（标签被 delta 切成两半的各种形态）|
 | `llm_stream_failure_test.dart` | 流式中断不得重复吐原文 / 残留行不丢 / 伪流式也要清 think |
 | `llm_legacy_fallback_format_test.dart` | 云账户失效后，旧 provider 配置仍选择正确的 OpenAI/Anthropic 协议 |
+| `update_service_test.dart` | DMG partial/完成标记、Content-Range 与安装 helper 状态 |
+| `chat_service_blackbox_test.dart` | 写队列、原子替换、不可变事件快照与持久化 |
 
 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）。
 

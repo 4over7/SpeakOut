@@ -2912,6 +2912,18 @@ abstract class AppLocalizations {
   /// **'No history yet'**
   String get chatEmptyAll;
 
+  /// No description provided for @chatHistoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load chat history'**
+  String get chatHistoryLoadFailed;
+
+  /// No description provided for @chatHistorySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save chat history'**
+  String get chatHistorySaveFailed;
+
   /// No description provided for @chatRoleUser.
   ///
   /// In en, this message translates to:

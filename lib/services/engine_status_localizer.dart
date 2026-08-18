@@ -73,8 +73,12 @@ String localizedEngineStatusForLocale(EngineStatus status, Locale locale) {
 }
 
 String localizedEngineStatusForCurrentLocale(EngineStatus status) {
+  return localizedEngineStatusForLocale(status, currentAppLocale());
+}
+
+Locale currentAppLocale() {
   final configured = ConfigService().appLanguage;
-  final locale = switch (configured) {
+  return switch (configured) {
     'zh' => const Locale('zh'),
     'en' => const Locale('en'),
     _ =>
@@ -82,5 +86,7 @@ String localizedEngineStatusForCurrentLocale(EngineStatus status) {
           ? const Locale('zh')
           : const Locale('en'),
   };
-  return localizedEngineStatusForLocale(status, locale);
 }
+
+AppLocalizations currentAppLocalizations() =>
+    lookupAppLocalizations(currentAppLocale());

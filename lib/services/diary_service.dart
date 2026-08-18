@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../config/app_log.dart';
 import 'notification_service.dart';
 import 'config_service.dart';
+import 'engine_status_localizer.dart';
 
 /// Handles saving Flash Notes (Diary) to local file.
 class DiaryService {
@@ -29,7 +30,8 @@ class DiaryService {
       // 没有 bookmark（非沙盒版 / 用户还没选过目录）就没什么可对账的
       if (authorized == null || authorized.isEmpty) return null;
       if (authorized == configured) return null;
-      AppLog.e('闪念目录不一致：配置=$configured 授权=$authorized');
+      AppLog.e('闪念目录不一致：配置=${AppLog.redact(configured)} '
+          '授权=${AppLog.redact(authorized)}');
       return authorized;
     } catch (_) {
       return null; // 旧壳工程没有这个 method，跳过对账
@@ -42,14 +44,15 @@ class DiaryService {
   ///
   /// Returns null if success, or error message.
   Future<String?> appendNote(String text) async {
-    if (text.trim().isEmpty) return "Empty text";
+    final loc = currentAppLocalizations();
+    if (text.trim().isEmpty) return loc.noSpeech;
     
     final dirPath = ConfigService().diaryDirectory;
-    if (dirPath.isEmpty) return "No directory configured";
+    if (dirPath.isEmpty) return loc.diaryDirNotSet;
 
     final mismatch = await _authorizedDirectoryMismatch(dirPath);
     if (mismatch != null) {
-      const msg = "闪念目录未获授权，请在设置里重新选择保存目录";
+      final msg = loc.diaryDirBookmarkFailed;
       NotificationService().notifyError(msg);
       return msg;
     }
@@ -74,7 +77,8 @@ class DiaryService {
       await file.writeAsString(contentToAppend, mode: FileMode.append);
       return null; // Success
     } catch (e) {
-      final msg = "Failed to save note: $e";
+      AppLog.e('闪念写入失败：${AppLog.redact('$e')}');
+      final msg = loc.diaryDirCannotWrite;
       NotificationService().notifyError(msg);
       return msg;
     }

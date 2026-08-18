@@ -94,13 +94,13 @@ void main() {
     test('空文本 → 返回错误', () async {
       final result = await service.appendNote('');
       expect(result, isNotNull);
-      expect(result, contains('Empty'));
+      expect(result, isNotEmpty);
     });
 
     test('纯空格文本 → 返回错误', () async {
       final result = await service.appendNote('   ');
       expect(result, isNotNull);
-      expect(result, contains('Empty'));
+      expect(result, isNotEmpty);
     });
 
     test('目录不存在 → 自动创建', () async {

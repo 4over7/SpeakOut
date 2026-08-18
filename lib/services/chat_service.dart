@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'notification_service.dart';
+import 'engine_status_localizer.dart';
 import '../models/chat_model.dart';
 import 'package:speakout/config/app_log.dart';
 
@@ -29,6 +30,12 @@ class ChatService {
   String? _testDirPath;
 
   @visibleForTesting
+  static Future<void> Function()? debugBeforeHistoryWrite;
+
+  @visibleForTesting
+  static Future<void> Function()? debugBeforeHistoryPromote;
+
+  @visibleForTesting
   /// **必须 await。**
   ///
   /// 直接把 `_pendingSave` 置 null 是把一个**还在跑的写盘**丢掉，而不是取消它。
@@ -43,6 +50,8 @@ class ChatService {
     _instance._isInit = false;
     _instance._pendingSave = null;
     _instance._testDirPath = null;
+    debugBeforeHistoryWrite = null;
+    debugBeforeHistoryPromote = null;
   }
 
   @visibleForTesting
@@ -86,8 +95,8 @@ class ChatService {
   
   Future<void> clearHistory() async {
     _messages.clear();
-    _streamController.add(_messages);
-    await _saveHistory();
+    _emitMessages();
+    await _enqueueSave();
   }
 
   // --- Internal ---
@@ -102,13 +111,19 @@ class ChatService {
     );
     
     _messages.add(msg);
-    _streamController.add(_messages);
+    _emitMessages();
     _scheduleSave();
   }
 
   /// Serialize save operations to prevent concurrent file writes
   void _scheduleSave() {
-    _pendingSave = (_pendingSave ?? Future.value()).then((_) => _saveHistory());
+    unawaited(_enqueueSave());
+  }
+
+  Future<void> _enqueueSave() {
+    final save = (_pendingSave ?? Future.value()).then((_) => _saveHistory());
+    _pendingSave = save;
+    return save;
   }
 
   // --- Persistence ---
@@ -130,11 +145,12 @@ class ChatService {
         final List<dynamic> jsonList = jsonDecode(content);
         _messages.clear();
         _messages.addAll(jsonList.map((e) => ChatMessage.fromJson(e)).toList());
-        _streamController.add(_messages);
+        _emitMessages();
       }
     } catch (e) {
       AppLog.d("Error loading chat history: $e");
-      NotificationService().notifyError("Failed to load chat history: $e");
+      NotificationService()
+          .notifyError(currentAppLocalizations().chatHistoryLoadFailed);
     }
   }
 
@@ -143,18 +159,29 @@ class ChatService {
       // Keep last 100 messages to avoid bloat
       if (_messages.length > 100) {
         _messages.removeRange(0, _messages.length - 100);
-        if (!_streamController.isClosed) _streamController.add(_messages); // Notify UI of truncation
+        _emitMessages();
       }
       
       final dir = await _getChatDir();
       if (!dir.existsSync()) dir.createSync(recursive: true);
 
       final file = File("${dir.path}/chat_history.json");
+      final staging = File('${file.path}.tmp');
       final jsonList = _messages.map((e) => e.toJson()).toList();
-      await file.writeAsString(jsonEncode(jsonList));
+      await debugBeforeHistoryWrite?.call();
+      await staging.writeAsString(jsonEncode(jsonList), flush: true);
+      await debugBeforeHistoryPromote?.call();
+      await staging.rename(file.path);
     } catch (e) {
       AppLog.d("Error saving chat history: $e");
-      NotificationService().notifyError("Failed to save chat history: $e");
+      NotificationService()
+          .notifyError(currentAppLocalizations().chatHistorySaveFailed);
+    }
+  }
+
+  void _emitMessages() {
+    if (!_streamController.isClosed) {
+      _streamController.add(List<ChatMessage>.unmodifiable(_messages));
     }
   }
 }

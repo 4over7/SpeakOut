@@ -675,6 +675,8 @@
   "chatFilterVoice": "Voice",
   "chatEmptyVoice": "No voice records yet",
   "chatEmptyAll": "No history yet",
+  "chatHistoryLoadFailed": "Failed to load chat history",
+  "chatHistorySaveFailed": "Failed to save chat history",
   "chatRoleUser": "You",
   "chatRoleTool": "Tool",
   "chatRoleVoice": "Voice input",

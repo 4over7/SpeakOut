@@ -635,6 +635,8 @@
   "chatFilterVoice": "语音记录",
   "chatEmptyVoice": "暂无语音记录",
   "chatEmptyAll": "暂无历史记录",
+  "chatHistoryLoadFailed": "聊天历史加载失败",
+  "chatHistorySaveFailed": "聊天历史保存失败",
   "chatRoleUser": "用户",
   "chatRoleTool": "工具",
   "chatRoleVoice": "语音输入",

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import '../config/app_constants.dart';
@@ -43,22 +44,68 @@ class UpdateService {
     final revision = latestBuild == null ? v : '$v+$latestBuild';
     return '${Directory.systemTemp.path}/SpeakOut-update-$revision.dmg';
   }
+  String get _partialDmgPath => '$_dmgPath.part';
+  String get _completionMarkerPath => '$_dmgPath.complete';
   static String get _helperPath => '${Directory.systemTemp.path}/speakout_update.sh';
 
   /// 最小合理 DMG 大小（B）。低于此值视为损坏/未完成下载。
   /// 当前 SpeakOut.dmg 约 53 MB，保守设 20 MB。
   static const int _minValidDmgBytes = 20 * 1024 * 1024;
 
+  bool _hasCompletedDmg() {
+    try {
+      final file = File(_dmgPath);
+      final marker = File(_completionMarkerPath);
+      if (!file.existsSync() || !marker.existsSync()) return false;
+      final expected = int.tryParse(marker.readAsStringSync().trim());
+      final actual = file.lengthSync();
+      return actual >= _minValidDmgBytes && expected == actual;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @visibleForTesting
+  void configureDownloadForTest({
+    required String version,
+    int? build,
+    required String dmgUrl,
+  }) {
+    latestVersion = version;
+    latestBuild = build;
+    _dmgAssetUrl = dmgUrl;
+    _state = UpdateState.idle;
+    errorMessage = null;
+    _lastProgress = 0;
+  }
+
+  @visibleForTesting
+  String get dmgPathForTest => _dmgPath;
+
+  @visibleForTesting
+  String get partialDmgPathForTest => _partialDmgPath;
+
+  @visibleForTesting
+  String get completionMarkerPathForTest => _completionMarkerPath;
+
   /// 清理旧版本的 DMG 缓存文件（保留当前 latestVersion 的）
   void _cleanupStaleDmgs() {
     try {
       final tempDir = Directory(Directory.systemTemp.path);
       final keep = latestVersion == null ? null : File(_dmgPath).uri.pathSegments.last;
+      final keepNames = keep == null
+          ? const <String>{}
+          : <String>{keep, '$keep.part', '$keep.complete'};
       for (final entity in tempDir.listSync()) {
         if (entity is! File) continue;
         final name = entity.uri.pathSegments.last;
-        if (!name.startsWith('SpeakOut-update-') || !name.endsWith('.dmg')) continue;
-        if (keep != null && name == keep) continue;
+        if (!name.startsWith('SpeakOut-update-') ||
+            !(name.endsWith('.dmg') ||
+                name.endsWith('.dmg.part') ||
+                name.endsWith('.dmg.complete'))) {
+          continue;
+        }
+        if (keepNames.contains(name)) continue;
         try {
           entity.deleteSync();
           AppLog.d('UpdateService: cleaned stale DMG: $name');
@@ -131,7 +178,7 @@ class UpdateService {
         // 清理旧版 DMG 缓存 + 检测本次版本是否已下载过
         _cleanupStaleDmgs();
         final cached = File(_dmgPath);
-        if (cached.existsSync() && cached.lengthSync() >= _minValidDmgBytes) {
+        if (_hasCompletedDmg()) {
           AppLog.d('UpdateService: reusing cached DMG: $_dmgPath (${cached.lengthSync()} bytes)');
           _lastProgress = 1.0;
           _setState(UpdateState.readyToInstall);
@@ -230,7 +277,7 @@ class UpdateService {
     }
     // 缓存复用：DMG 已下载过且文件合理，直接跳到 readyToInstall 不重下
     final cached = File(_dmgPath);
-    if (cached.existsSync() && cached.lengthSync() >= _minValidDmgBytes) {
+    if (_hasCompletedDmg()) {
       AppLog.d('UpdateService: DMG already cached, skip download: $_dmgPath (${cached.lengthSync()} bytes)');
       _lastProgress = 1.0;
       _progressController.add(1.0);
@@ -247,7 +294,15 @@ class UpdateService {
     _setState(UpdateState.downloading);
 
     // 计算断点位置（partial file 已有字节数）
-    final file = File(_dmgPath);
+    final file = File(_partialDmgPath);
+    final completed = File(_dmgPath);
+    final completionMarker = File(_completionMarkerPath);
+    if (completed.existsSync() && !_hasCompletedDmg()) {
+      try { completed.deleteSync(); } catch (_) {}
+    }
+    if (completionMarker.existsSync()) {
+      try { completionMarker.deleteSync(); } catch (_) {}
+    }
     var resumeFrom = 0;
     if (file.existsSync()) {
       resumeFrom = file.lengthSync();
@@ -294,9 +349,20 @@ class UpdateService {
       int totalBytes = 0;
       if (isPartial) {
         final contentRange = response.headers['content-range'] ?? '';
-        final match = RegExp(r'bytes\s+\d+-\d+/(\d+)').firstMatch(contentRange);
-        if (match != null) {
-          totalBytes = int.tryParse(match.group(1) ?? '') ?? 0;
+        final match = RegExp(r'bytes\s+(\d+)-(\d+)/(\d+)')
+            .firstMatch(contentRange);
+        final rangeStart = int.tryParse(match?.group(1) ?? '');
+        final rangeEnd = int.tryParse(match?.group(2) ?? '');
+        totalBytes = int.tryParse(match?.group(3) ?? '') ?? 0;
+        if (rangeStart != resumeFrom ||
+            rangeEnd == null ||
+            rangeEnd < rangeStart! ||
+            totalBytes <= rangeEnd) {
+          errorMessage = 'Invalid Content-Range: $contentRange';
+          AppLog.d('UpdateService: $errorMessage');
+          _setState(UpdateState.failed);
+          client.close();
+          return false;
         }
       } else {
         totalBytes = response.contentLength ?? 0;
@@ -340,6 +406,12 @@ class UpdateService {
         _setState(UpdateState.failed);
         return false;
       }
+
+      if (completed.existsSync()) {
+        await completed.delete();
+      }
+      await file.rename(_dmgPath);
+      await completionMarker.writeAsString('$finalSize', flush: true);
 
       AppLog.d('UpdateService: DMG ready: $_dmgPath ($finalSize bytes)');
       _lastProgress = 1.0;
@@ -553,6 +625,7 @@ fi
 echo ">> install ok, cleanup"
 rm -rf "\$BACKUP"
 rm -f "\$DMG"
+rm -f "\$DMG.complete"
 rm -f "$_helperPath"
 
 # Relaunch
@@ -599,7 +672,8 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
   }
 
   /// Check if a DMG has been downloaded and is ready
-  bool get isReadyToInstall => _state == UpdateState.readyToInstall && File(_dmgPath).existsSync();
+  bool get isReadyToInstall =>
+      _state == UpdateState.readyToInstall && _hasCompletedDmg();
 
   /// Whether we can do in-app update (have a direct DMG URL)
   bool get canAutoUpdate => Distribution.supportsAutoUpdate && _dmgAssetUrl != null;

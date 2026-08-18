@@ -16,6 +16,7 @@ import '../engine/model_manager.dart';
 import '../config/app_constants.dart';
 import 'package:speakout/config/app_log.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
 
 /// 管理应用程序生命周期与核心业务逻辑
 /// Central Hub for initialization and logic.
@@ -28,6 +29,12 @@ class AppService {
   final ModelManager modelManager = ModelManager();
 
   bool _isPunctuationInitialized = false;
+
+  @visibleForTesting
+  static bool startupHealthIsReady({
+    required bool listenerRunning,
+    required bool asrReady,
+  }) => listenerRunning && asrReady;
 
   // ════════════════════════════════════════════════════════════
   // Engine facade — UI 层经此访问 engine 能力，避免直接 import lib/engine/
@@ -181,6 +188,8 @@ class AppService {
        await Future.delayed(const Duration(seconds: 2));
     }
 
+    Object? asrStartupError;
+
     // 3. Initialize ASR (HEAVY TASK - Delay significantly)
     // Skip if already initialized (e.g., by onboarding)
     if (engine.isASRReady) {
@@ -203,6 +212,7 @@ class AppService {
       try {
         await _initASR();
       } catch (e) {
+        asrStartupError = e;
         engine.updateStatusEvent(EngineStatus.error(
           "Speech model failed: $e",
           code: 'speech_model_failed',
@@ -217,16 +227,25 @@ class AppService {
     }
     
     // Final Health Check
-    if (engine.isListenerRunning) {
+    if (startupHealthIsReady(
+      listenerRunning: engine.isListenerRunning,
+      asrReady: engine.isASRReady,
+    )) {
         engine.updateStatusEvent(
             const EngineStatus.ready("Ready", code: 'ready'));
         await Future.delayed(const Duration(milliseconds: 500));
         engine.updateStatus(""); // Clear
-    } else {
+    } else if (!engine.isListenerRunning) {
         // Persistent Error - Do NOT Clear
         engine.updateStatusEvent(const EngineStatus.error(
           "Listener startup failed",
           code: 'listener_failed',
+        ));
+    } else {
+        engine.updateStatusEvent(EngineStatus.error(
+          "Speech model failed: $asrStartupError",
+          code: 'speech_model_failed',
+          params: {'error': '$asrStartupError'},
         ));
     }
 
@@ -262,19 +281,20 @@ class AppService {
             await ConfigService().setActiveModelId(defaultId);
           } catch (e) {
             AppLog.d("AppService: Default download failed: $e");
+            rethrow;
           }
         }
       }
-      
-      if (path != null) {
-         final info = await modelManager.getActiveModelInfo();
-         final type = info?.type ?? 'zipformer'; 
-         final name = info?.name ?? 'Local Model';
-         final hasPunct = info?.hasPunctuation ?? false;
-         await engine.initASR(path, modelType: type, modelName: name, hasPunctuation: hasPunct);
-      }
+
+      final info = await modelManager.getActiveModelInfo();
+      final type = info?.type ?? 'zipformer';
+      final name = info?.name ?? 'Local Model';
+      final hasPunct = info?.hasPunctuation ?? false;
+      await engine.initASR(path,
+          modelType: type, modelName: name, hasPunctuation: hasPunct);
     } catch (e) {
        AppLog.d("AppService: ASR Init Error: $e");
+       rethrow;
     }
   }
 

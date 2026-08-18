@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:speakout/config/app_log.dart';
@@ -22,53 +23,60 @@ class OverlayController {
   /// Current recording mode: "ptt", "diary", or "organize"
   String recordingMode = "ptt";
 
+  int _statusGeneration = 0;
+
   /// Whether native overlay is available (macOS only)
   bool get _hasNativeOverlay => Platform.isMacOS;
 
   Future<void> show() async {
     if (!_hasNativeOverlay) return;
+    _statusGeneration++;
     String mode = isOfflineMode ? "offline" : "streaming";
     if (recordingMode == "diary") mode = "diary";
     if (recordingMode == "organize") mode = "organize";
-    _invoke('showRecording', {"mode": mode});
+    await _invoke('showRecording', {"mode": mode});
   }
 
   Future<void> hide() async {
     if (!_hasNativeOverlay) return;
-    _invoke('hideRecording');
+    _statusGeneration++;
+    await _invoke('hideRecording');
   }
 
   void updateText(String text, {int maxLen = 12}) {
     if (!_hasNativeOverlay) return;
+    _statusGeneration++;
     String display = text;
     if (display.length > maxLen) {
       display = "...${display.substring(display.length - maxLen)}";
     }
-    _invoke('updateStatus', {"text": display});
+    unawaited(_invoke('updateStatus', {"text": display}));
   }
 
   void showSilenceHint(String text) {
     if (!_hasNativeOverlay) return;
-    _invoke('showSilenceHint', {"text": text});
+    unawaited(_invoke('showSilenceHint', {"text": text}));
   }
 
   void hideSilenceHint() {
     if (!_hasNativeOverlay) return;
-    _invoke('hideSilenceHint');
+    unawaited(_invoke('hideSilenceHint'));
   }
 
   /// Show text on overlay, then clear after [delay].
   void showThenClear(String text, Duration delay) {
     if (!_hasNativeOverlay) return;
-    _invoke('updateStatus', {"text": text});
+    final generation = ++_statusGeneration;
+    unawaited(_invoke('updateStatus', {"text": text}));
     Future.delayed(delay, () {
-      _invoke('updateStatus', {"text": ""});
+      if (_statusGeneration != generation) return;
+      unawaited(_invoke('updateStatus', {"text": ""}));
     });
   }
 
-  void _invoke(String method, [Map<String, dynamic>? args]) {
+  Future<void> _invoke(String method, [Map<String, dynamic>? args]) async {
     try {
-      _channel.invokeMethod(method, args);
+      await _channel.invokeMethod<void>(method, args);
     } catch (e) {
       AppLog.d("[OverlayController] $method error: $e");
     }

@@ -280,6 +280,43 @@ void main() {
       expect(service.messages.length, 1);
       expect(service.messages.first.text, 'After clear');
     });
+
+    test('清空必须排在正在进行的历史写入之后，不能并发覆盖同一文件', () async {
+      final firstWriteEntered = Completer<void>();
+      final releaseFirstWrite = Completer<void>();
+      var activeWrites = 0;
+      var maxActiveWrites = 0;
+
+      ChatService.debugBeforeHistoryWrite = () async {
+        activeWrites++;
+        if (activeWrites > maxActiveWrites) maxActiveWrites = activeWrites;
+        if (!firstWriteEntered.isCompleted) {
+          firstWriteEntered.complete();
+          await releaseFirstWrite.future;
+        }
+        activeWrites--;
+      };
+
+      service.addUserMessage('排队中的旧消息');
+      await firstWriteEntered.future;
+
+      var clearCompleted = false;
+      final clear = service.clearHistory().then((_) => clearCompleted = true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(maxActiveWrites, 1,
+          reason: 'clearHistory 绕过写队列时会与第一笔写入同时打开 chat_history.json');
+      expect(clearCompleted, isFalse,
+          reason: '清空应等待先前写入完成，再把空列表作为队列中的最后一次写入');
+
+      releaseFirstWrite.complete();
+      await clear;
+
+      expect(maxActiveWrites, 1);
+      final persisted = jsonDecode(
+          File('${tmpDir.path}/chat_history.json').readAsStringSync()) as List<dynamic>;
+      expect(persisted, isEmpty);
+    });
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -372,6 +409,26 @@ void main() {
       await sub1.cancel();
       await sub2.cancel();
     });
+
+    test('每次事件都是不可变快照，不暴露内部列表引用', () async {
+      await service.init();
+      final events = <List<ChatMessage>>[];
+      final sub = service.messageStream.listen(events.add);
+
+      service.addUserMessage('first');
+      await Future<void>.delayed(Duration.zero);
+      service.addUserMessage('second');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(2));
+      expect(events.first.map((m) => m.text), ['first'],
+          reason: '首个事件不应因后续 add 而变成两条消息');
+      expect(() => events.last.clear(), throwsUnsupportedError,
+          reason: '订阅者不能通过 stream 直接改写 ChatService 内部状态');
+      expect(service.messages, hasLength(2));
+
+      await sub.cancel();
+    });
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -391,6 +448,43 @@ void main() {
       expect(content.length, 1);
       expect(content.first['text'], 'Persist this');
       expect(content.first['role'], 'user');
+    });
+
+    test('新快照写完并 flush 前，最终历史文件始终保持上一版完整 JSON', () async {
+      await service.init();
+      service.addUserMessage('stable');
+      final file = File('${tmpDir.path}/chat_history.json');
+      for (var i = 0; i < 50 && !file.existsSync(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(file.existsSync(), isTrue);
+      expect(file.readAsStringSync(), contains('stable'));
+
+      final stagingReady = Completer<void>();
+      final allowPromote = Completer<void>();
+      ChatService.debugBeforeHistoryPromote = () async {
+        if (!stagingReady.isCompleted) {
+          stagingReady.complete();
+          await allowPromote.future;
+        }
+      };
+
+      service.addUserMessage('new snapshot');
+      await stagingReady.future;
+
+      final whileBlocked = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      expect(whileBlocked.map((e) => e['text']), ['stable'],
+          reason: '直接 truncate 最终文件时，崩溃窗口会留下半截 JSON；'
+              '原子写应只让 staging 暴露新内容');
+
+      allowPromote.complete();
+      for (var i = 0;
+          i < 50 && !file.readAsStringSync().contains('new snapshot');
+          i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      final promoted = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      expect(promoted.map((e) => e['text']), ['stable', 'new snapshot']);
     });
 
     test('重新 init 后恢复消息', () async {

@@ -1516,6 +1516,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatEmptyAll => '暂无历史记录';
 
   @override
+  String get chatHistoryLoadFailed => '聊天历史加载失败';
+
+  @override
+  String get chatHistorySaveFailed => '聊天历史保存失败';
+
+  @override
   String get chatRoleUser => '用户';
 
   @override

@@ -25,6 +25,7 @@
 | Gateway / 更新 | [2026-08-18-gateway-enabled-update-stats](./2026-08-18-gateway-enabled-update-stats.md) | 已启用更新链的统计基数、分页完整性、version + build 一致性 |
 | macOS 打包 | [2026-08-18-macos-minimum-version](./2026-08-18-macos-minimum-version.md) | App、Pods、README 与随包 ONNX Runtime 的最低系统版本统一为 13.4 |
 | Engine 状态机 | [2026-08-18-engine-startup-and-status](./2026-08-18-engine-startup-and-status.md) | ASR/native 启动回滚、异步取消、热键 modifiers 与用户可见状态本地化 |
+| Services 状态/持久化 | [2026-08-18-services-state-and-persistence](./2026-08-18-services-state-and-persistence.md) | 启动健康、聊天原子写、更新完成边界与浮窗 generation |
 | 云端 ASR | [2026-08-11-volcengine-asr-never-worked](./2026-08-11-volcengine-asr-never-worked.md) | 火山 ASR 自接入起从未跑通（帧解析漏 sequence） |
 | ASR 启动 | [2026-06-02-asr-startup-audio-gap](./2026-06-02-asr-startup-audio-gap.md) | 录音起始丢音 |
 | 全局 | [2026-06-13-review-fixes](./2026-06-13-review-fixes.md) | 三份 review 的修复批次；多处旧逻辑已变，改代码前值得扫 |

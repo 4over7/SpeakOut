@@ -1598,6 +1598,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatEmptyAll => 'No history yet';
 
   @override
+  String get chatHistoryLoadFailed => 'Failed to load chat history';
+
+  @override
+  String get chatHistorySaveFailed => 'Failed to save chat history';
+
+  @override
   String get chatRoleUser => 'You';
 
   @override
