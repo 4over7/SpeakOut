@@ -43,9 +43,15 @@ void main() {
 
   group('UpdateService helper 脚本安全保护', () {
     test('prepareInstall 生成的脚本含签名校验 + 原子安装，且不先删旧 app', () {
-      final scriptPath = UpdateService().prepareInstall();
+      final service = UpdateService();
+      service.latestVersion = '1.10.0';
+      service.latestBuild = 241;
+      final scriptPath = service.prepareInstall();
       expect(scriptPath, isNotEmpty, reason: 'github 渠道应生成 helper 脚本');
       final script = File(scriptPath).readAsStringSync();
+
+      expect(script, contains('SpeakOut-update-1.10.0+241.dmg'),
+          reason: '同版本的不同 build 不能复用同一个 DMG 缓存');
 
       // F2：签名 / TeamIdentifier / BundleIdentifier 校验
       expect(script, contains('codesign --verify'));

@@ -198,6 +198,7 @@
   },
   "updateAction": "查看更新",
   "updateUpToDate": "已是最新版本",
+  "updateCheckFailed": "检查更新失败，请稍后重试",
   "updateDownload": "下载更新",
   "updateDownloading": "下载中 {pct}%",
   "@updateDownloading": {

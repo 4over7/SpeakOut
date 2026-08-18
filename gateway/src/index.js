@@ -3,6 +3,49 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
+const CLIENT_VERSION_PATTERN = /^(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})(-((0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$/;
+const MAX_CLIENT_VERSION_LENGTH = 96;
+const VERSION_COUNTERS_KEY = 'stats:versions';
+const MAX_TRACKED_VERSIONS = 128;
+
+function normalizedClientVersion(value) {
+    if (!value || value.length > MAX_CLIENT_VERSION_LENGTH || !CLIENT_VERSION_PATTERN.test(value)) {
+        return 'unknown';
+    }
+    return value;
+}
+
+async function readCounters(env, prefix) {
+    const counters = Object.create(null);
+    let cursor;
+    do {
+        const page = await env.SPEAKOUT_DB.list({ prefix, ...(cursor ? { cursor } : {}) });
+        const names = page.keys.map((key) => key.name);
+        for (let i = 0; i < names.length; i += 100) {
+            const values = await env.SPEAKOUT_DB.get(names.slice(i, i + 100));
+            for (const [name, raw] of values) {
+                const parsed = Number.parseInt(raw || '0', 10);
+                counters[name.slice(prefix.length)] = Number.isFinite(parsed) ? parsed : 0;
+            }
+        }
+        if (page.list_complete) break;
+        cursor = page.cursor;
+    } while (cursor);
+    return counters;
+}
+
+async function recordClientVersion(env, version) {
+    const stored = await env.SPEAKOUT_DB.get(VERSION_COUNTERS_KEY, { type: 'json' });
+    const counters = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    const tracked = Object.keys(counters).filter((key) => key !== 'other').length;
+    const key = Object.hasOwn(counters, version) || tracked < MAX_TRACKED_VERSIONS
+        ? version
+        : 'other';
+    const current = Number.isSafeInteger(counters[key]) && counters[key] >= 0 ? counters[key] : 0;
+    counters[key] = current + 1;
+    await env.SPEAKOUT_DB.put(VERSION_COUNTERS_KEY, JSON.stringify(counters));
+}
+
 // ═══════════════════════════════════════════════════════════
 // 套餐定义
 // ═══════════════════════════════════════════════════════════
@@ -30,14 +73,11 @@ app.options('*', (c) => c.body(null, 204, CORS_HEADERS));
 // 0. 版本检查
 // ═══════════════════════════════════════════════════════════
 app.get('/version', async (c) => {
-    // 记录客户端版本统计（fire-and-forget）。
+    // 记录客户端版本统计（best-effort）。
     // 注意：KV 非原子计数器，get→put 在高并发下会丢增量，此处计数仅为粗略估计。
-    const clientVersion = c.req.query('v') || 'unknown';
-    const clientBuild = c.req.query('b') || '0';
+    const clientVersion = normalizedClientVersion(c.req.query('v'));
     try {
-        const key = `stats:version:${clientVersion}`;
-        const current = parseInt(await c.env.SPEAKOUT_DB.get(key) || '0');
-        await c.env.SPEAKOUT_DB.put(key, String(current + 1));
+        await recordClientVersion(c.env, clientVersion);
         // 记录最近活跃（按天）
         const today = new Date().toISOString().split('T')[0];
         const dailyKey = `stats:daily:${today}`;
@@ -62,17 +102,17 @@ app.get('/stats', async (c) => {
     const adminKey = c.req.header('Admin-Key');
     // fail-closed：ADMIN_SECRET 未配置时一律拒绝，绝不放行（防止 undefined!==undefined 漏洞）
     if (!c.env.ADMIN_SECRET || adminKey !== c.env.ADMIN_SECRET) return c.json({ error: 'Unauthorized' }, 401);
-    const versions = {};
-    const list = await c.env.SPEAKOUT_DB.list({ prefix: 'stats:version:' });
-    for (const key of list.keys) {
-        const v = key.name.replace('stats:version:', '');
-        versions[v] = parseInt(await c.env.SPEAKOUT_DB.get(key.name) || '0');
-    }
-    const daily = {};
-    const dList = await c.env.SPEAKOUT_DB.list({ prefix: 'stats:daily:' });
-    for (const key of dList.keys) {
-        const d = key.name.replace('stats:daily:', '');
-        daily[d] = parseInt(await c.env.SPEAKOUT_DB.get(key.name) || '0');
+    const [legacyVersions, daily, storedVersions] = await Promise.all([
+        readCounters(c.env, 'stats:version:'),
+        readCounters(c.env, 'stats:daily:'),
+        c.env.SPEAKOUT_DB.get(VERSION_COUNTERS_KEY, { type: 'json' }),
+    ]);
+    const versions = { ...legacyVersions };
+    if (storedVersions && typeof storedVersions === 'object' && !Array.isArray(storedVersions)) {
+        for (const [version, count] of Object.entries(storedVersions)) {
+            if (!Number.isSafeInteger(count) || count < 0) continue;
+            versions[version] = (versions[version] || 0) + count;
+        }
     }
     return c.json({ versions, daily });
 });

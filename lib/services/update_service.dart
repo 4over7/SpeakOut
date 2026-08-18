@@ -15,7 +15,9 @@ class UpdateService {
   UpdateService._internal();
 
   bool _hasChecked = false;
+  bool _lastCheckSucceeded = false;
   String? latestVersion;
+  int? latestBuild;
   String? downloadUrl;
   String? _dmgAssetUrl; // Direct DMG download URL from GitHub assets
   bool hasUpdate = false;
@@ -35,10 +37,11 @@ class UpdateService {
   Stream<UpdateState> get stateChanges => _stateController.stream;
 
   // 使用系统临时目录（沙盒兼容）
-  // DMG 路径带版本号，避免重复下载；不同版本也不串台
+  // DMG 路径带版本号和 Gateway build，避免同版本重新发包时复用旧缓存。
   String get _dmgPath {
     final v = latestVersion ?? 'unknown';
-    return '${Directory.systemTemp.path}/SpeakOut-update-$v.dmg';
+    final revision = latestBuild == null ? v : '$v+$latestBuild';
+    return '${Directory.systemTemp.path}/SpeakOut-update-$revision.dmg';
   }
   static String get _helperPath => '${Directory.systemTemp.path}/speakout_update.sh';
 
@@ -50,7 +53,7 @@ class UpdateService {
   void _cleanupStaleDmgs() {
     try {
       final tempDir = Directory(Directory.systemTemp.path);
-      final keep = latestVersion == null ? null : 'SpeakOut-update-$latestVersion.dmg';
+      final keep = latestVersion == null ? null : File(_dmgPath).uri.pathSegments.last;
       for (final entity in tempDir.listSync()) {
         if (entity is! File) continue;
         final name = entity.uri.pathSegments.last;
@@ -82,6 +85,7 @@ class UpdateService {
   /// 重置检查状态，允许再次手动检查
   void resetCheck() {
     _hasChecked = false;
+    _lastCheckSucceeded = false;
     if (_state == UpdateState.failed) {
       _setState(UpdateState.idle);
       errorMessage = null;
@@ -89,14 +93,16 @@ class UpdateService {
   }
 
   /// 启动时调用，fire-and-forget，不阻塞 UI
-  Future<void> checkForUpdate() async {
-    if (!Distribution.supportsUpdateCheck) return;
-    if (_hasChecked) return;
+  Future<bool> checkForUpdate() async {
+    if (!Distribution.supportsUpdateCheck) return false;
+    if (_hasChecked) return _lastCheckSucceeded;
     _hasChecked = true;
+    _lastCheckSucceeded = false;
 
     try {
       final info = await PackageInfo.fromPlatform();
       final localVersion = info.version;
+      final localBuild = int.tryParse(info.buildNumber);
 
       // 主路径: Gateway（私有仓库 GitHub API 不返回 assets）
       var remote = await _checkGateway();
@@ -106,15 +112,21 @@ class UpdateService {
 
       if (remote == null) {
         AppLog.d('UpdateService: version check failed (both sources)');
-        return;
+        return false;
       }
 
       latestVersion = remote.version;
+      latestBuild = remote.build;
       downloadUrl = remote.url;
       _dmgAssetUrl = remote.dmgUrl;
 
-      if (isNewer(remote.version, localVersion)) {
-        hasUpdate = true;
+      hasUpdate = isNewer(
+        remote.version,
+        localVersion,
+        remoteBuild: remote.build,
+        localBuild: localBuild,
+      );
+      if (hasUpdate) {
         AppLog.d('UpdateService: new version available: ${remote.version} (local: $localVersion), dmg: ${remote.dmgUrl ?? "none"}');
         // 清理旧版 DMG 缓存 + 检测本次版本是否已下载过
         _cleanupStaleDmgs();
@@ -129,8 +141,11 @@ class UpdateService {
         // 本地已是最新，清掉所有残留缓存
         _cleanupStaleDmgs();
       }
+      _lastCheckSucceeded = true;
+      return true;
     } catch (e) {
       AppLog.d('UpdateService: check failed: $e');
+      return false;
     }
   }
 
@@ -186,7 +201,9 @@ class UpdateService {
 
       final url = (json['download_url'] as String?) ?? AppConstants.kGitHubReleasesUrl;
       final dmgUrl = json['dmg_url'] as String?;
-      return _RemoteVersion.tryCreate(version, url, dmgUrl: dmgUrl);
+      final buildValue = json['build'];
+      final build = buildValue is int && buildValue >= 0 ? buildValue : null;
+      return _RemoteVersion.tryCreate(version, url, build: build, dmgUrl: dmgUrl);
     } catch (e) {
       AppLog.d('UpdateService: Gateway check failed: $e');
       return null;
@@ -596,7 +613,7 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
   static bool isValidRemoteVersion(String version) =>
       version.length <= _maxVersionLength && _semverPattern.hasMatch(version);
 
-  static bool isNewer(String remote, String local) {
+  static bool isNewer(String remote, String local, {int? remoteBuild, int? localBuild}) {
     final r = _parseVersion(remote);
     final l = _parseVersion(local);
     for (var i = 0; i < 3; i++) {
@@ -606,7 +623,13 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
     // 主版本号相同 → 比 prerelease。白名单放行了 prerelease（仓库真发过
     // v1.1.0-RC3/RC4），如果这里还只比三段数字，RC3 和 RC4 会被判成同一个版本，
     // 而 1.1.0 稳定版相对 1.1.0-RC4 也永远"不是更新" —— 用户卡在 RC 上收不到正式版。
-    return _comparePrerelease(_prereleaseOf(remote), _prereleaseOf(local)) > 0;
+    final prereleaseComparison = _comparePrerelease(
+        _prereleaseOf(remote), _prereleaseOf(local));
+    if (prereleaseComparison != 0) return prereleaseComparison > 0;
+    if (remoteBuild != null && localBuild != null) {
+      return remoteBuild > localBuild;
+    }
+    return false;
   }
 
   static List<int> _parseVersion(String v) {
@@ -649,17 +672,19 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
 class _RemoteVersion {
   final String version;
   final String url;
+  final int? build;
   final String? dmgUrl;
-  _RemoteVersion(this.version, this.url, {this.dmgUrl});
+  _RemoteVersion(this.version, this.url, {this.build, this.dmgUrl});
 
   /// 两个来源（gateway / GitHub tag）的唯一收口点：非法版本号一律当作
   /// 「没拿到更新信息」，而不是带着脏串继续走下载安装流程。
-  static _RemoteVersion? tryCreate(String version, String url, {String? dmgUrl}) {
+  static _RemoteVersion? tryCreate(String version, String url,
+      {int? build, String? dmgUrl}) {
     if (!UpdateService.isValidRemoteVersion(version)) {
       AppLog.d('UpdateService: rejected malformed remote version: '
           '${AppLog.redact(version)}');
       return null;
     }
-    return _RemoteVersion(version, url, dmgUrl: dmgUrl);
+    return _RemoteVersion(version, url, build: build, dmgUrl: dmgUrl);
   }
 }

@@ -601,6 +601,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateUpToDate => '已是最新版本';
 
   @override
+  String get updateCheckFailed => '检查更新失败，请稍后重试';
+
+  @override
   String get updateDownload => '下载更新';
 
   @override

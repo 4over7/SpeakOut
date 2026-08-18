@@ -624,6 +624,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateUpToDate => 'Up to date';
 
   @override
+  String get updateCheckFailed =>
+      'Unable to check for updates. Try again later.';
+
+  @override
   String get updateDownload => 'Download Update';
 
   @override

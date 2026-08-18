@@ -96,6 +96,7 @@ flutter build macos --release
 ./scripts/create_styled_dmg.sh
 
 # Gateway 后端 (Cloudflare Workers)
+cd gateway && npm test     # 已启用路由的行为测试
 cd gateway && npm run dev      # 本地开发
 cd gateway && npm run deploy   # 部署
 ```

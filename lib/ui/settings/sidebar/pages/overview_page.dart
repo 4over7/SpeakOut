@@ -67,17 +67,19 @@ class _OverviewPageState extends State<OverviewPage> {
   Future<void> _checkUpdate(AppLocalizations loc) async {
     setState(() { _isCheckingUpdate = true; _updateResult = null; });
     try {
-      final info = await PackageInfo.fromPlatform();
-      UpdateService().resetCheck();
-      await UpdateService().checkForUpdate();
-      final latest = UpdateService().latestVersion;
-      if (latest != null && UpdateService.isNewer(latest, info.version)) {
+      final service = UpdateService();
+      service.resetCheck();
+      final checked = await service.checkForUpdate();
+      final latest = service.latestVersion;
+      if (!checked) {
+        if (mounted) setState(() => _updateResult = loc.updateCheckFailed);
+      } else if (service.hasUpdate && latest != null) {
         if (mounted) setState(() => _updateResult = loc.updateAvailable(latest));
       } else {
         if (mounted) setState(() => _updateResult = loc.updateUpToDate);
       }
     } catch (_) {
-      if (mounted) setState(() => _updateResult = loc.updateUpToDate);
+      if (mounted) setState(() => _updateResult = loc.updateCheckFailed);
     }
     if (mounted) setState(() => _isCheckingUpdate = false);
   }

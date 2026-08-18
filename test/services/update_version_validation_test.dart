@@ -128,5 +128,45 @@ void main() {
     test('注入串确实能骗过版本比较 —— 证明白名单不可省', () {
       expect(UpdateService.isNewer('999.0.0"; touch /tmp/pwned; #', '1.10.0'), isTrue);
     });
+
+    test('版本相同时按 Gateway build 判断更新', () {
+      expect(
+        UpdateService.isNewer(
+          '1.10.0',
+          '1.10.0',
+          remoteBuild: 241,
+          localBuild: 240,
+        ),
+        isTrue,
+      );
+      expect(
+        UpdateService.isNewer(
+          '1.10.0',
+          '1.10.0',
+          remoteBuild: 241,
+          localBuild: 241,
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateService.isNewer(
+          '1.10.0',
+          '1.10.0',
+          remoteBuild: 240,
+          localBuild: 241,
+        ),
+        isFalse,
+      );
+      expect(
+        UpdateService.isNewer(
+          '1.11.0',
+          '1.10.0',
+          remoteBuild: 1,
+          localBuild: 999,
+        ),
+        isTrue,
+        reason: '语义版本优先于 build number',
+      );
+    });
   });
 }

@@ -1226,6 +1226,12 @@ abstract class AppLocalizations {
   /// **'Up to date'**
   String get updateUpToDate;
 
+  /// No description provided for @updateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to check for updates. Try again later.'**
+  String get updateCheckFailed;
+
   /// No description provided for @updateDownload.
   ///
   /// In en, this message translates to:

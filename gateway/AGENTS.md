@@ -1,6 +1,6 @@
 # gateway/ — Cloudflare Workers 后端
 
-> 单文件 `src/index.js`（Hono 框架，~600 行）+ KV 存储。处理：版本检查、许可证、设备注册、计费与支付（支付宝 / Stripe）、统计上报。
+> 单文件 `src/index.js`（Hono 框架）+ KV 存储。处理：版本检查、许可证、设备注册、计费与支付（支付宝 / Stripe）、统计上报。
 
 ## 必读
 
@@ -40,8 +40,8 @@ v1.x 起一直保持单文件。Cloudflare Workers 部署单 entry，业务量�
 ### 2. KV 而非 D1
 Cloudflare KV 简单，符合 SpeakOut 的"键值统计 + 配置"场景。**不用 D1（SQL）**——查询模式都是 key lookup，关系数据无价值。
 
-### 3. version 字段是 SSoT for client
-客户端 `update_service.dart` 优先调 `GET /version` 拿 `dmg_url` + `version` + `build`，**降级**到 GitHub Releases API（私有 repo 时 GitHub API 不返回 assets，所以 Gateway 是主路径）。
+### 3. version + build 是客户端更新真源
+客户端 `update_service.dart` 优先调 `GET /version` 拿 `dmg_url` + `version` + `build`，**降级**到 GitHub Releases API（私有 repo 时 GitHub API 不返回 assets，所以 Gateway 是主路径）。语义版本相同时继续比较 build，DMG 缓存也用两者共同隔离。
 
 发版流程必须**同步 gateway version**：`pubspec.yaml` 改 → `gateway/src/index.js` 同步 → `npm run deploy`。**写错版本号 = 用户看到旧版**。
 
@@ -74,20 +74,24 @@ curl https://<your-worker>/version | jq
 - ❌ **不要 sync version 写错** — 发版前 sed 替换时用 `0,/pattern/s` 锁第一处，避免误改支付宝 API version 字段
 - ❌ **不要在 KV 里存大对象** — value 上限 25MB，但实际超过 1KB 就该考虑别的存储
 
-## 计费 KV schema（参考）
+## KV schema（参考）
 
 ```
 license:{license_key}        → {plan, expires, quota}
 balance:{license_key}        → {tokens_used, tokens_limit}
-stats:version:{v}            → 累加计数
-stats:daily:{YYYY-MM-DD}     → 当日活跃，90 天 TTL
+stats:versions               → 有界版本计数 map（旧 stats:version:{v} 只读兼容）
+stats:daily:{YYYY-MM-DD}     → 当日更新检查次数，90 天 TTL
 ```
+
+版本统计只接受有界 SemVer，并限制 map 中可独立跟踪的版本数；其余聚合为 `unknown` / `other`，不能再让公共查询参数无限制造 KV key。`daily` 是启动/手动检查次数的粗略近似，不是去重用户数。
 
 ## 测试
 
-无单元测试（业务量 + Cloudflare Workers 测试基础设施成本不平衡）。靠：
-- `curl` 验证 `/version` 等只读端点
-- 部署后人工冒烟
+```bash
+cd gateway && npm test
+node --check src/index.js
+```
 
-> **注意：客户端侧也没有兜底** —— `BillingService` 同样无单测。改计费/许可证逻辑时
-> 两端都没有自动化安全网，必须手动验证。
+`test/` 用 Node 内置测试器 + 内存 KV 覆盖当前启用的 `/version`、统计基数、旧数据分页兼容和 `/stats` fail-closed。部署后仍需用 `curl` 冒烟线上 `/version`。
+
+> **注意：计费/许可证链仍没有自动化安全网** —— `BillingService` 未启用且无单测。改那组路由时必须另建测试与端到端验证，不能拿当前更新/统计测试当覆盖。

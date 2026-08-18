@@ -238,6 +238,7 @@
   },
   "updateAction": "View Update",
   "updateUpToDate": "Up to date",
+  "updateCheckFailed": "Unable to check for updates. Try again later.",
   "updateDownload": "Download Update",
   "updateDownloading": "Downloading {pct}%",
   "@updateDownloading": {

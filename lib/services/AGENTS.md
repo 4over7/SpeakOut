@@ -23,7 +23,7 @@
 | `AppService` | `app_service.dart` | 应用生命周期总控：启动时调 init()，关闭时 dispose() 全部子服务 |
 | `CloudAccountService` | `cloud_account_service.dart` | 云账户 CRUD（多账户管理 + 凭证安全存储） |
 | `AudioDeviceService` | `audio_device_service.dart` | 麦克风设备枚举、用户偏好、蓝牙检测、设备变化 Stream |
-| `UpdateService` | `update_service.dart` | 检查更新、下载 DMG（带断点续传）、Helper 脚本启动安装 |
+| `UpdateService` | `update_service.dart` | 按 version + build 检查更新、隔离 DMG 缓存、断点下载并启动安装 Helper |
 | `ChatService` | `chat_service.dart` | 聊天历史持久化（JSON 文件）、metadata（如 ASR 原文）|
 | `BillingService` | `billing_service.dart` | Cloudflare Workers Gateway 通信：许可证验证、Token 生成、额度计费 |
 | `VocabService` | `vocab_service.dart` | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
