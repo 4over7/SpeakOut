@@ -74,29 +74,6 @@ class SpeakOutApp extends StatefulWidget {
 }
 
 class _SpeakOutAppState extends State<SpeakOutApp> {
-  bool _showOnboarding = false;
-  bool _initialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkFirstLaunch();
-  }
-
-  Future<void> _checkFirstLaunch() async {
-    await ConfigService().init();
-    if (mounted) {
-      setState(() {
-        _showOnboarding = ConfigService().isFirstLaunch;
-        _initialized = true;
-      });
-    }
-  }
-
-  void _onOnboardingComplete() {
-    setState(() => _showOnboarding = false);
-  }
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Locale?>(
@@ -139,15 +116,56 @@ class _SpeakOutAppState extends State<SpeakOutApp> {
           },
           supportedLocales: AppLocalizations.supportedLocales,
           
-          // Show onboarding for first-time users
-          home: !_initialized 
-              ? const _LoadingScreen()
-              : _showOnboarding 
-                  ? OnboardingPage(onComplete: _onOnboardingComplete)
-                  : const HomePage(),
+          // 首屏三态（加载 / 引导 / 主界面）必须在**路由内部**切换，不能写成
+          // `home: 条件 ? A : B` —— WidgetsApp 的 home 只用来生成 Navigator 的
+          // 初始路由，首帧压栈之后再改 home 不会替换已有路由。曾经因此永久黑屏：
+          // ConfigService().init() 只要慢于首帧，画面就永远停在 _LoadingScreen，
+          // 而状态早已就绪（reassemble 一下界面立刻正常，是这条竞态的确证）。
+          home: const _RootGate(),
         );
       },
     );
+  }
+}
+
+/// 首屏三态的持有者。作为固定的 home 挂在路由里，状态变化走它自己的 setState，
+/// 因此不依赖 Navigator 替换初始路由。
+class _RootGate extends StatefulWidget {
+  const _RootGate();
+
+  @override
+  State<_RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<_RootGate> {
+  bool _showOnboarding = false;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    await ConfigService().init();
+    if (mounted) {
+      setState(() {
+        _showOnboarding = ConfigService().isFirstLaunch;
+        _initialized = true;
+      });
+    }
+  }
+
+  void _onOnboardingComplete() {
+    setState(() => _showOnboarding = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized) return const _LoadingScreen();
+    if (_showOnboarding) return OnboardingPage(onComplete: _onOnboardingComplete);
+    return const HomePage();
   }
 }
 

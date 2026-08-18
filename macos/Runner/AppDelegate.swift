@@ -181,7 +181,11 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
-    super.applicationDidFinishLaunching(notification)
+    // 不要在这里调 super：FlutterAppDelegate 并未实现 applicationDidFinishLaunching:
+    // （它是 NSApplicationDelegate 的可选协议方法，Swift 允许 override 编译通过，
+    // 运行时 objc_msgSendSuper 直接 unrecognized selector）。v1.11.0 加过这行，
+    // 异常在本方法第一行抛出，下面的 bookmark 恢复与 MethodChannel 注册全部被跳过。
+    // 插件生命周期由 FlutterPluginRegistry 转发，不依赖这个调用。
     restoreScopedDiaryAccess()
 
     // Setup MethodChannel for recording overlay control
