@@ -1,6 +1,6 @@
 # native_lib/ — 原生 C/Objective-C 层（macOS）
 
-> macOS 原生能力实现：CGEventTap 键盘监听、AudioQueue 音频采集、Accessibility 文本注入、剪贴板注入、应用激活、权限检查。**单一大文件 `native_input.m`**（近 1800 行，按段分组）+ Linux/Windows 子目录的同名实现。
+> macOS 原生能力实现：CGEventTap 键盘监听、AudioQueue 音频采集、Accessibility 文本注入、剪贴板注入、应用激活、权限检查。**单一大文件 `native_input.m`**（按段分组）+ Linux/Windows 子目录的同名实现。
 >
 > ⚠️ **本层没有截屏能力** —— 只有权限探测 `check_screen_recording_permission`，且它已无业务调用（详见设计决策 8）。
 
@@ -89,7 +89,9 @@ macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑
 自动更新 install 时 `launch_updater` 用 NSTask 启动独立 bash 脚本，输出写到 `~/Library/Logs/speakout-updater.log`（不写 /dev/null，否则启动期失败完全看不见）。它必须返回启动状态；Dart 只在成功后退出主程序。
 
 ### 7. CGEventTap 权限
-需要 **Input Monitoring** 权限。未授权时 `start_keyboard_listener` 直接返回 0，不尝试启动（避免后续失败消息覆盖正确的"未授权"提示）。
+需要 **Input Monitoring** 权限。监听器创建失败会返回失败状态，由 Dart 侧重新诊断 Input Monitoring 与 Accessibility，展示准确原因。
+
+键盘事件经 `NativeCallable.listener` 异步交给 Dart。`stop_keyboard_listener` 必须等待在途 trampoline 调用结束后再返回，Dart 才能 `close()`；所有 EventTap 回调统一走 `emit_key_callback`，不要直接调用 `dartCallback`。
 
 ### 8. 屏幕录制：只剩权限探测函数
 本层有 `check_screen_recording_permission`，但**已无业务调用**。
@@ -122,6 +124,7 @@ native_input.m
 
 其他需要验证 native 内部状态转换的窄场景也使用独立可执行宿主，放在 `native_lib/tests/`，
 由 `test/engine/` 中的 Dart 测试负责编译运行；不要用源码文本断言代替行为测试。
+键盘 trampoline 的并发拆卸由 `keyboard_callback_harness.m` 覆盖。
 
 ## 不要做什么
 

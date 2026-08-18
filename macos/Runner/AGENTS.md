@@ -11,9 +11,9 @@
 
 | 文件 | 职责 |
 |---|---|
-| `AppDelegate.swift` | **自定义重点**：MethodChannel `com.SpeakOut/overlay`（`showRecording` / `updateStatus` / `hideRecording` / `showSilenceHint` / `hideSilenceHint` / `pickDirectory` / `pickFile`）+ 应用生命周期（保留 tray + Dock 重激活） |
+| `AppDelegate.swift` | **自定义重点**：MethodChannel `com.SpeakOut/overlay`（录音浮窗、闪念目录授权、文件选择）+ 应用生命周期（保留 tray + Dock 重激活） |
 | `MainFlutterWindow.swift` | Flutter window 标准包装，最小代码 |
-| `Info.plist` | Bundle ID / 权限声明。**只有两条**：`NSMicrophoneUsageDescription` + `NSAccessibilityUsageDescription`（截屏走 `screencapture` 子进程，不需要本 App 声明 ScreenCapture） |
+| `Info.plist` | Bundle ID / 权限声明。当前主路径只需要麦克风与辅助功能；已移除的截屏能力不得残留权限文案 |
 | `Release.entitlements` | 发布（Developer ID / DMG）—— **`app-sandbox = false`**，因此能加载 dylib、跑子进程 |
 | `DebugProfile.entitlements` | 调试 —— `app-sandbox = true` + `cs.allow-jit` + `network.server` |
 | `AppStore.entitlements` | App Store —— `app-sandbox = true` + audio-input + network.client |
@@ -33,6 +33,8 @@
 
 ### 3. 实时音频电平驱动浮窗动画
 AppDelegate `loadAudioLevelFunction()` 用 `dlopen` + `dlsym` 拿到原生 `get_audio_level` 函数指针，定时器 80ms 调用一次，把 0~1 电平驱动波形 bar 高度。**不通过 MethodChannel 传电平** —— 跨 isolate 60Hz 调用太重。
+
+动态库查找顺序必须与 Dart `NativeInput._resolveDylibPath()` 一致：安装脚本产物在 `Contents/MacOS/native_lib`，普通 `flutter build/run` 只在 Flutter assets 中。只覆盖前者会让开发构建的波形长期静音。
 
 ### 4. Mode-aware 浮窗配色
 浮窗模式 `streaming / offline / diary / organize` 各自一种颜色（accent / 紫 / 蓝绿）。模式由 Flutter 端 `OverlayController` 通过 channel 传入。

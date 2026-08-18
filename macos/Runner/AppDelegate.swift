@@ -22,20 +22,31 @@ class AppDelegate: FlutterAppDelegate {
   // Native audio level function pointer from dylib
   typealias GetAudioLevelFunc = @convention(c) () -> Float
   var getAudioLevelFunc: GetAudioLevelFunc?
+  private var audioDylibHandle: UnsafeMutableRawPointer?
 
   private func loadAudioLevelFunction() {
     if getAudioLevelFunc != nil { return }
-    let dylibPath = Bundle.main.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib"
-    guard let handle = dlopen(dylibPath, RTLD_NOW) else {
-      NSLog("[Overlay] Failed to load dylib: %@", String(cString: dlerror()))
+
+    // Keep this order aligned with NativeInput._resolveDylibPath(): install.sh
+    // places the first copy, while a plain flutter build/run only has the second.
+    let candidates = [
+      Bundle.main.bundlePath + "/Contents/MacOS/native_lib/libnative_input.dylib",
+      Bundle.main.bundlePath
+        + "/Contents/Frameworks/App.framework/Versions/A/Resources/"
+        + "flutter_assets/native_lib/libnative_input.dylib",
+    ]
+    for dylibPath in candidates where FileManager.default.fileExists(atPath: dylibPath) {
+      guard let handle = dlopen(dylibPath, RTLD_NOW) else { continue }
+      guard let sym = dlsym(handle, "get_audio_level") else {
+        dlclose(handle)
+        continue
+      }
+      audioDylibHandle = handle
+      getAudioLevelFunc = unsafeBitCast(sym, to: GetAudioLevelFunc.self)
+      NSLog("[Overlay] Audio level function loaded")
       return
     }
-    guard let sym = dlsym(handle, "get_audio_level") else {
-      NSLog("[Overlay] get_audio_level symbol not found")
-      return
-    }
-    getAudioLevelFunc = unsafeBitCast(sym, to: GetAudioLevelFunc.self)
-    NSLog("[Overlay] Audio level function loaded")
+    NSLog("[Overlay] Audio level function unavailable")
   }
 
   // MARK: - Security-scoped bookmark（沙盒版的闪念目录权限）
@@ -98,7 +109,8 @@ class AppDelegate: FlutterAppDelegate {
                                   includingResourceValuesForKeys: nil,
                                   relativeTo: nil)
     } catch {
-      NSLog("[Sandbox] 创建 bookmark 失败: %@", String(describing: error))
+      let nsError = error as NSError
+      NSLog("[Sandbox] 创建 bookmark 失败 (%@/%ld)", nsError.domain, nsError.code)
       return nil
     }
   }
@@ -116,7 +128,7 @@ class AppDelegate: FlutterAppDelegate {
                         relativeTo: nil,
                         bookmarkDataIsStale: &stale)
       guard url.startAccessingSecurityScopedResource() else {
-        NSLog("[Sandbox] startAccessingSecurityScopedResource 失败: %@", url.path)
+        NSLog("[Sandbox] startAccessingSecurityScopedResource 失败")
         return nil
       }
       guard stale else { return (url, data) }
@@ -128,7 +140,8 @@ class AppDelegate: FlutterAppDelegate {
       }
       return (url, fresh)
     } catch {
-      NSLog("[Sandbox] 解析 bookmark 失败: %@", String(describing: error))
+      let nsError = error as NSError
+      NSLog("[Sandbox] 解析 bookmark 失败 (%@/%ld)", nsError.domain, nsError.code)
       return nil
     }
   }
@@ -144,7 +157,7 @@ class AppDelegate: FlutterAppDelegate {
     if got.effective != data {
       UserDefaults.standard.set(got.effective, forKey: Self.diaryBookmarkKey)
     }
-    NSLog("[Sandbox] 已恢复闪念目录访问权限: %@", got.url.path)
+    NSLog("[Sandbox] 已恢复闪念目录访问权限")
     return true
   }
 
@@ -168,6 +181,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
+    super.applicationDidFinishLaunching(notification)
     restoreScopedDiaryAccess()
 
     // Setup MethodChannel for recording overlay control
@@ -220,7 +234,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func showRecordingOverlay(initialText: String, mode: String = "streaming") {
-    NSLog("[Overlay] showRecordingOverlay called with text: %@, mode: %@", initialText, mode)
+    NSLog("[Overlay] showRecordingOverlay called, mode: %@", mode)
     let previousMode = currentOverlayMode
     currentOverlayMode = mode
 
@@ -334,6 +348,8 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func startWaveAnimation() {
+    waveTimer?.invalidate()
+    waveTimer = nil
     isShowingRecording = true
     loadAudioLevelFunction()
 
@@ -432,8 +448,6 @@ class AppDelegate: FlutterAppDelegate {
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
     panel.allowedContentTypes = [.init(filenameExtension: "bz2")!]
-    panel.prompt = "Import"
-    panel.message = "Select a .tar.bz2 model file"
 
     panel.begin { response in
       if response == .OK, let url = panel.url {
@@ -450,7 +464,6 @@ class AppDelegate: FlutterAppDelegate {
     panel.canChooseDirectories = true
     panel.canChooseFiles = false
     panel.canCreateDirectories = true  // Critical: Allow creating new folders
-    panel.prompt = "Select"
 
     panel.begin { [weak self] response in
       guard response == .OK, let url = panel.url else {
@@ -468,7 +481,7 @@ class AppDelegate: FlutterAppDelegate {
         // message 只进日志：给用户看的文案由 Dart 侧走 i18n
         result(FlutterError(code: "bookmark_failed",
                             message: "security-scoped bookmark unavailable",
-                            details: url.path))
+                            details: nil))
         return
       }
       result(url.path)

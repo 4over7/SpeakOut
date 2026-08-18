@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "SpeakOut 需要使用麦克风将语音转换为文字。";
+"NSAccessibilityUsageDescription" = "SpeakOut 需要使用辅助功能来监听全局快捷键，并将识别结果输入其他应用。";

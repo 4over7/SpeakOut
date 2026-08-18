@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "SpeakOut needs microphone access to convert speech to text.";
+"NSAccessibilityUsageDescription" = "SpeakOut needs accessibility access to monitor global hotkeys and input recognized text into applications.";

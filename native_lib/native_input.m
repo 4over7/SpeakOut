@@ -275,6 +275,7 @@ bool check_permission();
 static CFMachPortRef eventTap = NULL;
 static CFRunLoopSourceRef runLoopSource = NULL;
 static DartKeyCallback dartCallback = NULL;
+static pthread_mutex_t keyCallbackMutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Active hotkey info
 static int targetKeyCode = -1; // e.g., 58 for Option, etc.
@@ -286,6 +287,17 @@ static atomic_bool isMonitoring = false;
 // the second one within 100ms is suppressed.
 static uint64_t lastGlobe179Time = 0;
 static uint64_t lastFn63Time = 0;
+
+// NativeCallable.listener 的 trampoline 会在 Dart dispose 时释放。
+// 回调与 stop 分属不同线程，必须让 stop 等在途调用退出后再返回。
+static void emit_key_callback(int keyCode, bool isDown, unsigned int flags) {
+  pthread_mutex_lock(&keyCallbackMutex);
+  DartKeyCallback callback = dartCallback;
+  if (atomic_load(&isMonitoring) && callback != NULL) {
+    callback(keyCode, isDown, flags);
+  }
+  pthread_mutex_unlock(&keyCallbackMutex);
+}
 
 // CGEventCallback
 CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
@@ -310,7 +322,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     return event;
   }
 
-  if (!isMonitoring || dartCallback == NULL) {
+  if (!atomic_load(&isMonitoring)) {
     return event;
   }
 
@@ -348,7 +360,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     CGEventFlags flags = CGEventGetFlags(event);
     unsigned int devFlags = (unsigned int)(flags & 0xFFFF); // device-dependent bits
     uint64_t t0 = mach_absolute_time();
-    dartCallback(mappedKeyCode, type == kCGEventKeyDown, devFlags);
+    emit_key_callback(mappedKeyCode, type == kCGEventKeyDown, devFlags);
     uint64_t t1 = mach_absolute_time();
 
     // Convert to milliseconds
@@ -431,7 +443,7 @@ CGEventRef myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
       log_from_tap("FlagsChanged: Key %d. IsDown: %d. devFlags: 0x%04x", keyCode, isDown, devFlags);
     }
 
-    dartCallback((int)keyCode, isDown, devFlags);
+    emit_key_callback((int)keyCode, isDown, devFlags);
   }
 
   return event;
@@ -447,8 +459,10 @@ int start_keyboard_listener(DartKeyCallback callback) {
     return 1; // Already running
   }
 
+  pthread_mutex_lock(&keyCallbackMutex);
   dartCallback = callback;
-  isMonitoring = true;
+  pthread_mutex_unlock(&keyCallbackMutex);
+  atomic_store(&isMonitoring, true);
 
   log_to_file("Start: Requesting EventTap...");
 
@@ -465,6 +479,10 @@ int start_keyboard_listener(DartKeyCallback callback) {
   if (!eventTap) {
     log_to_file("FATAL: Failed to create event tap! Security Check: %d",
                 check_permission());
+    atomic_store(&isMonitoring, false);
+    pthread_mutex_lock(&keyCallbackMutex);
+    dartCallback = NULL;
+    pthread_mutex_unlock(&keyCallbackMutex);
     return -1;
   }
 
@@ -484,6 +502,8 @@ int start_keyboard_listener(DartKeyCallback callback) {
 
 // 2. Stop Listening
 void stop_keyboard_listener() {
+  // 先阻止尚未进入 trampoline 的回调，再拆系统 listener。
+  atomic_store(&isMonitoring, false);
   if (runLoopSource) {
     CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource,
                           kCFRunLoopCommonModes);
@@ -494,8 +514,10 @@ void stop_keyboard_listener() {
     CFRelease(eventTap);
     eventTap = NULL;
   }
-  isMonitoring = false;
+  // 与 emit_key_callback 共用这把锁：本函数返回后，Dart 才能安全 close。
+  pthread_mutex_lock(&keyCallbackMutex);
   dartCallback = NULL;
+  pthread_mutex_unlock(&keyCallbackMutex);
   printf("[Native] Keyboard listener stopped.\n");
 }
 
