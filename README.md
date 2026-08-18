@@ -9,7 +9,7 @@
 
   [Download](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [Changelog](CHANGELOG.md)
 
-  ![Platform](https://img.shields.io/badge/platform-macOS%2013+-blue)
+  ![Platform](https://img.shields.io/badge/platform-macOS%2013.4+-blue)
   ![Version](https://img.shields.io/badge/version-1.10.0-brightgreen)
   ![Tests](https://img.shields.io/badge/tests-passing%20on%20macOS-brightgreen)
   ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
@@ -122,7 +122,7 @@ Settings page after the v1.8 redesign — sidebar navigation, every feature has 
 
 ### System Requirements
 
-- macOS 13+ (Ventura or later)
+- macOS 13.4+ (Ventura 13.4 or later)
 - **Default model is bundled — no download needed on first launch.** Optional larger models (Whisper / FireRedASR) download on demand, up to ~1.4GB
 
 ---
@@ -274,7 +274,7 @@ v1.8 设置页全面重构 — sidebar 导航，每个功能独立页面，每�
 3. 授权：**输入监控**、**辅助功能**、**麦克风**
 4. 按引导完成即可使用 —— **默认模型已随包内置，无需下载，装完就能说第一句话**
 
-**系统要求**：macOS 13+。默认模型已内置，无需额外下载；如需 Whisper / FireRedASR 等更大模型可按需下载（最多约 1.4GB）
+**系统要求**：macOS 13.4+（Ventura 13.4 或更高版本）。默认模型已内置，无需额外下载；如需 Whisper / FireRedASR 等更大模型可按需下载（最多约 1.4GB）
 
 ---
 

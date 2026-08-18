@@ -43,6 +43,9 @@ AppDelegate `loadAudioLevelFunction()` 用 `dlopen` + `dlsym` 拿到原生 `get_
 ### 6. 文件选择走 Native NSOpenPanel
 `pickDirectory` / `pickFile` 用 NSOpenPanel 而不是 Flutter file_picker 包。原因：NSOpenPanel 触发 macOS 沙盒授权弹窗，**让用户主动选目录后获得读写权限**——闪念笔记目录授权、模型导入文件读取都依赖此。
 
+### 7. 最低系统版本由最严格的随包依赖决定
+当前最低版本是 **macOS 13.4**，与随包 ONNX Runtime 的 Mach-O `minos` 一致。调整时必须同步 Xcode Runner、Podfile 和 README，并在构建后核对 App 的 `LSMinimumSystemVersion`；只改其中一处会让 13.0–13.3 用户满足宣传条件却在加载依赖时失败。
+
 ## 不要做什么
 
 - ❌ **不要在 AppDelegate 里写业务逻辑** — 这层是 native ↔ Flutter 桥接，业务在 Dart 端
