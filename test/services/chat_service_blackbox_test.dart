@@ -17,18 +17,41 @@ void main() {
   late ChatService service;
   late Directory tmpDir;
 
-  setUp(() {
+  setUp(() async {
     tmpDir = Directory.systemTemp.createTempSync('chat_blackbox_test_');
-    ChatService.resetForTest();
+    await ChatService.resetForTest();
     service = ChatService();
     service.setTestDirectory(tmpDir.path);
   });
 
-  tearDown(() {
-    ChatService.resetForTest();
+  tearDown(() async {
+    // 必须先 await 掉在飞的写盘，再删目录 ——
+    // 否则那个协程会写到已删除的路径，异常落在**下一个用例**头上
+    await ChatService.resetForTest();
     if (tmpDir.existsSync()) {
       tmpDir.deleteSync(recursive: true);
     }
+  });
+
+  test('resetForTest 必须等在飞的写盘落完', () async {
+    // `_scheduleSave()` 是**不 await**的：addUserMessage 返回时写盘还没开始。
+    // resetForTest 直接把 _pendingSave 置 null 等于把这个协程丢掉不管 ——
+    // 它稍后才去读 _testDirPath，那时已经被清空/换成下一个用例的目录，
+    // 于是这次写入落到别处，异常也算在**下一个用例**头上。
+    // 同一形态在 model_full_flow_test 踩过（见 lib/engine/AGENTS.md）。
+    final dir = Directory.systemTemp.createTempSync('chat_reset_pending_');
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    ChatService().setTestDirectory(dir.path);
+    ChatService().addUserMessage('待写入');
+
+    await ChatService.resetForTest();
+
+    final f = File('${dir.path}/chat_history.json');
+    expect(f.existsSync(), isTrue,
+        reason: 'reset 没等写盘 —— 这次写入会落到下一个用例的目录里');
+    expect(f.readAsStringSync(), contains('待写入'));
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -377,7 +400,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 500));
 
       // Reset and re-init
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       final freshService = ChatService();
       freshService.setTestDirectory(tmpDir.path);
       await freshService.init();
@@ -399,7 +422,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 500));
 
       // Reset and reload
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       final fresh = ChatService();
       fresh.setTestDirectory(tmpDir.path);
       await fresh.init();
@@ -508,7 +531,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 500));
 
       // Reload
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       final fresh = ChatService();
       fresh.setTestDirectory(tmpDir.path);
       await fresh.init();
@@ -523,7 +546,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 500));
 
       // Reload
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       final fresh = ChatService();
       fresh.setTestDirectory(tmpDir.path);
       await fresh.init();
@@ -537,7 +560,7 @@ void main() {
       service.addUserMessage(multiLine);
       await Future.delayed(const Duration(milliseconds: 500));
 
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       final fresh = ChatService();
       fresh.setTestDirectory(tmpDir.path);
       await fresh.init();
@@ -551,7 +574,7 @@ void main() {
       service.addUserMessage(chinese);
       await Future.delayed(const Duration(milliseconds: 500));
 
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       final fresh = ChatService();
       fresh.setTestDirectory(tmpDir.path);
       await fresh.init();
@@ -606,7 +629,7 @@ void main() {
       service.addUserMessage('Will be reset');
       expect(service.messages.length, 1);
 
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       expect(service.messages, isEmpty);
     });
 
@@ -614,7 +637,7 @@ void main() {
       await service.init();
       service.addUserMessage('First run');
 
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       service.setTestDirectory(tmpDir.path);
       await service.init();
 

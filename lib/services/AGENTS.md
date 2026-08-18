@@ -99,6 +99,8 @@ CoreEngine 录音结束
 | `write_chain_discipline_test.dart` | **纪律测试**：链内代码不得再调公开写方法（会死锁，不是报错）|
 | `config_backup_service_test.dart` | 导出默认不含凭证 |
 | `vocab_csv_test.dart` | CSV 引号/转义/空字段 |
+| `think_tag_filter_test.dart` | 流式剥 `<think>`（标签被 delta 切成两半的各种形态）|
+| `llm_stream_failure_test.dart` | 流式中断不得重复吐原文 / 残留行不丢 / 伪流式也要清 think |
 
 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）。
 
@@ -115,5 +117,14 @@ CoreEngine 录音结束
   表现是**卡死而不是报错**。规则由 `write_chain_discipline_test.dart` 守，加新写方法时同步加进它的名单
 - **`importFromFile` 现在会抛** — 文件读不了 / JSON 坏 / 不是账户导出格式都 rethrow。
   UI 必须接住；早期它吞成 `return 0`，界面报「导入完成，0 条」，把用户指向完全错误的方向
+- **`correctTextStream` 有两条形态完全不同的路径** —— SSE 真流式（OpenAI 兼容）
+  和「整段一次性 yield」的伪流式（Anthropic / Ollama）。改其中一条务必看另一条：
+  `<think>` 剥离、失败回退这些都要两边都做，否则同一个模型开不开打字机结果不一样
+- **流式路径里出错不能无脑 `yield input`** —— 打字机是边收边往用户文档里粘的，
+  已经吐过内容再补一份原文 = 用户文档里「半段润色 + 完整原文」。
+  只有一个字都没吐过时回退才是对的
+- **`ChatService.resetForTest()` 必须 await** —— 它要等掉在飞的 `_pendingSave`。
+  丢掉那个协程会让写入落到下一个用例的目录里，异常也算在下一个用例头上
+  （表现为「随机某条挂、单独跑不复现」）
 - **懒加载不要用「布尔完成位」** — `VocabService` 曾在 await **之前**就把 `_packsLoaded` 置 true，
   并发第二次调用立刻返回而数据还没读完。要记就记 Future 本身（`_x ??= _load()`）

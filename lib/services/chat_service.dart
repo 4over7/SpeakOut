@@ -29,7 +29,16 @@ class ChatService {
   String? _testDirPath;
 
   @visibleForTesting
-  static void resetForTest() {
+  /// **必须 await。**
+  ///
+  /// 直接把 `_pendingSave` 置 null 是把一个**还在跑的写盘**丢掉，而不是取消它。
+  /// 紧接着 tearDown 删掉临时目录 / 把 `_testDirPath` 清空，那个协程就会写到
+  /// 不存在的路径，落进 `_saveHistory` 的 catch → `NotificationService.notifyError`。
+  /// 这个异常发生时**当前跑的已经是下一个用例**，于是表现为
+  /// 「chat_service_blackbox_test 里随机某条挂掉、单独跑又永远复现不了」。
+  /// 同一个形态在 model_full_flow_test 上踩过一次（见 lib/engine/AGENTS.md）。
+  static Future<void> resetForTest() async {
+    await _instance._pendingSave; // _saveHistory 内部全 catch，这里不会抛
     _instance._messages.clear();
     _instance._isInit = false;
     _instance._pendingSave = null;

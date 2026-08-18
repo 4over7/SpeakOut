@@ -230,14 +230,15 @@ void main() {
   group('ChatService 消息裁剪', () {
     late Directory tmpDir;
 
-    setUp(() {
+    setUp(() async {
       tmpDir = Directory.systemTemp.createTempSync('chat_service_test_');
-      ChatService.resetForTest();
+      await ChatService.resetForTest();
       ChatService().setTestDirectory(tmpDir.path);
     });
 
-    tearDown(() {
-      ChatService.resetForTest();
+    tearDown(() async {
+      // 先 await 在飞的写盘再删目录，否则异常会落在下一个用例头上
+      await ChatService.resetForTest();
       if (tmpDir.existsSync()) {
         tmpDir.deleteSync(recursive: true);
       }

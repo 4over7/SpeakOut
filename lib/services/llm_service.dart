@@ -144,14 +144,20 @@ class LLMService {
       return;
     }
 
+    // 这两条是「伪流式」：整段结果一次性 yield 出去。
+    // **必须先 _cleanLlmOutput** —— 非流式入口 correctText() 会清，这里漏清的话
+    // thinking 模型的 `<think>…</think>` 会被打字机原样粘进用户文档
+    // （引擎收完后确实也清一遍，但清的是留档用的 finalText，粘出去的撤不回来）。
     final providerType = ConfigService().llmProviderType;
     if (providerType == 'ollama') {
-      yield await _correctTextOllama(input, vocabHints: vocabHints, translateTo: translateTo);
+      yield _cleanLlmOutput(
+          await _correctTextOllama(input, vocabHints: vocabHints, translateTo: translateTo));
       return;
     }
     final resolved = _resolveLlmConfig();
     if (resolved.isAnthropic) {
-      yield await _correctTextAnthropic(input, vocabHints: vocabHints, resolved: resolved, translateTo: translateTo);
+      yield _cleanLlmOutput(await _correctTextAnthropic(input,
+          vocabHints: vocabHints, resolved: resolved, translateTo: translateTo));
       return;
     }
     yield* _correctTextCloudStream(input, vocabHints: vocabHints, resolved: resolved, translateTo: translateTo);
@@ -174,6 +180,7 @@ class LLMService {
     _log("RAW INPUT (${input.length}字): ${AppLog.redact(input)}");
     _log("Calling Cloud LLM (stream): $baseUrl, model=$model");
 
+    var emittedAny = false;
     try {
       final client = _effectiveClient;
       final uri = Uri.parse('$baseUrl/chat/completions');
@@ -206,7 +213,25 @@ class LLMService {
       }
 
       final fullBuffer = StringBuffer();
+      final think = ThinkTagFilter();
       String lineBuffer = '';
+
+      /// 一行 SSE → 可安全输出的正文（已剥掉 think 段），拿不到内容就返回 null
+      String? parseLine(String line) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || !trimmed.startsWith('data: ')) return null;
+        final data = trimmed.substring(6);
+        if (data == '[DONE]') return null;
+        try {
+          final json = jsonDecode(data);
+          final delta = json['choices']?[0]?['delta']?['content']?.toString();
+          if (delta == null || delta.isEmpty) return null;
+          final safe = think.add(delta);
+          return safe.isEmpty ? null : safe;
+        } catch (_) {
+          return null;
+        }
+      }
 
       await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
         lineBuffer += chunk;
@@ -215,20 +240,29 @@ class LLMService {
         lineBuffer = lines.removeLast();
 
         for (final line in lines) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty || !trimmed.startsWith('data: ')) continue;
-          final data = trimmed.substring(6);
-          if (data == '[DONE]') continue;
-
-          try {
-            final json = jsonDecode(data);
-            final delta = json['choices']?[0]?['delta']?['content']?.toString();
-            if (delta != null && delta.isNotEmpty) {
-              fullBuffer.write(delta);
-              yield delta; // Yield incremental chunk
-            }
-          } catch (_) {}
+          final safe = parseLine(line);
+          if (safe != null) {
+            fullBuffer.write(safe);
+            emittedAny = true;
+            yield safe; // Yield incremental chunk
+          }
         }
+      }
+
+      // 收尾：服务端不以换行结束时，最后一条 data: 还留在 lineBuffer 里。
+      // 不处理的话末尾那个 token 会静默丢掉。
+      final lastSafe = parseLine(lineBuffer);
+      if (lastSafe != null) {
+        fullBuffer.write(lastSafe);
+        emittedAny = true;
+        yield lastSafe;
+      }
+      // think 过滤器可能还扣着「疑似标签前缀」的几个字，流结束时补吐出来
+      final tail = think.flush();
+      if (tail.isNotEmpty) {
+        fullBuffer.write(tail);
+        emittedAny = true;
+        yield tail;
       }
 
       final result = fullBuffer.toString().trim();
@@ -238,7 +272,9 @@ class LLMService {
       _log("LLM STREAM SUCCESS (${result.length}字, differs=${result != input}): ${AppLog.redact(result)}");
     } catch (e) {
       _log("LLM STREAM EXCEPTION: $e");
-      yield input;
+      // **只在一个字都没吐过时才回退原文**。已经吐过一部分再吐整段原文，
+      // 打字机模式会把「半段润色文本 + 完整原文」一起粘进用户文档 —— 文本翻倍。
+      if (!emittedAny) yield input;
     }
   }
 
@@ -731,5 +767,93 @@ Rules:
     }
     
     return null;
+  }
+}
+
+/// 流式输出里剥离 `<think>…</think>` 推理段。
+///
+/// 非流式路径用 `_cleanLlmOutput` 一次性正则清掉就行，流式不行：
+/// delta 是一小段一小段来的，标签会被切成两半；而**打字机模式边收边往用户文档里粘**，
+/// 等收完再清已经来不及 —— 引擎那边清的只是留档用的 finalText，
+/// 已经粘出去的字撤不回来。thinking 模型（R1 / Qwen thinking 等）一开就会漏。
+///
+/// 策略：能确定在 think 段之外的字立刻放行；末尾若是**疑似标签前缀**就先扣住，
+/// 等下一段 delta 来了再判。流结束时 `flush()` 把扣住的补出来
+/// （未闭合的 `<think>` 视为思考内容，整段丢弃）。
+class ThinkTagFilter {
+  static final _open = RegExp(r'<think>', caseSensitive: false);
+  static final _close = RegExp(r'</think>', caseSensitive: false);
+  static const _openLit = '<think>';
+  static const _closeLit = '</think>';
+
+  final StringBuffer _buf = StringBuffer();
+  bool _inThink = false;
+
+  /// 喂一段 delta，返回此刻可以安全输出的正文（可能为空串）。
+  String add(String delta) {
+    _buf.write(delta);
+    var work = _buf.toString();
+    final out = StringBuffer();
+
+    while (true) {
+      if (_inThink) {
+        final m = _close.firstMatch(work);
+        if (m == null) {
+          // 还在思考段里：整段丢掉，只留可能是 </think> 前缀的尾巴
+          work = _keepPartialSuffix(work, _closeLit);
+          break;
+        }
+        work = work.substring(m.end);
+        _inThink = false;
+        continue;
+      }
+      // 不在思考段：`<think>` 和落单的 `</think>` 都要处理，取靠前的那个。
+      // 落单闭标签也得删 —— 非流式路径的 _cleanLlmOutput 就是这么做的，
+      // 两条路径的输出必须一致，否则同一个模型开不开打字机结果不一样。
+      final mo = _open.firstMatch(work);
+      final mc = _close.firstMatch(work);
+      final m = (mo == null)
+          ? mc
+          : (mc == null || mo.start <= mc.start ? mo : mc);
+      if (m == null) {
+        // 尾巴可能是任一标签的前缀，扣住等下一段
+        final keep = _keepPartialSuffix(work, _openLit, _closeLit);
+        out.write(work.substring(0, work.length - keep.length));
+        work = keep;
+        break;
+      }
+      out.write(work.substring(0, m.start));
+      final wasOpen = identical(m, mo);
+      work = work.substring(m.end);
+      if (wasOpen) _inThink = true;
+    }
+
+    _buf.clear();
+    _buf.write(work);
+    return out.toString();
+  }
+
+  /// 流结束：把扣住的残留吐出来。仍在未闭合的 think 段里则整段丢弃。
+  String flush() {
+    final rest = _inThink ? '' : _buf.toString();
+    _buf.clear();
+    _inThink = false;
+    return rest;
+  }
+
+  /// 返回 s 末尾**可能是任一 tag 前缀**的那一小段（取最长的那个）。
+  /// 比如 `"好的</thi"` → `"</thi"`，下一段 delta 补齐后才判得出来。
+  /// 不扣住的话，跨 delta 的标签会被当成正文原样粘进用户文档。
+  static String _keepPartialSuffix(String s, String tag, [String? tag2]) {
+    final tags = [tag, ?tag2];
+    final maxLen = tags.map((t) => t.length - 1).reduce((a, b) => a > b ? a : b);
+    final start = s.length - maxLen;
+    for (var i = start < 0 ? 0 : start; i < s.length; i++) {
+      final suffix = s.substring(i).toLowerCase();
+      if (tags.any((t) => t.toLowerCase().startsWith(suffix))) {
+        return s.substring(i);
+      }
+    }
+    return '';
   }
 }
