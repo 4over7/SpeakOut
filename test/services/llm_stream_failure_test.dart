@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speakout/config/app_constants.dart';
 import 'package:speakout/services/config_service.dart';
 import 'package:speakout/services/llm_service.dart';
 
@@ -119,6 +120,8 @@ void main() {
     final out = await service.correctTextStream('x').toList();
     expect(out.join(), '正文');
   });
+
+  group('连接测试的错误信息', _connectionErrorTests);
 }
 
 /// 只是为了给 addError 一个具体异常类型，不依赖 dart:io
@@ -126,4 +129,56 @@ class SocketExceptionStub implements Exception {
   const SocketExceptionStub();
   @override
   String toString() => 'SocketExceptionStub: connection reset';
+}
+
+/// 连接测试失败时给用户看的那一行字。
+///
+/// 两个真实缺陷：`resp.body` 缺省按 latin1 解码，国内服务商的中文报错变乱码；
+/// 非 200 响应直接 jsonDecode，网关返回 HTML 时抛异常，用户看到的是
+/// "FormatException: ..." 而不是 "502 网关错误"。
+void _connectionErrorTests() {
+  late LLMService service;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await ConfigService().init();
+    service = LLMService();
+  });
+
+  Future<(bool, String)> testWith(int code, List<int> bytes,
+      {Map<String, String>? headers}) async {
+    service.setClient(MockClient((request) async =>
+        http.Response.bytes(bytes, code, headers: headers ?? const {})));
+    return service.testConnectionWith(
+      apiKey: 'k',
+      baseUrl: 'https://example.com/v1',
+      model: 'm',
+      apiFormat: LlmApiFormat.openai,
+    );
+  }
+
+  test('中文错误信息不得乱码', () async {
+    final (ok, msg) = await testWith(
+        401,
+        utf8.encode(jsonEncode({
+          'error': {'message': '认证失败：密钥无效'}
+        })));
+    expect(ok, isFalse);
+    expect(msg, contains('认证失败：密钥无效'),
+        reason: '用 resp.body（latin1）解码会把中文变成乱码');
+  });
+
+  test('网关返回 HTML 时要说 502，而不是 FormatException', () async {
+    final (ok, msg) = await testWith(
+        502, utf8.encode('<html><body>Bad Gateway</body></html>'));
+    expect(ok, isFalse);
+    expect(msg, startsWith('502'));
+    expect(msg.toLowerCase(), isNot(contains('formatexception')),
+        reason: '直接 jsonDecode 非 JSON 响应，用户看到的是解析错误而不是网关错误');
+  });
+
+  test('超长错误体要截断，不能整页 HTML 糊到弹窗里', () async {
+    final (_, msg) = await testWith(500, utf8.encode('x' * 5000));
+    expect(msg.length, lessThan(300));
+  });
 }

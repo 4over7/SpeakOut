@@ -630,6 +630,32 @@ class LLMService {
     }
   }
 
+  /// 把失败响应转成给用户看的一行字。
+  ///
+  /// 两个坑都踩过一次才补上：
+  /// - `resp.body` 按 Content-Type 的 charset 解码，缺省是 latin1 ——
+  ///   国内服务商（DeepSeek/Kimi/豆包/智谱）返回的中文错误直接变乱码。
+  ///   本文件其它地方都用 `utf8.decode(bodyBytes)`，这里以前漏了。
+  /// - 非 200 的响应**不一定是 JSON**（网关 502 会返回 HTML），
+  ///   直接 jsonDecode 会抛，被外层 catch 成 "FormatException: ..." ——
+  ///   用户看到的是解析错误，而不是「502 网关错误」。
+  static String _describeHttpFailure(http.Response resp) {
+    final raw = utf8.decode(resp.bodyBytes, allowMalformed: true);
+    try {
+      final body = jsonDecode(raw);
+      if (body is Map) {
+        final msg = body['error']?['message'] ?? body['message'];
+        if (msg != null) return '${resp.statusCode}: $msg';
+      }
+    } catch (_) {
+      // 不是 JSON，退回原文
+    }
+    final trimmed = raw.trim();
+    const maxLen = 200; // 网关的 HTML 错误页可能很长，截断
+    return '${resp.statusCode}: '
+        '${trimmed.length > maxLen ? '${trimmed.substring(0, maxLen)}…' : trimmed}';
+  }
+
   /// Test LLM connection with explicit parameters (no Keychain dependency)
   Future<(bool, String)> testConnectionWith({
     required String apiKey,
@@ -651,8 +677,7 @@ class LLMService {
         ).timeout(AppConstants.kLlmTestTimeout);
         _log("TEST: Anthropic response ${resp.statusCode}");
         if (resp.statusCode == 200) return (true, '连接成功 ($model)');
-        final body = jsonDecode(resp.body);
-        return (false, '${resp.statusCode}: ${body['error']?['message'] ?? resp.body}');
+        return (false, _describeHttpFailure(resp));
       } else {
         final resp = await client.post(
           Uri.parse('$baseUrl/chat/completions'),
@@ -661,8 +686,7 @@ class LLMService {
         ).timeout(AppConstants.kLlmTestTimeout);
         _log("TEST: OpenAI response ${resp.statusCode}");
         if (resp.statusCode == 200) return (true, '连接成功 ($model)');
-        final body = jsonDecode(resp.body);
-        return (false, '${resp.statusCode}: ${body['error']?['message'] ?? resp.body}');
+        return (false, _describeHttpFailure(resp));
       }
     } catch (e) {
       _log("TEST: exception $e");
@@ -681,7 +705,7 @@ class LLMService {
         body: jsonEncode({"model": model, "messages": [{"role": "user", "content": "Hi"}], "stream": false}),
       ).timeout(AppConstants.kLlmTestTimeout);
       if (resp.statusCode == 200) return (true, '连接成功 ($model)');
-      return (false, '${resp.statusCode}: ${resp.body}');
+      return (false, _describeHttpFailure(resp));
     } catch (e) {
       return (false, e.toString());
     }

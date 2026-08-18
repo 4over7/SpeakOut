@@ -113,6 +113,13 @@ CoreEngine 录音结束
 - **AppLog dispose 必须取消 _flushTimer** — 否则测试 hang（已修，2026-03-29）
 - **UpdateService 下载用 `request.followRedirects = true`** — http.Client 默认不跟随 302（这个 bug 卡过一次）
 - **测试连接（testConnectionWith）和真实调用走不同 base URL** — Anthropic 是 `/v1/messages`，OpenAI 兼容是 `/chat/completions`
+- **读响应体一律 `utf8.decode(resp.bodyBytes)`，不要用 `resp.body`** ——
+  后者按 Content-Type 的 charset 解码、缺省 latin1，国内服务商返回的中文错误会变乱码
+- **非 200 的响应体不一定是 JSON** — 网关 502 返回 HTML，直接 jsonDecode 会抛，
+  用户看到「FormatException」而不是「502」。统一走 `_describeHttpFailure()`
+- **`routeIntent()` 目前零调用方**（连同 `ConfigService.agentRouterModelRaw`）——
+  是 agent 路由的遗留。它只走 OpenAI 兼容分支，Anthropic 账户下必然失败；
+  要复用先补 Anthropic 分支和 `_cleanLlmOutput`
 - **`CloudAccountService` 的公开写方法只能从链外调** — 链内再调会把自己排到自己后面，
   表现是**卡死而不是报错**。规则由 `write_chain_discipline_test.dart` 守，加新写方法时同步加进它的名单
 - **`importFromFile` 现在会抛** — 文件读不了 / JSON 坏 / 不是账户导出格式都 rethrow。
