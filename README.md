@@ -10,7 +10,7 @@
   [Download](https://github.com/4over7/SpeakOut/releases/latest) · [Wiki](https://github.com/4over7/SpeakOut/wiki) · [Changelog](CHANGELOG.md)
 
   ![Platform](https://img.shields.io/badge/platform-macOS%2013.4+-blue)
-  ![Version](https://img.shields.io/badge/version-1.11.0-brightgreen)
+  ![Version](https://img.shields.io/badge/version-1.11.1-brightgreen)
   ![Tests](https://img.shields.io/badge/tests-passing%20on%20macOS-brightgreen)
   ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
