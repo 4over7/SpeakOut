@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:speakout/engine/model_manager.dart';
@@ -33,8 +34,19 @@ void main() {
     final dirName = model.url.split('/').last.replaceAll('.tar.bz2', '');
     final d = Directory('${modelsRoot.path}/$dirName')..createSync(recursive: true);
     File('${d.path}/tokens.txt').writeAsStringSync('existing-tokens');
-    File('${d.path}/model.onnx').writeAsStringSync('existing-onnx');
+    File('${d.path}/encoder.int8.onnx').writeAsStringSync('existing-encoder');
+    File('${d.path}/decoder.int8.onnx').writeAsStringSync('existing-decoder');
     return d;
+  }
+
+  File createArchive(String name, Map<String, String> files) {
+    final archive = Archive();
+    for (final entry in files.entries) {
+      final bytes = entry.value.codeUnits;
+      archive.addFile(ArchiveFile(entry.key, bytes.length, bytes));
+    }
+    final encoded = BZip2Encoder().encode(TarEncoder().encode(archive));
+    return File('${tmp.path}/$name.tar.bz2')..writeAsBytesSync(encoded);
   }
 
   test('导入损坏包失败后，原有模型必须原封不动', () async {
@@ -82,5 +94,55 @@ void main() {
         .toList();
     expect(leftovers, isEmpty, reason: '残留 .old 目录会白占几百 MB 磁盘');
     expect(existing.existsSync(), isTrue);
+  });
+
+  test('合法压缩包只有 tokens、没有推理模型时，拒绝导入并保留旧模型', () async {
+    final existing = seedExistingModel();
+    final incomplete = createArchive('tokens_only', {
+      'candidate/tokens.txt': 'new-tokens',
+    });
+
+    await expectLater(
+      ModelManager().importModel(modelId, incomplete.path),
+      throwsA(anything),
+    );
+
+    expect(existing.existsSync(), isTrue);
+    expect(
+      File('${existing.path}/tokens.txt').readAsStringSync(),
+      'existing-tokens',
+      reason: '结构不完整但可解压的包不得替换原模型',
+    );
+    expect(File('${existing.path}/encoder.int8.onnx').existsSync(), isTrue);
+  });
+
+  test('完整且类型匹配的模型包可以替换旧模型', () async {
+    final existing = seedExistingModel();
+    final complete = createArchive('complete', {
+      'candidate/tokens.txt': 'new-tokens',
+      'candidate/encoder.int8.onnx': 'new-encoder',
+      'candidate/decoder.int8.onnx': 'new-decoder',
+    });
+
+    final installedPath =
+        await ModelManager().importModel(modelId, complete.path);
+
+    expect(installedPath, existing.path);
+    expect(File('${existing.path}/tokens.txt').readAsStringSync(), 'new-tokens');
+    expect(Directory('${existing.path}.old').existsSync(), isFalse);
+  });
+
+  test('进程中断后只留下 .old 时，读取状态会恢复原模型', () async {
+    final existing = seedExistingModel();
+    final backup = Directory('${existing.path}.old');
+    existing.renameSync(backup.path);
+
+    expect(await ModelManager().isModelDownloaded(modelId), isTrue);
+    expect(existing.existsSync(), isTrue);
+    expect(backup.existsSync(), isFalse);
+    expect(
+      File('${existing.path}/tokens.txt').readAsStringSync(),
+      'existing-tokens',
+    );
   });
 }

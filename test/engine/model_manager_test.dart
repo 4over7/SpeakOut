@@ -45,11 +45,54 @@ void main() {
   }
 
   /// 创建模拟模型目录，返回该目录
-  Directory createFakeModelDir(ModelInfo model, {String tokenFileName = 'tokens.txt'}) {
+  Directory createFakeModelDir(
+    ModelInfo model, {
+    String tokenFileName = 'tokens.txt',
+    bool includeModelFiles = true,
+  }) {
     final dirName = dirNameFromUrl(model.url);
     final modelDir = Directory('${tmpDir.path}/Models/$dirName');
     modelDir.createSync(recursive: true);
-    File('${modelDir.path}/$tokenFileName').writeAsStringSync('dummy');
+    void write(String name) =>
+        File('${modelDir.path}/$name').writeAsStringSync('dummy');
+
+    write(model.type == 'funasr_nano' ? 'tokenizer.json' : tokenFileName);
+    if (!includeModelFiles) return modelDir;
+
+    switch (model.type) {
+      case 'paraformer':
+        write('encoder.int8.onnx');
+        write('decoder.int8.onnx');
+        break;
+      case 'zipformer':
+        write('encoder.int8.onnx');
+        write('decoder.int8.onnx');
+        write('joiner.int8.onnx');
+        break;
+      case 'sense_voice':
+      case 'offline_paraformer':
+        write('model.int8.onnx');
+        break;
+      case 'whisper':
+      case 'fire_red_asr':
+        write('encoder.int8.onnx');
+        write('decoder.int8.onnx');
+        break;
+      case 'funasr_nano':
+        write('encoder_adaptor.int8.onnx');
+        write('llm.int8.onnx');
+        write('embedding.int8.onnx');
+        break;
+      case 'fire_red_asr_ctc':
+      case 'telespeech_ctc':
+      case 'dolphin':
+        write('model.int8.onnx');
+        break;
+      case 'moonshine':
+        write('encoder_model.ort');
+        write('decoder_model_merged.ort');
+        break;
+    }
     return modelDir;
   }
 
@@ -109,8 +152,10 @@ void main() {
       });
     }
 
-    /// Whisper 风格: prefix-tokens.txt
-    for (final model in ModelManager.allModels) {
+    /// 只有 Provider 会主动查找前缀 tokens 的模型家族支持这种布局。
+    for (final model in ModelManager.allModels.where(
+      (m) => m.type == 'whisper' || m.type == 'moonshine',
+    )) {
       test('${model.id}: large-v3-tokens.txt → true', () async {
         createFakeModelDir(model, tokenFileName: 'large-v3-tokens.txt');
         expect(await manager.isModelDownloaded(model.id), isTrue);
@@ -128,6 +173,12 @@ void main() {
       modelDir.createSync(recursive: true);
       // 只放一个无关文件
       File('${modelDir.path}/model.onnx').writeAsStringSync('dummy');
+      expect(await manager.isModelDownloaded(model.id), isFalse);
+    });
+
+    test('只有 tokens、没有推理模型文件 → false', () async {
+      final model = ModelManager.allModels.first;
+      createFakeModelDir(model, includeModelFiles: false);
       expect(await manager.isModelDownloaded(model.id), isFalse);
     });
 
@@ -170,12 +221,14 @@ void main() {
       final subDir = Directory('${modelDir.path}/nested');
       subDir.createSync();
       File('${subDir.path}/tokens.txt').writeAsStringSync('dummy');
+      File('${subDir.path}/encoder.int8.onnx').writeAsStringSync('dummy');
+      File('${subDir.path}/decoder.int8.onnx').writeAsStringSync('dummy');
 
       SharedPreferences.setMockInitialValues({'active_model_id': model.id});
       await ConfigService().reload();
       final path = await manager.getActiveModelPath();
       expect(path, isNotNull, reason: '嵌套子目录下的 tokens.txt 应该能找到');
-      expect(path, endsWith(dirName));
+      expect(path, endsWith('nested'));
     });
   });
 
@@ -187,6 +240,14 @@ void main() {
       final dirName = dirNameFromUrl(ModelManager.punctuationModelUrl);
       final modelDir = Directory('${tmpDir.path}/Models/$dirName/$dirName');
       modelDir.createSync(recursive: true);
+      File('${modelDir.path}/model.onnx').writeAsStringSync('dummy');
+      expect(await manager.isPunctuationModelDownloaded(), isTrue);
+    });
+
+    test('isPunctuationModelDownloaded: model.onnx 在 root → true', () async {
+      final dirName = dirNameFromUrl(ModelManager.punctuationModelUrl);
+      final modelDir = Directory('${tmpDir.path}/Models/$dirName')
+        ..createSync(recursive: true);
       File('${modelDir.path}/model.onnx').writeAsStringSync('dummy');
       expect(await manager.isPunctuationModelDownloaded(), isTrue);
     });
@@ -222,6 +283,18 @@ void main() {
       modelDir.createSync(recursive: true);
       File('${modelDir.path}/other.txt').writeAsStringSync('dummy');
       expect(await manager.getPunctuationModelPath(), isNull);
+    });
+
+    test('getPunctuationModelPath: 中断安装只留下 .old 时恢复备份', () async {
+      final dirName = dirNameFromUrl(ModelManager.punctuationModelUrl);
+      final finalDir = Directory('${tmpDir.path}/Models/$dirName');
+      final backupDir = Directory('${finalDir.path}.old')
+        ..createSync(recursive: true);
+      File('${backupDir.path}/model.onnx').writeAsStringSync('dummy');
+
+      expect(await manager.getPunctuationModelPath(), finalDir.path);
+      expect(finalDir.existsSync(), isTrue);
+      expect(backupDir.existsSync(), isFalse);
     });
   });
 
@@ -291,12 +364,12 @@ void main() {
 
     test('large-v3-tokens.txt (Whisper 风格)', () async {
       createFakeModelDir(model, tokenFileName: 'large-v3-tokens.txt');
-      expect(await manager.isModelDownloaded(model.id), isTrue);
+      expect(await manager.isModelDownloaded(model.id), isFalse);
     });
 
     test('my-custom-tokens.txt (任意 prefix-tokens.txt)', () async {
       createFakeModelDir(model, tokenFileName: 'my-custom-tokens.txt');
-      expect(await manager.isModelDownloaded(model.id), isTrue);
+      expect(await manager.isModelDownloaded(model.id), isFalse);
     });
 
     test('TOKENS.txt (大写) → macOS HFS+ 大小写不敏感，仍匹配', () async {

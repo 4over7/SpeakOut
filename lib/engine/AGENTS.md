@@ -23,10 +23,10 @@
 
 | 类 | 文件 | 职责 |
 |---|---|---|
-| `CoreEngine` (singleton) | `core_engine.dart`（~1700 行，最大文件）| 主编排：键盘监听循环、音频管道、ASR 状态机、模式分发、超时/Watchdog |
+| `CoreEngine` (singleton) | `core_engine.dart` | 主编排：键盘监听循环、音频管道、ASR 状态机、模式分发、超时/Watchdog |
 | `ASRProvider` | `asr_provider.dart` | 抽象基类：`init() / start() / stop() / dispose()` + Stream<ASRResult> |
 | `ASRResult` | `asr_result.dart` | 结果载荷 `{text, isFinal, error?}`（错误走 `error` 字段不走异常）|
-| `ModelManager` | `model_manager.dart`（~830 行）| 离线模型下载/解压/校验/激活 + 注册表（9 可见 + 8 隐藏）|
+| `ModelManager` | `model_manager.dart` | 离线模型下载/解压/校验/激活 + 模型注册表 |
 | `ASRProviderFactory` | `providers/asr_provider_factory.dart` | 按工作模式 + 账户配置选 Provider |
 
 ## ASR Provider 实现矩阵
@@ -109,7 +109,11 @@
 - ⚠️ 注入必须在 codesign 之前，否则签名不覆盖新文件会导致公证失败
 
 ### 5. 模型激活失败回滚
-`ModelManager.initASR()` 抛异常时 CoreEngine 回滚到之前的模型 ID（防止用户卡在"无可用模型"状态）。
+设置页经 `AppService` 调用 `CoreEngine.initASR()` 失败时，必须把模型 ID 和引擎实例一起恢复到切换前状态。
+
+模型文件安装本身由 `ModelManager` 做事务保护：先在 staging 解压，并按 Provider 实际需要的
+文件组合校验；校验通过后才用 `.old` 备份替换正式目录。读取模型状态时会自动恢复中断安装
+留下的有效备份。**不能退化成只检查 tokens 文件**，否则残缺包会覆盖用户原有模型。
 
 ### 6. 预分段识别（pre-segmentation）
 录音中检测 3 秒停顿 + 累计 ≥30s 后台触发 ASR 解码。`kPauseSegmentThresholdCount=15`、`kPreSegmentMinDurationSec=30.0`（在 `core_engine.dart`）。停止时只需等最后一段，体感快。
@@ -185,6 +189,7 @@ CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——�
 - `test/engine/hotkey_matching_test.dart` — 修饰键精确匹配规则
 - `test/engine/asr_stop_budget_test.dart` — 上面 §3 的两层预算（含「不得秒级盲等」扫描）
 - `test/engine/asr_init_serialization_test.dart` — 上面 §3b 的串行链与 rethrow
+- `test/engine/model_import_atomicity_test.dart` — 模型导入完整性、原子替换与中断恢复
 - `test/engine/xfyun_wpgs_test.dart` — 讯飞动态修正的 segment 合并（rg 越界不得重复/丢字）
 - 新增 Provider 时：mock WebSocket，验证 protocol 序列（run-task → task-started → result-generated → task-finished/task-failed）
 

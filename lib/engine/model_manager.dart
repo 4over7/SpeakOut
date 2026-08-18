@@ -296,13 +296,7 @@ class ModelManager {
     try {
       final contents = File(Platform.resolvedExecutable).parent.parent.path;
       final dir = Directory('$contents/Resources/models/${_getDirNameFromUrl(model.url)}');
-      // 只判目录存在不够：打包出错可能留下空目录/残缺文件，
-      // 那样会被误判为"已内置"，最终静默失败在 initASR。
-      // 命名与 _hasTokensFile 保持一致（不同模型家族 tokens 文件名不同）。
-      bool hasTokens(String p) =>
-          File('$p/tokens.txt').existsSync() ||
-          File('$p/tokenizer.json').existsSync();
-      result = (dir.existsSync() && hasTokens(dir.path)) ? dir.path : null;
+      result = _findValidModelDir(model, dir.path);
     } catch (_) {
       result = null;
     }
@@ -321,8 +315,11 @@ class ModelManager {
     if (model == null) return false;
     final modelsRoot = await _getModelsRoot();
     final dir = Directory('${modelsRoot.path}/${_getDirNameFromUrl(model.url)}');
-    if (!await dir.exists()) return false;
-    return _hasTokensFile(dir.path);
+    await _recoverInterruptedInstall(
+      dir,
+      (path) => _findValidModelDir(model, path) != null,
+    );
+    return _findValidModelDir(model, dir.path) != null;
   }
 
   /// 找出「随包内置、同时又在用户目录留了一份下载副本」的冗余占用。
@@ -388,20 +385,13 @@ class ModelManager {
 
     final modelRoot = Directory('${modelsRoot.path}/${_getDirNameFromUrl(model.url)}');
 
-    // 1. Direct check
-    if (await _hasTokensFile(modelRoot.path)) return modelRoot.path;
+    await _recoverInterruptedInstall(
+      modelRoot,
+      (path) => _findValidModelDir(model!, path) != null,
+    );
 
-    // 2. Recursive check (one level deep)
-    if (await modelRoot.exists()) {
-      try {
-        final entities = modelRoot.listSync();
-        for (var entity in entities) {
-          if (entity is Directory) {
-             if (await _hasTokensFile(entity.path)) return entity.path;
-          }
-        }
-      } catch (_) {}
-    }
+    final local = _findValidModelDir(model, modelRoot.path);
+    if (local != null) return local;
 
     // 3. 兜底：随包内置的模型。
     //    放最后而非最前 —— 用户主动下载/导入的副本必须优先，
@@ -416,16 +406,187 @@ class ModelManager {
     await ConfigService().setActiveModelId(id);
   }
 
-  /// 检查目录下是否有 tokens 文件 (tokens.txt / *-tokens.txt / tokenizer.json)
-  Future<bool> _hasTokensFile(String dirPath) async {
-    if (await File('$dirPath/tokens.txt').exists()) return true;
-    if (await File('$dirPath/tokenizer.json').exists()) return true;
+  bool _isNonEmptyFile(File file) {
     try {
-      final entries = Directory(dirPath).listSync(recursive: true);
-      return entries.any((e) => e is File &&
-          (e.path.endsWith('tokens.txt') || e.path.endsWith('tokenizer.json')));
+      return file.existsSync() && file.lengthSync() > 0;
     } catch (_) {
       return false;
+    }
+  }
+
+  bool _isModelFile(File file) {
+    final name = file.path.toLowerCase();
+    return _isNonEmptyFile(file) &&
+        (name.endsWith('.onnx') || name.endsWith('.ort'));
+  }
+
+  bool _hasFile(List<File> files, String pattern) =>
+      files.any((file) =>
+          _isModelFile(file) &&
+          file.path.split(Platform.pathSeparator).last.contains(pattern));
+
+  bool _hasExactFile(List<File> files, String name) =>
+      files.any((file) =>
+          _isNonEmptyFile(file) &&
+          file.path.split(Platform.pathSeparator).last == name);
+
+  bool _hasTokenFile(List<File> files) => files.any((file) {
+        final name = file.path.split(Platform.pathSeparator).last;
+        return name.endsWith('tokens.txt') && _isNonEmptyFile(file);
+      });
+
+  /// 按 Provider 真正加载的文件组合判断模型是否可用。
+  /// 只看 tokens 会让「可解压但缺权重」的包覆盖掉现有模型。
+  bool _isValidModelDir(ModelInfo model, String dirPath) {
+    try {
+      final dir = Directory(dirPath);
+      if (!dir.existsSync()) return false;
+      final files = dir.listSync(followLinks: false).whereType<File>().toList();
+
+      if (model.type == 'funasr_nano') {
+        final hasTokenizer = dir
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .any((file) =>
+                file.path.split(Platform.pathSeparator).last ==
+                    'tokenizer.json' &&
+                _isNonEmptyFile(file));
+        return hasTokenizer &&
+            _hasFile(files, 'encoder_adaptor') &&
+            _hasFile(files, 'llm') &&
+            _hasFile(files, 'embedding');
+      }
+
+      final hasTokens = model.type == 'whisper' || model.type == 'moonshine'
+          ? _hasTokenFile(files)
+          : _isNonEmptyFile(File('$dirPath/tokens.txt'));
+      if (!hasTokens) return false;
+
+      switch (model.type) {
+        case 'paraformer':
+          return _hasExactFile(files, 'encoder.int8.onnx') &&
+              _hasExactFile(files, 'decoder.int8.onnx');
+        case 'zipformer':
+          return _hasFile(files, 'encoder') &&
+              _hasFile(files, 'decoder') &&
+              _hasFile(files, 'joiner');
+        case 'sense_voice':
+        case 'offline_paraformer':
+          return _hasExactFile(files, 'model.int8.onnx');
+        case 'whisper':
+        case 'fire_red_asr':
+          return _hasFile(files, 'encoder') && _hasFile(files, 'decoder');
+        case 'fire_red_asr_ctc':
+        case 'telespeech_ctc':
+        case 'dolphin':
+          return _hasFile(files, 'model');
+        case 'moonshine':
+          final hasMerged = _hasFile(files, 'encoder_model') &&
+              _hasFile(files, 'decoder_model_merged');
+          final hasSplit = _hasFile(files, 'preprocess') &&
+              _hasFile(files, 'encoder') &&
+              _hasFile(files, 'uncached') &&
+              files.any((file) {
+                final name = file.path.split(Platform.pathSeparator).last;
+                return _isModelFile(file) &&
+                    name.contains('cached') &&
+                    !name.contains('uncached');
+              });
+          return hasMerged || hasSplit;
+        default:
+          return false;
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 正常安装会把模型文件收敛在根目录；兼容旧版本遗留的一层 wrapper。
+  String? _findValidModelDir(ModelInfo model, String rootPath) {
+    if (_isValidModelDir(model, rootPath)) return rootPath;
+    try {
+      final root = Directory(rootPath);
+      if (!root.existsSync()) return null;
+      for (final entity in root.listSync(followLinks: false)) {
+        if (entity is Directory && _isValidModelDir(model, entity.path)) {
+          return entity.path;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Directory? _findExtractedModelDir(ModelInfo model, Directory extractedRoot) {
+    try {
+      final candidates = <Directory>[extractedRoot];
+      candidates.addAll(extractedRoot
+          .listSync(recursive: true, followLinks: false)
+          .whereType<Directory>());
+      candidates.sort((a, b) => b.path.length.compareTo(a.path.length));
+      return candidates
+          .where((dir) => _isValidModelDir(model, dir.path))
+          .firstOrNull;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _recoverInterruptedInstall(
+    Directory finalDir,
+    bool Function(String path) isValid,
+  ) async {
+    final backupDir = Directory('${finalDir.path}.old');
+    if (!await backupDir.exists()) return;
+
+    if (await finalDir.exists() && isValid(finalDir.path)) {
+      try {
+        await backupDir.delete(recursive: true);
+      } catch (e) {
+        AppLog.d('[Model] 无法清理安装备份 ${backupDir.path}: $e');
+      }
+      return;
+    }
+
+    if (!isValid(backupDir.path)) {
+      AppLog.d('[Model] 安装备份无效，保留现场: ${backupDir.path}');
+      return;
+    }
+
+    if (await finalDir.exists()) await finalDir.delete(recursive: true);
+    await backupDir.rename(finalDir.path);
+    AppLog.d('[Model] 已恢复中断安装留下的备份: ${finalDir.path}');
+  }
+
+  Future<void> _replaceDirectoryAtomically({
+    required Directory sourceDir,
+    required Directory finalDir,
+    required bool Function(String path) isValid,
+  }) async {
+    if (!isValid(sourceDir.path)) throw Exception('模型文件不完整');
+
+    await _recoverInterruptedInstall(finalDir, isValid);
+    final backupDir = Directory('${finalDir.path}.old');
+    if (await backupDir.exists()) {
+      throw Exception('发现无法自动恢复的安装备份: ${backupDir.path}');
+    }
+
+    if (await finalDir.exists()) await finalDir.rename(backupDir.path);
+
+    try {
+      await sourceDir.rename(finalDir.path);
+      if (!isValid(finalDir.path)) throw Exception('安装后模型校验失败');
+    } catch (_) {
+      if (await finalDir.exists()) await finalDir.delete(recursive: true);
+      if (await backupDir.exists()) await backupDir.rename(finalDir.path);
+      rethrow;
+    }
+
+    if (await backupDir.exists()) {
+      try {
+        await backupDir.delete(recursive: true);
+      } catch (e) {
+        AppLog.d('[Model] 新模型已安装，但旧备份清理失败: $e');
+      }
     }
   }
 
@@ -442,13 +603,16 @@ class ModelManager {
   Future<bool> isModelDownloaded(String id) async {
     final model = allModels.where((m) => m.id == id).firstOrNull;
     if (model == null) return false;
-    if (isModelBundled(id)) return true; // 随包内置 = 已就绪
     final modelsRoot = await _getModelsRoot();
     final dirName = _getDirNameFromUrl(model.url);
     final finalModelDir = Directory('${modelsRoot.path}/$dirName');
 
-    if (!await finalModelDir.exists()) return false;
-    return _hasTokensFile(finalModelDir.path);
+    await _recoverInterruptedInstall(
+      finalModelDir,
+      (path) => _findValidModelDir(model, path) != null,
+    );
+    if (_findValidModelDir(model, finalModelDir.path) != null) return true;
+    return isModelBundled(id);
   }
   
   Future<String> downloadAndExtractModel(String id, {Function(String)? onStatus, Function(double)? onProgress}) async {
@@ -503,9 +667,11 @@ class ModelManager {
     final modelsRoot = await _getModelsRoot();
     final tarPath = tarFile.path;
 
-    // Extract to a unique temp directory to handle unknown internal folder names
+    // Staging 与正式目录隔离；校验通过前绝不触碰现有模型。
     final tempExtractDir = Directory('${modelsRoot.path}/temp_extract_${model.id}');
-    if (await tempExtractDir.exists()) await tempExtractDir.delete(recursive: true);
+    if (await tempExtractDir.exists()) {
+      await tempExtractDir.delete(recursive: true);
+    }
     await tempExtractDir.create(recursive: true);
 
     onStatus?.call("正在解压...");
@@ -514,105 +680,33 @@ class ModelManager {
     try {
       await compute(_extractModelTask, [tarPath, tempExtractDir.path]);
 
-      // Normalize: Find where the content is and move to final 'dirName'
       final dirName = _getDirNameFromUrl(model.url); // Standard name
       final finalModelDir = Directory('${modelsRoot.path}/$dirName');
-      // 注意：**不要**在这里删 finalModelDir。
-      // 下面才做 anchor 校验，包损坏时会抛异常 —— 先删就等于「导入一个坏包
-      // 顺便毁掉本来能用的模型」。删除已挪到校验通过、rename 之前，并带 .old 回滚。
-
-      // Analyze tempExtractDir content
-      // Find anchor file: tokens.txt / *-tokens.txt / tokenizer.json (FunASR Nano)
-      File? anchorFile;
-      final anchorPatterns = ['*tokens.txt', 'tokenizer.json'];
-
-      if (Platform.isMacOS || Platform.isLinux) {
-         for (final pattern in anchorPatterns) {
-           if (anchorFile != null) break;
-           try {
-             final result = await Process.run('find', [tempExtractDir.path, '-name', pattern]);
-             if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
-                final lines = result.stdout.toString().trim().split('\n');
-                if (lines.isNotEmpty) {
-                   anchorFile = File(lines.first.trim());
-                   AppLog.d("[Verification] Native find success: ${anchorFile.path}");
-                }
-             }
-           } catch (e) {
-             AppLog.d("[Verification] Native find failed: $e");
-           }
-         }
+      final sourceDir = _findExtractedModelDir(model, tempExtractDir);
+      if (sourceDir == null) {
+        throw Exception('Invalid Model: 缺少 ${model.type} 所需的完整模型文件');
       }
 
-      // Fallback to Dart search
-      if (anchorFile == null) {
-          final entities = tempExtractDir.listSync(recursive: true);
-          AppLog.d("[Extraction] Entities: ${entities.length}");
-          for (var e in entities) {
-            if (e.path.endsWith('tokens.txt') || e.path.endsWith('tokenizer.json')) {
-               anchorFile = File(e.path);
-               break;
-            }
-          }
-
-          if (anchorFile == null) {
-             final fileList = entities.map((e) => e.path.split(Platform.pathSeparator).last).take(10).join(', ');
-             throw Exception("Invalid Model: tokens.txt/tokenizer.json not found. Found: $fileList...");
-          }
-      }
-
-      // Determine model root: anchor file's parent, but if that dir has no .onnx files,
-      // go up one level (e.g. FunASR Nano: tokenizer.json is in Qwen3-0.6B/ subdirectory)
-      var sourceDir = anchorFile.parent;
-      final hasOnnx = sourceDir.listSync().any((e) => e is File && e.path.endsWith('.onnx'));
-      if (!hasOnnx && sourceDir.parent.path != tempExtractDir.path) {
-        // Check parent for onnx files
-        final parentHasOnnx = sourceDir.parent.listSync().any((e) => e is File && e.path.endsWith('.onnx'));
-        if (parentHasOnnx) {
-          AppLog.d("[Extraction] Anchor was in subdirectory, using parent as model root");
-          sourceDir = sourceDir.parent;
-        }
-      }
-      AppLog.d("[Extraction] Found tokens in: ${sourceDir.path}");
-      AppLog.d("[Extraction] Moving/Renaming to: ${finalModelDir.path}");
-
-      // 到这里 anchor 校验已通过，才允许动既有模型。
-      // 先把旧模型改名成 .old 备份而不是直接删：rename 失败时还能回滚，
-      // 不至于既没装上新的、又弄丢了旧的。
-      Directory? backupDir;
-      if (await finalModelDir.exists()) {
-        backupDir = Directory('${finalModelDir.path}.old');
-        if (await backupDir.exists()) await backupDir.delete(recursive: true);
-        await finalModelDir.rename(backupDir.path);
-      }
-
-      final source = sourceDir.absolute.path == tempExtractDir.absolute.path
-          ? tempExtractDir
-          : sourceDir;
-      try {
-        await source.rename(finalModelDir.path);
-      } catch (e) {
-        // 回滚：新的没放进去，就把旧的还原回来
-        if (backupDir != null && !await finalModelDir.exists()) {
-          await backupDir.rename(finalModelDir.path);
-          AppLog.d("[Extraction] rename 失败，已回滚旧模型: $e");
-        }
-        rethrow;
-      }
-      if (backupDir != null && await backupDir.exists()) {
-        await backupDir.delete(recursive: true);
-      }
-
-      // Cleanup residue
-      if (await tempExtractDir.exists()) await tempExtractDir.delete(recursive: true);
-
-      // Delete tarball
-      if (await tarFile.exists()) await tarFile.delete();
-
+      await _replaceDirectoryAtomically(
+        sourceDir: sourceDir,
+        finalDir: finalModelDir,
+        isValid: (path) => _isValidModelDir(model, path),
+      );
     } catch (e) {
-      // Cleanup temp
-      if (await tempExtractDir.exists()) await tempExtractDir.delete(recursive: true);
       throw Exception("解压/整理失败: $e");
+    } finally {
+      try {
+        if (await tempExtractDir.exists()) {
+          await tempExtractDir.delete(recursive: true);
+        }
+      } catch (e) {
+        AppLog.d('[Model] 临时解压目录清理失败: $e');
+      }
+      try {
+        if (await tarFile.exists()) await tarFile.delete();
+      } catch (e) {
+        AppLog.d('[Model] 临时压缩包清理失败: $e');
+      }
     }
 
     // Set as active
@@ -620,20 +714,6 @@ class ModelManager {
 
     // Return path
     final dirName = _getDirNameFromUrl(model.url);
-
-    // Verify
-    if (!await isModelDownloaded(id)) {
-       // Debug verification failure
-       final finalPath = '${modelsRoot.path}/$dirName';
-       AppLog.d("[Extraction] Verification Failed!");
-       AppLog.d("[Extraction] Expected path: $finalPath");
-       if (await Directory(finalPath).exists()) {
-          AppLog.d("[Extraction] Final Dir Contents: ${Directory(finalPath).listSync()}");
-       } else {
-          AppLog.d("[Extraction] Final Dir DOES NOT EXIST!");
-       }
-       throw Exception("校验失败: 最终路径无有效模型文件");
-    }
 
     return '${modelsRoot.path}/$dirName';
   }
@@ -813,6 +893,10 @@ class ModelManager {
      if (await modelDir.exists()) {
        await modelDir.delete(recursive: true);
      }
+     final backupDir = Directory('${modelDir.path}.old');
+     if (await backupDir.exists()) {
+       await backupDir.delete(recursive: true);
+     }
      // 若删除的是当前 active 模型，切到另一个已下载模型，避免 active_model_id 悬空
      // （否则下次启动 getActiveModelPath 返回 null，会静默重下默认模型，造成"为什么又下载"困惑）
      final activeId = ConfigService().activeModelId;
@@ -830,13 +914,23 @@ class ModelManager {
   // ============ Punctuation Model Methods ============
   
   Future<bool> isPunctuationModelDownloaded() async {
-    final modelsRoot = await _getModelsRoot();
-    final dirName = _getDirNameFromUrl(punctuationModelUrl);
-    final modelDir = Directory('${modelsRoot.path}/$dirName');
-    
-    if (!await modelDir.exists()) return false;
-    // Check for model.onnx file
-    return await File('${modelDir.path}/$dirName/model.onnx').exists();
+    return await getPunctuationModelPath() != null;
+  }
+
+  String? _findPunctuationModelPath(String rootPath) {
+    try {
+      final root = Directory(rootPath);
+      if (!root.existsSync()) return null;
+      final direct = File('${root.path}/model.onnx');
+      if (_isNonEmptyFile(direct)) return root.path;
+      for (final entity in root.listSync(followLinks: false)) {
+        if (entity is Directory &&
+            _isNonEmptyFile(File('${entity.path}/model.onnx'))) {
+          return entity.path;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
   
   Future<String?> getPunctuationModelPath() async {
@@ -847,31 +941,11 @@ class ModelManager {
     // Generic find model.onnx
     AppLog.d("[Diagnose] Punctuation Root: ${modelRoot.path} (Exists: ${await modelRoot.exists()})");
     
-    if (!await modelRoot.exists()) return null;
-
-    // Robust search: Look for 'model.onnx' in root or 1-level deep
-    try {
-      if (await File('${modelRoot.path}/model.onnx').exists()) {
-        AppLog.d("[Diagnose] Found model.onnx at root: ${modelRoot.path}/model.onnx");
-        return modelRoot.path;
-      }
-      
-      final entities = modelRoot.listSync();
-      AppLog.d("[Diagnose] Root entities: ${entities.map((e) => e.path).toList()}");
-      
-      for (var entity in entities) {
-        if (entity is Directory) {
-           if (await File('${entity.path}/model.onnx').exists()) {
-             AppLog.d("[Diagnose] Found model.onnx in subfolder: ${entity.path}");
-             return entity.path;
-           }
-        }
-      }
-    } catch (e) {
-      AppLog.d("Warning: Error finding punctuation model: $e");
-    }
-    
-    return null;
+    await _recoverInterruptedInstall(
+      modelRoot,
+      (path) => _findPunctuationModelPath(path) != null,
+    );
+    return _findPunctuationModelPath(modelRoot.path);
   }
   
   Future<String> downloadPunctuationModel({Function(String)? onStatus, Function(double)? onProgress}) async {
@@ -881,7 +955,8 @@ class ModelManager {
     }
     
     final dirName = _getDirNameFromUrl(punctuationModelUrl);
-    final destDir = '${modelsRoot.path}/$dirName';
+    final finalDir = Directory('${modelsRoot.path}/$dirName');
+    final tempExtractDir = Directory('${modelsRoot.path}/temp_extract_punctuation');
     final tarPath = '${modelsRoot.path}/$dirName.tar.bz2';
     final tarFile = File(tarPath);
     
@@ -896,15 +971,37 @@ class ModelManager {
       modelName: "标点模型",
     );
     
-    // Extract
-    onStatus?.call("正在解压...");
-    await compute(_extractModelTask, [tarPath, destDir]);
-    
-    // Cleanup
-    if (await tarFile.exists()) await tarFile.delete();
-    onStatus?.call("完成");
-    
-    return destDir;
+    if (await tempExtractDir.exists()) {
+      await tempExtractDir.delete(recursive: true);
+    }
+    await tempExtractDir.create(recursive: true);
+
+    try {
+      onStatus?.call("正在解压...");
+      await compute(_extractModelTask, [tarPath, tempExtractDir.path]);
+      final sourcePath = _findPunctuationModelPath(tempExtractDir.path);
+      if (sourcePath == null) throw Exception('标点模型缺少 model.onnx');
+      await _replaceDirectoryAtomically(
+        sourceDir: Directory(sourcePath),
+        finalDir: finalDir,
+        isValid: (path) => _findPunctuationModelPath(path) != null,
+      );
+      onStatus?.call("完成");
+      return finalDir.path;
+    } finally {
+      try {
+        if (await tempExtractDir.exists()) {
+          await tempExtractDir.delete(recursive: true);
+        }
+      } catch (e) {
+        AppLog.d('[Model] 标点临时目录清理失败: $e');
+      }
+      try {
+        if (await tarFile.exists()) await tarFile.delete();
+      } catch (e) {
+        AppLog.d('[Model] 标点临时压缩包清理失败: $e');
+      }
+    }
   }
   
   Future<void> deletePunctuationModel() async {
@@ -914,6 +1011,10 @@ class ModelManager {
     
     if (await modelDir.exists()) {
       await modelDir.delete(recursive: true);
+    }
+    final backupDir = Directory('${modelDir.path}.old');
+    if (await backupDir.exists()) {
+      await backupDir.delete(recursive: true);
     }
   }
 }
