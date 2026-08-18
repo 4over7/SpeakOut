@@ -17,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// 每一条都对应一个已经发生过或已被确认可触发的缺陷。
 /// 导出签名的指纹。**改了任何导出函数的签名就要连同 ABI 版本一起更新。**
 /// 值由「导出签名一变，ABI 版本必须跟着变」这条测试的失败信息给出。
-const String kNativeAbiFingerprint = 'f33ddb0daf36d8760d425183bcb81d83549e14df';
+const String kNativeAbiFingerprint = '3e3abe48139b965e7534d58a8ffbf8491ed9410f';
 
 void main() {
   final src = File('native_lib/native_input.m').readAsStringSync();

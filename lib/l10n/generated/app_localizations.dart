@@ -1268,6 +1268,12 @@ abstract class AppLocalizations {
   /// **'Download failed'**
   String get updateFailed;
 
+  /// No description provided for @updateInstallerLaunchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the installer. Please try again.'**
+  String get updateInstallerLaunchFailed;
+
   /// No description provided for @updateManualDownload.
   ///
   /// In en, this message translates to:

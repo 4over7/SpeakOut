@@ -937,10 +937,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
 
   void _handleInstallAndRestart() {
     final svc = UpdateService();
-    final scriptPath = svc.prepareInstall();
-    // 空路径 = 当前渠道不支持自动安装（如 App Store）；不要在没有 helper 的情况下退出 app
-    if (scriptPath.isEmpty) return;
-    _appService.engine.nativeInput?.launchUpdater(scriptPath);
+    final launched = svc.launchInstall(
+      (scriptPath) => _appService.nativeInput?.launchUpdater(scriptPath) ?? false,
+    );
+    if (!launched) {
+      NotificationService().notifyError(
+        AppLocalizations.of(context)!.updateInstallerLaunchFailed,
+      );
+      return;
+    }
     Future.delayed(const Duration(milliseconds: 500), () async {
       await _appService.dispose(); // 退出前 flush，释放资源
       exit(0);

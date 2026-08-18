@@ -1253,9 +1253,15 @@ class CoreEngine {
     _stopAudioPolling();  // Stop polling BEFORE stopping AudioQueue
     if (_audioStarted) {
       try {
-        _nativeInput?.stopAudioRecording();
+        final stopped = _nativeInput?.stopAudioRecording() ?? false;
+        if (!stopped) {
+          AppLog.e('CoreEngine: native audio queue stop/dispose failed');
+        }
+      } catch (e, stackTrace) {
+        AppLog.e('CoreEngine: stop audio threw: $e\n$stackTrace');
+      } finally {
         _audioStarted = false;
-      } catch (e) { _log("Stop Audio Error: $e"); }
+      }
     }
   }
 

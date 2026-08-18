@@ -45,7 +45,7 @@ static void flush_tap_log_sync(void);
 // 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
 // 旧 dylib 没有这个 symbol，查找失败 → Dart 明确知道版本不匹配，
 // 而不是悄悄读垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 0xf33ddb
+#define SPEAKOUT_NATIVE_ABI_VERSION 0x3e3abe
 // 剪贴板还原最终失败的累计次数。还原发生在注入之后 800ms 的异步任务里，
 // 没法用返回值告诉 Dart —— 只记日志的话，用户的剪贴板被清空了却毫不知情。
 // Dart 侧在下一次注入时读一下这个计数，涨了就提示。
@@ -1825,20 +1825,31 @@ int start_audio_recording() {
   return 1;
 }
 
-// Stop Audio Recording
-void stop_audio_recording() {
-  if (!atomic_load(&isRecording) || audioQueue == NULL) {
-    return;
+// Stop Audio Recording. Returns 1 when the queue was disposed successfully.
+int stop_audio_recording() {
+  if (audioQueue == NULL) {
+    atomic_store(&isRecording, false);
+    return 1;
   }
 
+  AudioQueueRef queue = audioQueue;
   atomic_store(&isRecording, false);
 
-  // Stop and dispose queue (synchronous)
-  AudioQueueStop(audioQueue, true);
-  AudioQueueDispose(audioQueue, true);
+  OSStatus stopStatus = AudioQueueStop(queue, true);
+  OSStatus disposeStatus = AudioQueueDispose(queue, true);
+  // AudioQueue.h 明确规定 Dispose 返回后不得再操作该 queue，无论结果码如何。
   audioQueue = NULL;
 
+  if (stopStatus != noErr) {
+    log_to_file("Audio: AudioQueueStop failed, status=%d", (int)stopStatus);
+  }
+  if (disposeStatus != noErr) {
+    log_to_file("Audio: AudioQueueDispose failed, status=%d", (int)disposeStatus);
+    return 0;
+  }
+
   log_to_file("Audio: Recording stopped");
+  return 1;
 }
 
 /// Save the current ring buffer contents to a WAV file (16kHz mono 16-bit PCM).
@@ -2574,9 +2585,22 @@ const char *analyze_audio_quality(const int16_t *samples, int sampleCount,
 /// Uses device transport type + sample rate as heuristic
 /// Returns 1 if likely telephone quality, 0 otherwise
 // Launch an external shell script (for auto-update: replaces app after exit)
-void launch_updater(const char *scriptPath) {
+int launch_updater(const char *scriptPath) {
   @autoreleasepool {
+    if (scriptPath == NULL || scriptPath[0] == '\0') {
+      log_to_file("launch_updater: empty script path");
+      return 0;
+    }
+
     NSString *path = [NSString stringWithUTF8String:scriptPath];
+    BOOL isDirectory = NO;
+    if (path == nil ||
+        ![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] ||
+        isDirectory) {
+      log_to_file("launch_updater: script not found: %s", scriptPath);
+      return 0;
+    }
+
     NSTask *task = [[NSTask alloc] init];
     task.launchPath = @"/bin/bash";
     task.arguments = @[path];
@@ -2604,11 +2628,18 @@ void launch_updater(const char *scriptPath) {
     }
 
     @try {
-      [task launch];
+      NSError *launchError = nil;
+      if (![task launchAndReturnError:&launchError]) {
+        log_to_file("launch_updater: failed to launch %s: %s", scriptPath,
+                    launchError.localizedDescription.UTF8String ?: "unknown error");
+        return 0;
+      }
       log_to_file("launch_updater: launched %s (pid=%d, log=%s)",
                   scriptPath, task.processIdentifier, logPath.UTF8String);
+      return 1;
     } @catch (NSException *e) {
       log_to_file("launch_updater: failed to launch %s: %s", scriptPath, e.reason.UTF8String);
+      return 0;
     }
   }
 }

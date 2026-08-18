@@ -12,7 +12,7 @@ import 'package:speakout/config/app_log.dart';
 /// 手动递增靠自觉，而我漏过一次（改了 inject_clipboard_begin 的签名却没升，
 /// 正好是这个握手要防的情形）。现在版本是签名的函数，只改一半不可能。
 /// 数值由 test/engine/native_batch5_invariants_test.dart 的指纹锁给出。
-const int kExpectedNativeAbiVersion = 0xf33ddb;
+const int kExpectedNativeAbiVersion = 0x3e3abe;
 
 class NativeInputFFI implements NativeInputBase {
   late final DynamicLibrary _dylib;
@@ -290,10 +290,10 @@ class NativeInputFFI implements NativeInputBase {
   }
 
   @override
-  void stopAudioRecording() {
+  bool stopAudioRecording() {
     _bindAudioFunctions();
-    if (!_audioBound) return;
-    _stopAudioRecording();
+    if (!_audioBound) return false;
+    return _stopAudioRecording() == 1;
   }
 
   @override
@@ -742,7 +742,7 @@ class NativeInputFFI implements NativeInputBase {
   bool _updaterBound = false;
 
   @override
-  void launchUpdater(String scriptPath) {
+  bool launchUpdater(String scriptPath) {
     if (!_updaterBound) {
       try {
         _launchUpdater = _dylib
@@ -751,12 +751,15 @@ class NativeInputFFI implements NativeInputBase {
         _updaterBound = true;
       } catch (e) {
         _log("LaunchUpdater FFI binding FAILED: $e");
-        return;
+        return false;
       }
     }
     final ptr = scriptPath.toNativeUtf8();
-    _launchUpdater(ptr);
-    calloc.free(ptr);
+    try {
+      return _launchUpdater(ptr) == 1;
+    } finally {
+      calloc.free(ptr);
+    }
   }
 
   // ============ AI REPORT ============

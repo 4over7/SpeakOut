@@ -86,7 +86,7 @@ macOS 26 上 Globe 键 keyCode 179 + 标准 Fn 63 双重事件，要映射并抑
 `set_input_device` 设 `kAudioQueueProperty_CurrentDevice` 用偏好设备，**不改系统默认**（ConfigService.audioInputDeviceId 是 SSoT）。
 
 ### 6. NSTask 启动 helper
-自动更新 install 时 `launch_updater` 用 NSTask 启动独立 bash 脚本，输出写到 `~/Library/Logs/speakout-updater.log`（不写 /dev/null，否则启动期失败完全看不见）。
+自动更新 install 时 `launch_updater` 用 NSTask 启动独立 bash 脚本，输出写到 `~/Library/Logs/speakout-updater.log`（不写 /dev/null，否则启动期失败完全看不见）。它必须返回启动状态；Dart 只在成功后退出主程序。
 
 ### 7. CGEventTap 权限
 需要 **Input Monitoring** 权限。未授权时 `start_keyboard_listener` 直接返回 0，不尝试启动（避免后续失败消息覆盖正确的"未授权"提示）。

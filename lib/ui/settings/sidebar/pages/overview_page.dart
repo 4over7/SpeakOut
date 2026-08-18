@@ -9,6 +9,7 @@ import 'package:speakout/l10n/generated/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../config/distribution.dart';
 import '../../../../services/app_service.dart';
+import '../../../../services/notification_service.dart';
 import '../../../../services/update_service.dart';
 import '../../../theme.dart';
 import '../../../widgets/settings_widgets.dart';
@@ -96,10 +97,19 @@ class _OverviewPageState extends State<OverviewPage> {
 
   void _handleInstallAndRestart() {
     final svc = UpdateService();
-    final scriptPath = svc.prepareInstall();
-    if (scriptPath.isEmpty) return;
-    AppService().nativeInput?.launchUpdater(scriptPath);
-    Future.delayed(const Duration(milliseconds: 500), () => exit(0));
+    final launched = svc.launchInstall(
+      (scriptPath) => AppService().nativeInput?.launchUpdater(scriptPath) ?? false,
+    );
+    if (!launched) {
+      NotificationService().notifyError(
+        AppLocalizations.of(context)!.updateInstallerLaunchFailed,
+      );
+      return;
+    }
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      await AppService().dispose();
+      exit(0);
+    });
   }
 
   /// 状态化更新按钮：

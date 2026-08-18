@@ -27,8 +27,8 @@ typedef CheckKeyPressedDart = int Function(int keyCode);
 typedef StartAudioRecordingC = Int32 Function();
 typedef StartAudioRecordingDart = int Function();
 
-typedef StopAudioRecordingC = Void Function();
-typedef StopAudioRecordingDart = void Function();
+typedef StopAudioRecordingC = Int32 Function();
+typedef StopAudioRecordingDart = int Function();
 
 typedef IsAudioRecordingC = Int32 Function();
 typedef IsAudioRecordingDart = int Function();
@@ -126,8 +126,8 @@ typedef CheckIsTerminalAppC = Int32 Function();
 typedef CheckIsTerminalAppDart = int Function();
 
 // Auto-update: launch external script
-typedef LaunchUpdaterC = Void Function(Pointer<Utf8> scriptPath);
-typedef LaunchUpdaterDart = void Function(Pointer<Utf8> scriptPath);
+typedef LaunchUpdaterC = Int32 Function(Pointer<Utf8> scriptPath);
+typedef LaunchUpdaterDart = int Function(Pointer<Utf8> scriptPath);
 
 // AI 梳理: copy selection (Cmd+C) and press key
 typedef ClipboardRestoreFailuresC = Uint32 Function();
@@ -169,7 +169,7 @@ abstract class NativeInputBase {
   
   // Audio Recording (Ring Buffer API)
   bool startAudioRecording();
-  void stopAudioRecording();
+  bool stopAudioRecording();
   bool isAudioRecording();
   bool checkMicrophonePermission();
 
@@ -245,7 +245,7 @@ abstract class NativeInputBase {
   bool isTerminalApp();
 
   // Launch external updater script (for auto-update)
-  void launchUpdater(String scriptPath);
+  bool launchUpdater(String scriptPath);
 
   // AI 报告: activate app by bundle ID, get frontmost app info
   bool activateApp(String bundleId);

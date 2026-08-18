@@ -648,6 +648,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateFailed => 'Download failed';
 
   @override
+  String get updateInstallerLaunchFailed =>
+      'Could not start the installer. Please try again.';
+
+  @override
   String get updateManualDownload => 'Open Download Page';
 
   @override

@@ -568,12 +568,34 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] update helper done"
     return _helperPath;
   }
 
-  /// Install update and restart the app (GitHub distribution only).
-  /// Returns the helper script path; caller should launch it via FFI then exit.
-  String prepareInstall() {
-    if (!Distribution.supportsAutoUpdate) return '';
+  /// 生成并启动安装 helper。只有 native 明确确认进程已启动，才进入 installing。
+  bool launchInstall(bool Function(String scriptPath) launcher) {
+    if (!Distribution.supportsAutoUpdate) return false;
+
+    late final String scriptPath;
+    try {
+      scriptPath = _writeHelperScript();
+    } catch (e, stackTrace) {
+      errorMessage = 'Failed to prepare update helper';
+      AppLog.e('UpdateService: failed to prepare helper: $e\n$stackTrace');
+      return false;
+    }
+
+    try {
+      if (!launcher(scriptPath)) {
+        errorMessage = 'Failed to launch update helper';
+        AppLog.e('UpdateService: native helper launch failed');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      errorMessage = 'Failed to launch update helper';
+      AppLog.e('UpdateService: helper launcher threw: $e\n$stackTrace');
+      return false;
+    }
+
+    errorMessage = null;
     _setState(UpdateState.installing);
-    return _writeHelperScript();
+    return true;
   }
 
   /// Check if a DMG has been downloaded and is ready

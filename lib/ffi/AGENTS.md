@@ -59,7 +59,8 @@ Engine 层需要原生能力：键盘监听、音频采集、文本注入、应�
 
 原生侧凡是「可能失败、且用户会察觉」的操作，一律返回状态而不是 `void`。
 已经这么做的：`inject_text` / `inject_clipboard_begin` / `inject_clipboard_chunk` /
-`copy_selection_text` / `press_key`。
+`copy_selection_text` / `press_key` / `stop_audio_recording` / `launch_updater`。
+更新 helper 只有明确启动成功后，Dart 才能进入 installing 并退出主程序。
 
 > 反例（都真实发生过）：注入失败却报 Ready，用户口述整段话消失还以为是识别没成；
 > Cmd+C 没生效却继续读剪贴板，把**上一次的内容**当成选中文字发给 LLM。

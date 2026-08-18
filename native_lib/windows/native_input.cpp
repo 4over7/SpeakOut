@@ -157,7 +157,7 @@ static unsigned __stdcall keyboard_thread_proc(void* param) {
 // ABI 版本握手，必须与 macOS 侧的 SPEAKOUT_NATIVE_ABI_VERSION 保持一致。
 // Dart 初始化时校验：旧 dylib 没有这个 symbol 就明确报错，
 // 而不是按新签名去调旧函数、读到返回寄存器里的垃圾。
-#define SPEAKOUT_NATIVE_ABI_VERSION 0xf33ddb
+#define SPEAKOUT_NATIVE_ABI_VERSION 0x3e3abe
 EXPORT int native_input_abi_version(void) { return SPEAKOUT_NATIVE_ABI_VERSION; }
 
 EXPORT int start_keyboard_listener(KeyCallback callback) {
@@ -411,13 +411,14 @@ EXPORT int start_audio_recording(void) {
     return 1;
 }
 
-EXPORT void stop_audio_recording(void) {
+EXPORT int stop_audio_recording(void) {
     g_isRecording.store(0);
     if (g_audioThread) {
         WaitForSingleObject(g_audioThread, 3000);
         CloseHandle(g_audioThread);
         g_audioThread = NULL;
     }
+    return 1;
 }
 
 EXPORT int is_audio_recording(void) {

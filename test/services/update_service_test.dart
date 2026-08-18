@@ -42,11 +42,36 @@ void main() {
   });
 
   group('UpdateService helper 脚本安全保护', () {
-    test('prepareInstall 生成的脚本含签名校验 + 原子安装，且不先删旧 app', () {
+    test('native 拒绝启动时不进入 installing', () {
+      final service = UpdateService();
+      final stateBefore = service.state;
+      String? scriptPath;
+
+      final launched = service.launchInstall((path) {
+        scriptPath = path;
+        return false;
+      });
+
+      expect(launched, isFalse);
+      expect(service.state, stateBefore);
+      expect(service.errorMessage, isNotNull);
+      if (scriptPath != null) {
+        try { File(scriptPath!).deleteSync(); } catch (_) {}
+      }
+    });
+
+    test('launchInstall 启动成功后才进入 installing，脚本含签名校验 + 原子安装', () {
       final service = UpdateService();
       service.latestVersion = '1.10.0';
       service.latestBuild = 241;
-      final scriptPath = service.prepareInstall();
+      late String scriptPath;
+      final launched = service.launchInstall((path) {
+        scriptPath = path;
+        return true;
+      });
+
+      expect(launched, isTrue);
+      expect(service.state, UpdateState.installing);
       expect(scriptPath, isNotEmpty, reason: 'github 渠道应生成 helper 脚本');
       final script = File(scriptPath).readAsStringSync();
 
