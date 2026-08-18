@@ -13,6 +13,11 @@
 | **L3** | [`docs/decisions/INDEX.md`](./docs/decisions/INDEX.md)（ADR：为什么这么选）<br>[`docs/anti-patterns/INDEX.md`](./docs/anti-patterns/INDEX.md)（踩过的坑：别再这么干）<br>[`docs/debug-log/INDEX.md`](./docs/debug-log/INDEX.md)（事故追查：这段代码为什么这么绕） | 选型时查 ADR；实施前扫反模式；**改动某个模块前查它有没有事故史** |
 | **L4** | `docs/wiki/README.md` | 需要历史设计依据时。按 🚀 Planning / 🟢 Active / 📜 Historical / 🔴 Archived 分类。**gitignored 的本地文档库 —— 全新 clone 后没有这个目录，属正常** |
 
+> **本地档案（gitignored，不上 GitHub）**：除 L4 的 `docs/wiki/` 外，还有
+> `docs/review/`（历次 review 报告与修复交接，如 `full_review_2026_08_14.md`、
+> `handoff_*.md`）和 `docs/dev_notes/`。见 `.gitignore` 的「Internal docs」段。
+> **接手别人做了一半的工作时先翻 `docs/review/` 里最新的 `handoff_*.md`。**
+
 > **铁律：一个事实只写在一个层。** L1 可以有指向下层的**指针和一句话索引**，但不复制下层的**可执行细节**（命令、参数、实现机制）——曾经因为两处都抄，原生库编译命令在 L1 漂移成了缺 framework 的过期版本。
 > 同理：文档里少写会漂移的精确数字（文件行数、条目个数），改为指向真源。
 
