@@ -47,9 +47,9 @@ class OverlayController {
     _invoke('updateStatus', {"text": display});
   }
 
-  void showSilenceHint() {
+  void showSilenceHint(String text) {
     if (!_hasNativeOverlay) return;
-    _invoke('showSilenceHint');
+    _invoke('showSilenceHint', {"text": text});
   }
 
   void hideSilenceHint() {

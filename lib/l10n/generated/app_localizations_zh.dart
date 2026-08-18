@@ -960,6 +960,163 @@ class AppLocalizationsZh extends AppLocalizations {
   String get engineClipboardRestoreFailed => '剪贴板未能还原，原有内容可能已丢失';
 
   @override
+  String get engineMissingPermissions => '需要「输入监控」和「辅助功能」权限，请在系统设置中授权';
+
+  @override
+  String get engineMissingInputMonitoring =>
+      '需要「输入监控」权限，请在系统设置 → 隐私与安全性 → 输入监控中授权';
+
+  @override
+  String get engineKeyboardListenerStarted => '键盘监听已启动';
+
+  @override
+  String get engineAccessibilityReady => '辅助功能已授权';
+
+  @override
+  String get engineAccessibilityMissing => '键盘监听已启动，但缺少「辅助功能」权限，文本注入将不可用';
+
+  @override
+  String get engineListenerFailedInputMonitoring => '键盘监听启动失败：缺少「输入监控」权限';
+
+  @override
+  String get engineListenerFailed => '键盘监听启动失败，请检查系统权限设置';
+
+  @override
+  String engineConnectingProvider(String provider) {
+    return '正在连接 $provider…';
+  }
+
+  @override
+  String engineProviderReady(String provider) {
+    return '$provider 已就绪';
+  }
+
+  @override
+  String engineProviderConnectFailed(String provider, String error) {
+    return '$provider 连接失败：$error';
+  }
+
+  @override
+  String engineLoadingModel(String model) {
+    return '正在加载模型：$model…';
+  }
+
+  @override
+  String engineModelReady(String model) {
+    return '$model 已就绪';
+  }
+
+  @override
+  String engineModelLoadFailed(String model, String error) {
+    return '模型 $model 加载失败：$error';
+  }
+
+  @override
+  String enginePunctuationReadyWithModel(String model) {
+    return '$model 与标点模型已就绪';
+  }
+
+  @override
+  String get enginePunctuationReady => '标点模型已就绪';
+
+  @override
+  String enginePunctuationLoadFailed(String error) {
+    return '标点模型加载失败：$error';
+  }
+
+  @override
+  String get engineMicrophonePermissionRequired => '需要麦克风权限';
+
+  @override
+  String get engineSpeechModelRequired => '语音引擎未就绪，请先下载模型';
+
+  @override
+  String get engineSpeechModelSwitching => '正在切换语音引擎，请稍后再试';
+
+  @override
+  String get engineMicrophoneStartFailed => '麦克风启动失败';
+
+  @override
+  String get engineRecordingStartFailed => '录音启动失败';
+
+  @override
+  String get engineCancelled => '已取消';
+
+  @override
+  String get engineProcessing => '处理中…';
+
+  @override
+  String engineAsrFailed(String error) {
+    return '语音识别失败：$error';
+  }
+
+  @override
+  String get engineTranslating => '翻译中…';
+
+  @override
+  String get enginePolishing => 'AI 润色中…';
+
+  @override
+  String get engineSavingNote => '正在保存闪念…';
+
+  @override
+  String get engineNoteSaved => '闪念已保存';
+
+  @override
+  String get engineNoteSaveFailed => '闪念保存失败';
+
+  @override
+  String get engineReady => '已就绪';
+
+  @override
+  String get engineConfiguringServices => '正在配置服务…';
+
+  @override
+  String get engineStartingListener => '正在启动键盘监听…';
+
+  @override
+  String get enginePreparingSpeechModel => '正在准备语音模型…';
+
+  @override
+  String engineSpeechModelFailed(String error) {
+    return '语音模型启动失败：$error';
+  }
+
+  @override
+  String get engineRecordingNote => '正在记录闪念…';
+
+  @override
+  String get engineClipboardBusy => '剪贴板忙，请重试';
+
+  @override
+  String get engineSelectionReadFailed => '未能读取选中文字';
+
+  @override
+  String get engineSelectionEmpty => '未检测到选中文字';
+
+  @override
+  String get engineOrganizing => '梳理中…';
+
+  @override
+  String get engineOrganizeFailed => '梳理失败';
+
+  @override
+  String get engineOrganizeInjectFailed => '梳理结果注入失败';
+
+  @override
+  String get engineOfflineDurationWarning => '超过 30 秒，识别效果可能下降';
+
+  @override
+  String get engineOfflineDurationNotification =>
+      '离线录音超过 30 秒后识别效果可能下降，建议切换到流式模型';
+
+  @override
+  String get engineSilenceHint => '未检测到声音';
+
+  @override
+  String get engineSilenceNotification => '未检测到声音，请检查麦克风是否可用';
+
+  @override
   String get permissionsOpen => '打开';
 
   @override

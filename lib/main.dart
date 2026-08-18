@@ -182,7 +182,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   final AppService _appService = AppService();
   final SystemTray _systemTray = SystemTray();
   
-  EngineStatus _status = const EngineStatus.info("初始化中...");
+  EngineStatus _status = const EngineStatus.info(
+    "Initializing...",
+    code: 'configuring_services',
+  );
   bool _ready = false;
   String _lastError = "";
   /// 缺少「输入监控 / 辅助功能」时为 true —— 错误横幅据此追加「授权」按钮
@@ -330,7 +333,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
     // Check real permission state
     final hasInputMonitoring = _appService.engine.checkInputMonitoringPermission();
     final hasAccessibility = _appService.engine.checkAccessibilityPermission();
-    if (mounted) setState(() => _permissionMissing = !(hasInputMonitoring && hasAccessibility));
+    if (mounted) {
+      setState(() =>
+          _permissionMissing = !(hasInputMonitoring && hasAccessibility));
+    }
     if (hasInputMonitoring && hasAccessibility) {
       // Both permissions granted — try to start the listener
       await _appService.startKeyboardListener();
@@ -504,6 +510,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
   /// 改一句话就会失效，本地化后更是必崩。
   String _getLocalizedStatus(EngineStatus status) {
     final loc = AppLocalizations.of(context)!;
+    final message = localizedEngineStatus(context, status);
     switch (status.kind) {
       case EngineStatusKind.idle:
         return "";
@@ -511,10 +518,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
         // 就绪由下方「按住 X 说话」提示表达，状态栏留空避免重复
         return "";
       case EngineStatusKind.error:
-        return "${loc.error}: ${status.message.replaceFirst(RegExp(r'^Error:?\s*'), '')}";
+        return "${loc.error}: ${message.replaceFirst(RegExp(r'^Error:?\s*'), '')}";
       case EngineStatusKind.warning:
       case EngineStatusKind.info:
-        return status.message;
+        return message;
     }
   }
 
@@ -603,7 +610,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver, Window
                                       : 'Privacy_Accessibility';
                                   final uri = Uri.parse(
                                       'x-apple.systempreferences:com.apple.preference.security?$frag');
-                                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri);
+                                    }
                                 },
                                 child: Text(AppLocalizations.of(context)!.permGrant),
                               ),

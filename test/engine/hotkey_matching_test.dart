@@ -75,6 +75,20 @@ void main() {
     });
   });
 
+  group('CoreEngine.hotkeysAreIdentical — shared-key identity', () {
+    test('相同 keyCode 与 modifiers 才是 shared key', () {
+      expect(CoreEngine.hotkeysAreIdentical(keyK, cmd, keyK, cmd), isTrue);
+    });
+
+    test('只有 keyCode 相同不能进入 shared-key 分支', () {
+      expect(CoreEngine.hotkeysAreIdentical(keyK, cmd, keyK, opt), isFalse);
+    });
+
+    test('未启用的 0 keyCode 不是 shared key', () {
+      expect(CoreEngine.hotkeysAreIdentical(0, cmd, 0, cmd), isFalse);
+    });
+  });
+
   group('findHotkeyConflict — settings-side conflict detection', () {
     test('不同 keyCode → 不冲突', () {
       final active = {(keyK, cmd): 'Feature A'};

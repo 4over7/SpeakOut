@@ -29,6 +29,7 @@
 | `VocabService` | `vocab_service.dart` | 行业词典 + 个人词库 → 注入 LLM prompt 的 `<vocab_hints>` |
 | `DiaryService` | `diary_service.dart` | 闪念笔记 Markdown 文件按天追加 |
 | `OverlayController` | `overlay_controller.dart` | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
+| Engine 状态本地化 | `engine_status_localizer.dart` | Engine 状态码/参数 → 当前中英文文案，供状态栏、浮窗和通知共用 |
 | `NotificationService` | `notification_service.dart` | macOS 系统通知（应用内 + 横幅消息）|
 | `ConfigBackupService` | `config_backup_service.dart` | 配置导入/导出（JSON）。**永不导出凭证或本机标识**；导入先全量验证并在写失败时回滚 |
 
@@ -76,6 +77,11 @@
 蓝牙协商期间枚举全部 CoreAudio 设备可能长时间阻塞主 isolate。设备变化回调只做缓存失效、
 偏好对账和快照事件分发；启动只查询当前设备，设置页收到事件也只消费快照，完整列表留到用户主动进入页面时刷新。
 监听初始化必须幂等；注册失败要先清 native callback，再关闭 Dart `NativeCallable`。
+
+### 8. Engine 状态本地化只有一份映射
+
+Engine 不持有 `BuildContext`，只发稳定 code + params。三端 UI、macOS 浮窗和引擎通知
+都经 `engine_status_localizer.dart`；新增用户可见状态时同步 ARB 和该映射，不在调用点自己判断语言。
 
 ## 数据流
 

@@ -197,7 +197,9 @@ class AppDelegate: FlutterAppDelegate {
           self?.hideRecordingOverlay()
           result(nil)
         case "showSilenceHint":
-          self?.showSilenceHint()
+          let args = call.arguments as? [String: Any]
+          let text = args?["text"] as? String ?? ""
+          self?.showSilenceHint(text)
           result(nil)
         case "hideSilenceHint":
           self?.hideSilenceHint()
@@ -368,11 +370,11 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
-  private func showSilenceHint() {
+  private func showSilenceHint(_ text: String) {
     guard let overlay = recordingOverlayWindow else { return }
     if silenceHintWindow != nil { return } // already showing
 
-    let hintText = "🎤 未检测到声音"
+    let hintText = "🎤 \(text)"
     let hintWidth: CGFloat = 140
     let hintHeight: CGFloat = 22
     let overlayFrame = overlay.frame

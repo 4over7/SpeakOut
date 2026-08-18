@@ -99,7 +99,7 @@ void main() {
   // stopListener() 曾经全仓零调用点 —— 拆卸路径压根没写完。
   test('CoreEngine.dispose 必须先 stopListener 再 close NativeCallable', () {
     final src = File('lib/engine/core_engine.dart').readAsStringSync();
-    final body = RegExp(r'void dispose\(\)\s*\{([\s\S]*?)\n  \}')
+    final body = RegExp(r'Future<void> dispose\(\) async\s*\{([\s\S]*?)\n  \}')
         .firstMatch(src)
         ?.group(1);
     expect(body, isNotNull, reason: '没找到 CoreEngine.dispose() 方法体');

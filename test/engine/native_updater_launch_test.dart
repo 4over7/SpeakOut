@@ -16,7 +16,7 @@ void main() {
           .lookup<NativeFunction<_LaunchUpdaterC>>('launch_updater')
           .asFunction<_LaunchUpdaterDart>();
       final missingPath = '${Directory.systemTemp.path}/'
-          'speakout-updater-does-not-exist-${pid}-${DateTime.now().microsecondsSinceEpoch}.sh';
+          'speakout-updater-does-not-exist-$pid-${DateTime.now().microsecondsSinceEpoch}.sh';
       expect(File(missingPath).existsSync(), isFalse);
       final ptr = missingPath.toNativeUtf8();
 

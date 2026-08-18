@@ -1014,6 +1014,173 @@ class AppLocalizationsEn extends AppLocalizations {
       'Clipboard could not be restored — its previous contents may be lost';
 
   @override
+  String get engineMissingPermissions =>
+      'Input Monitoring and Accessibility permissions are required. Grant them in System Settings.';
+
+  @override
+  String get engineMissingInputMonitoring =>
+      'Input Monitoring permission is required. Grant it in System Settings → Privacy & Security → Input Monitoring.';
+
+  @override
+  String get engineKeyboardListenerStarted => 'Keyboard listener started';
+
+  @override
+  String get engineAccessibilityReady => 'Accessibility permission granted';
+
+  @override
+  String get engineAccessibilityMissing =>
+      'Keyboard listening is active, but Accessibility permission is missing, so text injection is unavailable';
+
+  @override
+  String get engineListenerFailedInputMonitoring =>
+      'Keyboard listener failed to start because Input Monitoring permission is missing';
+
+  @override
+  String get engineListenerFailed =>
+      'Keyboard listener failed to start. Check System Settings permissions.';
+
+  @override
+  String engineConnectingProvider(String provider) {
+    return 'Connecting to $provider…';
+  }
+
+  @override
+  String engineProviderReady(String provider) {
+    return '$provider is ready';
+  }
+
+  @override
+  String engineProviderConnectFailed(String provider, String error) {
+    return 'Could not connect to $provider: $error';
+  }
+
+  @override
+  String engineLoadingModel(String model) {
+    return 'Loading model: $model…';
+  }
+
+  @override
+  String engineModelReady(String model) {
+    return '$model is ready';
+  }
+
+  @override
+  String engineModelLoadFailed(String model, String error) {
+    return 'Could not load model $model: $error';
+  }
+
+  @override
+  String enginePunctuationReadyWithModel(String model) {
+    return '$model and punctuation model are ready';
+  }
+
+  @override
+  String get enginePunctuationReady => 'Punctuation model is ready';
+
+  @override
+  String enginePunctuationLoadFailed(String error) {
+    return 'Could not load the punctuation model: $error';
+  }
+
+  @override
+  String get engineMicrophonePermissionRequired =>
+      'Microphone permission is required';
+
+  @override
+  String get engineSpeechModelRequired =>
+      'The speech engine is not ready. Download a model first.';
+
+  @override
+  String get engineSpeechModelSwitching =>
+      'The speech engine is switching. Try again shortly.';
+
+  @override
+  String get engineMicrophoneStartFailed => 'Could not start the microphone';
+
+  @override
+  String get engineRecordingStartFailed => 'Could not start recording';
+
+  @override
+  String get engineCancelled => 'Cancelled';
+
+  @override
+  String get engineProcessing => 'Processing…';
+
+  @override
+  String engineAsrFailed(String error) {
+    return 'Speech recognition failed: $error';
+  }
+
+  @override
+  String get engineTranslating => 'Translating…';
+
+  @override
+  String get enginePolishing => 'AI polishing…';
+
+  @override
+  String get engineSavingNote => 'Saving flash note…';
+
+  @override
+  String get engineNoteSaved => 'Flash note saved';
+
+  @override
+  String get engineNoteSaveFailed => 'Could not save the flash note';
+
+  @override
+  String get engineReady => 'Ready';
+
+  @override
+  String get engineConfiguringServices => 'Configuring services…';
+
+  @override
+  String get engineStartingListener => 'Starting keyboard listener…';
+
+  @override
+  String get enginePreparingSpeechModel => 'Preparing speech model…';
+
+  @override
+  String engineSpeechModelFailed(String error) {
+    return 'Could not start the speech model: $error';
+  }
+
+  @override
+  String get engineRecordingNote => 'Recording flash note…';
+
+  @override
+  String get engineClipboardBusy => 'Clipboard is busy. Try again.';
+
+  @override
+  String get engineSelectionReadFailed => 'Could not read the selected text';
+
+  @override
+  String get engineSelectionEmpty => 'No selected text detected';
+
+  @override
+  String get engineOrganizing => 'Organizing…';
+
+  @override
+  String get engineOrganizeFailed => 'Could not organize the text';
+
+  @override
+  String get engineOrganizeInjectFailed =>
+      'Could not insert the organized text';
+
+  @override
+  String get engineOfflineDurationWarning =>
+      'Recognition quality may drop after 30 seconds';
+
+  @override
+  String get engineOfflineDurationNotification =>
+      'Offline recognition may degrade after 30 seconds. Consider switching to a streaming model.';
+
+  @override
+  String get engineSilenceHint => 'No sound detected';
+
+  @override
+  String get engineSilenceNotification =>
+      'No sound detected. Check whether the microphone is available.';
+
+  @override
   String get permissionsOpen => 'Open';
 
   @override

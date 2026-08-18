@@ -95,7 +95,7 @@ class AppService {
 
   /// 释放所有资源，应用退出时调用
   Future<void> dispose() async {
-    engine.dispose();
+    await engine.dispose();
     await ChatService().dispose(); // 等待待写队列 flush，避免退出丢最后一条
     NotificationService().dispose();
     UpdateService().dispose();
@@ -134,14 +134,20 @@ class AppService {
       await engine.init();
       return true;
     } catch (e) {
-      engine.updateStatusEvent(EngineStatus.error("❌ 键盘监听失败: $e"));
+      engine.updateStatusEvent(EngineStatus.error(
+        "Keyboard listener failed: $e",
+        code: 'listener_failed',
+      ));
       return false;
     }
   }
 
   /// 初始化应用核心服务
   Future<void> init() async {
-    engine.updateStatus("正在配置服务...");
+    engine.updateStatusEvent(const EngineStatus.info(
+      "Configuring services...",
+      code: 'configuring_services',
+    ));
     await Future.delayed(const Duration(milliseconds: 50));
     // 1. Config
     await ConfigService().init();
@@ -164,7 +170,10 @@ class AppService {
     // 放前面的话 _accounts 还是空列表，迁移会静默 no-op
     await CloudAccountService().migrateDeepSeekModels();
     
-    engine.updateStatus("正在启动键盘监听...");
+    engine.updateStatusEvent(const EngineStatus.info(
+      "Starting keyboard listener...",
+      code: 'starting_listener',
+    ));
     await Future.delayed(const Duration(milliseconds: 100));
 
     // 2. Engine (Set KeyCode)
@@ -175,19 +184,30 @@ class AppService {
     // 3. Initialize ASR (HEAVY TASK - Delay significantly)
     // Skip if already initialized (e.g., by onboarding)
     if (engine.isASRReady) {
-      engine.updateStatusEvent(const EngineStatus.ready("语音模型已就绪"));
+      engine.updateStatusEvent(
+          const EngineStatus.ready("Speech model ready", code: 'ready'));
       await Future.delayed(const Duration(milliseconds: 200));
     } else {
       // Give the UI time to fully settle (1 second) before hitting the CPU hard
-      engine.updateStatus("准备加载语音模型...");
+      engine.updateStatusEvent(const EngineStatus.info(
+        "Preparing speech model...",
+        code: 'preparing_speech_model',
+      ));
       await Future.delayed(const Duration(milliseconds: 800));
       
-      engine.updateStatus("正在加载语音模型...");
+      engine.updateStatusEvent(const EngineStatus.info(
+        "Loading speech model...",
+        code: 'preparing_speech_model',
+      ));
       await Future.delayed(const Duration(milliseconds: 50)); 
       try {
         await _initASR();
       } catch (e) {
-        engine.updateStatusEvent(EngineStatus.error("❌ 语音模型失败: $e"));
+        engine.updateStatusEvent(EngineStatus.error(
+          "Speech model failed: $e",
+          code: 'speech_model_failed',
+          params: {'error': '$e'},
+        ));
       }
     }
     
@@ -198,12 +218,16 @@ class AppService {
     
     // Final Health Check
     if (engine.isListenerRunning) {
-        engine.updateStatusEvent(const EngineStatus.ready("✅就绪"));
+        engine.updateStatusEvent(
+            const EngineStatus.ready("Ready", code: 'ready'));
         await Future.delayed(const Duration(milliseconds: 500));
         engine.updateStatus(""); // Clear
     } else {
         // Persistent Error - Do NOT Clear
-        engine.updateStatusEvent(const EngineStatus.error("❌ 监听启动失败 (请检查权限)"));
+        engine.updateStatusEvent(const EngineStatus.error(
+          "Listener startup failed",
+          code: 'listener_failed',
+        ));
     }
 
     // 5. Check for updates (non-blocking)

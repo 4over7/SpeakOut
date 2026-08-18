@@ -24,6 +24,7 @@ import '../services/cloud_account_service.dart';
 import '../services/diary_service.dart';
 import '../services/chat_service.dart';
 import '../services/audio_device_service.dart';
+import '../services/engine_status_localizer.dart';
 import '../services/overlay_controller.dart';
 import 'package:speakout/config/app_log.dart';
 
@@ -155,6 +156,8 @@ class CoreEngine {
       _recordingState == RecordingState.stopping;
   RecordingMode _recordingMode = RecordingMode.ptt;
   bool _audioStarted = false; // hardware-level flag: native audio is running
+  Future<void>? _recordingStartInFlight;
+  Future<void>? _recordingStopInFlight;
 
   // Keep Offline Punctuation & Debugging related fields
   sherpa.OfflinePunctuation? _punctuation;
@@ -213,8 +216,15 @@ class CoreEngine {
 
   void _log(String msg) => AppLog.d('[CoreEngine] $msg');
 
+  String _localizedText(String fallback, String code,
+      {Map<String, String> params = const {}}) {
+    return localizedEngineStatusForCurrentLocale(
+      EngineStatus.info(fallback, code: code, params: params),
+    );
+  }
+
   /// Release all resources. Call when app is shutting down.
-  void dispose() {
+  Future<void> dispose() async {
     // 顺序要紧：必须先让 native 停止回调，再关 Dart 侧的 NativeCallable。
     // 反过来的话 eventTap 还挂在 run loop 上、native 的 dartCallback 仍指向
     // 已释放的蹦床，下一次按键就是野指针调用。
@@ -223,16 +233,28 @@ class CoreEngine {
     _nativeCallable?.close();
     _nativeCallable = null;
 
+    if (_recordingState == RecordingState.starting ||
+        _recordingState == RecordingState.recording) {
+      await cancelRecording();
+    }
+    await _recordingStartInFlight;
+    await _recordingStopInFlight;
+    await _stopAudioSafely();
+
     // 原生设备变化监听同样要拆：AudioDeviceService.dispose() 写得没问题，
     // 但此前全仓无人调用，退出时 native listener 和它的 NativeCallable 都不释放。
     audioDeviceService?.dispose();
 
-    _statusController.close();
-    _recordingController.close();
-    _rawKeyController.close();
-    _resultController.close();
-    _partialTextController.close();
-    _asrSubscription?.cancel();
+    await _asrSubscription?.cancel();
+    _asrSubscription = null;
+    await _asrProvider?.dispose();
+    _asrProvider = null;
+
+    await _statusController.close();
+    await _recordingController.close();
+    await _rawKeyController.close();
+    await _resultController.close();
+    await _partialTextController.close();
     _watchdogTimer?.cancel();
     _toggleMaxTimer?.cancel();
     _silenceCheckTimer?.cancel();
@@ -241,7 +263,6 @@ class CoreEngine {
       pkg_ffi.calloc.free(_pollBuffer!);
       _pollBuffer = null;
     }
-    _asrProvider?.dispose();
     _punctuation?.free();
     _punctuation = null;
     _punctuationEnabled = false;
@@ -323,9 +344,15 @@ class CoreEngine {
     if (!hasInputMonitoring) {
       // Without Input Monitoring, CGEventTapCreate will fail. Don't attempt startup.
       if (!hasAccessibility) {
-        _statusController.add(EngineStatus.error("Error: 需要「输入监控」和「辅助功能」权限，请在系统设置中授权。"));
+        _statusController.add(const EngineStatus.error(
+          "Error: missing Input Monitoring and Accessibility permissions",
+          code: 'missing_permissions',
+        ));
       } else {
-        _statusController.add(EngineStatus.error("Error: 需要「输入监控」权限（用于监听快捷键），请在系统设置 → 隐私与安全性 → 输入监控中授权。"));
+        _statusController.add(const EngineStatus.error(
+          "Error: missing Input Monitoring permission",
+          code: 'missing_input_monitoring',
+        ));
       }
       _isListenerRunning = false;
       _log("Init aborted: missing Input Monitoring permission.");
@@ -373,14 +400,23 @@ class CoreEngine {
         _log("startListener returned: $started");
         if (started) {
           _isListenerRunning = true;
-          _statusController.add(EngineStatus.ready("Keyboard Listener Started."));
+          _statusController.add(const EngineStatus.ready(
+            "Keyboard Listener Started.",
+            code: 'keyboard_listener_started',
+          ));
           _log("Listener start success.");
           // Listener running = Input Monitoring OK. Now verify Accessibility separately.
           final ax = _nativeInput.checkAccessibilityPermission();
           if (ax) {
-            _statusController.add(EngineStatus.ready("Accessibility Trusted: true"));
+            _statusController.add(const EngineStatus.ready(
+              "Accessibility Trusted: true",
+              code: 'accessibility_ready',
+            ));
           } else {
-            _statusController.add(EngineStatus.warning("Warning: 键盘监听已启动，但缺少「辅助功能」权限 — 文本注入将不可用。"));
+            _statusController.add(const EngineStatus.warning(
+              "Warning: Accessibility permission missing",
+              code: 'accessibility_missing',
+            ));
           }
         } else {
            // Listener failed — re-diagnose which permission is missing
@@ -388,9 +424,15 @@ class CoreEngine {
            final ax = _nativeInput.checkAccessibilityPermission();
            _log("Listener start FAILED. InputMonitoring=$im, Accessibility=$ax");
            if (!im) {
-             _statusController.add(EngineStatus.error("Error: 键盘监听启动失败 — 缺少「输入监控」权限。"));
+             _statusController.add(const EngineStatus.error(
+               "Error: keyboard listener missing Input Monitoring",
+               code: 'listener_failed_input_monitoring',
+             ));
            } else {
-             _statusController.add(EngineStatus.error("Error: 键盘监听启动失败 — 请检查系统权限设置。"));
+             _statusController.add(const EngineStatus.error(
+               "Error: keyboard listener failed",
+               code: 'listener_failed',
+             ));
            }
            _isListenerRunning = false;
         }
@@ -427,20 +469,34 @@ class CoreEngine {
   /// 离线漏一个 native recognizer），而它的 textStream 还在往
   /// `_partialTextController` 里推 —— 两路识别结果交替出现在同一个浮窗上。
   Future<void>? _asrInitChain;
+  bool _asrSwitchInProgress = false;
 
   Future<void> initASR(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model', bool hasPunctuation = false}) {
     final prev = _asrInitChain;
     final task = () async {
       // 前一次失败不影响这一次：它的错误由它自己的调用方接。
       if (prev != null) { try { await prev; } catch (_) {} }
-      return _initASRUnsafe(modelPath,
-          modelType: modelType, modelName: modelName, hasPunctuation: hasPunctuation);
+      if (_recordingState != RecordingState.idle) {
+        throw StateError('Cannot reinitialize ASR while recording is active');
+      }
+      _asrSwitchInProgress = true;
+      try {
+        return await _initASRUnsafe(modelPath,
+            modelType: modelType, modelName: modelName,
+            hasPunctuation: hasPunctuation);
+      } finally {
+        _asrSwitchInProgress = false;
+      }
     }();
     _asrInitChain = task;
     return task;
   }
 
   Future<void> _initASRUnsafe(String modelPath, {String modelType = 'zipformer', String modelName = 'Local Model', bool hasPunctuation = false}) async {
+    if (_recordingState != RecordingState.idle) {
+      throw StateError('Cannot reinitialize ASR while recording is active');
+    }
+
     // Determine provider type
     final type = ConfigService().asrEngineType;
     ASRProvider provider;
@@ -478,24 +534,39 @@ class CoreEngine {
         config = ASRProviderFactory.buildConfig(account, asrModel);
         _isOfflineASR = !asrModel.isStreaming;
         _log("Initializing ${cloudProvider.name} ASR (model=${asrModel.name})...");
-        _statusController.add(EngineStatus.info("☁️ 连接 ${cloudProvider.name}..."));
+        _statusController.add(EngineStatus.info(
+          "Connecting to ${cloudProvider.name}...",
+          code: 'connecting_provider',
+          params: {'provider': cloudProvider.name},
+        ));
         // Skip legacy path
         try {
           await provider.initialize(config);
           _asrProvider = provider;
           _asrSubscription = provider.textStream.listen((text) {
-            if (!_partialTextController.isClosed) _partialTextController.add(text);
+            if (!_partialTextController.isClosed) {
+              _partialTextController.add(text);
+            }
             if (_recordingState == RecordingState.recording && text.isNotEmpty) {
               _overlay.updateText(text);
             }
           });
           _activeModelHasPunctuation = true; // Cloud ASR has built-in punctuation
           _overlay.isOfflineMode = _isOfflineASR;
-          _statusController.add(EngineStatus.ready("✅ ${cloudProvider.name} 就绪"));
+          _statusController.add(EngineStatus.ready(
+            "${cloudProvider.name} ready",
+            code: 'provider_ready',
+            params: {'provider': cloudProvider.name},
+          ));
           _log("ASR Provider initialized: ${provider.type}");
         } catch (e) {
           _log("Cloud ASR Init Failed: $e");
-          _statusController.add(EngineStatus.error("❌ ${cloudProvider.name} 连接失败: $e"));
+          _statusController.add(EngineStatus.error(
+            "${cloudProvider.name} connection failed: $e",
+            code: 'provider_connect_failed',
+            params: {'provider': cloudProvider.name, 'error': '$e'},
+          ));
+          await _disposeProviderAfterInitFailure(provider);
           _asrProvider = null;
           // 必须 rethrow：只发 status 的话调用方看到的是「成功返回」，
           // 设置页那段「Init failed -> rollback」永远不执行 ——
@@ -515,7 +586,11 @@ class CoreEngine {
         'appKey': ConfigService().aliyunAppKey,
       };
       _log("Initializing Aliyun Provider (legacy)...");
-      _statusController.add(EngineStatus.info("☁️ 连接阿里云 (Connecting)..."));
+      _statusController.add(const EngineStatus.info(
+        "Connecting to Aliyun...",
+        code: 'connecting_provider',
+        params: {'provider': 'Aliyun'},
+      ));
     } else if (isOfflineModel) {
       // Offline Sherpa (non-streaming, batch recognition)
       provider = OfflineSherpaProvider();
@@ -524,7 +599,11 @@ class CoreEngine {
         'modelType': modelType,
       };
       _log("Initializing Offline Sherpa Provider...");
-      _statusController.add(EngineStatus.info("⏳ 加载模型: $modelName..."));
+      _statusController.add(EngineStatus.info(
+        "Loading model: $modelName...",
+        code: 'loading_model',
+        params: {'model': modelName},
+      ));
     } else {
       // Default: Sherpa Local (streaming)
       provider = SherpaProvider();
@@ -533,7 +612,11 @@ class CoreEngine {
         'modelType': modelType,
       };
       _log("Initializing Sherpa Provider (Local)...");
-      _statusController.add(EngineStatus.info("⏳ 加载模型: $modelName..."));
+      _statusController.add(EngineStatus.info(
+        "Loading model: $modelName...",
+        code: 'loading_model',
+        params: {'model': modelName},
+      ));
     }
 
     try {
@@ -559,22 +642,53 @@ class CoreEngine {
   
       
       if (type == 'aliyun') {
-         _statusController.add(EngineStatus.ready("✅ 阿里云就绪 (Aliyun Ready)"));
+         _statusController.add(const EngineStatus.ready(
+           "Aliyun Ready",
+           code: 'provider_ready',
+           params: {'provider': 'Aliyun'},
+         ));
       } else {
-         _statusController.add(EngineStatus.ready("✅ 就绪: $modelName"));
+         _statusController.add(EngineStatus.ready(
+           "$modelName ready",
+           code: 'model_ready',
+           params: {'model': modelName},
+         ));
       }
       
       _log("ASR Provider initialized: ${provider.type}");
     } catch (e) {
       _log("Provider Init Failed: $e");
       if (type == 'aliyun') {
-         _statusController.add(EngineStatus.error("❌ 阿里云连接失败: $e"));
+         _statusController.add(EngineStatus.error(
+           "Aliyun connection failed: $e",
+           code: 'provider_connect_failed',
+           params: {'provider': 'Aliyun', 'error': '$e'},
+         ));
       } else {
-         _statusController.add(EngineStatus.error("❌ 模型加载失败: $modelName ($e)"));
+         _statusController.add(EngineStatus.error(
+           "Model load failed: $modelName ($e)",
+           code: 'model_load_failed',
+           params: {'model': modelName, 'error': '$e'},
+         ));
       }
       _log("ASR Init Failed: $e");
+      await _disposeProviderAfterInitFailure(provider);
       _asrProvider = null;
       rethrow; // 同上：吞掉会让调用方的回滚/报错分支变成死代码
+    }
+  }
+
+  Future<void> _disposeProviderAfterInitFailure(ASRProvider provider) async {
+    try {
+      await _asrSubscription?.cancel();
+    } catch (e) {
+      _log("Provider subscription cleanup after init failure failed: $e");
+    }
+    _asrSubscription = null;
+    try {
+      await provider.dispose();
+    } catch (e) {
+      _log("Provider dispose after init failure failed: $e");
     }
   }
 
@@ -605,19 +719,32 @@ class CoreEngine {
       _punctuationEnabled = true;
       
       if (activeModelName.isNotEmpty) {
-        _statusController.add(EngineStatus.ready("✅ 就绪: $activeModelName + 标点"));
+        _statusController.add(EngineStatus.ready(
+          "$activeModelName + punctuation ready",
+          code: 'punctuation_ready_with_model',
+          params: {'model': activeModelName},
+        ));
       } else {
-        _statusController.add(EngineStatus.ready("✅ 就绪: 标点模型已加载"));
+        _statusController.add(const EngineStatus.ready(
+          "Punctuation model ready",
+          code: 'punctuation_ready',
+        ));
       }
     } catch (e) {
       _punctuationEnabled = false;
       _log("[initPunctuation] Failed: $e");
-      _statusController.add(EngineStatus.error("❌ 标点加载失败: $e"));
+      _statusController.add(EngineStatus.error(
+        "Punctuation model load failed: $e",
+        code: 'punctuation_load_failed',
+        params: {'error': '$e'},
+      ));
     }
   }
   
   String addPunctuation(String text) {
-    if (!_punctuationEnabled || _punctuation == null || text.isEmpty) return text;
+    if (!_punctuationEnabled || _punctuation == null || text.isEmpty) {
+      return text;
+    }
     try {
       return _punctuation!.addPunct(text);
     } catch (e) { return text; }
@@ -670,6 +797,15 @@ class CoreEngine {
     return stripped == requiredFlags;
   }
 
+  /// Shared-key 模式只适用于完全相同的快捷键；仅 keyCode 相同不够。
+  @visibleForTesting
+  static bool hotkeysAreIdentical(
+      int firstCode, int firstModifiers, int secondCode, int secondModifiers) {
+    return firstCode != 0 &&
+        firstCode == secondCode &&
+        firstModifiers == secondModifiers;
+  }
+
   // Instance wrapper for internal use
   bool _modifiersMatch(int keyCode, int currentFlags, int requiredFlags) =>
       modifiersMatch(keyCode, currentFlags, requiredFlags);
@@ -708,8 +844,10 @@ class CoreEngine {
 
     // 1. Toggle stop: if toggle recording is active and the same toggle key is pressed again
     if (isDown && _isToggleMode && _recordingState == RecordingState.recording) {
-      if ((_recordingMode == RecordingMode.ptt && keyCode == toggleInputCode) ||
-          (_recordingMode == RecordingMode.diary && keyCode == toggleDiaryCode)) {
+      if ((_recordingMode == RecordingMode.ptt &&
+              matchKey(toggleInputCode, config.toggleInputModifiers)) ||
+          (_recordingMode == RecordingMode.diary &&
+              matchKey(toggleDiaryCode, config.toggleDiaryModifiers))) {
         _log("[Toggle] Second tap → stopRecording");
         stopRecording();
         return;
@@ -735,8 +873,19 @@ class CoreEngine {
     }
 
     // 3. Shared key: toggle key == PTT/diary key → use time-threshold logic
-    final bool isSharedPtt = toggleInputCode != 0 && toggleInputCode == pttKeyCode && keyCode == pttKeyCode;
-    final bool isSharedDiary = toggleDiaryCode != 0 && config.diaryEnabled && toggleDiaryCode == config.diaryKeyCode && keyCode == config.diaryKeyCode;
+    final bool isSharedPtt = hotkeysAreIdentical(
+            toggleInputCode,
+            config.toggleInputModifiers,
+            pttKeyCode,
+            config.pttModifiers) &&
+        matchKey(pttKeyCode, config.pttModifiers);
+    final bool isSharedDiary = config.diaryEnabled &&
+        hotkeysAreIdentical(
+            toggleDiaryCode,
+            config.toggleDiaryModifiers,
+            config.diaryKeyCode,
+            config.diaryModifiers) &&
+        matchKey(config.diaryKeyCode, config.diaryModifiers);
 
     if (isSharedPtt) {
       _handleSharedKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
@@ -774,7 +923,9 @@ class CoreEngine {
     final bool diaryMatch = config.diaryEnabled && matchKey(config.diaryKeyCode, config.diaryModifiers);
 
     if (pttMatch) {
-      if (isDown && _recordingState == RecordingState.idle) _activeHotkeyCode = pttKeyCode;
+      if (isDown && _recordingState == RecordingState.idle) {
+        _activeHotkeyCode = pttKeyCode;
+      }
       _handleModeKey(isDown, RecordingMode.ptt, _pttKeyHeld, (v) => _pttKeyHeld = v);
     } else if (diaryMatch) {
       _handleModeKey(isDown, RecordingMode.diary, _diaryKeyHeld, (v) => _diaryKeyHeld = v);
@@ -796,7 +947,7 @@ class CoreEngine {
       if (!_clipBegin()) {
         _log("[Organize] 剪贴板会话开启失败，放弃本次梳理");
         overlay.recordingMode = "organize";
-        overlay.updateText("剪贴板忙，请重试");
+        overlay.updateText(_localizedText("Clipboard busy", 'clipboard_busy'));
         await overlay.show();
         await Future.delayed(const Duration(seconds: 2));
         await overlay.hide();
@@ -811,7 +962,8 @@ class CoreEngine {
         _log("[Organize] 复制选中文字失败，中止");
         _clipEnd();
         overlay.recordingMode = "organize";
-        overlay.updateText("未能读取选中文字");
+        overlay.updateText(_localizedText(
+            "Could not read selection", 'selection_read_failed'));
         await overlay.show();
         await Future.delayed(const Duration(seconds: 2));
         await overlay.hide();
@@ -824,7 +976,7 @@ class CoreEngine {
         _log("[Organize] 未检测到选中文字");
         _clipEnd();
         overlay.recordingMode = "organize";
-        overlay.updateText("未检测到选中文字");
+        overlay.updateText(_localizedText("No text selected", 'selection_empty'));
         await overlay.show();
         await Future.delayed(const Duration(seconds: 2));
         await overlay.hide();
@@ -834,7 +986,7 @@ class CoreEngine {
 
       // 3. 显示悬浮窗
       overlay.recordingMode = "organize";
-      overlay.updateText("梳理中...");
+      overlay.updateText(_localizedText("Organizing...", 'organizing'));
       await overlay.show();
 
       // 4. 调用 LLM
@@ -843,7 +995,7 @@ class CoreEngine {
 
       if (result.isEmpty) {
         _log("[Organize] LLM 返回空结果");
-        overlay.updateText("梳理失败");
+        overlay.updateText(_localizedText("Organize failed", 'organize_failed'));
         await Future.delayed(const Duration(seconds: 2));
         _clipEnd();
         await overlay.hide();
@@ -863,7 +1015,8 @@ class CoreEngine {
 
       if (!pasted) {
         _log("[Organize] 注入失败 (moved=$moved newline=$newline)");
-        overlay.updateText("梳理结果注入失败");
+        overlay.updateText(_localizedText(
+            "Could not insert result", 'organize_inject_failed'));
         await Future.delayed(const Duration(seconds: 2));
         await overlay.hide();
         return;
@@ -875,7 +1028,7 @@ class CoreEngine {
     } catch (e) {
       _log("[Organize] 错误: $e");
       try { _clipEnd(); } catch (_) {}
-      overlay.updateText("梳理失败");
+      overlay.updateText(_localizedText("Organize failed", 'organize_failed'));
       await Future.delayed(const Duration(seconds: 2));
       await overlay.hide();
     } finally {
@@ -888,8 +1041,11 @@ class CoreEngine {
     if (_recordingState == RecordingState.idle) {
       _log("[Toggle] Independent key → startRecording (mode=${mode.name})");
       _isToggleMode = true;
-      startRecording(mode: mode);
-      _startToggleMaxTimer();
+      startRecording(mode: mode).then((_) {
+        if (_isToggleMode && _recordingState == RecordingState.recording) {
+          _startToggleMaxTimer();
+        }
+      });
     }
     // If already recording in toggle mode, stop is handled at the top of _handleKey
   }
@@ -973,11 +1129,29 @@ class CoreEngine {
 
   // NATIVE AUDIO PIPELINE
   Future<void> startRecording({required RecordingMode mode}) async {
+    final existing = _recordingStartInFlight;
+    if (existing != null) {
+      await existing;
+      return;
+    }
+    final completion = Completer<void>();
+    _recordingStartInFlight = completion.future;
+    try {
     _log("startRecording(mode=${mode.name}) BEGIN, state=$_recordingState");
 
     // Guard: only start from idle
     if (_recordingState != RecordingState.idle) {
       _log("Not idle (state=$_recordingState), ignoring.");
+      return;
+    }
+
+    if (_asrSwitchInProgress) {
+      _log("ASR switch in progress, rejecting recording startup.");
+      _statusController.add(const EngineStatus.info(
+        "Speech engine is switching",
+        code: 'speech_model_switching',
+      ));
+      _cleanupRecordingState();
       return;
     }
 
@@ -995,7 +1169,11 @@ class CoreEngine {
       if (_nativeInput?.microphonePermissionStatus() == 0) {
         _nativeInput!.requestMicrophonePermission();
       }
-      _statusController.add(EngineStatus.error("需要麦克风权限"));
+      _statusController.add(const EngineStatus.error(
+        "Microphone permission required",
+        code: 'microphone_permission_required',
+      ));
+      _cleanupRecordingState();
       return;
     }
 
@@ -1007,22 +1185,38 @@ class CoreEngine {
     // 2. UI FEEDBACK (fire-and-forget)
     _overlay.recordingMode = mode == RecordingMode.diary ? "diary" : "ptt";
     if (mode == RecordingMode.diary) {
-      _overlay.updateText("📝 Note...");
+      _overlay.updateText(_localizedText("Recording note...", 'recording_note'));
     }
     _overlay.show();
 
     // 3. AUDIO INIT via Native FFI
+    ASRProvider? startingProvider;
     try {
       if (_asrProvider == null || !_asrProvider!.isReady) {
         _log("ASR Provider not ready!");
-        _overlay.updateText("❌ 请先下载语音模型");
-        _statusController.add(EngineStatus.error("引擎未就绪 - 请下载模型"));
+        _overlay.updateText(
+            _localizedText("Speech model required", 'speech_model_required'));
+        _statusController.add(const EngineStatus.error(
+          "Speech model required",
+          code: 'speech_model_required',
+        ));
         await Future.delayed(const Duration(seconds: 2));
         _cleanupRecordingState();
         return;
       }
-      await _asrProvider!.start();
+      startingProvider = _asrProvider!;
+      await startingProvider.start();
       _log("ASR Provider Started.");
+
+      // cancelRecording() 只切换状态，不会在 start() 尚未完成时抢先
+      // stop provider；这里在 start() 返回后接管回滚，避免遗留新 session。
+      if (_recordingState != RecordingState.starting) {
+        _log("Recording startup superseded (state=$_recordingState).");
+        await _abortStartedAsrSession(startingProvider);
+        startingProvider = null;
+        _cleanupRecordingState();
+        return;
+      }
 
       // 4. WATCHDOG (PTT only — diary/toggle/translate have reliable key-up)
       // Skip watchdog for translate: modifier keys (Shift/Option/etc) don't report
@@ -1055,8 +1249,14 @@ class CoreEngine {
       final success = _nativeInput.startAudioRecording();
       if (!success) {
         _log("Native audio start failed!");
+        _recordingState = RecordingState.stopping;
+        await _abortStartedAsrSession(startingProvider);
+        startingProvider = null;
         _cleanupRecordingState();
-        _statusController.add(EngineStatus.error("麦克风启动失败"));
+        _statusController.add(const EngineStatus.error(
+          "Microphone start failed",
+          code: 'microphone_start_failed',
+        ));
         return;
       }
       _audioStarted = true;
@@ -1093,8 +1293,14 @@ class CoreEngine {
         if (_isToggleMode && _isOfflineASR && _recordingStartTime != null) {
           final elapsed = DateTime.now().difference(_recordingStartTime!).inSeconds;
           if (elapsed == AppConstants.kOfflineModelDurationWarningSeconds) {
-            _overlay.updateText("⚠️ 超过30秒，识别效果可能下降");
-            NotificationService().notify('离线模型超过30秒识别效果可能下降，建议切换到流式模型');
+              _overlay.updateText(_localizedText(
+                "Recognition quality may drop after 30 seconds",
+                'offline_duration_warning',
+              ));
+              NotificationService().notify(_localizedText(
+                "Offline recognition may degrade after 30 seconds; consider a streaming model",
+                'offline_duration_notification',
+              ));
           }
         }
 
@@ -1108,8 +1314,12 @@ class CoreEngine {
               now.difference(_lastSilenceNotify!).inSeconds >= 10) {
             _lastSilenceNotify = now;
             _log("Silence detected for 2s — mic may be unavailable");
-            _overlay.showSilenceHint();
-            NotificationService().notify('未检测到声音，请检查麦克风是否可用');
+              _overlay.showSilenceHint(
+                  _localizedText("No sound detected", 'silence_hint'));
+              NotificationService().notify(_localizedText(
+                "No sound detected; check the microphone",
+                'silence_notification',
+              ));
           }
         }
 
@@ -1140,6 +1350,7 @@ class CoreEngine {
 
       // Transition: starting → recording
       _recordingState = RecordingState.recording;
+      startingProvider = null;
       _recordingStartTime = DateTime.now();
       _log("Recording started (mode=${mode.name}).");
 
@@ -1152,8 +1363,49 @@ class CoreEngine {
       }
     } catch (e) {
       _log("Start Fatal Error: $e");
-      _cleanupRecordingState();
-      _statusController.add(EngineStatus.error("启动失败"));
+      final wasCancelled = _recordingState == RecordingState.stopping;
+      if (_recordingState == RecordingState.starting || wasCancelled) {
+        _recordingState = RecordingState.stopping;
+        await _stopAudioSafely();
+        if (startingProvider != null) {
+          await _abortStartedAsrSession(startingProvider);
+        }
+        _cleanupRecordingState();
+        if (!wasCancelled) {
+          _statusController.add(const EngineStatus.error(
+            "Recording start failed",
+            code: 'recording_start_failed',
+          ));
+        }
+      }
+    }
+    } finally {
+      completion.complete();
+      if (identical(_recordingStartInFlight, completion.future)) {
+        _recordingStartInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _abortStartedAsrSession(ASRProvider provider) async {
+    try {
+      await provider.stop().timeout(AppConstants.kAsrStopTimeout);
+    } catch (e) {
+      _log("ASR startup rollback failed, disposing provider: $e");
+      if (identical(_asrProvider, provider)) {
+        try {
+          await _asrSubscription?.cancel();
+        } catch (cancelError) {
+          _log("ASR subscription cancel during startup rollback failed: $cancelError");
+        }
+        _asrSubscription = null;
+        _asrProvider = null;
+      }
+      try {
+        await provider.dispose();
+      } catch (disposeError) {
+        _log("ASR provider dispose after startup rollback failed: $disposeError");
+      }
     }
   }
   
@@ -1179,7 +1431,9 @@ class CoreEngine {
   
   /// Poll the C ring buffer and feed audio to ASR pipeline
   void _pollAudioRingBuffer() {
-    if (!_shouldConsumeAudio || _nativeInput == null || _pollBuffer == null) return;
+    if (!_shouldConsumeAudio || _nativeInput == null || _pollBuffer == null) {
+      return;
+    }
     
     final samplesRead = _nativeInput.readAudioBuffer(_pollBuffer!, _pollBufferSamples);
     if (samplesRead <= 0) return;
@@ -1216,6 +1470,8 @@ class CoreEngine {
      _isToggleMode = false;
      _pauseSegmentPollCount = 0;
      _activeHotkeyCode = null;
+     _translateOverride = null;
+     _keyDownTime = null;
      _toggleMaxTimer?.cancel();
      _toggleMaxTimer = null;
      _stopAudioPolling();
@@ -1274,6 +1530,7 @@ class CoreEngine {
         _recordingState != RecordingState.starting) {
       return;
     }
+    final wasStarting = _recordingState == RecordingState.starting;
     _log("[Cancel] User requested cancel (state=$_recordingState)");
 
     // 立即 UI 切回
@@ -1283,13 +1540,28 @@ class CoreEngine {
     _recordingState = RecordingState.stopping;
     _recordingController.add(false);
     _overlay.hide();
-    _statusController.add(EngineStatus.info("已取消"));
+    _statusController.add(
+        const EngineStatus.info("Cancelled", code: 'cancelled'));
 
     // 关音频硬件
     try {
       await _stopAudioSafely();
     } catch (e) {
       _log("[Cancel] Audio stop error: $e");
+    }
+
+    _activeHotkeyCode = null;
+    _deferredStop = false;
+    _pttKeyHeld = false;
+    _diaryKeyHeld = false;
+    _translateKeyHeld = false;
+    _translateOverride = null;
+
+    if (wasStarting) {
+      // provider.start() 返回后由原启动任务统一回滚，避免
+      // 「stop 已完成，start 随后才真正建好 session」的竞态。
+      _log("[Cancel] Waiting for in-flight provider start to roll itself back.");
+      return;
     }
 
     // 停 ASR（丢弃结果）
@@ -1308,18 +1580,21 @@ class CoreEngine {
 
     // 复位状态
     _recordingState = RecordingState.idle;
-    _activeHotkeyCode = null;
-    _deferredStop = false;
-    _pttKeyHeld = false;
-    _diaryKeyHeld = false;
-    _translateKeyHeld = false;
-    _translateOverride = null;
     _log("[Cancel] Done, state → idle");
   }
 
   Future<void> stopRecording() async {
+    final existing = _recordingStopInFlight;
+    if (existing != null) {
+      await existing;
+      return;
+    }
     // Guard: only stop from recording state (prevents watchdog + key-up race)
     if (_recordingState != RecordingState.recording) return;
+
+    final completion = Completer<void>();
+    _recordingStopInFlight = completion.future;
+    try {
 
     final sw = Stopwatch()..start();
     _log("[PERF] stopRecording BEGIN");
@@ -1335,7 +1610,8 @@ class CoreEngine {
 
     // 1. UI FIRST (Optimistic Update)
     _recordingController.add(false);
-    _statusController.add(EngineStatus.info("处理中..."));
+    _statusController.add(
+        const EngineStatus.info("Processing...", code: 'processing'));
     _overlay.hide();
 
     // Yield to event loop so method channel message is dispatched
@@ -1383,8 +1659,19 @@ class CoreEngine {
       // 云端 ASR 错误（鉴权失败、配额超限等）
       if (asrResult.error != null) {
         _log("ASR Error: ${asrResult.error}");
-        _statusController.add(EngineStatus.error("❌ ${asrResult.error}"));
-        _overlay.showThenClear("❌ ${asrResult.error}", AppConstants.kErrorDisplayDuration);
+        _statusController.add(EngineStatus.error(
+          "ASR failed: ${asrResult.error}",
+          code: 'asr_failed',
+          params: {'error': '${asrResult.error}'},
+        ));
+        _overlay.showThenClear(
+          _localizedText(
+            "ASR failed: ${asrResult.error}",
+            'asr_failed',
+            params: {'error': '${asrResult.error}'},
+          ),
+          AppConstants.kErrorDisplayDuration,
+        );
         return; // finally block handles cleanup
       }
 
@@ -1399,8 +1686,14 @@ class CoreEngine {
       final shouldCallLlm = finalText.isNotEmpty && trimmedForCheck.length > 2 &&
           (ConfigService().aiCorrectionEnabled || isQuickTranslate);
       if (shouldCallLlm) {
-        _statusController.add(EngineStatus.info(isQuickTranslate ? "翻译中..." : "AI 润色中..."));
-        _overlay.updateText(isQuickTranslate ? "🌐 Translating..." : "🤖 AI Polishing...");
+        _statusController.add(EngineStatus.info(
+          isQuickTranslate ? "Translating..." : "AI polishing...",
+          code: isQuickTranslate ? 'translating' : 'polishing',
+        ));
+        _overlay.updateText(_localizedText(
+          isQuickTranslate ? "Translating..." : "AI polishing...",
+          isQuickTranslate ? 'translating' : 'polishing',
+        ));
         _log("[PERF] +${sw.elapsedMilliseconds}ms — AI polish starting...");
         bool typewriterBegan = false;
         try {
@@ -1558,7 +1851,8 @@ class CoreEngine {
 
       if (finalText.isNotEmpty) {
         if (mode == RecordingMode.diary) {
-          _statusController.add(EngineStatus.info("Saving Note..."));
+          _statusController.add(
+              const EngineStatus.info("Saving Note...", code: 'saving_note'));
 
           // 顺序要紧：**先**写聊天记录，再 await 笔记落盘。
           // ChatService 有自己的写入队列，且 AppService.dispose() 会 await
@@ -1574,10 +1868,15 @@ class CoreEngine {
           // 在途的 stopRecording，属独立改动。
           final err = await DiaryService().appendNote(finalText);
           if (err == null) {
-            _statusController.add(EngineStatus.info("✅ Saved Note"));
-            _overlay.showThenClear("✅ Saved Note", AppConstants.kSuccessDisplayDuration);
+            _statusController.add(
+                const EngineStatus.info("Saved Note", code: 'note_saved'));
+            _overlay.showThenClear(_localizedText("Saved Note", 'note_saved'),
+                AppConstants.kSuccessDisplayDuration);
           } else {
-            _statusController.add(EngineStatus.error("❌ Save Failed"));
+            _statusController.add(const EngineStatus.error(
+              "Save Failed",
+              code: 'note_save_failed',
+            ));
             _log("Diary Save Error: $err");
           }
         } else {
@@ -1589,7 +1888,8 @@ class CoreEngine {
           // 文字仍然进聊天记录 —— 注入失败时那里是用户唯一能找回这段话的地方
           ChatService().addDictation(finalText, asrOriginal: originalAsrText);
           if (injected) {
-            _statusController.add(EngineStatus.ready("Ready"));
+            _statusController.add(
+                const EngineStatus.ready("Ready", code: 'ready'));
           } else {
             // 注入失败绝不能静默：用户刚口述的整段话没进输入框，
             // 不说的话他只会对着没变化的界面发愣，还以为识别没成功。
@@ -1601,7 +1901,8 @@ class CoreEngine {
         }
         _log("[PERF] +${sw.elapsedMilliseconds}ms — inject/save done");
       } else {
-        _statusController.add(EngineStatus.info("🔇 No Speech"));
+        _statusController.add(
+            const EngineStatus.info("No Speech", code: 'no_speech'));
         _log("[PERF] +${sw.elapsedMilliseconds}ms — no speech detected");
       }
     }
@@ -1622,6 +1923,12 @@ class CoreEngine {
       // Guarantee state recovery — no matter what happens above
       _cleanupRecordingState();
       _log("[PERF] +${sw.elapsedMilliseconds}ms — stopRecording END");
+    }
+    } finally {
+      completion.complete();
+      if (identical(_recordingStopInFlight, completion.future)) {
+        _recordingStopInFlight = null;
+      }
     }
   }
   

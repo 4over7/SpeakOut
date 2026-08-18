@@ -87,6 +87,31 @@ void main() {
     expect(writeIdx, greaterThan(awaitIdx), reason: '新任务没挂回链上');
   });
 
+  test('initASR 在进入 unsafe 前锁住录音入口，完成后 finally 解锁', () {
+    final body = methodNamed('initASR').toSource();
+    final guardIdx = body.indexOf('_recordingState != RecordingState.idle');
+    final lockIdx = body.indexOf('_asrSwitchInProgress = true');
+    final unsafeIdx = body.indexOf('await _initASRUnsafe');
+    final unlockIdx = body.indexOf('_asrSwitchInProgress = false');
+
+    expect(lockIdx, greaterThan(guardIdx));
+    expect(unsafeIdx, greaterThan(lockIdx));
+    expect(unlockIdx, greaterThan(unsafeIdx),
+        reason: '切换期间必须持续拒绝新录音，失败也要解锁');
+  });
+
+  test('_initASRUnsafe 在释放当前 provider 前必须拒绝非 idle 状态', () {
+    final body = methodNamed('_initASRUnsafe').toSource();
+    final guardIdx = body.indexOf('_recordingState != RecordingState.idle');
+    final rejectIdx = body.indexOf('throw StateError', guardIdx);
+    final disposeIdx = body.indexOf('await _asrProvider!.dispose()');
+
+    expect(guardIdx, greaterThanOrEqualTo(0), reason: '录音中不能替换 provider');
+    expect(rejectIdx, greaterThan(guardIdx), reason: '非 idle 状态必须明确失败');
+    expect(disposeIdx, greaterThan(rejectIdx),
+        reason: '守卫必须在释放旧 provider 前执行');
+  });
+
   test('把 _asrProvider 置 null 的 catch 必须 rethrow', () {
     // 判据挑「catch 里有 _asrProvider = null」而不是「第 N 个 try」：
     // 前者跟着语义走，后者跟着行号走，加一个 try 就失效。
@@ -98,6 +123,17 @@ void main() {
     expect(v.withoutRethrow, isEmpty,
         reason: '这些 catch 把 provider 置 null 却没上抛，调用方会当成初始化成功：'
             '${v.withoutRethrow}');
+  });
+
+  test('两条 provider 初始化失败路径都要 dispose 局部 provider', () {
+    final body = methodNamed('_initASRUnsafe').toSource();
+    expect(
+      RegExp(r'await _disposeProviderAfterInitFailure\(provider\)')
+          .allMatches(body)
+          .length,
+      2,
+      reason: '只把字段置 null 会泄漏初始化到一半的 native/WebSocket 资源',
+    );
   });
 }
 

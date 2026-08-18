@@ -76,7 +76,7 @@
 > 例外：OpenAI/Groq 是批量上传，`stopTimeout` 单独声明 35s（HTTP 自身 30s），
 > 这在类里写明了理由。取消路径不用它 —— 见 `core_engine.dart` 里的注释。
 
-### 3b. initASR 必须串行，失败必须上抛
+### 3b. initASR 必须串行且只能在 idle 执行，失败必须上抛
 
 `initASR` 在 await `provider.initialize()` **之前**就把 `_asrProvider` 置 null，
 所以两次调用重叠时第二次看不到旧 provider，跳过 dispose 直接并发初始化：
@@ -84,10 +84,18 @@
 而它的 textStream 还在往浮窗推 —— 两路结果交替出现。
 
 公开的 `initASR` 因此只是一层串行链，实现在 `_initASRUnsafe`。**不要绕过它。**
+执行时还必须重新确认录音状态为 `idle`；录音/处理中替换 provider
+会把当前 session 静默丢掉。整个切换期间会锁住录音入口，不能只在第一个 await 前查一次。
 
 初始化失败也必须 `rethrow`：只发一条 `EngineStatus.error` 就正常返回的话，
 调用方看到的是「成功」，设置页那段 `Init failed -> rollback` 变成死代码，
 配置停在一个加载不起来的模型上。`test/engine/asr_init_serialization_test.dart` 守这两条。
+
+### 3c. 录音启动是跨 provider / native 的事务
+
+`provider.start()` 成功但原生麦克风启动失败时，必须回滚 ASR session；
+异步启动期间被取消时，原启动任务在 await 返回后负责回滚，不得再打开麦克风。
+应用退出时 `dispose()` 必须等待在途 start/stop，再关 provider 和 stream，否则识别收尾或闪念落盘会被截断。
 
 ### 4. 默认模型随包内置（v1.10）
 
@@ -120,9 +128,15 @@
 
 ### 7. activeHotkeyCode 而非 pttKeyCode
 CoreEngine 记录"实际触发录音的键"，而不是固定查 PTT 键——因为可能是闪念笔记键、AI 梳理键、翻译键。Watchdog 检查的是 `activeHotkeyCode`。
+只有 keyCode 和 modifiers 都相同才能进入 shared-key 逻辑；Toggle 的二次按下也必须重新校验 modifiers。
 
 ### 8. translateOverride 单次覆盖
 即时翻译键按下时设 `_translateOverride`，处理完自动清除。即使 AI 润色全局关闭，翻译键也强制启用 LLM。
+
+### 9. 用户可见状态发 code，不直接展示 fallback
+
+Engine 发 `EngineStatus(code, params)`，状态栏、录音浮窗和通知共用
+`engine_status_localizer.dart` 的中英文映射。`message` 只是未知 code 的诊断兜底，不是用户文案真源。
 
 ## 数据流（细节）
 

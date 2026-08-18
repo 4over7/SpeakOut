@@ -1916,6 +1916,276 @@ abstract class AppLocalizations {
   /// **'Clipboard could not be restored — its previous contents may be lost'**
   String get engineClipboardRestoreFailed;
 
+  /// No description provided for @engineMissingPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Monitoring and Accessibility permissions are required. Grant them in System Settings.'**
+  String get engineMissingPermissions;
+
+  /// No description provided for @engineMissingInputMonitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Monitoring permission is required. Grant it in System Settings → Privacy & Security → Input Monitoring.'**
+  String get engineMissingInputMonitoring;
+
+  /// No description provided for @engineKeyboardListenerStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard listener started'**
+  String get engineKeyboardListenerStarted;
+
+  /// No description provided for @engineAccessibilityReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility permission granted'**
+  String get engineAccessibilityReady;
+
+  /// No description provided for @engineAccessibilityMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard listening is active, but Accessibility permission is missing, so text injection is unavailable'**
+  String get engineAccessibilityMissing;
+
+  /// No description provided for @engineListenerFailedInputMonitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard listener failed to start because Input Monitoring permission is missing'**
+  String get engineListenerFailedInputMonitoring;
+
+  /// No description provided for @engineListenerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard listener failed to start. Check System Settings permissions.'**
+  String get engineListenerFailed;
+
+  /// No description provided for @engineConnectingProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {provider}…'**
+  String engineConnectingProvider(String provider);
+
+  /// No description provided for @engineProviderReady.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} is ready'**
+  String engineProviderReady(String provider);
+
+  /// No description provided for @engineProviderConnectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect to {provider}: {error}'**
+  String engineProviderConnectFailed(String provider, String error);
+
+  /// No description provided for @engineLoadingModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading model: {model}…'**
+  String engineLoadingModel(String model);
+
+  /// No description provided for @engineModelReady.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} is ready'**
+  String engineModelReady(String model);
+
+  /// No description provided for @engineModelLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load model {model}: {error}'**
+  String engineModelLoadFailed(String model, String error);
+
+  /// No description provided for @enginePunctuationReadyWithModel.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} and punctuation model are ready'**
+  String enginePunctuationReadyWithModel(String model);
+
+  /// No description provided for @enginePunctuationReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Punctuation model is ready'**
+  String get enginePunctuationReady;
+
+  /// No description provided for @enginePunctuationLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the punctuation model: {error}'**
+  String enginePunctuationLoadFailed(String error);
+
+  /// No description provided for @engineMicrophonePermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission is required'**
+  String get engineMicrophonePermissionRequired;
+
+  /// No description provided for @engineSpeechModelRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech engine is not ready. Download a model first.'**
+  String get engineSpeechModelRequired;
+
+  /// No description provided for @engineSpeechModelSwitching.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech engine is switching. Try again shortly.'**
+  String get engineSpeechModelSwitching;
+
+  /// No description provided for @engineMicrophoneStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the microphone'**
+  String get engineMicrophoneStartFailed;
+
+  /// No description provided for @engineRecordingStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start recording'**
+  String get engineRecordingStartFailed;
+
+  /// No description provided for @engineCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get engineCancelled;
+
+  /// No description provided for @engineProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get engineProcessing;
+
+  /// No description provided for @engineAsrFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition failed: {error}'**
+  String engineAsrFailed(String error);
+
+  /// No description provided for @engineTranslating.
+  ///
+  /// In en, this message translates to:
+  /// **'Translating…'**
+  String get engineTranslating;
+
+  /// No description provided for @enginePolishing.
+  ///
+  /// In en, this message translates to:
+  /// **'AI polishing…'**
+  String get enginePolishing;
+
+  /// No description provided for @engineSavingNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving flash note…'**
+  String get engineSavingNote;
+
+  /// No description provided for @engineNoteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash note saved'**
+  String get engineNoteSaved;
+
+  /// No description provided for @engineNoteSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the flash note'**
+  String get engineNoteSaveFailed;
+
+  /// No description provided for @engineReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get engineReady;
+
+  /// No description provided for @engineConfiguringServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuring services…'**
+  String get engineConfiguringServices;
+
+  /// No description provided for @engineStartingListener.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting keyboard listener…'**
+  String get engineStartingListener;
+
+  /// No description provided for @enginePreparingSpeechModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing speech model…'**
+  String get enginePreparingSpeechModel;
+
+  /// No description provided for @engineSpeechModelFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the speech model: {error}'**
+  String engineSpeechModelFailed(String error);
+
+  /// No description provided for @engineRecordingNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording flash note…'**
+  String get engineRecordingNote;
+
+  /// No description provided for @engineClipboardBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard is busy. Try again.'**
+  String get engineClipboardBusy;
+
+  /// No description provided for @engineSelectionReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the selected text'**
+  String get engineSelectionReadFailed;
+
+  /// No description provided for @engineSelectionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No selected text detected'**
+  String get engineSelectionEmpty;
+
+  /// No description provided for @engineOrganizing.
+  ///
+  /// In en, this message translates to:
+  /// **'Organizing…'**
+  String get engineOrganizing;
+
+  /// No description provided for @engineOrganizeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not organize the text'**
+  String get engineOrganizeFailed;
+
+  /// No description provided for @engineOrganizeInjectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not insert the organized text'**
+  String get engineOrganizeInjectFailed;
+
+  /// No description provided for @engineOfflineDurationWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognition quality may drop after 30 seconds'**
+  String get engineOfflineDurationWarning;
+
+  /// No description provided for @engineOfflineDurationNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline recognition may degrade after 30 seconds. Consider switching to a streaming model.'**
+  String get engineOfflineDurationNotification;
+
+  /// No description provided for @engineSilenceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No sound detected'**
+  String get engineSilenceHint;
+
+  /// No description provided for @engineSilenceNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'No sound detected. Check whether the microphone is available.'**
+  String get engineSilenceNotification;
+
   /// No description provided for @permissionsOpen.
   ///
   /// In en, this message translates to:
