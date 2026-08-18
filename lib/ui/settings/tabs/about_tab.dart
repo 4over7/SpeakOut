@@ -473,7 +473,9 @@ class _AboutTabState extends State<AboutTab> {
                         if (context.mounted) {
                           result.success
                               ? NotificationService()
-                                  .notifySuccess(loc.aboutExportSuccess(result.message))
+                                  .notifySuccess(
+                                    loc.aboutExportSuccess(result.settingsCount),
+                                  )
                               : NotificationService()
                                   .notifyError(loc.aboutExportFailed(result.error ?? ''));
                         }
@@ -502,7 +504,12 @@ class _AboutTabState extends State<AboutTab> {
                           setState(() {});
                           importResult.success
                               ? NotificationService()
-                                  .notifySuccess(loc.aboutImportSuccess(importResult.message))
+                                  .notifySuccess(
+                                    loc.aboutImportSuccess(
+                                      importResult.settingsCount,
+                                      importResult.credentialCount,
+                                    ),
+                                  )
                               : NotificationService()
                                   .notifyError(loc.aboutImportFailed(importResult.error ?? ''));
                         }

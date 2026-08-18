@@ -19,6 +19,7 @@
 | native 层 | [2026-08-16-batch5-native-findings](./2026-08-16-batch5-native-findings.md) | EventTap 禁用不恢复、回调内同步 I/O、麦克风授权同步阻塞、音量平滑随调用频率失真 |
 | 音频设备 | [2026-08-18-audio-device-lifecycle](./2026-08-18-audio-device-lifecycle.md) | 设备监听重试/拆卸、蓝牙回调禁止全量枚举、native 与偏好配置原子提交 |
 | 配置服务 | [2026-08-18-config-service-consistency](./2026-08-18-config-service-consistency.md) | 初始化失败后可重试，切换主配置时不得遗留旧从属字段 |
+| 配置备份 | [2026-08-18-config-backup-transaction](./2026-08-18-config-backup-transaction.md) | 导出永久排除秘密与本机标识，导入先验证、写失败回滚 |
 | 云端 ASR | [2026-08-11-volcengine-asr-never-worked](./2026-08-11-volcengine-asr-never-worked.md) | 火山 ASR 自接入起从未跑通（帧解析漏 sequence） |
 | ASR 启动 | [2026-06-02-asr-startup-audio-gap](./2026-06-02-asr-startup-audio-gap.md) | 录音起始丢音 |
 | 全局 | [2026-06-13-review-fixes](./2026-06-13-review-fixes.md) | 三份 review 的修复批次；多处旧逻辑已变，改代码前值得扫 |

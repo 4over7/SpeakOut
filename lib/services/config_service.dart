@@ -73,6 +73,91 @@ class ConfigService {
     _updateLocaleNotifier();
   }
 
+  /// 为配置备份提供当前偏好的只读快照。
+  Map<String, Object> snapshotPreferencesForBackup() {
+    final prefs = _prefs;
+    if (prefs == null) {
+      throw StateError('ConfigService 尚未初始化');
+    }
+    return {
+      for (final key in prefs.getKeys())
+        if (prefs.get(key) case final Object value)
+          key: value is List<String> ? List<String>.from(value) : value,
+    };
+  }
+
+  /// 批量恢复已完成类型校验的配置；任一写入失败时恢复导入前状态。
+  Future<void> restorePreferencesFromBackup(Map<String, Object> values) async {
+    final prefs = _prefs;
+    if (prefs == null) {
+      throw StateError('ConfigService 尚未初始化');
+    }
+
+    final previous = <String, Object>{};
+    final absentKeys = <String>{};
+    for (final key in values.keys) {
+      final oldValue = prefs.get(key);
+      if (oldValue == null) {
+        absentKeys.add(key);
+      } else {
+        previous[key] = oldValue is List<String>
+            ? List<String>.from(oldValue)
+            : oldValue;
+      }
+    }
+
+    try {
+      for (final entry in values.entries) {
+        await _writePreference(prefs, entry.key, entry.value);
+      }
+    } catch (error, stackTrace) {
+      Object? rollbackError;
+      for (final key in values.keys.toList().reversed) {
+        try {
+          if (absentKeys.contains(key)) {
+            if (!await prefs.remove(key)) {
+              throw StateError('删除 $key 失败');
+            }
+          } else {
+            await _writePreference(prefs, key, previous[key]!);
+          }
+        } catch (e) {
+          rollbackError ??= e;
+        }
+      }
+      _preloadSecureKeys();
+      _updateLocaleNotifier();
+      if (rollbackError != null) {
+        throw StateError('配置导入失败，且回滚失败：$error；$rollbackError');
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    _preloadSecureKeys();
+    _updateLocaleNotifier();
+  }
+
+  Future<void> _writePreference(
+      SharedPreferences prefs, String key, Object value) async {
+    final bool success;
+    if (value is String) {
+      success = await prefs.setString(key, value);
+    } else if (value is int) {
+      success = await prefs.setInt(key, value);
+    } else if (value is double) {
+      success = await prefs.setDouble(key, value);
+    } else if (value is bool) {
+      success = await prefs.setBool(key, value);
+    } else if (value is List<String>) {
+      success = await prefs.setStringList(key, value);
+    } else {
+      throw ArgumentError.value(value, key, '不支持的配置类型');
+    }
+    if (!success) {
+      throw StateError('写入 $key 失败');
+    }
+  }
+
   // --- Hotkey ---
 
   int get pttKeyCode => _prefs?.getInt(AppConstants.kKeyPttKeyCode) ?? AppConstants.kDefaultPttKeyCode;

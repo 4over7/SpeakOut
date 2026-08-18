@@ -428,30 +428,6 @@ class _DeveloperPageState extends State<DeveloperPage> {
               // 原来第一句就是 ScaffoldMessenger.of(context) —— macOS 根是 MacosApp
               // （基于 WidgetsApp），没有 ScaffoldMessenger 祖先，这里直接抛，
               // 对话框根本弹不出来：配置导出/导入整个功能坏死，不是"少个提示"。
-              // 导出前让用户选择是否包含密钥（默认不含，更安全）
-              final includeCreds = await showMacosAlertDialog<bool>(
-                context: context,
-                builder: (ctx) => MacosAlertDialog(
-                  appIcon: const MacosIcon(CupertinoIcons.lock_shield, size: 48),
-                  title: Text(loc.exportConfigDialogTitle),
-                  message: Text(
-                    loc.exportConfigDialogMsg,
-                    textAlign: TextAlign.center,
-                  ),
-                  primaryButton: PushButton(
-                    controlSize: ControlSize.large,
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: Text(loc.exportConfigWithout),
-                  ),
-                  secondaryButton: PushButton(
-                    controlSize: ControlSize.large,
-                    secondary: true,
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    child: Text(loc.exportConfigWith),
-                  ),
-                ),
-              );
-              if (includeCreds == null) return; // 用户关闭对话框
               final path = await FilePicker.platform.saveFile(
                 dialogTitle: loc.aboutExportFileTitle,
                 fileName: 'speakout_config.json',
@@ -459,9 +435,11 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 type: FileType.custom,
               );
               if (path != null) {
-                final result = await ConfigBackupService.exportToFile(path, includeCredentials: includeCreds);
+                final result = await ConfigBackupService.exportToFile(path);
                 result.success
-                    ? NotificationService().notifySuccess(loc.aboutExportSuccess(result.message))
+                    ? NotificationService().notifySuccess(
+                        loc.aboutExportSuccess(result.settingsCount),
+                      )
                     : NotificationService().notifyError(loc.aboutExportFailed(result.error ?? ''));
               }
             },
@@ -490,7 +468,12 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 if (!mounted) return;
                 setState(() {});
                 importResult.success
-                    ? NotificationService().notifySuccess(loc.aboutImportSuccess(importResult.message))
+                    ? NotificationService().notifySuccess(
+                        loc.aboutImportSuccess(
+                          importResult.settingsCount,
+                          importResult.credentialCount,
+                        ),
+                      )
                     : NotificationService().notifyError(loc.aboutImportFailed(importResult.error ?? ''));
               }
             },

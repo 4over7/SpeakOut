@@ -985,7 +985,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutExportConfig => '导出配置';
 
   @override
-  String get aboutExportConfigDesc => '导出所有设置到文件；是否包含 API 密钥会在导出前询问（默认不含）';
+  String get aboutExportConfigDesc => '导出所有设置到文件；API 密钥和本机标识不会导出';
 
   @override
   String get aboutExportAction => '导出';
@@ -1006,8 +1006,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutImportFileTitle => '选择配置文件';
 
   @override
-  String aboutExportSuccess(String msg) {
-    return '已导出：$msg';
+  String aboutExportSuccess(int count) {
+    return '已导出 $count 项设置';
   }
 
   @override
@@ -1016,8 +1016,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String aboutImportSuccess(String msg) {
-    return '$msg，配置已生效';
+  String aboutImportSuccess(int settingsCount, int credentialCount) {
+    return '已恢复 $settingsCount 项设置、$credentialCount 项凭证，配置已生效';
   }
 
   @override
@@ -1252,19 +1252,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get devResetOnboardingDone => '已重置，请重启应用';
 
   @override
-  String get exportConfigDialogTitle => '导出配置';
-
-  @override
-  String get exportConfigDialogMsg =>
-      '是否在导出文件中包含 API 密钥/凭证？\n包含便于换机迁移，但文件含明文敏感信息，请妥善保管。';
-
-  @override
-  String get exportConfigWithout => '不含密钥（推荐）';
-
-  @override
-  String get exportConfigWith => '包含密钥';
-
-  @override
   String get cloudAccountDelete => '删除账户';
 
   @override
@@ -1311,7 +1298,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String cloudAccountExportedN(Object count) {
-    return '已导出 $count 个云服务账户\n注意：文件含明文凭证，请妥善保管';
+    return '已导出 $count 个云服务账户（不含凭证值，导入后需补填）';
   }
 
   @override

@@ -397,18 +397,18 @@
   "aboutLoading": "Loading…",
   "aboutConfigBackup": "Config Backup",
   "aboutExportConfig": "Export Config",
-  "aboutExportConfigDesc": "Export all settings to a file. You'll be asked whether to include API keys (excluded by default).",
+  "aboutExportConfigDesc": "Export all settings to a file; API keys and machine-local identifiers are never exported",
   "aboutExportAction": "Export",
   "aboutExportFileTitle": "Export Config File",
   "aboutImportConfig": "Import Config",
   "aboutImportConfigDesc": "Restore all settings from a backup file, takes effect immediately",
   "aboutImportAction": "Import",
   "aboutImportFileTitle": "Choose Config File",
-  "aboutExportSuccess": "Exported: {msg}",
+  "aboutExportSuccess": "Exported {count} setting(s)",
   "@aboutExportSuccess": {
     "placeholders": {
-      "msg": {
-        "type": "String"
+      "count": {
+        "type": "int"
       }
     }
   },
@@ -420,11 +420,14 @@
       }
     }
   },
-  "aboutImportSuccess": "{msg}, config applied",
+  "aboutImportSuccess": "Restored {settingsCount} setting(s) and {credentialCount} credential(s); config applied",
   "@aboutImportSuccess": {
     "placeholders": {
-      "msg": {
-        "type": "String"
+      "settingsCount": {
+        "type": "int"
+      },
+      "credentialCount": {
+        "type": "int"
       }
     }
   },
@@ -564,10 +567,6 @@
   "devResetOnboardingConfirm": "The first-run setup (permissions, model choice) will run again on next launch. Cloud accounts, shortcuts and other settings are untouched.",
   "devResetOnboardingConfirmBtn": "Reset",
   "devResetOnboardingDone": "Reset — please restart the app",
-  "exportConfigDialogTitle": "Export Settings",
-  "exportConfigDialogMsg": "Include API keys / credentials in the exported file?\nIncluding them eases migration, but the file will contain plaintext secrets — store it safely.",
-  "exportConfigWithout": "Without keys (recommended)",
-  "exportConfigWith": "Include keys",
   "cloudAccountDelete": "Delete account",
   "cloudAccountDeleteConfirm": "Delete \"{name}\"? Its saved credentials will be removed. You can set it up again later.",
   "cloudAccountDeleted": "Account deleted",
@@ -586,7 +585,7 @@
   "cloudAccountExportTitle": "Export cloud accounts",
   "cloudAccountExportOk": "Export succeeded",
   "cloudAccountExportFail": "Export failed",
-  "cloudAccountExportedN": "Exported {count} cloud account(s)\nNote: the file contains plaintext credentials — store it safely",
+  "cloudAccountExportedN": "Exported {count} cloud account(s) without credential values; refill them after import",
   "cloudAccountWriteFail": "Failed to write file",
   "cloudAccountConfigure": "Configure",
   "cloudAccountEditShort": "Edit",

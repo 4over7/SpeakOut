@@ -30,7 +30,7 @@
 | `DiaryService` | `diary_service.dart` | 闪念笔记 Markdown 文件按天追加 |
 | `OverlayController` | `overlay_controller.dart` | 录音浮窗 MethodChannel（show/update/hide → AppDelegate）|
 | `NotificationService` | `notification_service.dart` | macOS 系统通知（应用内 + 横幅消息）|
-| `ConfigBackupService` | `config_backup_service.dart` | 配置导入/导出（JSON）。**默认不导出凭证** — 须显式 `includeCredentials=true` 才含密钥（v1.9.0 加固）|
+| `ConfigBackupService` | `config_backup_service.dart` | 配置导入/导出（JSON）。**永不导出凭证或本机标识**；导入先全量验证并在写失败时回滚 |
 
 ## 关键设计决策
 
@@ -62,7 +62,7 @@
 
 ### 5. 云账户凭证存储（⚠️ 当前为明文 SharedPreferences）
 **现状（2026-06-13 核实）**：云账户凭证（`cloud_cred_*`）、阿里云 AK/SK、LLM key 实际**仍明文存 SharedPreferences**（见 `cloud_account_service.dart`、`config_service._preloadSecureKeys`）。早期文档曾声称"已迁 keychain"，与实现不符，现更正为实话。
-- 配置导出默认排除凭证（`ConfigBackupService.exportToFile` 的 `includeCredentials` 默认 false）。
+- 配置和云账户导出都不包含凭证值；恢复到新设备后由用户重新填写。
 - updateAccount 会清理被移除的旧凭证 key（差集），避免残留 secret。
 - **TODO（需单独排期，不可顺手做）**：迁移到 `flutter_secure_storage`（macOS keychain）。涉及 entitlement 变更 + 现有明文数据迁移 + 公证签名验证，需专门测试与回滚方案。
 
@@ -112,7 +112,7 @@ CoreEngine 录音结束
 | `llm_service_test.dart` + `llm_blackbox_test.dart` | Golden prompt + 流式协议 + 三种 API 格式 |
 | `cloud_account_import_test.dart` | 账户导入/合并/回滚/凭证清理（27 例，写路径的主要安全网）|
 | `write_chain_discipline_test.dart` | **纪律测试**：链内代码不得再调公开写方法（会死锁，不是报错）|
-| `config_backup_service_test.dart` | 导出默认不含凭证 |
+| `config_backup_service_test.dart` | 导出永久排除凭证/本机标识，导入预校验与写失败回滚 |
 | `config_service_init_retry_test.dart` + `config_service_consistency_test.dart` | 初始化失败重试 + 成组字段一致性 |
 | `vocab_csv_test.dart` | CSV 引号/转义/空字段 |
 | `audio_device_service_test.dart` | 设备缓存、监听生命周期、回调非阻塞、提醒开关恢复 |
@@ -139,7 +139,7 @@ CoreEngine 录音结束
   要复用先补 Anthropic 分支和 `_cleanLlmOutput`
 - **`CloudAccountService` 的公开写方法只能从链外调** — 链内再调会把自己排到自己后面，
   表现是**卡死而不是报错**。规则由 `write_chain_discipline_test.dart` 守，加新写方法时同步加进它的名单
-- **`importFromFile` 现在会抛** — 文件读不了 / JSON 坏 / 不是账户导出格式都 rethrow。
+- **`CloudAccountService.importFromFile` 现在会抛** — 文件读不了 / JSON 坏 / 不是账户导出格式都 rethrow。
   UI 必须接住；早期它吞成 `return 0`，界面报「导入完成，0 条」，把用户指向完全错误的方向
 - **`correctTextStream` 有两条形态完全不同的路径** —— SSE 真流式（OpenAI 兼容）
   和「整段一次性 yield」的伪流式（Anthropic / Ollama）。改其中一条务必看另一条：

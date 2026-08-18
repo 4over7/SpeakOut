@@ -194,7 +194,7 @@ cd native_lib && clang -dynamiclib -framework Cocoa -framework Carbon \
 ## Security
 
 - **Offline Mode** — Audio never leaves your device
-- **Credentials** — API keys stored in SharedPreferences (local, not synced); export/backup includes plaintext keys with explicit user confirmation
+- **Credentials** — API keys are stored locally in SharedPreferences and are never included in configuration or account exports
 - **Logging** — User speech content never logged by default; developer mode logs may include input/output text for debugging
 - **Independent Review** — Passed 4 rounds of independent third-party security review
 
@@ -244,11 +244,11 @@ license.
 - **6 家云端 ASR** — 阿里云百炼（DashScope 实时）、Groq、OpenAI、火山引擎、讯飞、腾讯云
 - **12 家 LLM** — 百炼、DeepSeek、豆包、OpenAI、Claude、智谱、Kimi、MiniMax、Gemini、讯飞、Groq、Ollama 本地
 - **服务商预置** — 新用户打开云账户即可看到完整列表，点击配置即用
-- **账户导入/导出** — 跨设备迁移，JSON 格式，**含明文凭证**（与「配置备份」不同，后者默认排除密钥）
+- **账户导入/导出** — 跨设备迁移账户结构，JSON 格式；不含凭证值，导入后需重新填写
 
 ### 专业词汇 & 安全
 - **行业词典 + 个人词库** — 术语注入 LLM 实现领域感知
-- **API 密钥本地存储** — SharedPreferences，不上云、不同步；导出备份含明文密钥需用户确认
+- **API 密钥本地存储** — SharedPreferences，不上云、不同步；配置与账户导出均不包含密钥值
 - **签名公证** — Developer ID 签名 + Apple 公证，下载双击即用，无 Gatekeeper 警告
 
 ## 产品截图

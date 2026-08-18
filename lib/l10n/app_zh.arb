@@ -357,18 +357,18 @@
   "aboutLoading": "加载中…",
   "aboutConfigBackup": "配置备份",
   "aboutExportConfig": "导出配置",
-  "aboutExportConfigDesc": "导出所有设置到文件；是否包含 API 密钥会在导出前询问（默认不含）",
+  "aboutExportConfigDesc": "导出所有设置到文件；API 密钥和本机标识不会导出",
   "aboutExportAction": "导出",
   "aboutExportFileTitle": "导出配置文件",
   "aboutImportConfig": "导入配置",
   "aboutImportConfigDesc": "从备份文件恢复所有设置，立即生效",
   "aboutImportAction": "导入",
   "aboutImportFileTitle": "选择配置文件",
-  "aboutExportSuccess": "已导出：{msg}",
+  "aboutExportSuccess": "已导出 {count} 项设置",
   "@aboutExportSuccess": {
     "placeholders": {
-      "msg": {
-        "type": "String"
+      "count": {
+        "type": "int"
       }
     }
   },
@@ -380,11 +380,14 @@
       }
     }
   },
-  "aboutImportSuccess": "{msg}，配置已生效",
+  "aboutImportSuccess": "已恢复 {settingsCount} 项设置、{credentialCount} 项凭证，配置已生效",
   "@aboutImportSuccess": {
     "placeholders": {
-      "msg": {
-        "type": "String"
+      "settingsCount": {
+        "type": "int"
+      },
+      "credentialCount": {
+        "type": "int"
       }
     }
   },
@@ -524,10 +527,6 @@
   "devResetOnboardingConfirm": "下次启动会重新走一遍首次引导（权限、选模型）。不影响云账户、快捷键等任何配置。",
   "devResetOnboardingConfirmBtn": "重置",
   "devResetOnboardingDone": "已重置，请重启应用",
-  "exportConfigDialogTitle": "导出配置",
-  "exportConfigDialogMsg": "是否在导出文件中包含 API 密钥/凭证？\n包含便于换机迁移，但文件含明文敏感信息，请妥善保管。",
-  "exportConfigWithout": "不含密钥（推荐）",
-  "exportConfigWith": "包含密钥",
   "cloudAccountDelete": "删除账户",
   "cloudAccountDeleteConfirm": "确定删除「{name}」？该服务商保存的凭证会一并清除，之后可重新配置。",
   "cloudAccountDeleted": "账户已删除",
@@ -546,7 +545,7 @@
   "cloudAccountExportTitle": "导出云服务账户",
   "cloudAccountExportOk": "导出成功",
   "cloudAccountExportFail": "导出失败",
-  "cloudAccountExportedN": "已导出 {count} 个云服务账户\n注意：文件含明文凭证，请妥善保管",
+  "cloudAccountExportedN": "已导出 {count} 个云服务账户（不含凭证值，导入后需补填）",
   "cloudAccountWriteFail": "写入文件失败",
   "cloudAccountConfigure": "配置",
   "cloudAccountEditShort": "编辑",

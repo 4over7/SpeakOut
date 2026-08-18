@@ -106,6 +106,26 @@ class CloudAccountService {
     _initialized = true;
   }
 
+  /// 配置备份写入前校验持久化账户结构，避免 reload 吞掉格式错误后清空运行时账户。
+  static void validateStoredAccountsJson(String source) {
+    final decoded = jsonDecode(source);
+    if (decoded is! List) {
+      throw const FormatException('cloud_accounts 必须是数组');
+    }
+    for (final item in decoded) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException('cloud_accounts 条目格式无效');
+      }
+      CloudAccount.fromJson(item);
+      final credentialKeys = item['credentialKeys'];
+      if (credentialKeys != null &&
+          (credentialKeys is! List ||
+              credentialKeys.any((key) => key is! String))) {
+        throw const FormatException('cloud_accounts credentialKeys 格式无效');
+      }
+    }
+  }
+
   /// 仅供测试：模拟「进程重启后尚未 init」—— 清内存与初始化标志，不动磁盘。
   @visibleForTesting
   void debugResetForTest() {

@@ -1967,7 +1967,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutExportConfigDesc.
   ///
   /// In en, this message translates to:
-  /// **'Export all settings to a file. You\'ll be asked whether to include API keys (excluded by default).'**
+  /// **'Export all settings to a file; API keys and machine-local identifiers are never exported'**
   String get aboutExportConfigDesc;
 
   /// No description provided for @aboutExportAction.
@@ -2009,8 +2009,8 @@ abstract class AppLocalizations {
   /// No description provided for @aboutExportSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Exported: {msg}'**
-  String aboutExportSuccess(String msg);
+  /// **'Exported {count} setting(s)'**
+  String aboutExportSuccess(int count);
 
   /// No description provided for @aboutExportFailed.
   ///
@@ -2021,8 +2021,8 @@ abstract class AppLocalizations {
   /// No description provided for @aboutImportSuccess.
   ///
   /// In en, this message translates to:
-  /// **'{msg}, config applied'**
-  String aboutImportSuccess(String msg);
+  /// **'Restored {settingsCount} setting(s) and {credentialCount} credential(s); config applied'**
+  String aboutImportSuccess(int settingsCount, int credentialCount);
 
   /// No description provided for @aboutImportFailed.
   ///
@@ -2444,30 +2444,6 @@ abstract class AppLocalizations {
   /// **'Reset — please restart the app'**
   String get devResetOnboardingDone;
 
-  /// No description provided for @exportConfigDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Export Settings'**
-  String get exportConfigDialogTitle;
-
-  /// No description provided for @exportConfigDialogMsg.
-  ///
-  /// In en, this message translates to:
-  /// **'Include API keys / credentials in the exported file?\nIncluding them eases migration, but the file will contain plaintext secrets — store it safely.'**
-  String get exportConfigDialogMsg;
-
-  /// No description provided for @exportConfigWithout.
-  ///
-  /// In en, this message translates to:
-  /// **'Without keys (recommended)'**
-  String get exportConfigWithout;
-
-  /// No description provided for @exportConfigWith.
-  ///
-  /// In en, this message translates to:
-  /// **'Include keys'**
-  String get exportConfigWith;
-
   /// No description provided for @cloudAccountDelete.
   ///
   /// In en, this message translates to:
@@ -2549,7 +2525,7 @@ abstract class AppLocalizations {
   /// No description provided for @cloudAccountExportedN.
   ///
   /// In en, this message translates to:
-  /// **'Exported {count} cloud account(s)\nNote: the file contains plaintext credentials — store it safely'**
+  /// **'Exported {count} cloud account(s) without credential values; refill them after import'**
   String cloudAccountExportedN(Object count);
 
   /// No description provided for @cloudAccountWriteFail.

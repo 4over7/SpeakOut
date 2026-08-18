@@ -1038,7 +1038,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutExportConfigDesc =>
-      'Export all settings to a file. You\'ll be asked whether to include API keys (excluded by default).';
+      'Export all settings to a file; API keys and machine-local identifiers are never exported';
 
   @override
   String get aboutExportAction => 'Export';
@@ -1060,8 +1060,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutImportFileTitle => 'Choose Config File';
 
   @override
-  String aboutExportSuccess(String msg) {
-    return 'Exported: $msg';
+  String aboutExportSuccess(int count) {
+    return 'Exported $count setting(s)';
   }
 
   @override
@@ -1070,8 +1070,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String aboutImportSuccess(String msg) {
-    return '$msg, config applied';
+  String aboutImportSuccess(int settingsCount, int credentialCount) {
+    return 'Restored $settingsCount setting(s) and $credentialCount credential(s); config applied';
   }
 
   @override
@@ -1320,19 +1320,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get devResetOnboardingDone => 'Reset — please restart the app';
 
   @override
-  String get exportConfigDialogTitle => 'Export Settings';
-
-  @override
-  String get exportConfigDialogMsg =>
-      'Include API keys / credentials in the exported file?\nIncluding them eases migration, but the file will contain plaintext secrets — store it safely.';
-
-  @override
-  String get exportConfigWithout => 'Without keys (recommended)';
-
-  @override
-  String get exportConfigWith => 'Include keys';
-
-  @override
   String get cloudAccountDelete => 'Delete account';
 
   @override
@@ -1380,7 +1367,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String cloudAccountExportedN(Object count) {
-    return 'Exported $count cloud account(s)\nNote: the file contains plaintext credentials — store it safely';
+    return 'Exported $count cloud account(s) without credential values; refill them after import';
   }
 
   @override
