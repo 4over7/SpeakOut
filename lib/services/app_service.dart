@@ -113,10 +113,8 @@ class AppService {
     AppLog.enabled = enabled;
     AppLog.logSensitive = ConfigService().logSensitiveContent;
     final dir = ConfigService().logDirectory;
-    if (dir.isNotEmpty) {
-      AppLog.customLogDirectory = dir;
-      engine.nativeInput?.setLogDirectory(dir);
-    }
+    AppLog.customLogDirectory = dir.isEmpty ? null : dir;
+    engine.nativeInput?.setLogDirectory(dir);
     if (enabled) {
       await AppLog.init();
     } else {

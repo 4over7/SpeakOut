@@ -32,6 +32,7 @@ class AppLog {
 
   static IOSink? _sink;
   static bool _initAttempted = false;
+  static Future<void> _operationQueue = Future.value();
   static String? _activeLogDirectory; // 当前生效的日志目录
   // ignore: unused_field — held to prevent GC
   static Timer? _flushTimer;
@@ -40,23 +41,36 @@ class AppLog {
   static String? customLogDirectory;
 
   /// Initialize log file. Called at startup and when log directory changes.
-  static Future<void> init() async {
-    // 如果目录没变且已初始化，跳过
-    if (_initAttempted && customLogDirectory == _activeLogDirectory) return;
-    // 关闭旧 sink
-    if (_sink != null) {
-      try { await _sink!.flush(); _sink!.close(); } catch (_) {}
-      _sink = null;
-    }
-    // 取消旧 flush timer（切换日志目录重建时避免 timer 泄漏 + 重复 flush）
+  static Future<void> init() {
+    final requestedDirectory = customLogDirectory;
+    return _enqueue(() async {
+      if (_initAttempted && requestedDirectory == _activeLogDirectory) return;
+      await _initialize(requestedDirectory);
+    });
+  }
+
+  static Future<void> _enqueue(Future<void> Function() operation) {
+    final future = _operationQueue.then((_) => operation());
+    _operationQueue = future;
+    return future;
+  }
+
+  static Future<void> _initialize(String? requestedDirectory) async {
     _flushTimer?.cancel();
     _flushTimer = null;
-    _initAttempted = true;
-    _activeLogDirectory = customLogDirectory;
+    // 关闭旧 sink
+    if (_sink != null) {
+      try {
+        await _sink!.flush();
+        await _sink!.close();
+      } catch (_) {}
+      _sink = null;
+    }
+    _initAttempted = false;
     try {
       final Directory dir;
-      if (customLogDirectory != null && customLogDirectory!.isNotEmpty) {
-        dir = Directory(customLogDirectory!);
+      if (requestedDirectory != null && requestedDirectory.isNotEmpty) {
+        dir = Directory(requestedDirectory);
         if (!dir.existsSync()) {
           dir.createSync(recursive: true);
         }
@@ -69,13 +83,18 @@ class AppLog {
         file.writeAsStringSync('');
       }
       _sink = file.openWrite(mode: FileMode.append);
-      _sink!.writeln('\n=== SpeakOut started at ${DateTime.now().toIso8601String()} ===');
+      _sink!.writeln(
+        '\n=== SpeakOut started at ${DateTime.now().toIso8601String()} ===',
+      );
       // Periodic flush every 500ms
       _flushTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
         _safeFlush();
       });
+      _activeLogDirectory = requestedDirectory;
+      _initAttempted = true;
     } catch (_) {
       _sink = null;
+      _activeLogDirectory = null;
     }
   }
 
@@ -84,18 +103,26 @@ class AppLog {
   static void _safeFlush() {
     if (_sink == null || _flushing) return;
     _flushing = true;
-    _sink!.flush().then((_) {
-      _flushing = false;
-    }).catchError((_) {
-      _flushing = false;
-    });
+    _sink!
+        .flush()
+        .then((_) {
+          _flushing = false;
+        })
+        .catchError((_) {
+          _flushing = false;
+        });
   }
 
-  static Future<void> dispose() async {
+  static Future<void> dispose() => _enqueue(_dispose);
+
+  static Future<void> _dispose() async {
     _flushTimer?.cancel();
     _flushTimer = null;
     if (_sink != null) {
-      try { await _sink!.flush(); _sink!.close(); } catch (_) {}
+      try {
+        await _sink!.flush();
+        await _sink!.close();
+      } catch (_) {}
       _sink = null;
     }
     _initAttempted = false;

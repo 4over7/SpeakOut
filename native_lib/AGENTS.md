@@ -120,6 +120,9 @@ native_input.m
 （不碰用户剪贴板）、宏掉 `CGEventPost`（不发真按键）。由
 `test/engine/native_tx_harness_test.dart` 编译并运行。
 
+其他需要验证 native 内部状态转换的窄场景也使用独立可执行宿主，放在 `native_lib/tests/`，
+由 `test/engine/` 中的 Dart 测试负责编译运行；不要用源码文本断言代替行为测试。
+
 ## 不要做什么
 
 - ❌ **不要在原生层加业务逻辑** — 这层只暴露原生能力，业务判断放 Engine 层

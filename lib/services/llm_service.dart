@@ -84,15 +84,15 @@ class LLMService {
 
     // 2. Fall back to existing preset system
     final presetId = ConfigService().llmPresetId;
-    final preset = AppConstants.kLlmPresets.firstWhere(
-      (p) => p.id == presetId,
-      orElse: () => AppConstants.kLlmPresets.last,
-    );
+    final presetProvider = CloudProviders.getById(presetId);
+    final isAnthropic =
+        presetId == 'custom_anthropic' ||
+        presetProvider?.llmApiFormat == LlmApiFormat.anthropic;
     return (
       apiKey: ConfigService().llmApiKey,
       baseUrl: ConfigService().llmBaseUrl,
       model: ConfigService().llmModel,
-      isAnthropic: preset.apiFormat == LlmApiFormat.anthropic,
+      isAnthropic: isAnthropic,
     );
   }
 

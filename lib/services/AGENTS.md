@@ -55,6 +55,8 @@
 - 入口在 `correctText()` / `correctTextStream()`。⚠️ 分流是**两段式**，别只看枚举：
   先判 `providerType == 'ollama'` → 走 `_correctTextOllama()`；**其余**才按
   `provider.llmApiFormat` 分流，而 `enum LlmApiFormat` **只有 `openai` / `anthropic`**（无 ollama 成员）
+- 云账户不可用而退回旧配置时，协议仍按 `CloudProviders` 的 provider metadata 判断；
+  `AppConstants.kLlmPresets` 不是当前 provider 注册表，不能拿缺项后的默认条目决定协议
 - 模型特定参数（如 V4 thinking off）通过 `_applyModelSpecificParams()` helper 注入
 
 ### 4. 流式 stream 在 dispose() 时必须关
@@ -101,7 +103,7 @@ CoreEngine 录音结束
 - ❌ **不要 new singleton 第二个实例**（`LLMService.new()`） — 用 `LLMService()` 拿全局
 - ❌ **新加 service 必须实现 `dispose()`** — 关 stream / 取消 timer
 - ❌ **不要在 service 内 `import 'package:flutter/material.dart'`** — service 层无 UI 依赖
-- ❌ **不要用 `print()`** — 日志走 `AppLog.d/i/w/e`（在 `lib/config/app_log.dart`）
+- ❌ **不要用 `print()`** — 普通调试走 `AppLog.d`，默认也必须落盘的稀少错误走 `AppLog.e`
 
 ## 测试
 
@@ -118,10 +120,11 @@ CoreEngine 录音结束
 | `audio_device_service_test.dart` | 设备缓存、监听生命周期、回调非阻塞、提醒开关恢复 |
 | `think_tag_filter_test.dart` | 流式剥 `<think>`（标签被 delta 切成两半的各种形态）|
 | `llm_stream_failure_test.dart` | 流式中断不得重复吐原文 / 残留行不丢 / 伪流式也要清 think |
+| `llm_legacy_fallback_format_test.dart` | 云账户失效后，旧 provider 配置仍选择正确的 OpenAI/Anthropic 协议 |
 
 测试中 ConfigService 用 setter 重置（singleton 不能 fresh new）。
 
-> **无单测的 service**（改动时没有安全网，靠手动验证）：`BillingService`、
+> **几乎无单测的 service**（改动时安全网很窄）：`BillingService`、
 > `AppService`、`OverlayController`、`UpdateService` 的安装脚本部分
 > （`update_service_test.dart` 只覆盖版本比较与校验，不覆盖 helper 脚本执行）。
 

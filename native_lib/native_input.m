@@ -84,17 +84,28 @@ void set_debug_logging(int enabled) {
   // 200ms 空转一次的开销 —— 此时 ring 已无写入，handler 立刻返回。
 }
 
-// Log file path — defaults to ~/Downloads/speakout_native.log
+// Log file path — defaults to Application Support/speakout_native.log
 // Override via set_log_directory()
 static char logFilePath[1024] = {0};
+static pthread_mutex_t logPathMutex = PTHREAD_MUTEX_INITIALIZER;
 
 void set_log_directory(const char *dir) {
-  if (dir == NULL || dir[0] == 0) return;
-  snprintf(logFilePath, sizeof(logFilePath), "%s/speakout_native.log", dir);
+  pthread_mutex_lock(&logPathMutex);
+  if (dir == NULL || dir[0] == 0) {
+    logFilePath[0] = '\0';
+  } else {
+    snprintf(logFilePath, sizeof(logFilePath), "%s/speakout_native.log", dir);
+  }
+  pthread_mutex_unlock(&logPathMutex);
 }
 
-static char *get_log_path() {
-  if (logFilePath[0] != 0) return logFilePath;
+static void get_log_path(char *buffer, size_t size) {
+  pthread_mutex_lock(&logPathMutex);
+  if (logFilePath[0] != 0) {
+    snprintf(buffer, size, "%s", logFilePath);
+    pthread_mutex_unlock(&logPathMutex);
+    return;
+  }
   // Default: ~/Library/Application Support/com.speakout.speakout/speakout_native.log
   // (与 Dart 层 AppLog 的 speakout.log 在同一目录)
   static char defaultPath[512] = {0};
@@ -107,7 +118,8 @@ static char *get_log_path() {
     snprintf(defaultPath, sizeof(defaultPath),
              "%s/Library/Application Support/com.speakout.speakout/speakout_native.log", home);
   }
-  return defaultPath;
+  snprintf(buffer, size, "%s", defaultPath);
+  pthread_mutex_unlock(&logPathMutex);
 }
 
 void log_to_file(const char *fmt, ...) {
@@ -118,7 +130,9 @@ void log_to_file(const char *fmt, ...) {
   va_list args_copy;
   va_copy(args_copy, args);
 
-  FILE *f = fopen(get_log_path(), "a");
+  char logPath[1024];
+  get_log_path(logPath, sizeof(logPath));
+  FILE *f = fopen(logPath, "a");
   if (f) {
     time_t now;
     time(&now);
