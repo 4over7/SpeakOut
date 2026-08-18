@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speakout/services/llm_service.dart';
 
@@ -100,6 +102,51 @@ void main() {
     final f = ThinkTagFilter();
     // 没有任何疑似标签前缀时，喂进去就该立刻出来
     expect(f.add('立刻输出'), '立刻输出');
+  });
+
+  /// 最关键的一条：**流式和非流式必须给出同样的结果**。
+  ///
+  /// 非流式走 `_cleanLlmOutput` 的一次性正则，流式走这个状态机。
+  /// 两者不一致的话，同一个模型「开打字机」和「不开打字机」出来的文字就不一样 ——
+  /// 这种差异极难在手工冒烟里发现。
+  ///
+  /// 用固定种子随机切分，覆盖状态机在任意位置被打断的情形。
+  test('任意切分下都与非流式的一次性正则结果一致', () {
+    // 非流式那边的等价实现（llm_service._cleanLlmOutput 的正则部分）
+    String oneShot(String t) => t
+        .replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</?think>', caseSensitive: false), '');
+
+    const samples = [
+      '你好世界',
+      '<think>思考</think>正文',
+      '前<think>中</think>后<think>再</think>尾',
+      'a<think></think>b',
+      '正文</think>更多',
+      '<THINK>大写</Think>混合',
+      '含 < 和 > 的普通文本',
+      '<thinkx>不是标签</thinkx>',
+    ];
+    final rnd = Random(20260818);
+
+    for (final text in samples) {
+      for (var trial = 0; trial < 40; trial++) {
+        // 随机切成若干段
+        final cuts = <int>{0, text.length};
+        final n = rnd.nextInt(4) + 1;
+        for (var i = 0; i < n; i++) {
+          cuts.add(rnd.nextInt(text.length + 1));
+        }
+        final sorted = cuts.toList()..sort();
+        final deltas = [
+          for (var i = 0; i + 1 < sorted.length; i++)
+            text.substring(sorted[i], sorted[i + 1])
+        ];
+
+        expect(run(deltas), oneShot(text),
+            reason: '文本 "$text" 按 $deltas 切分后，流式结果与非流式不一致');
+      }
+    }
   });
 
   test('think 段里的内容一个字都不许提前泄漏', () {
