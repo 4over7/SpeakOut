@@ -177,6 +177,14 @@ void _connectionErrorTests() {
         reason: '直接 jsonDecode 非 JSON 响应，用户看到的是解析错误而不是网关错误');
   });
 
+  test('error 是字符串（部分代理/Ollama 的形态）也要提取出来', () async {
+    final (ok, msg) = await testWith(
+        403, utf8.encode(jsonEncode({'error': 'insufficient_quota'})));
+    expect(ok, isFalse);
+    expect(msg, '403: insufficient_quota',
+        reason: '只认 error.message 的话，这种形态会退化成打印整段 JSON');
+  });
+
   test('超长错误体要截断，不能整页 HTML 糊到弹窗里', () async {
     final (_, msg) = await testWith(500, utf8.encode('x' * 5000));
     expect(msg.length, lessThan(300));

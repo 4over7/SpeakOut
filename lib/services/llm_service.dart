@@ -644,14 +644,18 @@ class LLMService {
     try {
       final body = jsonDecode(raw);
       if (body is Map) {
-        final msg = body['error']?['message'] ?? body['message'];
+        // error 两种形态都有：`{"error":{"message":"..."}}`（OpenAI 系）
+        // 和 `{"error":"invalid_api_key"}`（部分代理 / Ollama）。
+        // 只认前者的话，后者会 fall through 到打印整段 JSON。
+        final err = body['error'];
+        final msg = (err is Map ? err['message'] : err) ?? body['message'];
         if (msg != null) return '${resp.statusCode}: $msg';
       }
     } catch (_) {
       // 不是 JSON，退回原文
     }
     final trimmed = raw.trim();
-    const maxLen = 200; // 网关的 HTML 错误页可能很长，截断
+    const maxLen = AppConstants.kHttpErrorBodyMaxChars;
     return '${resp.statusCode}: '
         '${trimmed.length > maxLen ? '${trimmed.substring(0, maxLen)}…' : trimmed}';
   }

@@ -220,6 +220,8 @@ class AppConstants {
   /// 超时回调返回的是**空文本**。内层不留余量的话，引擎先放弃，
   /// provider 好不容易攒下的部分文本一起被丢掉 —— 用户看到的是「一个字都没有」。
   static const Duration kAsrFinalFrameWait = Duration(seconds: 4);
+  /// 失败响应体展示给用户时的截断长度（网关的 HTML 错误页可能有几千字）
+  static const int kHttpErrorBodyMaxChars = 200;
   /// 错误信息在悬浮窗显示的持续时间
   static const Duration kErrorDisplayDuration = Duration(seconds: 4);
   /// 成功提示显示时间
